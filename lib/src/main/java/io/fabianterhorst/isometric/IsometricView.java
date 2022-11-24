@@ -96,7 +96,6 @@ public class IsometricView extends View {
         super(context, attrs, defStyleAttr);
     }
 
-    @androidx.annotation.RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public IsometricView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
     }
