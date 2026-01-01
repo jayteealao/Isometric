@@ -5,14 +5,14 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import io.fabianterhorst.isometric.Color;
-import io.fabianterhorst.isometric.Isometric;
-import io.fabianterhorst.isometric.IsometricView;
 import io.fabianterhorst.isometric.Path;
 import io.fabianterhorst.isometric.Point;
+import io.fabianterhorst.isometric.RenderCommand;
 import io.fabianterhorst.isometric.shapes.Octahedron;
 import io.fabianterhorst.isometric.shapes.Prism;
 import io.fabianterhorst.isometric.shapes.Pyramid;
 import io.fabianterhorst.isometric.shapes.Stairs;
+import io.fabianterhorst.isometric.view.IsometricView;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
         IsometricView isometricView = findViewById(R.id.isometricView);
         isometricView.setClickListener(new IsometricView.OnItemClickListener() {
             @Override
-            public void onClick(@NonNull Isometric.Item item) {
+            public void onClick(@NonNull RenderCommand item) {
 
             }
         });

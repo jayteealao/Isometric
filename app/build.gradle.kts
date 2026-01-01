@@ -1,18 +1,18 @@
 plugins {
-    id("com.android.library")
+    id("com.android.application")
     kotlin("android")
-    id("app.cash.paparazzi") version "1.3.0"
 }
 
 android {
-    namespace = "io.fabianterhorst.isometric.compose"
+    namespace = "io.fabianterhorst.isometric.sample"
     compileSdk = 33
 
     defaultConfig {
+        applicationId = "io.fabianterhorst.isometric.sample"
         minSdk = 24
         targetSdk = 33
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 1
+        versionName = "1.0"
     }
 
     buildTypes {
@@ -44,23 +44,20 @@ android {
 }
 
 dependencies {
-    // Core module
-    api(project(":isometric-core"))
+    // New modularized dependencies
+    implementation(project(":isometric-android-view"))  // For View-based samples
+    implementation(project(":isometric-compose"))       // For Compose samples
+
+    // Android
+    implementation("androidx.appcompat:appcompat:1.5.1")
+    implementation("androidx.activity:activity-ktx:1.6.1")
 
     // Compose
     val composeVersion = "1.3.1"
     implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.foundation:foundation:$composeVersion")
-    implementation("androidx.compose.runtime:runtime:$composeVersion")
+    implementation("androidx.compose.material:material:$composeVersion")
     implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
-
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("com.google.truth:truth:1.1.3")
-    androidTestImplementation("androidx.test.ext:junit:1.1.4")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:$composeVersion")
+    implementation("androidx.activity:activity-compose:1.6.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:$composeVersion")
 }

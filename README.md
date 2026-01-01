@@ -1,23 +1,112 @@
 # Isometric
 Isometric drawing library for Android
 
-### Drawing a simple cube
+**Now with Jetpack Compose support!** 🎉
+
+## Architecture
+
+The library is now modularized into three packages:
+
+- **:isometric-core** - Platform-agnostic rendering engine (pure Kotlin/JVM)
+- **:isometric-compose** - Jetpack Compose UI components
+- **:isometric-android-view** - Traditional Android View support
+
+## Installation
+
+### Gradle (Kotlin DSL)
+
+For **Jetpack Compose** support:
+```kotlin
+dependencies {
+    implementation("io.fabianterhorst:isometric-compose:0.1.0")
+}
+```
+
+For **traditional View** support:
+```kotlin
+dependencies {
+    implementation("io.fabianterhorst:isometric-android-view:0.1.0")
+}
+```
+
+### Gradle (Groovy)
+
+For **Jetpack Compose** support:
+```groovy
+implementation 'io.fabianterhorst:isometric-compose:0.1.0'
+```
+
+For **traditional View** support:
+```groovy
+implementation 'io.fabianterhorst:isometric-android-view:0.1.0'
+```
+
+## Quick Start
+
+### Compose (Recommended)
+
+```kotlin
+@Composable
+fun MyIsometricScene() {
+    IsometricCanvas {
+        add(
+            Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0),
+            IsoColor(33.0, 150.0, 243.0)
+        )
+    }
+}
+```
+
+### Traditional View
 
 ```java
 isometricView.add(
-	new Prism(
-		new Point(/* x */ 0, /* y */ 0, /* z */ 0), 
-		/* width */ 1, /* length */ 1, /* height */ 1
-	), 
-	new Color(33, 150, 243)
+    new Prism(new Point(0, 0, 0), 1, 1, 1),
+    new Color(33, 150, 243)
+);
+```
+
+For complete Compose documentation, see [README_COMPOSE.md](README_COMPOSE.md).
+
+---
+
+## Examples
+
+### Drawing a simple cube
+
+**Compose:**
+```kotlin
+IsometricCanvas {
+    add(
+        Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0),
+        IsoColor(33.0, 150.0, 243.0)
+    )
+}
+```
+
+**View:**
+```java
+isometricView.add(
+    new Prism(new Point(0, 0, 0), 1, 1, 1),
+    new Color(33, 150, 243)
 );
 ```
 
 ![Image](https://github.com/FabianTerhorst/Isometric/blob/master/lib/screenshots/io.fabianterhorst.isometric.screenshot.IsometricViewTest_doScreenshotOne.png?raw=true)
 
 ### Drawing multiple Shapes
-#### There are 3 basic components: points, paths and shapes. A shape needs an origin point and 3 measurements for the x, y and z axes. The default Prism constructor is setting all measurements to 1.
+#### There are 3 basic components: points, paths and shapes. A shape needs an origin point and 3 measurements for the x, y and z axes. The default Prism constructor sets all measurements to 1.
 
+**Compose:**
+```kotlin
+IsometricCanvas {
+    add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+    add(Prism(Point(-1.0, 1.0, 0.0), 1.0, 2.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+    add(Prism(Point(1.0, -1.0, 0.0), 2.0, 1.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+}
+```
+
+**View:**
 ```java
 isometricView.add(new Prism(new Point(0, 0, 0)), new Color(33, 150, 243));
 isometricView.add(new Prism(new Point(-1, 1, 0), 1, 2, 1), new Color(33, 150, 243));
@@ -50,10 +139,46 @@ isometricView.add(new Path(new Point[]{
 
 ![Image](https://github.com/FabianTerhorst/Isometric/blob/master/lib/screenshots/io.fabianterhorst.isometric.screenshot.IsometricViewTest_doScreenshotThree.png?raw=true)
 
-# Include in your project
-## Using JCenter
-```groovy
-compile 'io.fabianterhorst:Isometric:0.0.9'
+## Advanced Features
+
+### Animation (Compose)
+
+```kotlin
+@Composable
+fun AnimatedScene() {
+    val sceneState = rememberIsometricSceneState()
+    var angle by remember { mutableStateOf(0.0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(16) // ~60fps
+            angle += PI / 90
+        }
+    }
+
+    LaunchedEffect(angle) {
+        sceneState.clear()
+        sceneState.add(
+            Octahedron(Point(0.0, 0.0, 0.0)).rotateZ(Point.ORIGIN, angle),
+            IsoColor(33.0, 150.0, 243.0)
+        )
+    }
+
+    IsometricCanvas(state = sceneState)
+}
+```
+
+### Interactive Scenes (Compose)
+
+```kotlin
+IsometricCanvas(
+    onItemClick = { item ->
+        println("Clicked item: ${item.id}")
+    }
+) {
+    add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+    add(Pyramid(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
+}
 ```
 
 ### Available Shapes
