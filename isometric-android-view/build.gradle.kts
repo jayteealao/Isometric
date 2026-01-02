@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "io.fabianterhorst.isometric.view"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 24

@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "io.fabianterhorst.isometric.compose"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 24
@@ -39,7 +39,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.3.1"
+        kotlinCompilerExtensionVersion = "1.5.0"
     }
 }
 
@@ -48,7 +48,7 @@ dependencies {
     api(project(":isometric-core"))
 
     // Compose
-    val composeVersion = "1.3.1"
+    val composeVersion = "1.5.0"
     implementation("androidx.compose.ui:ui:$composeVersion")
     implementation("androidx.compose.foundation:foundation:$composeVersion")
     implementation("androidx.compose.runtime:runtime:$composeVersion")

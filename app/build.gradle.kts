@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "io.fabianterhorst.isometric.sample"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "io.fabianterhorst.isometric.sample"
@@ -39,7 +39,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.3.1"
+        kotlinCompilerExtensionVersion = "1.5.0"
     }
 }
 
