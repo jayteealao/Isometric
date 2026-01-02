@@ -171,7 +171,7 @@ fun AnimatedSample() {
         )
     }
 
-    IsometricCanvas(state = sceneState)
+    IsometricCanvas(state = sceneState) {}
 }
 
 @Composable

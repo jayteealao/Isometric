@@ -53,10 +53,10 @@ object ComposeRenderer {
      */
     fun IsoColor.toComposeColor(): Color {
         return Color(
-            red = (r / 255f).coerceIn(0f, 1f),
-            green = (g / 255f).coerceIn(0f, 1f),
-            blue = (b / 255f).coerceIn(0f, 1f),
-            alpha = (a / 255f).coerceIn(0f, 1f)
+            red = (r.toFloat() / 255f).coerceIn(0f, 1f),
+            green = (g.toFloat() / 255f).coerceIn(0f, 1f),
+            blue = (b.toFloat() / 255f).coerceIn(0f, 1f),
+            alpha = (a.toFloat() / 255f).coerceIn(0f, 1f)
         )
     }
 
