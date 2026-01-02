@@ -13,6 +13,7 @@ data class Point(
     val z: Double = 0.0
 ) {
     companion object {
+        @JvmField
         val ORIGIN = Point(0.0, 0.0, 0.0)
 
         /**

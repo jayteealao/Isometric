@@ -1,13 +1,9 @@
 plugins {
-    kotlin("jvm") version "1.7.10"
+    kotlin("jvm")
 }
 
 group = "io.fabianterhorst"
 version = "1.0.0"
-
-repositories {
-    mavenCentral()
-}
 
 dependencies {
     // Pure Kotlin/JVM - NO Android dependencies
@@ -16,11 +12,13 @@ dependencies {
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.7.10")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.0")
 }
 
 kotlin {
-    jvmToolchain(8)
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
 }
 
 tasks.test {

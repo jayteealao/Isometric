@@ -83,7 +83,7 @@ class IsometricEngine(
         val commands = mutableListOf<RenderCommand>()
 
         // Transform all items to 2D screen space
-        val transformed Items = items.mapNotNull { item ->
+        val transformedItems = items.mapNotNull { item ->
             val transformedPoints = item.path.points.map { point ->
                 translatePoint(point, originX, originY)
             }

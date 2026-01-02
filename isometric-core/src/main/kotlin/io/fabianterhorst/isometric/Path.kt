@@ -3,7 +3,7 @@ package io.fabianterhorst.isometric
 /**
  * Represents a 2D path (polygon face) in 3D space
  */
-data class Path(
+open class Path(
     val points: List<Point>
 ) {
     constructor(vararg points: Point) : this(points.toList())

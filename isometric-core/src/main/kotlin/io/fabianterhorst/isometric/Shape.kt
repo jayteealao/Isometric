@@ -3,7 +3,7 @@ package io.fabianterhorst.isometric
 /**
  * Represents a 3D shape composed of multiple 2D paths (faces)
  */
-data class Shape(
+open class Shape(
     val paths: List<Path>
 ) {
     constructor(vararg paths: Path) : this(paths.toList())
