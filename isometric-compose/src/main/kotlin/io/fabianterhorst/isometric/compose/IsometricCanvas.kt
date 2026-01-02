@@ -4,7 +4,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -39,22 +42,29 @@ fun IsometricCanvas(
     val scope = remember(state) { IsometricScopeImpl(state) }
     scope.content()
 
+    // Track canvas size for hit testing
+    var canvasWidth by remember { mutableStateOf(800) }
+    var canvasHeight by remember { mutableStateOf(600) }
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(state.currentVersion) {
+            .pointerInput(state.currentVersion, canvasWidth, canvasHeight) {
                 detectTapGestures { offset ->
-                    handleTap(state, offset, renderOptions, onItemClick)
+                    handleTap(state, offset, canvasWidth, canvasHeight, renderOptions, onItemClick)
                 }
             }
     ) {
-        val preparedScene = remember(size, state.currentVersion, renderOptions) {
-            state.engine.prepare(
-                width = size.width.toInt(),
-                height = size.height.toInt(),
-                options = renderOptions
-            )
-        }
+        // Update canvas size
+        canvasWidth = size.width.toInt()
+        canvasHeight = size.height.toInt()
+
+        // Prepare scene using current canvas size
+        val preparedScene = state.engine.prepare(
+            width = canvasWidth,
+            height = canvasHeight,
+            options = renderOptions
+        )
 
         with(ComposeRenderer) {
             renderIsometric(preparedScene, strokeWidth, drawStroke)
@@ -68,12 +78,13 @@ fun IsometricCanvas(
 private fun handleTap(
     state: IsometricSceneState,
     offset: Offset,
+    canvasWidth: Int,
+    canvasHeight: Int,
     renderOptions: RenderOptions,
     onItemClick: (RenderCommand) -> Unit
 ) {
-    // Need to prepare scene to get commands for hit testing
-    // This is a simplified approach - ideally we'd cache the last prepared scene
-    val tempScene = state.engine.prepare(800, 600, renderOptions)
+    // Prepare scene with actual canvas dimensions for accurate hit testing
+    val tempScene = state.engine.prepare(canvasWidth, canvasHeight, renderOptions)
     val hit = state.engine.findItemAt(
         preparedScene = tempScene,
         x = offset.x.toDouble(),
