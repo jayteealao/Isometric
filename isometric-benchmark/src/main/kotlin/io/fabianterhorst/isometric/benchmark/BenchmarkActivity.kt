@@ -66,7 +66,8 @@ class BenchmarkActivity : ComponentActivity() {
             sceneSize = 100,
             scenario = Scenario.STATIC,
             interactionPattern = InteractionPattern.NONE,
-            flags = OptimizationFlags.BASELINE
+            flags = OptimizationFlags.BASELINE,  // Cache OFF for true baseline
+            numberOfRuns = 3  // Multi-run averaging
         )
     }
 
