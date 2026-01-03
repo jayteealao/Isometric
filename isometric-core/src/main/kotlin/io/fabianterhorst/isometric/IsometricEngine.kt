@@ -90,6 +90,19 @@ class IsometricEngine(
         height: Int,
         options: RenderOptions = RenderOptions.Default
     ): PreparedScene {
+        // For now, just delegate to internal implementation
+        // Cache logic will be added in next task
+        return prepareSceneInternal(width, height, options)
+    }
+
+    /**
+     * Internal implementation that performs scene transformation
+     */
+    private fun prepareSceneInternal(
+        width: Int,
+        height: Int,
+        options: RenderOptions
+    ): PreparedScene {
         val originX = width / 2.0
         val originY = height * 0.9
 
