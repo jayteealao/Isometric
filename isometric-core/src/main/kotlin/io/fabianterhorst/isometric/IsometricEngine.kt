@@ -81,19 +81,17 @@ class IsometricEngine(
      * @param sceneVersion Cache invalidation key that should increment when scene content changes
      * @param width Viewport width in pixels
      * @param height Viewport height in pixels
-     * @param options Rendering configuration options
-     * @param enableCache Whether to use PreparedScene caching (default true)
+     * @param options Rendering configuration options (includes cache toggle)
      * @return Platform-agnostic PreparedScene with sorted render commands
      */
     fun prepare(
         sceneVersion: Int,
         width: Int,
         height: Int,
-        options: RenderOptions = RenderOptions.Default,
-        enableCache: Boolean = true
+        options: RenderOptions = RenderOptions.Default
     ): PreparedScene {
         // Fast path: cache hit (zero allocations) - only if cache enabled
-        if (enableCache &&
+        if (options.enablePreparedSceneCache &&
             cachedScene != null &&
             sceneVersion == cachedVersion &&
             width == cachedWidth &&
@@ -106,7 +104,7 @@ class IsometricEngine(
         val scene = prepareSceneInternal(width, height, options)
 
         // Update cache only if enabled
-        if (enableCache) {
+        if (options.enablePreparedSceneCache) {
             cachedScene = scene
             cachedVersion = sceneVersion
             cachedWidth = width
