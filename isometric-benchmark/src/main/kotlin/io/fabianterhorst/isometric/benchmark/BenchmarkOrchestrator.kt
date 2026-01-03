@@ -59,18 +59,21 @@ class BenchmarkOrchestrator(
     }
 
     private suspend fun runFrames(count: Int, measure: Boolean) {
+        var previousFrameTime = 0L
+
         repeat(count) { frameIndex ->
             framePacer.awaitNextFrame { frameTimeNanos ->
-                if (measure) {
-                    metrics.onFrameStart(frameTimeNanos)
+                // Measure time between consecutive frame callbacks
+                // This includes composition + layout + draw time
+                if (measure && frameIndex > 0) {
+                    val frameDuration = frameTimeNanos - previousFrameTime
+                    metrics.recordFrameDuration(frameDuration)
                 }
 
-                // Trigger recomposition
+                previousFrameTime = frameTimeNanos
+
+                // Trigger recomposition for NEXT frame
                 _frameTickFlow.value = frameIndex
-
-                if (measure) {
-                    metrics.onFrameEnd(System.nanoTime())
-                }
             }
         }
     }

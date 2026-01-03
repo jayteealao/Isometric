@@ -3,23 +3,17 @@ package io.fabianterhorst.isometric.benchmark
 class MetricsCollector {
     // Pre-allocated arrays for zero allocation during measurement
     private val frameTimes = LongArray(500)
-    private val frameTimesMs = DoubleArray(500) // Pre-allocated working array
+    private val frameTimesMs = DoubleArray(500)
     private var frameCount = 0
-    private var currentFrameStart = 0L
 
-    fun onFrameStart(frameTimeNanos: Long) {
-        currentFrameStart = frameTimeNanos
-    }
-
-    fun onFrameEnd(frameTimeNanos: Long) {
-        val duration = frameTimeNanos - currentFrameStart
-        require(duration >= 0) {
-            "Negative frame duration: ${duration}ns. Start=${currentFrameStart}ns, End=${frameTimeNanos}ns"
+    fun recordFrameDuration(durationNanos: Long) {
+        require(durationNanos >= 0) {
+            "Negative frame duration: ${durationNanos}ns"
         }
         require(frameCount < frameTimes.size) {
             "Frame buffer overflow! Attempted to record frame ${frameCount + 1} but buffer size is ${frameTimes.size}"
         }
-        frameTimes[frameCount] = duration
+        frameTimes[frameCount] = durationNanos
         frameCount++
     }
 
@@ -37,7 +31,7 @@ class MetricsCollector {
             frameTimesMs[i] = frameTimes[i] / 1_000_000.0
         }
 
-        // Sort in-place (zero allocation beyond internal temp arrays)
+        // Sort in-place
         frameTimesMs.sort(0, frameCount)
 
         // Calculate average
@@ -60,7 +54,6 @@ class MetricsCollector {
     }
 
     private fun calculatePercentile(percentile: Double): Double {
-        if (frameCount == 0) return 0.0
         if (frameCount == 1) return frameTimesMs[0]
 
         val rank = percentile * (frameCount - 1)
