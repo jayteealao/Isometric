@@ -1,6 +1,7 @@
 package io.fabianterhorst.isometric
 
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
@@ -105,5 +106,55 @@ class PreparedSceneCacheTest {
         val scene2 = engine.prepare(sceneVersion = 1, width = 100, height = 100, options = options2)
 
         assertNotSame(scene1, scene2)
+    }
+
+    @Test
+    fun `cache works for empty scene`() {
+        val engine = IsometricEngine()
+        // No items added
+
+        val scene1 = engine.prepare(sceneVersion = 1, width = 100, height = 100)
+        val scene2 = engine.prepare(sceneVersion = 1, width = 100, height = 100)
+
+        assertSame(scene1, scene2)
+        assertEquals(0, scene1.commands.size)
+    }
+
+    @Test
+    fun `cache miss every frame on rapid version changes`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.RED)
+
+        val scenes = (1..10).map { version ->
+            engine.prepare(sceneVersion = version, width = 100, height = 100)
+        }
+
+        // All different instances (cache miss every time)
+        scenes.forEach { scene1 ->
+            scenes.forEach { scene2 ->
+                if (scene1 !== scene2) {
+                    assertNotSame(scene1, scene2)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `cache uses reference equality for RenderOptions`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.RED)
+
+        val options = RenderOptions.Default
+
+        val scene1 = engine.prepare(sceneVersion = 1, width = 100, height = 100, options = options)
+        val scene2 = engine.prepare(sceneVersion = 1, width = 100, height = 100, options = options)
+
+        // Same reference = cache hit
+        assertSame(scene1, scene2)
+
+        // Different instance (even if structurally equal) = cache miss
+        val optionsCopy = RenderOptions.Default
+        val scene3 = engine.prepare(sceneVersion = 1, width = 100, height = 100, options = optionsCopy)
+        assertNotSame(scene1, scene3)
     }
 }
