@@ -29,6 +29,13 @@ class IsometricEngine(
     private val items = mutableListOf<SceneItem>()
     private var nextId = 0
 
+    // Cache state (zero-allocation checking)
+    private var cachedScene: PreparedScene? = null
+    private var cachedVersion: Int = -1
+    private var cachedWidth: Int = -1
+    private var cachedHeight: Int = -1
+    private var cachedOptions: RenderOptions? = null
+
     init {
         transformation = arrayOf(
             doubleArrayOf(
