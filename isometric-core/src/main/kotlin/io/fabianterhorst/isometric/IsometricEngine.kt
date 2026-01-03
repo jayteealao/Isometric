@@ -82,16 +82,19 @@ class IsometricEngine(
      * @param width Viewport width in pixels
      * @param height Viewport height in pixels
      * @param options Rendering configuration options
+     * @param enableCache Whether to use PreparedScene caching (default true)
      * @return Platform-agnostic PreparedScene with sorted render commands
      */
     fun prepare(
         sceneVersion: Int,
         width: Int,
         height: Int,
-        options: RenderOptions = RenderOptions.Default
+        options: RenderOptions = RenderOptions.Default,
+        enableCache: Boolean = true
     ): PreparedScene {
-        // Fast path: cache hit (zero allocations)
-        if (cachedScene != null &&
+        // Fast path: cache hit (zero allocations) - only if cache enabled
+        if (enableCache &&
+            cachedScene != null &&
             sceneVersion == cachedVersion &&
             width == cachedWidth &&
             height == cachedHeight &&
@@ -102,12 +105,14 @@ class IsometricEngine(
         // Slow path: cache miss - prepare scene
         val scene = prepareSceneInternal(width, height, options)
 
-        // Update cache
-        cachedScene = scene
-        cachedVersion = sceneVersion
-        cachedWidth = width
-        cachedHeight = height
-        cachedOptions = options
+        // Update cache only if enabled
+        if (enableCache) {
+            cachedScene = scene
+            cachedVersion = sceneVersion
+            cachedWidth = width
+            cachedHeight = height
+            cachedOptions = options
+        }
 
         return scene
     }
