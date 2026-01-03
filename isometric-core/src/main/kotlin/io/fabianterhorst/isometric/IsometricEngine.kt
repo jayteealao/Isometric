@@ -90,8 +90,9 @@ class IsometricEngine(
         height: Int,
         options: RenderOptions = RenderOptions.Default
     ): PreparedScene {
-        // Fast path: cache hit (zero allocations)
-        if (cachedScene != null &&
+        // Fast path: cache hit (zero allocations) - only if cache enabled
+        if (options.enablePreparedSceneCache &&
+            cachedScene != null &&
             sceneVersion == cachedVersion &&
             width == cachedWidth &&
             height == cachedHeight &&
@@ -102,12 +103,14 @@ class IsometricEngine(
         // Slow path: cache miss - prepare scene
         val scene = prepareSceneInternal(width, height, options)
 
-        // Update cache
-        cachedScene = scene
-        cachedVersion = sceneVersion
-        cachedWidth = width
-        cachedHeight = height
-        cachedOptions = options
+        // Update cache only if enabled
+        if (options.enablePreparedSceneCache) {
+            cachedScene = scene
+            cachedVersion = sceneVersion
+            cachedWidth = width
+            cachedHeight = height
+            cachedOptions = options
+        }
 
         return scene
     }

@@ -150,7 +150,8 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
         RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = true,
-            enableBoundsChecking = false  // Baseline: render ALL objects for worst-case measurement
+            enableBoundsChecking = false,  // Baseline: render ALL objects for worst-case measurement
+            enablePreparedSceneCache = config.flags.enablePreparedSceneCache
         )
     }
 

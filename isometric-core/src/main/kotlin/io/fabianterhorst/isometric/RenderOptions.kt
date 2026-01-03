@@ -6,11 +6,13 @@ package io.fabianterhorst.isometric
  * @property enableDepthSorting Enable complex intersection-based depth sorting (slower but correct)
  * @property enableBackfaceCulling Remove back-facing polygons (improves performance)
  * @property enableBoundsChecking Remove polygons outside viewport bounds (improves performance)
+ * @property enablePreparedSceneCache Cache prepared scenes to avoid redundant transformation (improves performance for static scenes)
  */
 data class RenderOptions(
     val enableDepthSorting: Boolean = true,
     val enableBackfaceCulling: Boolean = true,
-    val enableBoundsChecking: Boolean = true
+    val enableBoundsChecking: Boolean = true,
+    val enablePreparedSceneCache: Boolean = true
 ) {
     companion object {
         /**
@@ -25,7 +27,8 @@ data class RenderOptions(
         val Performance = RenderOptions(
             enableDepthSorting = false,
             enableBackfaceCulling = true,
-            enableBoundsChecking = true
+            enableBoundsChecking = true,
+            enablePreparedSceneCache = true
         )
 
         /**
@@ -34,7 +37,8 @@ data class RenderOptions(
         val Quality = RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
-            enableBoundsChecking = false     // Render everything
+            enableBoundsChecking = false,    // Render everything
+            enablePreparedSceneCache = true
         )
     }
 }
