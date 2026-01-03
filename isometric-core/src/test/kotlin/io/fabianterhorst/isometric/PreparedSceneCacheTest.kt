@@ -37,4 +37,22 @@ class PreparedSceneCacheTest {
 
         assertNotNull(scene)
     }
+
+    @Test
+    fun `prepareSceneInternal is callable internally`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.RED)
+
+        // Access via reflection since it's private
+        val method = engine.javaClass.getDeclaredMethod(
+            "prepareSceneInternal",
+            Int::class.java,
+            Int::class.java,
+            RenderOptions::class.java
+        )
+        method.isAccessible = true
+
+        val scene = method.invoke(engine, 100, 100, RenderOptions.Default) as PreparedScene
+        assertNotNull(scene)
+    }
 }
