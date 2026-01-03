@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.compose.IsometricCanvas
 import io.fabianterhorst.isometric.compose.rememberIsometricSceneState
 import kotlinx.coroutines.delay
@@ -93,25 +94,36 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
 
     // Apply scene mutations based on scenario
     LaunchedEffect(frameTick) {
-        when (config.scenario) {
+        // Determine if scene needs rebuilding
+        val needsRebuild = when (config.scenario) {
             Scenario.STATIC -> {
-                // No mutations
+                // STATIC: Only rebuild on first frame to establish initial scene
+                // All subsequent frames use cached PreparedScene (version unchanged)
+                frameTick == 0
             }
             Scenario.INCREMENTAL_1 -> {
-                SceneGenerator.mutateScene(baseScene, 0.01f, frameTick)
+                // Mutate 1% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 0.01f, frameTick)
+                true  // Always rebuild (initial setup + after mutations)
             }
             Scenario.INCREMENTAL_10 -> {
-                SceneGenerator.mutateScene(baseScene, 0.10f, frameTick)
+                // Mutate 10% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 0.10f, frameTick)
+                true
             }
             Scenario.FULL_MUTATION -> {
-                SceneGenerator.mutateScene(baseScene, 1.0f, frameTick)
+                // Mutate 100% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 1.0f, frameTick)
+                true
             }
         }
 
-        // Rebuild scene
-        sceneState.clear()
-        baseScene.forEach { item ->
-            sceneState.add(item.shape, item.color)
+        // Only rebuild scene when it actually changed
+        if (needsRebuild) {
+            sceneState.clear()
+            baseScene.forEach { item ->
+                sceneState.add(item.shape, item.color)
+            }
         }
     }
 
@@ -132,9 +144,20 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
         }
     }
 
+    // CRITICAL: Create RenderOptions once and reuse across all frames
+    // Cache uses reference equality (===) for performance, so new instances = cache miss
+    val renderOptions = remember {
+        RenderOptions(
+            enableDepthSorting = true,
+            enableBackfaceCulling = true,
+            enableBoundsChecking = false  // Baseline: render ALL objects for worst-case measurement
+        )
+    }
+
     IsometricCanvas(
         state = sceneState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        renderOptions = renderOptions
     ) {
         // Scene already built in LaunchedEffect
     }
