@@ -90,9 +90,26 @@ class IsometricEngine(
         height: Int,
         options: RenderOptions = RenderOptions.Default
     ): PreparedScene {
-        // For now, just delegate to internal implementation
-        // Cache logic will be added in next task
-        return prepareSceneInternal(width, height, options)
+        // Fast path: cache hit (zero allocations)
+        if (cachedScene != null &&
+            sceneVersion == cachedVersion &&
+            width == cachedWidth &&
+            height == cachedHeight &&
+            options === cachedOptions) {
+            return cachedScene!!
+        }
+
+        // Slow path: cache miss - prepare scene
+        val scene = prepareSceneInternal(width, height, options)
+
+        // Update cache
+        cachedScene = scene
+        cachedVersion = sceneVersion
+        cachedWidth = width
+        cachedHeight = height
+        cachedOptions = options
+
+        return scene
     }
 
     /**
