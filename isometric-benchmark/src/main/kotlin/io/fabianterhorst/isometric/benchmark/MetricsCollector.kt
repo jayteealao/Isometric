@@ -3,6 +3,7 @@ package io.fabianterhorst.isometric.benchmark
 class MetricsCollector {
     // Pre-allocated arrays for zero allocation during measurement
     private val frameTimes = LongArray(500)
+    private val frameTimesMs = DoubleArray(500) // Pre-allocated working array
     private var frameCount = 0
     private var currentFrameStart = 0L
 
@@ -12,10 +13,14 @@ class MetricsCollector {
 
     fun onFrameEnd(frameTimeNanos: Long) {
         val duration = frameTimeNanos - currentFrameStart
-        if (frameCount < frameTimes.size) {
-            frameTimes[frameCount] = duration
-            frameCount++
+        require(duration >= 0) {
+            "Negative frame duration: ${duration}ns. Start=${currentFrameStart}ns, End=${frameTimeNanos}ns"
         }
+        require(frameCount < frameTimes.size) {
+            "Frame buffer overflow! Attempted to record frame ${frameCount + 1} but buffer size is ${frameTimes.size}"
+        }
+        frameTimes[frameCount] = duration
+        frameCount++
     }
 
     fun reset() {
@@ -23,20 +28,46 @@ class MetricsCollector {
     }
 
     fun computeResults(config: BenchmarkConfig): BenchmarkResults {
-        // Convert to milliseconds and sort
-        val frameTimesMs = frameTimes.take(frameCount)
-            .map { it / 1_000_000.0 }
-            .sorted()
+        require(frameCount > 0) {
+            "Cannot compute results with zero frames. Did the benchmark run properly?"
+        }
+
+        // Convert in-place (zero allocation)
+        for (i in 0 until frameCount) {
+            frameTimesMs[i] = frameTimes[i] / 1_000_000.0
+        }
+
+        // Sort in-place (zero allocation beyond internal temp arrays)
+        frameTimesMs.sort(0, frameCount)
+
+        // Calculate average
+        var sum = 0.0
+        for (i in 0 until frameCount) {
+            sum += frameTimesMs[i]
+        }
+        val avg = sum / frameCount
 
         return BenchmarkResults(
             config = config,
             frameCount = frameCount,
-            avgFrameTime = frameTimesMs.average(),
-            p50FrameTime = frameTimesMs[frameCount / 2],
-            p95FrameTime = frameTimesMs[(frameCount * 0.95).toInt()],
-            p99FrameTime = frameTimesMs[(frameCount * 0.99).toInt()],
-            minFrameTime = frameTimesMs.first(),
-            maxFrameTime = frameTimesMs.last()
+            avgFrameTime = avg,
+            p50FrameTime = calculatePercentile(0.50),
+            p95FrameTime = calculatePercentile(0.95),
+            p99FrameTime = calculatePercentile(0.99),
+            minFrameTime = frameTimesMs[0],
+            maxFrameTime = frameTimesMs[frameCount - 1]
         )
+    }
+
+    private fun calculatePercentile(percentile: Double): Double {
+        if (frameCount == 0) return 0.0
+        if (frameCount == 1) return frameTimesMs[0]
+
+        val rank = percentile * (frameCount - 1)
+        val lowerIndex = rank.toInt()
+        val upperIndex = (lowerIndex + 1).coerceAtMost(frameCount - 1)
+        val fraction = rank - lowerIndex
+
+        return frameTimesMs[lowerIndex] + fraction * (frameTimesMs[upperIndex] - frameTimesMs[lowerIndex])
     }
 }
