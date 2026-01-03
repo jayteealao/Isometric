@@ -54,9 +54,9 @@ LaunchedEffect(frameTick) {  // Runs EVERY frame
 
 ---
 
-## Measured Results (WITH BUG)
+## Measured Results
 
-### Smoke Test Results
+### BEFORE Fixes (WITH BUGS)
 
 | Scenario | Size | Avg (ms) | P50 (ms) | P90 (ms) | P99 (ms) |
 |----------|------|----------|----------|----------|----------|
@@ -64,7 +64,23 @@ LaunchedEffect(frameTick) {  // Runs EVERY frame
 | **STATIC** | 100 | 116.80 | 116.67 | 133.33 | 150.00 |
 | **MUTATION** | 100 | 89.01 | 116.67 | 133.33 | 150.00 |
 
-**Anomaly:** MUTATION (89ms) is faster than STATIC (117ms)! This confirms cache is NOT hitting.
+**Anomaly:** MUTATION (89ms) faster than STATIC (117ms)! Confirmed cache not hitting.
+
+---
+
+### AFTER Fixes (BUGS FIXED)
+
+| Scenario | Size | Avg (ms) | P50 (ms) | P90 (ms) | P99 (ms) | Improvement |
+|----------|------|----------|----------|----------|----------|-------------|
+| **STATIC** | 10 | 18.84 | 16.67 | 33.33 | 50.00 | N/A |
+| **STATIC** | 100 | **17.77** | 16.67 | 33.33 | 33.33 | **84.8%** ✅ |
+| **MUTATION** | 100 | 17.60 | 16.67 | 16.67 | 33.33 | 80.2% |
+| **STATIC** + interaction | 100 | 17.74 | 16.67 | 33.33 | 33.33 | **84.8%** ✅ |
+
+**Success Criteria:**
+- ✅ STATIC 100: 17.77ms avg < 20ms target
+- ✅ Improvement: 84.8% reduction (exceeds 70% target)
+- ✅ Cache validated and working correctly
 
 ---
 
