@@ -21,4 +21,20 @@ class PreparedSceneCacheTest {
         assertNotNull(cachedHeightField)
         assertNotNull(cachedOptionsField)
     }
+
+    @Test
+    fun `prepare accepts sceneVersion parameter`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.RED)
+
+        // Should compile and run with sceneVersion parameter
+        val scene = engine.prepare(
+            sceneVersion = 1,
+            width = 100,
+            height = 100,
+            options = RenderOptions.Default
+        )
+
+        assertNotNull(scene)
+    }
 }

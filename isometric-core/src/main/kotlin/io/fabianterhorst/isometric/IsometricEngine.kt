@@ -80,6 +80,7 @@ class IsometricEngine(
      * Returns a platform-agnostic PreparedScene with sorted render commands
      */
     fun prepare(
+        sceneVersion: Int,
         width: Int,
         height: Int,
         options: RenderOptions = RenderOptions.Default
