@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.compose.IsometricCanvas
 import io.fabianterhorst.isometric.compose.rememberIsometricSceneState
 import kotlinx.coroutines.delay
@@ -134,7 +135,12 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
 
     IsometricCanvas(
         state = sceneState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        renderOptions = RenderOptions(
+            enableDepthSorting = true,
+            enableBackfaceCulling = true,
+            enableBoundsChecking = false  // Baseline: render ALL objects for worst-case measurement
+        )
     ) {
         // Scene already built in LaunchedEffect
     }
