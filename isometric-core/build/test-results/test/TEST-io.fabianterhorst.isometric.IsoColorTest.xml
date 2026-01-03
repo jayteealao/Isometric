@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.fabianterhorst.isometric.IsoColorTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-03T11:04:04" hostname="DRAGON" time="0.001">
+  <properties/>
+  <testcase name="RGB to HSL conversion" classname="io.fabianterhorst.isometric.IsoColorTest" time="0.0"/>
+  <testcase name="lighten increases lightness" classname="io.fabianterhorst.isometric.IsoColorTest" time="0.0"/>
+  <testcase name="toRGBA converts correctly" classname="io.fabianterhorst.isometric.IsoColorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

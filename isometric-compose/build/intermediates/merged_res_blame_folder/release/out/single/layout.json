@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "io.fabianterhorst.isometric.compose.isometric-compose-merged_res-35:/layout/notification_template_part_chronometer.xml",
+        "source": "io.fabianterhorst.isometric.compose.isometric-compose-core-1.10.0-3:/layout/notification_template_part_chronometer.xml"
+    },
+    {
+        "merged": "io.fabianterhorst.isometric.compose.isometric-compose-merged_res-35:/layout/custom_dialog.xml",
+        "source": "io.fabianterhorst.isometric.compose.isometric-compose-core-1.10.0-3:/layout/custom_dialog.xml"
+    },
+    {
+        "merged": "io.fabianterhorst.isometric.compose.isometric-compose-merged_res-35:/layout/notification_template_part_time.xml",
+        "source": "io.fabianterhorst.isometric.compose.isometric-compose-core-1.10.0-3:/layout/notification_template_part_time.xml"
+    }
+]

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.fabianterhorst.isometric.PathTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-03T11:04:04" hostname="DRAGON" time="0.0">
+  <properties/>
+  <testcase name="reverse reverses point order" classname="io.fabianterhorst.isometric.PathTest" time="0.0"/>
+  <testcase name="depth calculates average" classname="io.fabianterhorst.isometric.PathTest" time="0.0"/>
+  <testcase name="translate moves all points" classname="io.fabianterhorst.isometric.PathTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
