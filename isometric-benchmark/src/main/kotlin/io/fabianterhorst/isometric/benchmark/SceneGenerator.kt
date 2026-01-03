@@ -8,7 +8,7 @@ import io.fabianterhorst.isometric.shapes.Prism
 import io.fabianterhorst.isometric.shapes.Pyramid
 import kotlin.random.Random
 
-data class SceneItem(
+class SceneItem(
     val shape: Shape,
     val color: IsoColor,
     var position: Point  // Mutable for incremental updates
@@ -37,8 +37,8 @@ object SceneGenerator {
             val position = Point(x, y, z)
 
             val shape = when (i % 3) {
-                0 -> Prism(position)
-                1 -> Pyramid(position)
+                0 -> Prism(position, dx = 1.0, dy = 1.0, dz = 1.0)
+                1 -> Pyramid(position, dx = 1.0, dy = 1.0, dz = 1.0)
                 else -> Cylinder(position, radius = 0.5, vertices = 20, height = 2.0)
             }
 
@@ -54,21 +54,27 @@ object SceneGenerator {
 
     /**
      * Mutate a percentage of scene items (for incremental update tests)
+     *
+     * WARNING: This function allocates new Point objects for each mutation.
+     * Benchmark scenarios using this function will include allocation/GC overhead
+     * in their measurements. This is intentional for testing real-world mutation patterns.
+     *
+     * @param mutationRate 0.01 = 1%, 0.10 = 10%
      */
     fun mutateScene(
         scene: List<SceneItem>,
-        mutationRate: Float,  // 0.01 = 1%, 0.10 = 10%
+        mutationRate: Float,
         frameIndex: Int,
         seed: Long = 67890L
     ) {
         val random = Random(seed + frameIndex)
         val itemsToMutate = (scene.size * mutationRate).toInt()
 
-        repeat(itemsToMutate) {
-            val index = random.nextInt(scene.size)
-            val item = scene[index]
+        // Shuffle indices to ensure unique mutations
+        val indices = scene.indices.toMutableList().apply { shuffle(random) }
 
-            // Slightly offset position
+        indices.take(itemsToMutate).forEach { index ->
+            val item = scene[index]
             item.position = Point(
                 item.position.x + random.nextDouble(-0.1, 0.1),
                 item.position.y + random.nextDouble(-0.1, 0.1),
