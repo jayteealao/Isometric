@@ -77,7 +77,12 @@ class IsometricEngine(
 
     /**
      * Prepare the scene for rendering at the given viewport size
-     * Returns a platform-agnostic PreparedScene with sorted render commands
+     *
+     * @param sceneVersion Cache invalidation key that should increment when scene content changes
+     * @param width Viewport width in pixels
+     * @param height Viewport height in pixels
+     * @param options Rendering configuration options
+     * @return Platform-agnostic PreparedScene with sorted render commands
      */
     fun prepare(
         sceneVersion: Int,
