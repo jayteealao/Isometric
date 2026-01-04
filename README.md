@@ -64,13 +64,15 @@ fun MyIsometricScene() {
 ```
 
 **Features:**
-- 🚀 7-20x faster animations
+- 🚀 7-20x faster animations with automatic optimizations
 - 🌲 Hierarchical transformations with `Group`
-- 🎯 Advanced gesture handling
+- 🎯 Advanced gesture handling (tap, drag, custom)
 - ⚡ Dirty tracking for efficient updates
 - 🎨 CompositionLocal theming support
+- 💾 Path caching enabled by default (30-40% less GC)
+- 🔍 Spatial indexing for 7-25x faster hit testing
 
-📖 **[See Runtime API Documentation](RUNTIME_API.md)**
+📖 **[See Runtime API Documentation](docs/RUNTIME_API.md)** | ⚡ **[Performance Guide](docs/PERFORMANCE_OPTIMIZATIONS.md)**
 
 ### Compose - High-Level API (Simple scenes)
 
@@ -97,11 +99,13 @@ isometricView.add(
 );
 ```
 
-### Documentation
+## Documentation
 
-- 📘 [**Runtime API Guide**](RUNTIME_API.md) - Complete reference for the new runtime-level API
-- 📗 [**Primitive Levels**](PRIMITIVE_LEVELS.md) - Understanding high-level vs low-level API
-- 📙 [**Compose README**](README_COMPOSE.md) - Original Compose documentation
+- 📘 [**Runtime API Guide**](docs/RUNTIME_API.md) - Complete reference for the runtime-level API
+- 📗 [**Primitive Levels**](docs/PRIMITIVE_LEVELS.md) - Understanding high-level vs low-level API usage
+- ⚡ [**Performance Optimizations**](docs/PERFORMANCE_OPTIMIZATIONS.md) - Detailed optimization guide with benchmarks
+- 📊 [**Optimization Summary**](docs/OPTIMIZATION_SUMMARY.md) - Quick reference for performance features
+- 🔄 [**Migration Guide**](docs/MIGRATION.md) - Migrating from View API to Compose
 
 ---
 
@@ -167,7 +171,7 @@ ComposeNode<ShapeNode, IsometricApplier>(...) {
 }
 ```
 
-📖 See [**PRIMITIVE_LEVELS.md**](PRIMITIVE_LEVELS.md) for details.
+📖 See [**PRIMITIVE_LEVELS.md**](docs/PRIMITIVE_LEVELS.md) for details.
 
 ---
 
