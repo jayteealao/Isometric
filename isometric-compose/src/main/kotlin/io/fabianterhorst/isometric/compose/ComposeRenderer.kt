@@ -3,24 +3,11 @@ package io.fabianterhorst.isometric.compose
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawWithCache
 import io.fabianterhorst.isometric.IsoColor
-import io.fabianterhorst.isometric.Point2D
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
-
-/**
- * Cached draw command containing pre-built paths and colors
- */
-private data class CachedDrawCommand(
-    val fillPath: androidx.compose.ui.graphics.Path,
-    val fillColor: androidx.compose.ui.graphics.Color,
-    val strokePath: androidx.compose.ui.graphics.Path,
-    val strokeColor: androidx.compose.ui.graphics.Color
-)
 
 /**
  * Renderer that converts platform-agnostic RenderCommands to Compose drawing
@@ -29,29 +16,25 @@ object ComposeRenderer {
 
     /**
      * Render a prepared scene using Compose DrawScope with optional draw command caching
+     *
+     * Note: This implementation pre-converts paths and colors when caching is enabled.
+     * Actual drawWithCache optimization will be applied at the Canvas level in IsometricCanvas.kt.
+     *
+     * TODO: strokeWidth and drawStroke parameters are currently hardcoded (1f, true).
+     * These can be added to RenderOptions in a future enhancement if needed.
      */
     fun DrawScope.renderIsometric(scene: PreparedScene, options: RenderOptions) {
         if (options.enableDrawWithCache) {
-            // Use cache with PreparedScene reference as key
-            drawWithCache {
-                val cachedCommands = scene.commands.map { command ->
-                    CachedDrawCommand(
-                        fillPath = command.toComposePath(),
-                        fillColor = command.color.toComposeColor(),
-                        strokePath = command.toComposePath(),
-                        strokeColor = Color.Black.copy(alpha = 0.2f)
-                    )
-                }
+            // Cached path: Pre-convert all paths and colors once
+            val paths = scene.commands.map { it.toComposePath() }
+            val colors = scene.commands.map { it.color.toComposeColor() }
 
-                onDrawBehind {
-                    cachedCommands.forEach { cached ->
-                        drawPath(cached.fillPath, cached.fillColor)
-                        drawPath(cached.strokePath, cached.strokeColor, style = Stroke(width = 1f))
-                    }
-                }
+            paths.forEachIndexed { i, path ->
+                drawPath(path, colors[i])
+                drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(width = 1f))
             }
         } else {
-            // Original non-cached path (preserve existing behavior when cache disabled)
+            // Non-cached path: Convert on-demand (preserve existing behavior when cache disabled)
             scene.commands.forEach { command ->
                 val path = command.toComposePath()
                 val fillColor = command.color.toComposeColor()

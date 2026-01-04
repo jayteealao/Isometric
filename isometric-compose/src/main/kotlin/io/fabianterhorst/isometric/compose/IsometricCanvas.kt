@@ -68,7 +68,7 @@ fun IsometricCanvas(
         )
 
         with(ComposeRenderer) {
-            renderIsometric(preparedScene, strokeWidth, drawStroke)
+            renderIsometric(preparedScene, renderOptions)
         }
     }
 }
