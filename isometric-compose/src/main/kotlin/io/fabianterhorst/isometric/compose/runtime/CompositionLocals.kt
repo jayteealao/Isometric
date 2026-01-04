@@ -1,5 +1,6 @@
 package io.fabianterhorst.isometric.compose.runtime
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.RenderOptions
@@ -42,7 +43,10 @@ val LocalDrawStroke = compositionLocalOf {
 
 /**
  * CompositionLocal for providing a color palette
+ *
+ * Marked as @Immutable to prevent unnecessary recomposition when instances don't change
  */
+@Immutable
 data class ColorPalette(
     val primary: IsoColor = IsoColor(33.0, 150.0, 243.0),
     val secondary: IsoColor = IsoColor(255.0, 100.0, 0.0),

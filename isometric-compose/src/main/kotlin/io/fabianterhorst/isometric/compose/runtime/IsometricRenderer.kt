@@ -85,9 +85,12 @@ class IsometricRenderer(
             rebuildCache(rootNode, context, width, height)
         }
 
-        // FAST PATH: Render from cached paths (no allocations!)
+        // FAST PATH: Render from cached paths (minimal allocations!)
         if (enablePathCaching && cachedPaths != null) {
-            cachedPaths!!.forEach { cached ->
+            val paths = cachedPaths!!
+            // Use indexed loop to avoid iterator allocation
+            for (i in paths.indices) {
+                val cached = paths[i]
                 drawPath(cached.path, cached.fillColor, style = Fill)
 
                 if (drawStroke) {
@@ -104,6 +107,11 @@ class IsometricRenderer(
 
     /**
      * Render using native Android canvas (2x faster, Android-only)
+     *
+     * **ANDROID-ONLY:** This function uses `android.graphics.Canvas` and will not work
+     * on non-Android platforms. Use `render()` for cross-platform compatibility.
+     *
+     * @throws NoClassDefFoundError on non-Android platforms
      */
     fun DrawScope.renderNative(
         rootNode: GroupNode,

@@ -17,7 +17,8 @@ dependencies {
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        // Use Java 11 to match Android library requirements (Java 8 target)
+        languageVersion.set(JavaLanguageVersion.of(11))
     }
 }
 

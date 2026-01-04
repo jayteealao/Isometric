@@ -1,5 +1,6 @@
 package io.fabianterhorst.isometric.compose.runtime
 
+import androidx.compose.runtime.Immutable
 import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.RenderOptions
@@ -8,7 +9,10 @@ import io.fabianterhorst.isometric.Vector
 
 /**
  * Context for rendering that accumulates transforms through the tree hierarchy
+ *
+ * Marked as @Immutable to prevent unnecessary recomposition when instances don't change
  */
+@Immutable
 data class RenderContext(
     val width: Int,
     val height: Int,

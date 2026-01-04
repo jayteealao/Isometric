@@ -76,6 +76,9 @@ class IsometricApplier(
  * Extension function to move items in a mutable list
  */
 private fun <T> MutableList<T>.move(from: Int, to: Int, count: Int) {
+    // Early return for no-op cases
+    if (from == to || count == 0) return
+
     val items = mutableListOf<T>()
 
     // Extract items to move
