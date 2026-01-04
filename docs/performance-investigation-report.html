@@ -332,28 +332,28 @@
                 <p>
                     This report documents performance optimization of the Isometric rendering library
                     through a phased implementation approach. Two optimization phases have been completed,
-                    achieving an 87% reduction in frame time for static scenes.
+                    achieving an 83.1% reduction in frame time for static scenes.
                 </p>
 
                 <div class="data-grid">
                     <div class="data-cell">
                         <div class="data-label">Baseline</div>
-                        <div class="data-value">124.85ms</div>
-                        <div class="data-subtext">8 FPS</div>
+                        <div class="data-value">113.87ms</div>
+                        <div class="data-subtext">9 FPS</div>
                     </div>
                     <div class="data-cell">
                         <div class="data-label">Phase 1</div>
-                        <div class="data-value">18.04ms</div>
-                        <div class="data-subtext">55 FPS</div>
+                        <div class="data-value">20.36ms</div>
+                        <div class="data-subtext">49 FPS</div>
                     </div>
                     <div class="data-cell">
                         <div class="data-label">Phase 2</div>
-                        <div class="data-value">16.5ms</div>
-                        <div class="data-subtext">~60 FPS</div>
+                        <div class="data-value">19.22ms</div>
+                        <div class="data-subtext">52 FPS</div>
                     </div>
                     <div class="data-cell">
                         <div class="data-label">Improvement</div>
-                        <div class="data-value">87%</div>
+                        <div class="data-value">83.1%</div>
                         <div class="data-subtext">Total reduction</div>
                     </div>
                 </div>
@@ -390,23 +390,23 @@
                     <tbody>
                         <tr>
                             <td>Average</td>
-                            <td>124.85ms</td>
-                            <td>18.04ms</td>
-                            <td>16.5ms*</td>
-                            <td class="metric-positive">↓ 87%</td>
+                            <td>113.87ms</td>
+                            <td>20.36ms</td>
+                            <td>19.22ms</td>
+                            <td class="metric-positive">↓ 83.1%</td>
                         </tr>
                         <tr>
                             <td>P50 (Median)</td>
                             <td>116.67ms</td>
                             <td>16.67ms</td>
-                            <td>15.5ms*</td>
-                            <td class="metric-positive">↓ 87%</td>
+                            <td>16.67ms</td>
+                            <td class="metric-positive">↓ 85.7%</td>
                         </tr>
                         <tr>
                             <td>P90</td>
                             <td>133.33ms</td>
                             <td>33.33ms</td>
-                            <td>30ms*</td>
+                            <td>33.33ms</td>
                             <td class="metric-positive">↓ 77%</td>
                         </tr>
                         <tr>
@@ -526,9 +526,9 @@
 
                         <h4>Results</h4>
                         <ul>
-                            <li>Additional improvement: 6-11% over Phase 1</li>
-                            <li>Frame time: 16-17ms (from 18.04ms Phase 1)</li>
-                            <li>60 FPS target achieved (< 16.67ms threshold)</li>
+                            <li>Additional improvement: 5.6% over Phase 1</li>
+                            <li>Frame time: 19.22ms (from 20.36ms Phase 1)</li>
+                            <li>Target: 52 FPS (19.23ms average)</li>
                             <li>Multiplicative benefit with Phase 1 cache</li>
                         </ul>
 
@@ -711,19 +711,19 @@ IsometricCanvas(
                 labels: ['Average', 'P50 (Median)', 'P90', 'P99'],
                 datasets: [{
                     label: 'Baseline (No Cache)',
-                    data: [124.85, 116.67, 133.33, 150.00],
+                    data: [113.87, 116.67, 133.33, 150.00],
                     backgroundColor: 'rgba(200, 200, 200, 0.8)',
                     borderColor: 'rgb(100, 100, 100)',
                     borderWidth: 1
                 }, {
                     label: 'Phase 1 (PreparedScene Cache)',
-                    data: [18.04, 16.67, 33.33, 33.67],
+                    data: [20.36, 16.67, 33.33, 33.33],
                     backgroundColor: 'rgba(100, 149, 237, 0.8)',
                     borderColor: 'rgb(65, 105, 225)',
                     borderWidth: 1
                 }, {
                     label: 'Phase 2 (Both Caches)',
-                    data: [16.5, 15.5, 30, 31],
+                    data: [19.22, 16.67, 33.33, 39.00],
                     backgroundColor: 'rgba(60, 179, 113, 0.8)',
                     borderColor: 'rgb(46, 139, 87)',
                     borderWidth: 1
