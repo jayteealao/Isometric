@@ -37,7 +37,9 @@ sealed class IsometricNode {
 
     /**
      * Dirty tracking for efficient rendering
+     * Volatile to ensure visibility across threads (when using off-thread computation)
      */
+    @Volatile
     var isDirty: Boolean = true
         private set
 

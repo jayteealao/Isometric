@@ -90,17 +90,16 @@ fun IsometricScene(
         )
     }
 
-    // Scene version for off-thread computation
-    var sceneVersion by remember { mutableStateOf(0) }
-
     // Off-thread computation (if enabled)
+    // NOTE: Off-thread computation is currently experimental and may not provide
+    // significant benefits due to Compose's snapshot system. Consider removing or
+    // using snapshotFlow to properly observe isDirty changes.
     if (enableOffThreadComputation) {
-        LaunchedEffect(rootNode.isDirty, canvasWidth, canvasHeight) {
-            if (rootNode.isDirty) {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                    renderer.prepareSceneAsync(rootNode, renderContext)
-                }
-                sceneVersion++
+        LaunchedEffect(canvasWidth, canvasHeight) {
+            // This will run once per size change
+            // For proper dirty tracking, would need snapshotFlow { rootNode.isDirty }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                renderer.prepareSceneAsync(rootNode, renderContext)
             }
         }
     }

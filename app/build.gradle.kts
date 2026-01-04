@@ -39,7 +39,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.0"
+        kotlinCompilerExtensionVersion = "1.5.3"  // Compatible with Kotlin 1.9.0
     }
 }
 
@@ -52,8 +52,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.5.1")
     implementation("androidx.activity:activity-ktx:1.6.1")
 
-    // Compose
-    val composeVersion = "1.3.1"
+    // Compose (aligned with isometric-compose module)
+    val composeVersion = "1.5.0"
     implementation("androidx.compose.ui:ui:$composeVersion")
     implementation("androidx.compose.material:material:$composeVersion")
     implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
