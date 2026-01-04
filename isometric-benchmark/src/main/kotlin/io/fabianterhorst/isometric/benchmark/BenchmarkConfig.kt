@@ -9,6 +9,7 @@ data class BenchmarkConfig(
     val scenario: Scenario,
     val interactionPattern: InteractionPattern,
     val flags: OptimizationFlags,
+    val numberOfRuns: Int = 3,       // Number of benchmark runs to average
     val outputFile: String = "benchmark_results.csv"
 ) {
     fun toBundle(): Bundle = Bundle().apply {
@@ -17,6 +18,7 @@ data class BenchmarkConfig(
         putString("scenario", scenario.name)
         putString("interactionPattern", interactionPattern.name)
         putBundle("flags", flags.toBundle())
+        putInt("numberOfRuns", numberOfRuns)
         putString("outputFile", outputFile)
     }
 
@@ -45,6 +47,7 @@ data class BenchmarkConfig(
                 flags = OptimizationFlags.fromBundle(
                     bundle.getBundle("flags") ?: Bundle()
                 ),
+                numberOfRuns = bundle.getInt("numberOfRuns", 3),
                 outputFile = bundle.getString("outputFile") ?: "benchmark_results.csv"
             )
         }

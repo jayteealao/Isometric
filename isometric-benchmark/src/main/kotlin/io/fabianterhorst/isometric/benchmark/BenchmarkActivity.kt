@@ -66,7 +66,8 @@ class BenchmarkActivity : ComponentActivity() {
             sceneSize = 100,
             scenario = Scenario.STATIC,
             interactionPattern = InteractionPattern.NONE,
-            flags = OptimizationFlags.BASELINE
+            flags = OptimizationFlags.BASELINE,  // Cache OFF for true baseline
+            numberOfRuns = 3  // Multi-run averaging
         )
     }
 
@@ -94,25 +95,36 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
 
     // Apply scene mutations based on scenario
     LaunchedEffect(frameTick) {
-        when (config.scenario) {
+        // Determine if scene needs rebuilding
+        val needsRebuild = when (config.scenario) {
             Scenario.STATIC -> {
-                // No mutations
+                // STATIC: Only rebuild on first frame to establish initial scene
+                // All subsequent frames use cached PreparedScene (version unchanged)
+                frameTick == 0
             }
             Scenario.INCREMENTAL_1 -> {
-                SceneGenerator.mutateScene(baseScene, 0.01f, frameTick)
+                // Mutate 1% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 0.01f, frameTick)
+                true  // Always rebuild (initial setup + after mutations)
             }
             Scenario.INCREMENTAL_10 -> {
-                SceneGenerator.mutateScene(baseScene, 0.10f, frameTick)
+                // Mutate 10% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 0.10f, frameTick)
+                true
             }
             Scenario.FULL_MUTATION -> {
-                SceneGenerator.mutateScene(baseScene, 1.0f, frameTick)
+                // Mutate 100% of items (only after warmup frame)
+                if (frameTick > 0) SceneGenerator.mutateScene(baseScene, 1.0f, frameTick)
+                true
             }
         }
 
-        // Rebuild scene
-        sceneState.clear()
-        baseScene.forEach { item ->
-            sceneState.add(item.shape, item.color)
+        // Only rebuild scene when it actually changed
+        if (needsRebuild) {
+            sceneState.clear()
+            baseScene.forEach { item ->
+                sceneState.add(item.shape, item.color)
+            }
         }
     }
 
@@ -133,14 +145,22 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
         }
     }
 
+    // CRITICAL: Create RenderOptions once and reuse across all frames
+    // Cache uses reference equality (===) for performance, so new instances = cache miss
+    val renderOptions = remember(config.flags) {
+        RenderOptions(
+            enableDepthSorting = true,
+            enableBackfaceCulling = true,
+            enableBoundsChecking = false,  // Baseline: render ALL objects for worst-case measurement
+            enablePreparedSceneCache = config.flags.enablePreparedSceneCache,
+            enableDrawWithCache = config.flags.enableDrawWithCache
+        )
+    }
+
     IsometricCanvas(
         state = sceneState,
         modifier = Modifier.fillMaxSize(),
-        renderOptions = RenderOptions(
-            enableDepthSorting = true,
-            enableBackfaceCulling = true,
-            enableBoundsChecking = false  // Baseline: render ALL objects for worst-case measurement
-        )
+        renderOptions = renderOptions
     ) {
         // Scene already built in LaunchedEffect
     }
