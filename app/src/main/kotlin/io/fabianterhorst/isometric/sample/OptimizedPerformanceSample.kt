@@ -8,7 +8,6 @@ import androidx.compose.ui.unit.dp
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.compose.runtime.*
-import io.fabianterhorst.isometric.compose.runtime.optimized.OptimizedIsometricScene
 import io.fabianterhorst.isometric.shapes.Prism
 import kotlinx.coroutines.delay
 import kotlin.math.sin
@@ -124,9 +123,10 @@ fun OptimizedPerformanceSample() {
             }
         }
 
-        // Optimized Scene
-        OptimizedIsometricScene(
+        // Optimized Scene with unified API
+        IsometricScene(
             modifier = Modifier.weight(1f),
+            enablePathCaching = true,  // Always enabled (huge win)
             enableSpatialIndex = enableSpatialIndex,
             useNativeCanvas = useNativeCanvas,
             enableOffThreadComputation = enableOffThread,
@@ -261,9 +261,10 @@ fun PerformanceComparisonDemo() {
         }
 
         if (useOptimized) {
-            // Optimized version
-            OptimizedIsometricScene(
+            // Optimized version with all optimizations enabled
+            IsometricScene(
                 modifier = Modifier.weight(1f),
+                enablePathCaching = true,
                 enableSpatialIndex = true,
                 useNativeCanvas = true,
                 enableOffThreadComputation = true
@@ -271,9 +272,13 @@ fun PerformanceComparisonDemo() {
                 LargeAnimatedGrid(wave)
             }
         } else {
-            // Standard version
+            // Standard version with optimizations disabled
             IsometricScene(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                enablePathCaching = false,
+                enableSpatialIndex = false,
+                useNativeCanvas = false,
+                enableOffThreadComputation = false
             ) {
                 LargeAnimatedGrid(wave)
             }

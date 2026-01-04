@@ -249,15 +249,25 @@ LaunchedEffect(rootNode.isDirty, canvasWidth, canvasHeight) {
 
 ## Usage
 
-### Basic (All Optimizations)
+### Basic (All Optimizations Enabled)
 
 ```kotlin
-OptimizedIsometricScene(
-    enableSpatialIndex = true,        // ✅ Fast hit testing
-    useNativeCanvas = true,           // ✅ Native rendering (Android)
-    enableOffThreadComputation = true // ✅ Async computation
+IsometricScene(
+    enablePathCaching = true,         // ✅ Path caching (default: true)
+    enableSpatialIndex = true,        // ✅ Fast hit testing (default: true)
+    useNativeCanvas = true,           // ✅ Native rendering (Android-only)
+    enableOffThreadComputation = true // ✅ Async computation (opt-in)
 ) {
     // Your scene
+}
+```
+
+### Minimal (Sensible Defaults)
+
+```kotlin
+IsometricScene {
+    // Path caching and spatial indexing enabled by default!
+    // Just use it - optimizations are automatic
 }
 ```
 
@@ -279,9 +289,9 @@ OptimizedIsometricScene(
 ## Documentation
 
 - **PERFORMANCE_OPTIMIZATIONS.md** - Detailed guide with benchmarks
-- **OptimizedIsometricScene.kt** - Main implementation
-- **OptimizedIsometricRenderer.kt** - Rendering engine
-- **OptimizedPerformanceSample.kt** - Interactive demo
+- **IsometricScene.kt** - Main composable with integrated optimizations
+- **IsometricRenderer.kt** - Rendering engine with all optimizations
+- **OptimizedPerformanceSample.kt** - Interactive demo with optimization toggles
 
 ---
 

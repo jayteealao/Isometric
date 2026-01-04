@@ -4,7 +4,7 @@ This document covers the **advanced performance optimizations** available in the
 
 ## Overview
 
-The **OptimizedIsometricScene** implements **8 major optimizations** for maximum performance:
+The **IsometricScene** composable includes **8 major optimizations** built-in, with smart defaults for maximum performance:
 
 1. ✅ **Path Object Caching** - Reuse Compose Path objects between frames
 2. ✅ **Stable Engine Instance** - No rebuild on recomposition
@@ -19,14 +19,14 @@ The **OptimizedIsometricScene** implements **8 major optimizations** for maximum
 
 ## When to Use Optimizations
 
-| Scenario | Use Standard API | Use Optimized API |
-|----------|-----------------|-------------------|
-| **Simple scenes (<20 shapes)** | ✅ | ❌ Overkill |
-| **Medium scenes (20-100 shapes)** | ✅ | ⚠️ Optional |
-| **Large scenes (100+ shapes)** | ❌ May lag | ✅ **Recommended** |
-| **Animated scenes** | ⚠️ Good | ✅ **Much better** |
-| **Interactive (frequent clicks)** | ⚠️ Good | ✅ **Faster hit testing** |
-| **Android-only app** | N/A | ✅ **Use nativeCanvas** |
+| Scenario | Default Settings | Recommended Settings |
+|----------|-----------------|---------------------|
+| **Simple scenes (<20 shapes)** | ✅ Defaults work great | Keep defaults |
+| **Medium scenes (20-100 shapes)** | ✅ Defaults work great | Keep defaults |
+| **Large scenes (100+ shapes)** | ✅ Defaults work well | Consider `useNativeCanvas` on Android |
+| **Animated scenes** | ✅ Good performance | Enable `enableOffThreadComputation` |
+| **Interactive (frequent clicks)** | ✅ Fast hit testing | Spatial index enabled by default |
+| **Android-only app** | Cross-platform defaults | Set `useNativeCanvas = true` for 2x speedup |
 
 ---
 
@@ -134,7 +134,7 @@ renderPreparedScene(cachedScene)
 
 **Usage:**
 ```kotlin
-OptimizedIsometricScene(
+IsometricScene(
     useNativeCanvas = true // ✅ 2x faster on Android
 ) {
     // ...
@@ -240,7 +240,7 @@ batches.forEach { (color, shapesWithColor) ->
 
 **Usage:**
 ```kotlin
-OptimizedIsometricScene(
+IsometricScene(
     enableOffThreadComputation = true
 ) {
     // Scene updates compute off main thread
@@ -285,15 +285,12 @@ drawDynamicOverlay()     // ✅ Necessary
 
 ## Usage Examples
 
-### Basic Optimized Scene
+### Basic Scene (Smart Defaults)
 
 ```kotlin
 @Composable
-fun OptimizedScene() {
-    OptimizedIsometricScene(
-        enableSpatialIndex = true, // Fast hit testing
-        useNativeCanvas = true     // Android-only speed boost
-    ) {
+fun BasicScene() {
+    IsometricScene {  // Path caching + spatial index enabled by default!
         ForEach((0..100).toList()) { i ->
             Shape(
                 Prism(Point(i.toDouble(), 0.0, 0.0)),
@@ -304,15 +301,29 @@ fun OptimizedScene() {
 }
 ```
 
+### Android-Optimized Scene
+
+```kotlin
+@Composable
+fun AndroidOptimizedScene() {
+    IsometricScene(
+        useNativeCanvas = true  // ✅ 2x faster on Android
+    ) {
+        // Scene content
+    }
+}
+```
+
 ### Maximum Performance (All Optimizations)
 
 ```kotlin
 @Composable
 fun MaxPerformanceScene() {
-    OptimizedIsometricScene(
-        enableSpatialIndex = true,        // ✅ Fast hit testing
-        useNativeCanvas = true,           // ✅ Native rendering (Android)
-        enableOffThreadComputation = true, // ✅ Background computation
+    IsometricScene(
+        enablePathCaching = true,         // ✅ Default: ON
+        enableSpatialIndex = true,        // ✅ Default: ON
+        useNativeCanvas = true,           // ✅ Android-only
+        enableOffThreadComputation = true, // ✅ Async computation
         onTap = { x, y, node ->
             // Hit testing is O(1) + O(k)
             println("Tapped: $node")
@@ -395,25 +406,23 @@ fun MaxPerformanceScene() {
 
 ## Best Practices
 
-### 1. Start Simple, Optimize as Needed
+### 1. Start Simple - Defaults Are Already Optimized!
 
 ```kotlin
-// Start with standard API
+// Start with defaults (path caching + spatial index enabled)
 IsometricScene { ... }
 
-// Profile and identify bottlenecks
+// Profile and identify bottlenecks (if needed)
 
-// Add optimizations incrementally
-OptimizedIsometricScene(
-    enableSpatialIndex = true // Add first optimization
+// For Android apps, enable native canvas
+IsometricScene(
+    useNativeCanvas = true  // 2x faster on Android
 ) { ... }
 
-// Measure improvement
-
-// Add more if needed
-OptimizedIsometricScene(
-    enableSpatialIndex = true,
-    useNativeCanvas = true // Add second optimization
+// For heavy animated scenes, enable off-thread computation
+IsometricScene(
+    useNativeCanvas = true,
+    enableOffThreadComputation = true  // Non-blocking updates
 ) { ... }
 ```
 
@@ -429,18 +438,19 @@ Use Android Studio Profiler to identify actual bottlenecks:
 
 **Multiplatform Project:**
 ```kotlin
-OptimizedIsometricScene(
-    enableSpatialIndex = true,  // ✅ Works everywhere
-    useNativeCanvas = false     // ❌ Android-only
-)
+IsometricScene {
+    // Defaults work great everywhere!
+    // Path caching + spatial index are cross-platform
+}
 ```
 
 **Android-Only Project:**
 ```kotlin
-OptimizedIsometricScene(
-    enableSpatialIndex = true,  // ✅
-    useNativeCanvas = true      // ✅ Faster on Android
-)
+IsometricScene(
+    useNativeCanvas = true  // ✅ Enable for 2x speedup
+) {
+    // ...
+}
 ```
 
 ---
@@ -469,7 +479,7 @@ val useNative = remember {
     }
 }
 
-OptimizedIsometricScene(useNativeCanvas = useNative) { ... }
+IsometricScene(useNativeCanvas = useNative) { ... }
 ```
 
 ### Issue: Spatial index uses too much memory
@@ -488,19 +498,22 @@ SpatialGrid(width, height, cellSize = 200) // Less memory
 
 ## Summary
 
-The **OptimizedIsometricScene** provides **8 major optimizations**:
+The **IsometricScene** composable provides **8 major optimizations** with smart defaults:
 
-| Optimization | Speedup | Memory Impact | Complexity |
-|--------------|---------|---------------|------------|
-| Path Caching | 1.3-1.4x | -40% | Low |
-| Stable Engine | 1.1-1.2x | Neutral | Low |
-| Scene Caching | 1.5-2x | Neutral | Low |
-| Native Canvas | 1.4-1.5x | Neutral | Medium |
-| Spatial Index | 3-25x (hit test) | +10-20% | Medium |
-| Batch Rendering | 1.2-1.3x | Neutral | Medium |
-| Off-Thread | ~1x (async) | Neutral | High |
-| Layer Caching | 1.6-4x | +50% | High |
+| Optimization | Default | Speedup | Memory Impact | When to Use |
+|--------------|---------|---------|---------------|-------------|
+| Path Caching | ✅ ON | 1.3-1.4x | -40% | Always (enabled by default) |
+| Stable Engine | ✅ ON | 1.1-1.2x | Neutral | Always (enabled by default) |
+| Scene Caching | ✅ ON | 1.5-2x | Neutral | Always (enabled by default) |
+| Spatial Index | ✅ ON | 3-25x (hit test) | +10-20% | Always (enabled by default) |
+| Native Canvas | ❌ OFF | 1.4-1.5x | Neutral | Android-only apps |
+| Batch Rendering | ✅ ON | 1.2-1.3x | Neutral | Always (automatic) |
+| Off-Thread | ❌ OFF | ~1x (async) | Neutral | Heavy animated scenes |
+| Layer Caching | Manual | 1.6-4x | +50% | Static backgrounds |
 
 **Combined:** Up to **5-10x** overall performance improvement for large, complex scenes.
 
-**Recommendation:** Start with path caching + scene caching (easy wins), then add spatial indexing if hit testing is slow, then native canvas if Android-only.
+**Recommendation:**
+- **Default settings work great for most apps!** Path caching, scene caching, and spatial indexing are already enabled.
+- **Android-only apps:** Enable `useNativeCanvas = true` for 2x speedup
+- **Heavy animations:** Enable `enableOffThreadComputation = true` to keep UI responsive
