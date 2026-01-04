@@ -15,40 +15,31 @@ import io.fabianterhorst.isometric.RenderOptions
 object ComposeRenderer {
 
     /**
-     * Render a prepared scene using Compose DrawScope with optional draw command caching
+     * Render a prepared scene using Compose DrawScope
      *
-     * Note: This implementation pre-converts paths and colors when caching is enabled.
-     * Actual drawWithCache optimization will be applied at the Canvas level in IsometricCanvas.kt.
+     * Note: For cached rendering (enableDrawWithCache), caching happens at the
+     * Canvas modifier level in IsometricCanvas.kt. This function handles the
+     * non-cached fallback path.
      *
      * TODO: strokeWidth and drawStroke parameters are currently hardcoded (1f, true).
      * These can be added to RenderOptions in a future enhancement if needed.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun DrawScope.renderIsometric(scene: PreparedScene, options: RenderOptions) {
-        if (options.enableDrawWithCache) {
-            // Cached path: Pre-convert all paths and colors once
-            val paths = scene.commands.map { it.toComposePath() }
-            val colors = scene.commands.map { it.color.toComposeColor() }
+        // Non-cached rendering: Convert on-demand
+        scene.commands.forEach { command ->
+            val path = command.toComposePath()
+            val fillColor = command.color.toComposeColor()
 
-            paths.forEachIndexed { i, path ->
-                drawPath(path, colors[i])
-                drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(width = 1f))
-            }
-        } else {
-            // Non-cached path: Convert on-demand (preserve existing behavior when cache disabled)
-            scene.commands.forEach { command ->
-                val path = command.toComposePath()
-                val fillColor = command.color.toComposeColor()
-
-                drawPath(path, fillColor)
-                drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(width = 1f))
-            }
+            drawPath(path, fillColor)
+            drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(width = 1f))
         }
     }
 
     /**
      * Convert RenderCommand to Compose Path
      */
-    private fun RenderCommand.toComposePath(): Path {
+    internal fun RenderCommand.toComposePath(): Path {
         return Path().apply {
             if (points.isEmpty()) return@apply
 

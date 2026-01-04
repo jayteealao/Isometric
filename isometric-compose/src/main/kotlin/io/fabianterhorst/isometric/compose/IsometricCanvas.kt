@@ -9,7 +9,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import io.fabianterhorst.isometric.IsoColor
@@ -54,22 +57,58 @@ fun IsometricCanvas(
                     handleTap(state, offset, canvasWidth, canvasHeight, renderOptions, onItemClick)
                 }
             }
+            .drawWithCache {
+                // Get current canvas dimensions
+                val width = size.width.toInt()
+                val height = size.height.toInt()
+
+                // Prepare scene (may use Phase 1 cache if scene unchanged)
+                val preparedScene = state.engine.prepare(
+                    sceneVersion = state.currentVersion,
+                    width = width,
+                    height = height,
+                    options = renderOptions
+                )
+
+                // Conditional caching based on enableDrawWithCache flag
+                if (renderOptions.enableDrawWithCache) {
+                    // Cache path: Pre-convert all RenderCommands to Compose primitives
+                    val cachedPaths = preparedScene.commands.map { command ->
+                        with(ComposeRenderer) {
+                            command.toComposePath()
+                        }
+                    }
+                    val cachedFillColors = preparedScene.commands.map { command ->
+                        with(ComposeRenderer) {
+                            command.color.toComposeColor()
+                        }
+                    }
+                    val strokeColor = Color.Black.copy(alpha = 0.2f)
+                    val strokeStyle = Stroke(width = strokeWidth)
+
+                    onDrawBehind {
+                        cachedPaths.forEachIndexed { index, path ->
+                            // Draw fill
+                            drawPath(path, cachedFillColors[index])
+                            // Draw stroke outline
+                            if (drawStroke) {
+                                drawPath(path, strokeColor, style = strokeStyle)
+                            }
+                        }
+                    }
+                } else {
+                    // Non-cached path: Use ComposeRenderer directly
+                    onDrawBehind {
+                        with(ComposeRenderer) {
+                            renderIsometric(preparedScene, renderOptions)
+                        }
+                    }
+                }
+            }
     ) {
-        // Update canvas size
+        // Update canvas size for hit testing
         canvasWidth = size.width.toInt()
         canvasHeight = size.height.toInt()
-
-        // Prepare scene using current canvas size
-        val preparedScene = state.engine.prepare(
-            sceneVersion = state.currentVersion,
-            width = canvasWidth,
-            height = canvasHeight,
-            options = renderOptions
-        )
-
-        with(ComposeRenderer) {
-            renderIsometric(preparedScene, renderOptions)
-        }
     }
 }
 
