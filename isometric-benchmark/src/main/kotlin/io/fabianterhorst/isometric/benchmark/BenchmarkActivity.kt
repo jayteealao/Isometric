@@ -147,12 +147,13 @@ fun BenchmarkScreen(orchestrator: BenchmarkOrchestrator) {
 
     // CRITICAL: Create RenderOptions once and reuse across all frames
     // Cache uses reference equality (===) for performance, so new instances = cache miss
-    val renderOptions = remember {
+    val renderOptions = remember(config.flags) {
         RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = true,
             enableBoundsChecking = false,  // Baseline: render ALL objects for worst-case measurement
-            enablePreparedSceneCache = config.flags.enablePreparedSceneCache
+            enablePreparedSceneCache = config.flags.enablePreparedSceneCache,
+            enableDrawWithCache = config.flags.enableDrawWithCache
         )
     }
 
