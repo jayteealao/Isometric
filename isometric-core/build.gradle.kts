@@ -9,6 +9,9 @@ dependencies {
     // Pure Kotlin/JVM - NO Android dependencies
     implementation(kotlin("stdlib"))
 
+    // Compose runtime for stability annotations only (no Android dependency)
+    compileOnly("androidx.compose.runtime:runtime:1.6.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation(kotlin("test"))

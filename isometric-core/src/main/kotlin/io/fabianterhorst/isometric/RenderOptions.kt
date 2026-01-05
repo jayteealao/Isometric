@@ -1,5 +1,7 @@
 package io.fabianterhorst.isometric
 
+import androidx.compose.runtime.Stable
+
 /**
  * Configuration options for rendering
  *
@@ -8,13 +10,18 @@ package io.fabianterhorst.isometric
  * @property enableBoundsChecking Remove polygons outside viewport bounds (improves performance)
  * @property enablePreparedSceneCache Cache prepared scenes to avoid redundant transformation (improves performance for static scenes)
  * @property enableDrawWithCache Cache Compose Path objects to eliminate redundant allocations (improves performance)
+ * @property enableBroadPhaseSort Z-order pre-sorting optimization for depth sorting (improves performance)
+ * @property enableSpatialIndex Spatial index for accelerated hit testing (improves performance)
  */
+@Stable
 data class RenderOptions(
     val enableDepthSorting: Boolean = true,
     val enableBackfaceCulling: Boolean = true,
     val enableBoundsChecking: Boolean = true,
     val enablePreparedSceneCache: Boolean = true,
-    val enableDrawWithCache: Boolean = false
+    val enableDrawWithCache: Boolean = false,
+    val enableBroadPhaseSort: Boolean = false,
+    val enableSpatialIndex: Boolean = false
 ) {
     companion object {
         /**
@@ -31,7 +38,9 @@ data class RenderOptions(
             enableBackfaceCulling = true,
             enableBoundsChecking = true,
             enablePreparedSceneCache = true,
-            enableDrawWithCache = true
+            enableDrawWithCache = true,
+            enableBroadPhaseSort = true,
+            enableSpatialIndex = true
         )
 
         /**
@@ -41,7 +50,9 @@ data class RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
             enableBoundsChecking = false,    // Render everything
-            enablePreparedSceneCache = true
+            enablePreparedSceneCache = true,
+            enableBroadPhaseSort = false,
+            enableSpatialIndex = false
         )
     }
 }

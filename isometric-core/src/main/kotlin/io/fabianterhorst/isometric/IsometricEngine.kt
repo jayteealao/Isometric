@@ -36,6 +36,26 @@ class IsometricEngine(
     private var cachedHeight: Int = -1
     private var cachedOptions: RenderOptions? = null
 
+    // Spatial index cache
+    private var cachedSpatialIndex: SpatialIndex? = null
+    private var spatialIndexVersion: Int = -1
+
+    // Cache statistics
+    var cacheHits: Long = 0
+        private set
+    var cacheMisses: Long = 0
+        private set
+
+    // Performance tracking
+    var lastPrepareTimeNanos: Long = 0
+        private set
+
+    fun resetCacheStats() {
+        cacheHits = 0
+        cacheMisses = 0
+        lastPrepareTimeNanos = 0
+    }
+
     init {
         transformation = arrayOf(
             doubleArrayOf(
@@ -90,6 +110,8 @@ class IsometricEngine(
         height: Int,
         options: RenderOptions = RenderOptions.Default
     ): PreparedScene {
+        val prepareStart = System.nanoTime()
+
         // Fast path: cache hit (zero allocations) - only if cache enabled
         if (options.enablePreparedSceneCache &&
             cachedScene != null &&
@@ -97,10 +119,13 @@ class IsometricEngine(
             width == cachedWidth &&
             height == cachedHeight &&
             options === cachedOptions) {
+            cacheHits++
+            lastPrepareTimeNanos = System.nanoTime() - prepareStart
             return cachedScene!!
         }
 
         // Slow path: cache miss - prepare scene
+        cacheMisses++
         val scene = prepareSceneInternal(width, height, options)
 
         // Update cache only if enabled
@@ -112,6 +137,17 @@ class IsometricEngine(
             cachedOptions = options
         }
 
+        // Build spatial index if enabled
+        if (options.enableSpatialIndex) {
+            if (spatialIndexVersion != sceneVersion || cachedSpatialIndex == null) {
+                val spatialIndex = SpatialIndex(width, height)
+                scene.commands.forEach { spatialIndex.insert(it) }
+                cachedSpatialIndex = spatialIndex
+                spatialIndexVersion = sceneVersion
+            }
+        }
+
+        lastPrepareTimeNanos = System.nanoTime() - prepareStart
         return scene
     }
 
@@ -152,7 +188,7 @@ class IsometricEngine(
 
         // Sort by depth if enabled
         val sortedItems = if (options.enableDepthSorting) {
-            sortPaths(transformedItems)
+            sortPaths(transformedItems, options)
         } else {
             transformedItems
         }
@@ -181,6 +217,7 @@ class IsometricEngine(
      * @param reverseSort If true, search front-to-back (for click handling)
      * @param useRadius If true, consider points within radius of edges
      * @param radius Touch radius in pixels
+     * @param useSpatialIndex If true, use spatial index to accelerate search
      * @return The RenderCommand at this position, or null
      */
     fun findItemAt(
@@ -189,12 +226,19 @@ class IsometricEngine(
         y: Double,
         reverseSort: Boolean = true,
         useRadius: Boolean = false,
-        radius: Double = 8.0
+        radius: Double = 8.0,
+        useSpatialIndex: Boolean = false
     ): RenderCommand? {
-        val commandsList = if (reverseSort) {
-            preparedScene.commands.reversed()
+        val candidates = if (useSpatialIndex && cachedSpatialIndex != null) {
+            cachedSpatialIndex!!.query(x, y)
         } else {
             preparedScene.commands
+        }
+
+        val commandsList = if (reverseSort) {
+            candidates.reversed()
+        } else {
+            candidates
         }
 
         for (command in commandsList) {
@@ -313,19 +357,40 @@ class IsometricEngine(
 
     /**
      * Sort paths using intersection-based depth sorting algorithm
+     *
+     * @param items Items to sort
+     * @param options Rendering options (controls broad-phase optimization)
      */
-    private fun sortPaths(items: List<TransformedItem>): List<TransformedItem> {
+    private fun sortPaths(items: List<TransformedItem>, options: RenderOptions): List<TransformedItem> {
         val sortedItems = mutableListOf<TransformedItem>()
         val observer = Point(-10.0, -10.0, 20.0)
         val length = items.size
+
+        // Broad-phase sort: pre-sort items by average Z coordinate if enabled
+        val processedItems = if (options.enableBroadPhaseSort) {
+            items.sortedBy { item ->
+                item.item.path.points.map { it.z }.average()
+            }
+        } else {
+            items
+        }
 
         // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
         val drawBefore = List(length) { mutableListOf<Int>() }
 
         for (i in 0 until length) {
-            val itemA = items[i]
+            val itemA = processedItems[i]
             for (j in 0 until i) {
-                val itemB = items[j]
+                val itemB = processedItems[j]
+
+                // Broad-phase: skip items that are far apart in Z if enabled
+                if (options.enableBroadPhaseSort) {
+                    val avgZA = itemA.item.path.points.map { it.z }.average()
+                    val avgZB = itemB.item.path.points.map { it.z }.average()
+                    if (kotlin.math.abs(avgZA - avgZB) > 5.0) {
+                        continue
+                    }
+                }
 
                 // Check if 2D projections intersect
                 if (IntersectionUtils.hasIntersection(
@@ -355,7 +420,7 @@ class IsometricEngine(
                     // Check if all dependencies are drawn
                     val canDraw = drawBefore[i].all { drawn[it] }
                     if (canDraw) {
-                        sortedItems.add(items[i])
+                        sortedItems.add(processedItems[i])
                         drawn[i] = true
                         drawThisTurn = true
                     }
@@ -366,7 +431,7 @@ class IsometricEngine(
         // Add any remaining items (circular dependencies)
         for (i in 0 until length) {
             if (!drawn[i]) {
-                sortedItems.add(items[i])
+                sortedItems.add(processedItems[i])
             }
         }
 
