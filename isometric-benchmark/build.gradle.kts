@@ -42,6 +42,7 @@ android {
 dependencies {
     implementation(project(":isometric-compose"))
     implementation(project(":isometric-core"))
+    implementation(project(":benchmark-reporting"))
 
     // Compose
     val composeVersion = "1.5.0"

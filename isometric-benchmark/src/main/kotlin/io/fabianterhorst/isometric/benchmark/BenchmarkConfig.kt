@@ -24,9 +24,17 @@ data class BenchmarkConfig(
 
     companion object {
         fun fromIntent(intent: Intent): BenchmarkConfig {
+            // Try Bundle approach first
             val bundle = intent.getBundleExtra("config")
-                ?: throw IllegalArgumentException("No config bundle in intent")
+            if (bundle != null) {
+                return fromBundle(bundle)
+            }
 
+            // Fallback: Read individual intent extras
+            return fromIntentExtras(intent)
+        }
+
+        private fun fromBundle(bundle: Bundle): BenchmarkConfig {
             return BenchmarkConfig(
                 name = bundle.getString("name") ?: "unknown",
                 sceneSize = bundle.getInt("sceneSize", -1).also { size ->
@@ -49,6 +57,39 @@ data class BenchmarkConfig(
                 ),
                 numberOfRuns = bundle.getInt("numberOfRuns", 3),
                 outputFile = bundle.getString("outputFile") ?: "benchmark_results.csv"
+            )
+        }
+
+        private fun fromIntentExtras(intent: Intent): BenchmarkConfig {
+            val extras = intent.extras ?: throw IllegalArgumentException("No extras in intent")
+
+            val sceneSize = extras.getInt("sceneSize", 100)
+            val scenario = Scenario.valueOf(extras.getString("scenario") ?: "STATIC")
+            val interaction = InteractionPattern.valueOf(extras.getString("interaction") ?: "NONE")
+            val enablePreparedCache = extras.getBoolean("enablePreparedSceneCache", false)
+            val enableDrawCache = extras.getBoolean("enableDrawWithCache", false)
+            val runs = extras.getInt("runs", 3)
+
+            // Construct config name based on parameters
+            val cachePart = when {
+                enablePreparedCache && enableDrawCache -> "bothcache"
+                enablePreparedCache -> "preparedcache"
+                enableDrawCache -> "drawcache"
+                else -> "baseline"
+            }
+            val scenarioPart = scenario.name.lowercase()
+            val name = "${cachePart}_${scenarioPart}_${sceneSize}_${interaction.name.lowercase()}"
+
+            return BenchmarkConfig(
+                name = name,
+                sceneSize = sceneSize,
+                scenario = scenario,
+                interactionPattern = interaction,
+                flags = OptimizationFlags(
+                    enablePreparedSceneCache = enablePreparedCache,
+                    enableDrawWithCache = enableDrawCache
+                ),
+                numberOfRuns = runs
             )
         }
     }
