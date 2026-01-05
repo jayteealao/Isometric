@@ -4,6 +4,10 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal()
     }
+    plugins {
+        id("androidx.benchmark") version "1.2.3"
+        id("androidx.baselineprofile") version "1.2.3"
+    }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -20,3 +24,7 @@ include ':isometric-core'
 include ':isometric-compose'
 include ':isometric-android-view'
 include ':isometric-benchmark'
+include ':microbenchmark'
+include ':macrobenchmark'
+include ':benchmarkapp'
+include ':benchmark-reporting'

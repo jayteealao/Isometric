@@ -20,12 +20,12 @@ mkdir -p "$RESULTS_DIR"
 
 echo "Step 1: Building benchmark APK..."
 echo "-----------------------------------"
-./gradlew :isometric-benchmark:assembleRelease
+./gradlew :isometric-benchmark:assembleDebug
 
 echo ""
 echo "Step 2: Installing APK on device..."
 echo "------------------------------------"
-adb install -r isometric-benchmark/build/outputs/apk/release/isometric-benchmark-release.apk
+adb install -r isometric-benchmark/build/outputs/apk/debug/isometric-benchmark-debug.apk
 
 echo ""
 echo "Step 3: Running STATIC scenario (should show cache benefit)..."
