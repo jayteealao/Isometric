@@ -1,5 +1,6 @@
 package io.fabianterhorst.isometric.compose
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,7 @@ import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Main Isometric Canvas composable for rendering 3D isometric scenes.
@@ -41,6 +43,11 @@ fun IsometricCanvas(
     onItemClick: (RenderCommand) -> Unit = {},
     content: IsometricScope.() -> Unit
 ) {
+    // Log composable execution to track if it's being skipped
+    val composableExecutionCount = remember { AtomicInteger(0) }
+    val execCount = composableExecutionCount.incrementAndGet()
+    Log.d("IsometricCanvas", "IsometricCanvas COMPOSABLE body executed #$execCount")
+
     // Build scene
     val scope = remember(state) { IsometricScopeImpl(state) }
     scope.content()
@@ -48,6 +55,10 @@ fun IsometricCanvas(
     // Track canvas size for hit testing
     var canvasWidth by remember { mutableStateOf(800) }
     var canvasHeight by remember { mutableStateOf(600) }
+
+    // Logging counters to track drawWithCache vs onDrawBehind execution
+    val drawCacheExecutionCount = remember { AtomicInteger(0) }
+    val drawExecutionCount = remember { AtomicInteger(0) }
 
     Canvas(
         modifier = modifier
@@ -61,6 +72,10 @@ fun IsometricCanvas(
                 // Get current canvas dimensions
                 val width = size.width.toInt()
                 val height = size.height.toInt()
+
+                // Log drawWithCache execution
+                val cacheCount = drawCacheExecutionCount.incrementAndGet()
+                Log.d("IsometricCanvas", "drawWithCache block executed #$cacheCount, size=${size.width}x${size.height}, sceneVersion=${state.currentVersion}")
 
                 // Prepare scene (may use Phase 1 cache if scene unchanged)
                 val preparedScene = state.engine.prepare(
@@ -87,18 +102,30 @@ fun IsometricCanvas(
                     val strokeStyle = Stroke(width = strokeWidth)
 
                     onDrawBehind {
+                        val drawCount = drawExecutionCount.incrementAndGet()
+                        Log.d("IsometricCanvas", "onDrawBehind executed #$drawCount (cached paths, ${cachedPaths.size} paths)")
+
+                        val drawStart = System.nanoTime()
+
                         cachedPaths.forEachIndexed { index, path ->
                             // Draw fill
                             drawPath(path, cachedFillColors[index])
+                            ComposeRenderer.incrementDrawCallCount()
                             // Draw stroke outline
                             if (drawStroke) {
                                 drawPath(path, strokeColor, style = strokeStyle)
+                                ComposeRenderer.incrementDrawCallCount()
                             }
                         }
+
+                        ComposeRenderer.lastDrawTimeNanos = System.nanoTime() - drawStart
                     }
                 } else {
                     // Non-cached path: Use ComposeRenderer directly
                     onDrawBehind {
+                        val drawCount = drawExecutionCount.incrementAndGet()
+                        Log.d("IsometricCanvas", "onDrawBehind executed #$drawCount (no cache, ${preparedScene.commands.size} commands)")
+
                         with(ComposeRenderer) {
                             renderIsometric(preparedScene, renderOptions)
                         }

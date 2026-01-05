@@ -8,11 +8,34 @@ import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Renderer that converts platform-agnostic RenderCommands to Compose drawing
  */
 object ComposeRenderer {
+
+    // Draw call statistics (thread-safe)
+    private val drawCallCounter = AtomicLong(0)
+
+    val drawCallCount: Long
+        get() = drawCallCounter.get()
+
+    fun resetDrawCallCount() {
+        drawCallCounter.set(0)
+    }
+
+    // Drawing time tracking (for benchmarking)
+    var lastDrawTimeNanos: Long = 0
+        internal set
+
+    fun resetDrawTime() {
+        lastDrawTimeNanos = 0
+    }
+
+    fun incrementDrawCallCount() {
+        drawCallCounter.incrementAndGet()
+    }
 
     /**
      * Render a prepared scene using Compose DrawScope
@@ -26,14 +49,20 @@ object ComposeRenderer {
      */
     @Suppress("UNUSED_PARAMETER")
     fun DrawScope.renderIsometric(scene: PreparedScene, options: RenderOptions) {
+        val drawStart = System.nanoTime()
+
         // Non-cached rendering: Convert on-demand
         scene.commands.forEach { command ->
             val path = command.toComposePath()
             val fillColor = command.color.toComposeColor()
 
             drawPath(path, fillColor)
+            drawCallCounter.incrementAndGet()
             drawPath(path, Color.Black.copy(alpha = 0.2f), style = Stroke(width = 1f))
+            drawCallCounter.incrementAndGet()
         }
+
+        lastDrawTimeNanos = System.nanoTime() - drawStart
     }
 
     /**

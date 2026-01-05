@@ -15,7 +15,7 @@ import io.fabianterhorst.isometric.Shape
  */
 @Stable
 class IsometricSceneState internal constructor(
-    internal val engine: IsometricEngine
+    val engine: IsometricEngine  // Public for benchmark access to cache stats
 ) {
     // Version counter to trigger recomposition when scene changes
     private var version by mutableIntStateOf(0)
