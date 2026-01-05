@@ -9,3 +9,7 @@
 .externalNativeBuild
 .idea/*.worktrees/
 .worktrees/
+
+.idea/
+**/build/
+benchmark-results/

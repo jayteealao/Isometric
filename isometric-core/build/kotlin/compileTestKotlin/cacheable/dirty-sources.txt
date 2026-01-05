@@ -1,7 +1,0 @@
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\PointTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\IsometricEngineTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\IsoColorTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\ShapeTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\PathTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\VectorTest.kt
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\preparedscene-cache\isometric-core\src\test\kotlin\io\fabianterhorst\isometric\PreparedSceneCacheTest.kt

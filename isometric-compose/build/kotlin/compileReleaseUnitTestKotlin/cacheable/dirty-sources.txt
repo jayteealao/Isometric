@@ -1,1 +1,0 @@
-C:\Users\jayte\Documents\dev\Isometric\.worktrees\benchmark-harness\isometric-compose\src\test\kotlin\io\fabianterhorst\isometric\compose\IsometricCanvasSnapshotTest.kt
