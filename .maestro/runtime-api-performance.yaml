@@ -1,0 +1,25 @@
+appId: io.fabianterhorst.isometric.sample
+name: "Runtime API - Performance grid size and animation"
+---
+# Swipe tab row left to reveal Performance tab
+- swipe:
+    start: "80%, 7%"
+    end: "20%, 7%"
+    duration: 300
+
+- tapOn: "Performance"
+- waitForAnimationToEnd
+
+# Take initial screenshot (default 5x5 grid)
+- takeScreenshot: screenshots/05_performance_default
+
+# Toggle animation ON — tap the switch at right side of Animate row
+- tapOn:
+    point: "88%, 21%"
+- waitForAnimationToEnd
+
+# Take screenshot with animation enabled
+- takeScreenshot: screenshots/05_performance_animated_frame1
+
+# Take another screenshot — animation should show wave
+- takeScreenshot: screenshots/05_performance_animated_frame2

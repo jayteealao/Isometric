@@ -66,12 +66,24 @@ abstract class IsometricNode {
     val nodeId: String = "node_${System.identityHashCode(this)}"
 
     /**
-     * Mark this node and all ancestors as dirty
+     * Callback invoked when dirty propagation reaches a root node (parent == null).
+     * Used by IsometricScene to trigger Canvas invalidation via Compose state.
+     */
+    var onDirty: (() -> Unit)? = null
+
+    /**
+     * Mark this node and all ancestors as dirty.
+     * When propagation reaches the root (no parent), invokes [onDirty] to
+     * trigger a Canvas redraw via Compose's snapshot system.
      */
     fun markDirty() {
         if (!isDirty) {
             isDirty = true
-            parent?.markDirty()
+            if (parent != null) {
+                parent?.markDirty()
+            } else {
+                onDirty?.invoke()
+            }
         }
     }
 

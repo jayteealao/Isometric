@@ -75,6 +75,17 @@ fun IsometricScene(
         )
     }
 
+    // Scene version counter — incremented when the node tree becomes dirty.
+    // The Canvas lambda reads this to create a Compose state dependency,
+    // ensuring the Canvas redraws when nodes change.
+    var sceneVersion by remember { mutableStateOf(0L) }
+
+    // Wire up dirty notification: when markDirty() reaches the root,
+    // increment sceneVersion to trigger Canvas invalidation.
+    SideEffect {
+        rootNode.onDirty = { sceneVersion++ }
+    }
+
     // Track canvas size
     var canvasWidth by remember { mutableStateOf(800) }
     var canvasHeight by remember { mutableStateOf(600) }
@@ -191,6 +202,11 @@ fun IsometricScene(
                 }
             )
     ) {
+        // Read sceneVersion to subscribe to node tree changes.
+        // When any node calls markDirty(), this triggers a Canvas redraw.
+        @Suppress("UNUSED_EXPRESSION")
+        sceneVersion
+
         // Update canvas size
         canvasWidth = size.width.toInt()
         canvasHeight = size.height.toInt()

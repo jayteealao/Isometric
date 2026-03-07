@@ -1,0 +1,14 @@
+appId: io.fabianterhorst.isometric.sample
+name: "Runtime API - Hierarchy with rotating groups"
+---
+# Navigate to Hierarchy tab
+- tapOn: "Hierarchy"
+- waitForAnimationToEnd
+
+# Take first screenshot of rotating groups
+- takeScreenshot: screenshots/03_hierarchy_frame1
+
+# Wait and take another
+- tapOn: "Hierarchy"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/03_hierarchy_frame2

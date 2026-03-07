@@ -1,0 +1,12 @@
+appId: io.fabianterhorst.isometric.sample
+name: "Runtime API - Animation updates visually"
+---
+# Navigate to Animation tab
+- tapOn: "Animation"
+- waitForAnimationToEnd
+
+# Take first screenshot
+- takeScreenshot: screenshots/02_animation_frame1
+
+# Take second screenshot after a brief pause (animation should have progressed)
+- takeScreenshot: screenshots/02_animation_frame2

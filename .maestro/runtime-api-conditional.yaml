@@ -1,0 +1,32 @@
+appId: io.fabianterhorst.isometric.sample
+name: "Runtime API - Conditional toggles change rendering"
+---
+# Swipe tab row left to reveal Conditional tab
+- swipe:
+    start: "80%, 7%"
+    end: "20%, 7%"
+    duration: 300
+
+- tapOn: "Conditional"
+- waitForAnimationToEnd
+
+# Take screenshot with both pyramids and cylinders ON (default)
+- takeScreenshot: screenshots/04_conditional_both_on
+
+# Toggle OFF "Show Pyramids" — tap the switch (right side of the row)
+- tapOn:
+    point: "88%, 16%"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/04_conditional_pyramids_off
+
+# Toggle OFF "Show Cylinders" — tap the switch
+- tapOn:
+    point: "88%, 21%"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/04_conditional_both_off
+
+# Toggle pyramids back ON
+- tapOn:
+    point: "88%, 16%"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/04_conditional_pyramids_back_on

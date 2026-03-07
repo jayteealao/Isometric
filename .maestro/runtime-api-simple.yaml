@@ -1,0 +1,10 @@
+appId: io.fabianterhorst.isometric.sample
+name: "Runtime API - Simple shapes render"
+---
+# Verify the Simple tab is selected and visible tabs exist
+- assertVisible: "Simple"
+- assertVisible: "Hierarchy"
+- assertVisible: "Animation"
+
+# Take a screenshot of the simple shapes
+- takeScreenshot: screenshots/01_simple_shapes
