@@ -227,17 +227,10 @@ fun OptimizedBatchUpdate(
     ComposeNode<ShapeNode, IsometricApplier>(
         factory = { ShapeNode(shape, color) },
         update = {
-            // Update all properties
-            update {
-                // Update multiple properties
-                this.shape = shape
-                this.color = color
-                this.rotation = rotation
-                this.scale = scale
-
-                // Mark dirty only ONCE for all changes
-                markDirty()
-            }
+            set(shape) { this.shape = it; markDirty() }
+            set(color) { this.color = it; markDirty() }
+            set(rotation) { this.rotation = it; markDirty() }
+            set(scale) { this.scale = it; markDirty() }
         }
     )
 }
@@ -307,9 +300,9 @@ fun MixedLevelExample() {
 @Composable
 fun StandardUseCase() {
     IsometricScene {
-        Shape(Prism(Point(0, 0, 0)), IsoColor(255, 0, 0))
+        Shape(Prism(Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0))
         Group(rotation = PI / 4) {
-            Shape(Pyramid(Point(1, 0, 0)), IsoColor(0, 255, 0))
+            Shape(Pyramid(Point(1.0, 0.0, 0.0)), IsoColor(0.0, 255.0, 0.0))
         }
     }
 }
@@ -326,7 +319,7 @@ fun AdvancedUseCase() {
     var rotation by remember { mutableStateOf(0.0) }
 
     ComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(Prism(Point(0, 0, 0)), IsoColor(255, 0, 0)) },
+        factory = { ShapeNode(Prism(Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0)) },
         update = {
             set(rotation) {
                 // Custom logic: only update every 0.5 radians

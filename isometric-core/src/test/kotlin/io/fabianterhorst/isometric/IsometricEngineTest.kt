@@ -15,11 +15,12 @@ class IsometricEngineTest {
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
         engine.add(Prism(Point(1.0, 0.0, 0.0)), IsoColor.RED)
 
-        val scene = engine.prepare(800, 600, RenderOptions.Default)
+        // Use Quality mode (no culling) to get all faces
+        val scene = engine.prepare(800, 600, RenderOptions.Quality)
         assertEquals(12, scene.commands.size) // 2 prisms × 6 faces each
 
         engine.clear()
-        val emptyScene = engine.prepare(800, 600, RenderOptions.Default)
+        val emptyScene = engine.prepare(800, 600, RenderOptions.Quality)
         assertEquals(0, emptyScene.commands.size)
     }
 
@@ -52,9 +53,13 @@ class IsometricEngineTest {
         engine.add(Prism(Point.ORIGIN, 2.0, 2.0, 2.0), IsoColor.BLUE)
 
         val scene = engine.prepare(800, 600, RenderOptions.Default)
+        assertTrue(scene.commands.isNotEmpty())
 
-        // Click in center (should hit the cube)
-        val hit = engine.findItemAt(scene, 400.0, 540.0, reverseSort = true)
+        // Use the center of a rendered face's projected points as hit coordinate
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+        val hit = engine.findItemAt(scene, avgX, avgY, reverseSort = true)
         assertNotNull(hit)
 
         // Click far outside (should miss)

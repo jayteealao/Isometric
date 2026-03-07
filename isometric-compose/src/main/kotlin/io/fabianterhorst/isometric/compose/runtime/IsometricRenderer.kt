@@ -333,9 +333,7 @@ class IsometricRenderer(
         private val rows = (height / cellSize).toInt() + 1
         private val grid = Array(rows) { Array(cols) { mutableListOf<String>() } }
 
-        data class Bounds(val minX: Double, val minY: Double, val maxX: Double, val maxY: Double)
-
-        fun insert(id: String, bounds: Bounds) {
+        fun insert(id: String, bounds: ShapeBounds) {
             val minCol = max(0, (bounds.minX / cellSize).toInt())
             val maxCol = min(cols - 1, (bounds.maxX / cellSize).toInt())
             val minRow = max(0, (bounds.minY / cellSize).toInt())
@@ -392,9 +390,17 @@ private fun RenderCommand.toNativePath(): android.graphics.Path {
 }
 
 /**
+ * Axis-aligned bounding box for spatial indexing
+ */
+private data class ShapeBounds(
+    val minX: Double, val minY: Double,
+    val maxX: Double, val maxY: Double
+)
+
+/**
  * Extension: Get bounds of a render command
  */
-private fun RenderCommand.getBounds(): IsometricRenderer.SpatialGrid.Bounds? {
+private fun RenderCommand.getBounds(): ShapeBounds? {
     if (points.isEmpty()) return null
 
     var minX = Double.MAX_VALUE
@@ -409,7 +415,7 @@ private fun RenderCommand.getBounds(): IsometricRenderer.SpatialGrid.Bounds? {
         maxY = max(maxY, point.y)
     }
 
-    return IsometricRenderer.SpatialGrid.Bounds(minX, minY, maxX, maxY)
+    return ShapeBounds(minX, minY, maxX, maxY)
 }
 
 /**

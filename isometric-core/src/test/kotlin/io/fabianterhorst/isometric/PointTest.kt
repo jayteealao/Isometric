@@ -33,9 +33,9 @@ class PointTest {
 
     @Test
     fun `depth calculation is correct`() {
-        val p1 = Point(1.0, 1.0, 1.0)
-        val p2 = Point(2.0, 2.0, 0.0)
-        assertTrue(p1.depth() > p2.depth()) // p1 is further back
+        val p1 = Point(1.0, 1.0, 1.0) // depth = 1+1-2*1 = 0
+        val p2 = Point(2.0, 2.0, 0.0) // depth = 2+2-2*0 = 4
+        assertTrue(p2.depth() > p1.depth()) // p2 is further back (higher depth)
     }
 
     @Test

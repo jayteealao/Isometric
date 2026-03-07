@@ -11,7 +11,10 @@ class VectorTest {
         val v1 = Vector(1.0, 0.0, 0.0)
         val v2 = Vector(0.0, 1.0, 0.0)
         val cross = Vector.crossProduct(v1, v2)
-        assertEquals(Vector(0.0, 0.0, 1.0), cross)
+        // Use component-wise comparison to avoid -0.0 vs 0.0 data class equality issue
+        assertEquals(0.0, cross.i, 0.0001)
+        assertEquals(0.0, cross.j, 0.0001)
+        assertEquals(1.0, cross.k, 0.0001)
     }
 
     @Test

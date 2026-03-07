@@ -82,7 +82,7 @@ fun RuntimeApiSamplesScreen() {
                 0 -> SimpleSample()
                 1 -> HierarchySample()
                 2 -> AnimationSample()
-                3 -> InteractiveSample()
+                3 -> RuntimeInteractiveSample()
                 4 -> ConditionalSample()
                 5 -> PerformanceSample()
             }
@@ -243,10 +243,10 @@ fun AnimationSample() {
 }
 
 /**
- * Sample 4: Interactive with gesture handling
+ * Sample 4: Interactive with gesture handling (runtime API version)
  */
 @Composable
-fun InteractiveSample() {
+fun RuntimeInteractiveSample() {
     var tappedNode by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(Point(0.0, 0.0, 0.0)) }
 

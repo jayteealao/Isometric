@@ -9,8 +9,9 @@ import io.fabianterhorst.isometric.Shape
 /**
  * Base node for the isometric scene graph.
  * This is the fundamental building block that Compose Runtime manages.
+ * Open for extension to support custom node types via low-level ComposeNode primitives.
  */
-sealed class IsometricNode {
+abstract class IsometricNode {
     /**
      * Parent node in the tree
      */
@@ -197,15 +198,7 @@ class ShapeNode(
 
     override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
         if (!isVisible) return null
-
-        // Render to get projected paths
-        val commands = render(context)
-
-        // Test against each path (will be implemented by engine)
-        // For now, return this node if any path contains the point
-        // This will be properly implemented with the engine's hit testing
-
-        return null // Will be implemented with proper hit testing
+        return null // Stub — will be implemented with engine's findItemAt
     }
 }
 
