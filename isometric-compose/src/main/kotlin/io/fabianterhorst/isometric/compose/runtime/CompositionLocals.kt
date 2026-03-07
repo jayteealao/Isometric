@@ -59,10 +59,3 @@ data class ColorPalette(
 val LocalColorPalette = compositionLocalOf {
     ColorPalette()
 }
-
-/**
- * CompositionLocal for animation speed multiplier
- */
-val LocalAnimationSpeed = compositionLocalOf {
-    1.0
-}

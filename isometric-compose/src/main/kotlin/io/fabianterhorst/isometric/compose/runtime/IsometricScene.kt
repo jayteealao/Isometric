@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +39,6 @@ import io.fabianterhorst.isometric.Vector
  * @param enablePathCaching Enable path object caching (default: true) - reduces GC pressure by 30-40%
  * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
  * @param useNativeCanvas Use Android native canvas for rendering (default: false) - 2x faster, Android-only
- * @param enableOffThreadComputation Compute scene preparation off main thread (default: false) - keeps UI responsive
  * @param onTap Callback when the scene is tapped (x, y, node)
  * @param onDragStart Callback when drag starts
  * @param onDrag Callback when dragging (delta x, delta y)
@@ -58,7 +58,6 @@ fun IsometricScene(
     enablePathCaching: Boolean = true,
     enableSpatialIndex: Boolean = true,
     useNativeCanvas: Boolean = false,
-    enableOffThreadComputation: Boolean = false,
     onTap: (x: Double, y: Double, node: IsometricNode?) -> Unit = { _, _, _ -> },
     onDragStart: (x: Double, y: Double) -> Unit = { _, _ -> },
     onDrag: (deltaX: Double, deltaY: Double) -> Unit = { _, _ -> },
@@ -90,31 +89,17 @@ fun IsometricScene(
         )
     }
 
-    // Off-thread computation (if enabled)
-    // NOTE: Off-thread computation is currently experimental and may not provide
-    // significant benefits due to Compose's snapshot system. Consider removing or
-    // using snapshotFlow to properly observe isDirty changes.
-    if (enableOffThreadComputation) {
-        LaunchedEffect(canvasWidth, canvasHeight) {
-            // This will run once per size change
-            // For proper dirty tracking, would need snapshotFlow { rootNode.isDirty }
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                renderer.prepareSceneAsync(rootNode, renderContext)
-            }
-        }
-    }
-
-    // Recompose flag - increment to force recomposition of the node tree
-    var recomposeKey by remember { mutableStateOf(0) }
-
     // Setup composition with custom applier
     val compositionContext = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
 
-    LaunchedEffect(compositionContext, recomposeKey) {
-        val applier = IsometricApplier(rootNode)
-        val composition = Composition(applier, compositionContext)
+    val composition = remember(compositionContext) {
+        Composition(IsometricApplier(rootNode), compositionContext)
+    }
 
+    // Set content on every recomposition — captures the latest lambda via rememberUpdatedState.
+    // Compose's snapshot system ensures the sub-composition recomposes when read state changes.
+    SideEffect {
         composition.setContent {
             CompositionLocalProvider(
                 LocalDefaultColor provides defaultColor,
@@ -127,12 +112,11 @@ fun IsometricScene(
                 IsometricScopeImpl.currentContent()
             }
         }
+    }
 
-        // Cleanup on dispose
-        try {
-            // Keep composition alive
-            kotlinx.coroutines.awaitCancellation()
-        } finally {
+    // Dispose the sub-composition when this composable leaves the tree
+    DisposableEffect(composition) {
+        onDispose {
             composition.dispose()
         }
     }

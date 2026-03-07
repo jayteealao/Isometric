@@ -11,8 +11,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,7 +23,6 @@ import kotlin.math.min
  * - Path object caching
  * - Spatial indexing for hit testing
  * - Native canvas rendering (Android)
- * - Off-thread scene preparation
  */
 class IsometricRenderer(
     private val engine: IsometricEngine,
@@ -148,49 +145,6 @@ class IsometricRenderer(
                 }
             }
         }
-    }
-
-    /**
-     * Prepare scene asynchronously (can be called from background thread)
-     */
-    suspend fun prepareSceneAsync(
-        rootNode: GroupNode,
-        context: RenderContext
-    ) {
-        withContext(Dispatchers.Default) {
-            // Clear engine
-            engine.clear()
-
-            // Collect all render commands from the tree
-            val commands = rootNode.render(context)
-
-            // Add commands to engine
-            commands.forEach { command ->
-                engine.add(command.originalPath, command.color, command.originalShape)
-            }
-
-            // Prepare scene (CPU-intensive, runs off main thread)
-            val scene = engine.prepare(
-                width = context.width,
-                height = context.height,
-                options = context.renderOptions
-            )
-
-            // Cache it
-            cachedPreparedScene = scene
-            cachedWidth = context.width
-            cachedHeight = context.height
-
-            // Pre-convert paths and build spatial index
-            if (enablePathCaching) {
-                buildCacheAndIndex(scene)
-            }
-
-            cacheValid = true
-        }
-
-        // Mark root as clean (back on caller's context)
-        rootNode.clearDirty()
     }
 
     /**

@@ -13,6 +13,29 @@ class IsometricApplier(
 ) : AbstractApplier<IsometricNode>(root) {
 
     /**
+     * Set of GroupNodes modified during the current change batch.
+     * Snapshot updates and dirty propagation are deferred to onEndChanges().
+     */
+    private val modifiedGroups = mutableSetOf<GroupNode>()
+    private var batching = false
+
+    override fun onBeginChanges() {
+        super.onBeginChanges()
+        batching = true
+    }
+
+    override fun onEndChanges() {
+        batching = false
+        // Update snapshots and propagate dirty once per batch
+        modifiedGroups.forEach { group ->
+            group.updateChildrenSnapshot()
+            group.markDirty()
+        }
+        modifiedGroups.clear()
+        super.onEndChanges()
+    }
+
+    /**
      * Insert nodes top-down.
      * We ignore this and use bottom-up insertion for efficiency.
      */
@@ -30,7 +53,13 @@ class IsometricApplier(
 
         parent.children.add(index, instance)
         instance.parent = parent
-        parent.markDirty()
+
+        if (batching) {
+            modifiedGroups.add(parent)
+        } else {
+            parent.updateChildrenSnapshot()
+            parent.markDirty()
+        }
     }
 
     /**
@@ -45,7 +74,12 @@ class IsometricApplier(
             removed.parent = null
         }
 
-        parent.markDirty()
+        if (batching) {
+            modifiedGroups.add(parent)
+        } else {
+            parent.updateChildrenSnapshot()
+            parent.markDirty()
+        }
     }
 
     /**
@@ -56,7 +90,13 @@ class IsometricApplier(
             ?: error("Can only move children within GroupNode, but current is ${current::class.simpleName}")
 
         parent.children.move(from, to, count)
-        parent.markDirty()
+
+        if (batching) {
+            modifiedGroups.add(parent)
+        } else {
+            parent.updateChildrenSnapshot()
+            parent.markDirty()
+        }
     }
 
     /**
@@ -67,7 +107,13 @@ class IsometricApplier(
         if (node is GroupNode) {
             node.children.forEach { it.parent = null }
             node.children.clear()
-            node.markDirty()
+
+            if (batching) {
+                modifiedGroups.add(node)
+            } else {
+                node.updateChildrenSnapshot()
+                node.markDirty()
+            }
         }
     }
 }

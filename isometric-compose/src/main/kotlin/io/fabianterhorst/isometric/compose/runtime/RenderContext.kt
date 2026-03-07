@@ -37,11 +37,29 @@ data class RenderContext(
         rotationOrigin: Point? = null,
         scaleOrigin: Point? = null
     ): RenderContext {
-        // Accumulate position
+        // Transform child's local position into parent's coordinate space:
+        // first scale by accumulated scale, then rotate by accumulated rotation.
+        var childPosInParentSpace = position
+
+        if (accumulatedScale != 1.0) {
+            childPosInParentSpace = Point(
+                childPosInParentSpace.x * accumulatedScale,
+                childPosInParentSpace.y * accumulatedScale,
+                childPosInParentSpace.z * accumulatedScale
+            )
+        }
+
+        if (accumulatedRotation != 0.0) {
+            childPosInParentSpace = childPosInParentSpace.rotateZ(
+                Point.ORIGIN, accumulatedRotation
+            )
+        }
+
+        // Accumulate position (now correctly in world space)
         val newPosition = Point(
-            accumulatedPosition.x + position.x,
-            accumulatedPosition.y + position.y,
-            accumulatedPosition.z + position.z
+            accumulatedPosition.x + childPosInParentSpace.x,
+            accumulatedPosition.y + childPosInParentSpace.y,
+            accumulatedPosition.z + childPosInParentSpace.z
         )
 
         // Accumulate rotation
@@ -101,41 +119,23 @@ data class RenderContext(
         if (accumulatedPosition.x != 0.0 ||
             accumulatedPosition.y != 0.0 ||
             accumulatedPosition.z != 0.0) {
-            result = Path(
-                origin = result.origin.translate(
-                    accumulatedPosition.x,
-                    accumulatedPosition.y,
-                    accumulatedPosition.z
-                ),
-                points = result.points.map {
-                    it.translate(
-                        accumulatedPosition.x,
-                        accumulatedPosition.y,
-                        accumulatedPosition.z
-                    )
-                },
-                fillColor = result.fillColor
+            result = result.translate(
+                accumulatedPosition.x,
+                accumulatedPosition.y,
+                accumulatedPosition.z
             )
         }
 
         // Apply accumulated rotation
         if (accumulatedRotation != 0.0) {
             val origin = rotationOrigin ?: accumulatedPosition
-            result = Path(
-                origin = result.origin.rotateZ(origin, accumulatedRotation),
-                points = result.points.map { it.rotateZ(origin, accumulatedRotation) },
-                fillColor = result.fillColor
-            )
+            result = result.rotateZ(origin, accumulatedRotation)
         }
 
         // Apply accumulated scale
         if (accumulatedScale != 1.0) {
             val origin = scaleOrigin ?: accumulatedPosition
-            result = Path(
-                origin = result.origin.scale(origin, accumulatedScale),
-                points = result.points.map { it.scale(origin, accumulatedScale) },
-                fillColor = result.fillColor
-            )
+            result = result.scale(origin, accumulatedScale)
         }
 
         return result

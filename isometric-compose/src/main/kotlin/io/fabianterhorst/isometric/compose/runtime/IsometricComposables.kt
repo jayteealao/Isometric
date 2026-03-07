@@ -101,6 +101,8 @@ fun IsometricScope.Group(
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
+ * @param rotationOrigin Origin point for rotation
+ * @param scaleOrigin Origin point for scaling
  * @param visible Whether the path is visible
  */
 @IsometricComposable
@@ -111,6 +113,8 @@ fun IsometricScope.Path(
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
+    rotationOrigin: Point? = null,
+    scaleOrigin: Point? = null,
     visible: Boolean = true
 ) {
     ReusableComposeNode<PathNode, IsometricApplier>(
@@ -121,6 +125,8 @@ fun IsometricScope.Path(
             set(position) { this.position = it; markDirty() }
             set(rotation) { this.rotation = it; markDirty() }
             set(scale) { this.scale = it; markDirty() }
+            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
+            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
         }
     )
@@ -134,6 +140,8 @@ fun IsometricScope.Path(
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
+ * @param rotationOrigin Origin point for rotation
+ * @param scaleOrigin Origin point for scaling
  * @param visible Whether the batch is visible
  */
 @IsometricComposable
@@ -144,6 +152,8 @@ fun IsometricScope.Batch(
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
+    rotationOrigin: Point? = null,
+    scaleOrigin: Point? = null,
     visible: Boolean = true
 ) {
     ReusableComposeNode<BatchNode, IsometricApplier>(
@@ -154,6 +164,8 @@ fun IsometricScope.Batch(
             set(position) { this.position = it; markDirty() }
             set(rotation) { this.rotation = it; markDirty() }
             set(scale) { this.scale = it; markDirty() }
+            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
+            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
         }
     )

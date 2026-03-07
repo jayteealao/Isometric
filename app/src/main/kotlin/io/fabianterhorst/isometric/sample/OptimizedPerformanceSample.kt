@@ -29,7 +29,6 @@ fun OptimizedPerformanceSample() {
     var gridSize by remember { mutableStateOf(10) }
     var enableSpatialIndex by remember { mutableStateOf(true) }
     var useNativeCanvas by remember { mutableStateOf(true) }
-    var enableOffThread by remember { mutableStateOf(false) }
     var animationEnabled by remember { mutableStateOf(false) }
     var wave by remember { mutableStateOf(0.0) }
     var clickCount by remember { mutableStateOf(0) }
@@ -103,17 +102,6 @@ fun OptimizedPerformanceSample() {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Off-Thread Compute\n(Async preparation)")
-                    Switch(
-                        checked = enableOffThread,
-                        onCheckedChange = { enableOffThread = it }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
                     Text("Animate\n(Test caching)")
                     Switch(
                         checked = animationEnabled,
@@ -129,7 +117,6 @@ fun OptimizedPerformanceSample() {
             enablePathCaching = true,  // Always enabled (huge win)
             enableSpatialIndex = enableSpatialIndex,
             useNativeCanvas = useNativeCanvas,
-            enableOffThreadComputation = enableOffThread,
             enableGestures = true,
             onTap = { _, _, node ->
                 // Measure click time
@@ -210,11 +197,6 @@ fun OptimizedPerformanceSample() {
                 )
 
                 Text(
-                    "• Off-Thread: ${if (enableOffThread) "Async computation ✅" else "Main thread blocking ⚠️"}",
-                    style = MaterialTheme.typography.caption
-                )
-
-                Text(
                     "• Path Caching: Always enabled ✅",
                     style = MaterialTheme.typography.caption
                 )
@@ -266,8 +248,7 @@ fun PerformanceComparisonDemo() {
                 modifier = Modifier.weight(1f),
                 enablePathCaching = true,
                 enableSpatialIndex = true,
-                useNativeCanvas = true,
-                enableOffThreadComputation = true
+                useNativeCanvas = true
             ) {
                 LargeAnimatedGrid(wave)
             }
@@ -277,8 +258,7 @@ fun PerformanceComparisonDemo() {
                 modifier = Modifier.weight(1f),
                 enablePathCaching = false,
                 enableSpatialIndex = false,
-                useNativeCanvas = false,
-                enableOffThreadComputation = false
+                useNativeCanvas = false
             ) {
                 LargeAnimatedGrid(wave)
             }

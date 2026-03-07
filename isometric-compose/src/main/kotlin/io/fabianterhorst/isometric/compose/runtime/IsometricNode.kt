@@ -17,9 +17,25 @@ sealed class IsometricNode {
     var parent: IsometricNode? = null
 
     /**
-     * Children of this node
+     * Mutable children list — only accessed by the Applier for mutations.
      */
     abstract val children: MutableList<IsometricNode>
+
+    /**
+     * Thread-safe snapshot of children for rendering and traversal.
+     * Updated atomically after Applier mutations complete (copy-on-write).
+     */
+    @Volatile
+    var childrenSnapshot: List<IsometricNode> = emptyList()
+        private set
+
+    /**
+     * Update the snapshot from the current mutable children list.
+     * Called by the Applier after structural mutations.
+     */
+    fun updateChildrenSnapshot() {
+        childrenSnapshot = children.toList()
+    }
 
     /**
      * Local transform properties
@@ -36,8 +52,8 @@ sealed class IsometricNode {
     var isVisible: Boolean = true
 
     /**
-     * Dirty tracking for efficient rendering
-     * Volatile to ensure visibility across threads (when using off-thread computation)
+     * Dirty tracking for efficient rendering.
+     * Volatile to ensure visibility across threads (Applier vs Canvas draw).
      */
     @Volatile
     var isDirty: Boolean = true
@@ -63,31 +79,7 @@ sealed class IsometricNode {
      */
     fun clearDirty() {
         isDirty = false
-        children.forEach { it.clearDirty() }
-    }
-
-    /**
-     * Apply local transform to a point
-     */
-    fun applyLocalTransform(point: Point): Point {
-        var result = point
-
-        // Apply translation
-        result = result.translate(position.x, position.y, position.z)
-
-        // Apply rotation
-        if (rotation != 0.0) {
-            val origin = rotationOrigin ?: position
-            result = result.rotateZ(origin, rotation)
-        }
-
-        // Apply scale
-        if (scale != 1.0) {
-            val origin = scaleOrigin ?: position
-            result = result.scale(origin, scale)
-        }
-
-        return result
+        childrenSnapshot.forEach { it.clearDirty() }
     }
 
     /**
@@ -120,8 +112,8 @@ class GroupNode : IsometricNode() {
             scaleOrigin = scaleOrigin
         )
 
-        // Render all children
-        return children.flatMap { child ->
+        // Render all children from the thread-safe snapshot
+        return childrenSnapshot.flatMap { child ->
             child.render(childContext)
         }
     }
@@ -137,8 +129,8 @@ class GroupNode : IsometricNode() {
             scaleOrigin = scaleOrigin
         )
 
-        // Test children in reverse order (front to back)
-        for (child in children.asReversed()) {
+        // Test children in reverse order (front to back) using thread-safe snapshot
+        for (child in childrenSnapshot.asReversed()) {
             val hit = child.hitTest(x, y, childContext)
             if (hit != null) return hit
         }
@@ -244,31 +236,17 @@ class PathNode(
 
         // Apply local transforms
         if (position.x != 0.0 || position.y != 0.0 || position.z != 0.0) {
-            transformedPath = Path(
-                origin = transformedPath.origin.translate(position.x, position.y, position.z),
-                points = transformedPath.points.map {
-                    it.translate(position.x, position.y, position.z)
-                },
-                fillColor = transformedPath.fillColor
-            )
+            transformedPath = transformedPath.translate(position.x, position.y, position.z)
         }
 
         if (rotation != 0.0) {
             val origin = rotationOrigin ?: position
-            transformedPath = Path(
-                origin = transformedPath.origin.rotateZ(origin, rotation),
-                points = transformedPath.points.map { it.rotateZ(origin, rotation) },
-                fillColor = transformedPath.fillColor
-            )
+            transformedPath = transformedPath.rotateZ(origin, rotation)
         }
 
         if (scale != 1.0) {
             val origin = scaleOrigin ?: position
-            transformedPath = Path(
-                origin = transformedPath.origin.scale(origin, scale),
-                points = transformedPath.points.map { it.scale(origin, scale) },
-                fillColor = transformedPath.fillColor
-            )
+            transformedPath = transformedPath.scale(origin, scale)
         }
 
         cachedPath = transformedPath
