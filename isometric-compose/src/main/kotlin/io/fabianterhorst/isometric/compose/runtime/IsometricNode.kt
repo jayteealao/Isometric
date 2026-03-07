@@ -161,19 +161,8 @@ class ShapeNode(
 ) : IsometricNode() {
     override val children = mutableListOf<IsometricNode>()
 
-    /**
-     * Cached transformed shape (invalidated when dirty)
-     */
-    private var cachedShape: Shape? = null
-    private var cachedCommands: List<RenderCommand>? = null
-
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
-
-        // Use cached commands if not dirty
-        if (!isDirty && cachedCommands != null) {
-            return cachedCommands!!
-        }
 
         // Apply accumulated transforms from context
         var transformedShape = context.applyTransformsToShape(shape)
@@ -191,10 +180,8 @@ class ShapeNode(
             transformedShape = transformedShape.scale(origin, scale)
         }
 
-        cachedShape = transformedShape
-
         // Convert shape to render commands
-        val commands = transformedShape.paths.map { path ->
+        return transformedShape.paths.map { path ->
             RenderCommand(
                 id = "${nodeId}_${path.hashCode()}",
                 points = emptyList(), // Will be filled by engine
@@ -203,9 +190,6 @@ class ShapeNode(
                 originalShape = transformedShape
             )
         }
-
-        cachedCommands = commands
-        return commands
     }
 
     override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
@@ -223,15 +207,8 @@ class PathNode(
 ) : IsometricNode() {
     override val children = mutableListOf<IsometricNode>()
 
-    private var cachedPath: Path? = null
-    private var cachedCommands: List<RenderCommand>? = null
-
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
-
-        if (!isDirty && cachedCommands != null) {
-            return cachedCommands!!
-        }
 
         // Apply transforms to path points
         var transformedPath = path
@@ -254,9 +231,7 @@ class PathNode(
             transformedPath = transformedPath.scale(origin, scale)
         }
 
-        cachedPath = transformedPath
-
-        val commands = listOf(
+        return listOf(
             RenderCommand(
                 id = nodeId,
                 points = emptyList(), // Will be filled by engine
@@ -265,9 +240,6 @@ class PathNode(
                 originalShape = null
             )
         )
-
-        cachedCommands = commands
-        return commands
     }
 
     override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
@@ -286,16 +258,10 @@ class BatchNode(
 ) : IsometricNode() {
     override val children = mutableListOf<IsometricNode>()
 
-    private var cachedCommands: List<RenderCommand>? = null
-
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
 
-        if (!isDirty && cachedCommands != null) {
-            return cachedCommands!!
-        }
-
-        val commands = shapes.flatMapIndexed { index, shape ->
+        return shapes.flatMapIndexed { index, shape ->
             var transformedShape = context.applyTransformsToShape(shape)
             transformedShape = transformedShape.translate(position.x, position.y, position.z)
 
@@ -319,9 +285,6 @@ class BatchNode(
                 )
             }
         }
-
-        cachedCommands = commands
-        return commands
     }
 
     override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {

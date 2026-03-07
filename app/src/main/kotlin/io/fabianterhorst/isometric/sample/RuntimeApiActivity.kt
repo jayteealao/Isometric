@@ -134,13 +134,13 @@ fun HierarchySample() {
             color = IsoColor(100.0, 100.0, 100.0)
         )
 
-        // Rotating group
+        // Rotating group — centered on the base
         Group(
-            position = Point(0.0, 0.0, 0.5),
+            position = Point(2.0, 2.0, 0.5),
             rotation = groupRotation,
-            rotationOrigin = Point(0.0, 0.0, 0.5)
+            rotationOrigin = Point(2.0, 2.0, 0.5)
         ) {
-            // These all rotate together
+            // These all rotate together (local coords relative to group center)
             Shape(
                 shape = Prism(Point(-1.5, 0.0, 0.0), 1.0, 1.0, 2.0),
                 color = IsoColor(255.0, 0.0, 0.0)
@@ -161,11 +161,10 @@ fun HierarchySample() {
                 color = IsoColor(255.0, 255.0, 0.0)
             )
 
-            // Nested group with additional rotation
+            // Nested group with additional counter-rotation
             Group(
                 position = Point(0.0, 0.0, 2.0),
-                rotation = -groupRotation * 2,
-                rotationOrigin = Point(0.0, 0.0, 2.0)
+                rotation = -groupRotation * 2
             ) {
                 Shape(
                     shape = Octahedron(Point(0.0, 0.0, 0.0)),
@@ -352,21 +351,21 @@ fun ConditionalSample() {
                 color = IsoColor(150.0, 150.0, 150.0)
             )
 
-            // Conditional pyramids
+            // Conditional pyramids — positioned on the base
             If(showPyramids) {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
-                        shape = Pyramid(Point(-3.0 + i.toDouble(), 2.0, 0.2)),
+                        shape = Pyramid(Point(1.0 + i * 1.5, 2.0, 0.2)),
                         color = IsoColor(255.0, 100.0 + i * 15.0, 0.0)
                     )
                 }
             }
 
-            // Conditional cylinders
+            // Conditional cylinders — positioned on the base
             If(showCylinders) {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
-                        shape = Cylinder(Point(-3.0 + i.toDouble(), -2.0, 0.2), 0.4, 20, 1.5),
+                        shape = Cylinder(Point(1.0 + i * 1.5, 5.0, 0.2), 0.4, 20, 1.5),
                         color = IsoColor(0.0, 150.0 + i * 10.0, 255.0)
                     )
                 }
