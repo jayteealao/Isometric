@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
+import io.fabianterhorst.isometric.IsometricEngine.Companion.DEFAULT_LIGHT_DIRECTION
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 
@@ -32,7 +33,9 @@ import io.fabianterhorst.isometric.Vector
  * @param renderOptions Rendering configuration options
  * @param strokeWidth Width of outline strokes
  * @param drawStroke Whether to draw outlines around shapes
- * @param lightDirection Direction of the light source
+ * @param lightDirection Direction of the light source (unit vector).
+ *   Affects per-face shading via dot-product lighting. The default matches
+ *   the engine's built-in light direction to preserve existing visuals.
  * @param defaultColor Default color for shapes
  * @param colorPalette Color palette for theming
  * @param enableGestures Whether to enable gesture handling
@@ -51,7 +54,7 @@ fun IsometricScene(
     renderOptions: RenderOptions = RenderOptions.Default,
     strokeWidth: Float = 1f,
     drawStroke: Boolean = true,
-    lightDirection: Vector = Vector(0.0, 1.0, 1.0).normalize(),
+    lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
     defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
     colorPalette: ColorPalette = ColorPalette(),
     enableGestures: Boolean = true,

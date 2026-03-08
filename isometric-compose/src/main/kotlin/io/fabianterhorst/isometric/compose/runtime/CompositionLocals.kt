@@ -3,8 +3,8 @@ package io.fabianterhorst.isometric.compose.runtime
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import io.fabianterhorst.isometric.IsoColor
+import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
-import io.fabianterhorst.isometric.Vector
 
 /**
  * CompositionLocal for providing default color to shapes
@@ -17,7 +17,7 @@ val LocalDefaultColor = compositionLocalOf {
  * CompositionLocal for providing light direction to the scene
  */
 val LocalLightDirection = compositionLocalOf {
-    Vector(0.0, 1.0, 1.0).normalize()
+    IsometricEngine.DEFAULT_LIGHT_DIRECTION.normalize()
 }
 
 /**

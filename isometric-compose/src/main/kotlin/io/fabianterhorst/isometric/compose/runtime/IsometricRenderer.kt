@@ -12,6 +12,7 @@ import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
+import io.fabianterhorst.isometric.Vector
 import kotlin.math.max
 import kotlin.math.min
 
@@ -39,6 +40,12 @@ class IsometricRenderer(
     private val enablePathCaching: Boolean = true,
     private val enableSpatialIndex: Boolean = true
 ) {
+    /** Bundles inputs to engine.prepare() for cache invalidation. */
+    private data class PrepareInputs(
+        val renderOptions: RenderOptions,
+        val lightDirection: Vector
+    )
+
     /**
      * Cached path with pre-converted objects to avoid reallocations
      */
@@ -55,7 +62,9 @@ class IsometricRenderer(
     private var cachedWidth: Int = 0
     private var cachedHeight: Int = 0
     private var cacheValid: Boolean = false
-    private var cachedRenderOptions: RenderOptions? = null
+    private var cachedPrepareInputs: PrepareInputs? = null
+
+    internal val currentPreparedScene: PreparedScene? get() = cachedPreparedScene
 
     // Spatial index for O(log n) hit testing
     private var spatialIndex: SpatialGrid? = null
@@ -87,14 +96,7 @@ class IsometricRenderer(
         val width = size.width.toInt()
         val height = size.height.toInt()
 
-        // Check if we need to regenerate the scene
-        val needsUpdate = rootNode.isDirty ||
-                !cacheValid ||
-                width != cachedWidth ||
-                height != cachedHeight ||
-                context.renderOptions != cachedRenderOptions
-
-        if (needsUpdate) {
+        if (needsUpdate(rootNode, context, width, height)) {
             rebuildCache(rootNode, context, width, height)
         }
 
@@ -136,13 +138,7 @@ class IsometricRenderer(
             val width = size.width.toInt()
             val height = size.height.toInt()
 
-            val needsUpdate = rootNode.isDirty ||
-                    !cacheValid ||
-                    width != cachedWidth ||
-                    height != cachedHeight ||
-                    context.renderOptions != cachedRenderOptions
-
-            if (needsUpdate) {
+            if (needsUpdate(rootNode, context, width, height)) {
                 rebuildCache(rootNode, context, width, height)
             }
 
@@ -216,13 +212,31 @@ class IsometricRenderer(
     }
 
     /**
+     * Check whether the cache is stale and needs a rebuild.
+     * Extracted so both render paths share one check and tests can verify it.
+     */
+    internal fun needsUpdate(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int
+    ): Boolean {
+        val currentInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+        return rootNode.isDirty ||
+                !cacheValid ||
+                width != cachedWidth ||
+                height != cachedHeight ||
+                currentInputs != cachedPrepareInputs
+    }
+
+    /**
      * Invalidate cache (call when render options change)
      */
     fun invalidate() {
         cacheValid = false
         cachedPreparedScene = null
         cachedPaths = null
-        cachedRenderOptions = null
+        cachedPrepareInputs = null
         spatialIndex = null
         nodeIdMap = emptyMap()
     }
@@ -230,7 +244,7 @@ class IsometricRenderer(
     /**
      * Rebuild cache when scene changes
      */
-    private fun rebuildCache(
+    internal fun rebuildCache(
         rootNode: GroupNode,
         context: RenderContext,
         width: Int,
@@ -254,12 +268,13 @@ class IsometricRenderer(
         cachedPreparedScene = engine.prepare(
             width = width,
             height = height,
-            options = context.renderOptions
+            options = context.renderOptions,
+            lightDirection = context.lightDirection
         )
 
         cachedWidth = width
         cachedHeight = height
-        cachedRenderOptions = context.renderOptions
+        cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
 
         // Build path cache and spatial index
         if (enablePathCaching) {

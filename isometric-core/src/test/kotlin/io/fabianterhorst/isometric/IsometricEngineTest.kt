@@ -85,6 +85,43 @@ class IsometricEngineTest {
     }
 
     @Test
+    fun `prepare without lightDirection uses engine default`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        val defaultScene = engine.prepare(800, 600, RenderOptions.Quality)
+
+        engine.clear()
+        engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        val explicitScene = engine.prepare(800, 600, RenderOptions.Quality,
+            lightDirection = Vector(2.0, -1.0, 3.0))
+
+        assertEquals(defaultScene.commands.size, explicitScene.commands.size)
+        for (i in defaultScene.commands.indices) {
+            assertEquals(defaultScene.commands[i].color, explicitScene.commands[i].color,
+                "Command $i color should match engine default")
+        }
+    }
+
+    @Test
+    fun `lightDirection changes shading colors`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        val sceneA = engine.prepare(800, 600, RenderOptions.Quality,
+            lightDirection = Vector(2.0, -1.0, 3.0))
+
+        engine.clear()
+        engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        val sceneB = engine.prepare(800, 600, RenderOptions.Quality,
+            lightDirection = Vector(-1.0, 2.0, 0.5))
+
+        assertEquals(sceneA.commands.size, sceneB.commands.size)
+        val anyDifferent = sceneA.commands.indices.any { i ->
+            sceneA.commands[i].color != sceneB.commands[i].color
+        }
+        assertTrue(anyDifferent, "Different light directions should produce different shading")
+    }
+
+    @Test
     fun `culling removes back-facing polygons`() {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)

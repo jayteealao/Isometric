@@ -111,7 +111,7 @@ Group(position = Point(5.0, 0.0, 0.0)) {
 Shared state is provided through Composition Locals:
 
 - `LocalDefaultColor` - Default color for shapes
-- `LocalLightDirection` - Light direction for shading
+- `LocalLightDirection` - Light direction for shading (unit vector; default matches engine's built-in direction)
 - `LocalRenderOptions` - Rendering configuration
 - `LocalColorPalette` - Color theming
 - And more...
@@ -131,7 +131,7 @@ fun IsometricScene(
     renderOptions: RenderOptions = RenderOptions.Default,
     strokeWidth: Float = 1f,
     drawStroke: Boolean = true,
-    lightDirection: Vector = Vector(0.0, 1.0, 1.0).normalize(),
+    lightDirection: Vector = IsometricEngine.DEFAULT_LIGHT_DIRECTION.normalize(),
     defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
     colorPalette: ColorPalette = ColorPalette(),
     enableGestures: Boolean = true,
@@ -694,3 +694,18 @@ IsometricScene(enableGestures = true) { ... }
 The runtime-level API provides a powerful, efficient, and idiomatic way to build complex isometric scenes in Jetpack Compose. By leveraging Compose Runtime primitives, it achieves significant performance improvements while providing a more intuitive API for hierarchical scenes and animations.
 
 For questions or issues, please file an issue on GitHub.
+
+---
+
+## Breaking Changes
+
+### Lighting direction default
+
+The default `lightDirection` was changed from `Vector(0.0, 1.0, 1.0).normalize()`
+to `Vector(2.0, -1.0, 3.0).normalize()` to match the engine's historical light
+direction. Since the old default was never consumed (it was a dead field), this
+change has no visual effect — existing scenes already rendered with the engine's
+`Vector(2.0, -1.0, 3.0)` direction.
+
+`lightDirection` now actually controls face shading. Passing a different unit
+vector will change how faces are lit based on their surface normals.

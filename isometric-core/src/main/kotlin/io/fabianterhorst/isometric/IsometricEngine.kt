@@ -12,12 +12,17 @@ import kotlin.math.sqrt
 class IsometricEngine(
     private val angle: Double = PI / 6,  // 30 degrees
     private val scale: Double = 70.0,
-    private val lightPosition: Vector = Vector(2.0, -1.0, 3.0),
+    private val lightDirection: Vector = DEFAULT_LIGHT_DIRECTION,
     private val colorDifference: Double = 0.20,
     private val lightColor: IsoColor = IsoColor.WHITE
 ) {
+    companion object {
+        /** Default light direction used when none is specified. */
+        val DEFAULT_LIGHT_DIRECTION = Vector(2.0, -1.0, 3.0)
+    }
+
     private val transformation: Array<DoubleArray>
-    private val lightAngle: Vector
+    private val defaultLightDirection: Vector
 
     private data class SceneItem(
         val path: Path,
@@ -40,7 +45,7 @@ class IsometricEngine(
                 scale * sin(PI - angle)
             )
         )
-        lightAngle = lightPosition.normalize()
+        defaultLightDirection = lightDirection.normalize()
     }
 
     /**
@@ -75,8 +80,10 @@ class IsometricEngine(
     fun prepare(
         width: Int,
         height: Int,
-        options: RenderOptions = RenderOptions.Default
+        options: RenderOptions = RenderOptions.Default,
+        lightDirection: Vector = this.defaultLightDirection
     ): PreparedScene {
+        val normalizedLight = lightDirection.normalize()
         val originX = width / 2.0
         val originY = height * 0.9
 
@@ -99,7 +106,7 @@ class IsometricEngine(
             }
 
             // Calculate lighting-adjusted color
-            val litColor = transformColor(item.path, item.baseColor)
+            val litColor = transformColor(item.path, item.baseColor, normalizedLight)
 
             TransformedItem(item, transformedPoints, litColor)
         }
@@ -198,7 +205,7 @@ class IsometricEngine(
     /**
      * Apply lighting to a color based on the path's surface normal
      */
-    private fun transformColor(path: Path, color: IsoColor): IsoColor {
+    private fun transformColor(path: Path, color: IsoColor, lightDirection: Vector): IsoColor {
         if (path.points.size < 3) return color
 
         val p1 = path.points[1]
@@ -225,7 +232,7 @@ class IsometricEngine(
         val normalK = if (magnitude == 0.0) 0.0 else k3 / magnitude
 
         // Dot product with light angle
-        val brightness = normalI * lightAngle.i + normalJ * lightAngle.j + normalK * lightAngle.k
+        val brightness = normalI * lightDirection.i + normalJ * lightDirection.j + normalK * lightDirection.k
 
         return color.lighten(brightness * colorDifference, lightColor)
     }
