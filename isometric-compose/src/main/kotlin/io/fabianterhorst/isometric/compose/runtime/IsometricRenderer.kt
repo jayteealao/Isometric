@@ -66,6 +66,23 @@ class IsometricRenderer(
 
     internal val currentPreparedScene: PreparedScene? get() = cachedPreparedScene
 
+    /**
+     * Ensure the prepared scene is up-to-date, rebuilding the cache if needed.
+     * Returns null only when [width] or [height] are non-positive (no valid viewport).
+     */
+    private fun ensurePreparedScene(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int
+    ): PreparedScene? {
+        if (width <= 0 || height <= 0) return null
+        if (needsUpdate(rootNode, context, width, height)) {
+            rebuildCache(rootNode, context, width, height)
+        }
+        return cachedPreparedScene
+    }
+
     // Spatial index for O(k) hit testing
     private var spatialIndex: SpatialGrid? = null
 
@@ -107,9 +124,8 @@ class IsometricRenderer(
         val width = size.width.toInt()
         val height = size.height.toInt()
 
-        if (needsUpdate(rootNode, context, width, height)) {
-            rebuildCache(rootNode, context, width, height)
-        }
+        ensurePreparedScene(rootNode, context, width, height)
+            ?: return
 
         // FAST PATH: Render from cached paths (minimal allocations!)
         if (enablePathCaching && cachedPaths != null) {
@@ -149,9 +165,8 @@ class IsometricRenderer(
             val width = size.width.toInt()
             val height = size.height.toInt()
 
-            if (needsUpdate(rootNode, context, width, height)) {
-                rebuildCache(rootNode, context, width, height)
-            }
+            ensurePreparedScene(rootNode, context, width, height)
+                ?: return@drawIntoCanvas
 
             // Render using native canvas (faster than Compose on Android)
             cachedPreparedScene?.commands?.forEach { command ->
@@ -172,17 +187,30 @@ class IsometricRenderer(
     }
 
     /**
-     * Perform hit testing with optional spatial indexing
+     * Perform hit testing with optional spatial indexing.
+     *
+     * Self-sufficient: rebuilds the prepared scene if the cache is stale,
+     * so callers do not need to call [DrawScope.render] first.
+     *
+     * @param rootNode the root of the node tree
+     * @param x screen-space x coordinate
+     * @param y screen-space y coordinate
+     * @param context render context (options, light direction, transforms)
+     * @param width viewport width in pixels
+     * @param height viewport height in pixels
+     * @return the frontmost [IsometricNode] at (x, y), or null if nothing is hit
+     *         or the viewport dimensions are non-positive
      */
     fun hitTest(
         rootNode: GroupNode,
         x: Double,
         y: Double,
-        context: RenderContext
+        context: RenderContext,
+        width: Int,
+        height: Int
     ): IsometricNode? {
-        if (cachedPreparedScene == null || !cacheValid) {
-            return null
-        }
+        ensurePreparedScene(rootNode, context, width, height)
+            ?: return null
 
         if (enableSpatialIndex && spatialIndex != null) {
             // Fast path: Use spatial index for O(k) hit testing

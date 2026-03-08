@@ -135,6 +135,16 @@ fun IsometricScene(
         }
     }
 
+    // Keep fresh references for the pointer-input coroutine, which is launched once
+    // via pointerInput(Unit) and would otherwise capture stale values.
+    val currentRenderContext by rememberUpdatedState(renderContext)
+    val currentCanvasWidth by rememberUpdatedState(canvasWidth)
+    val currentCanvasHeight by rememberUpdatedState(canvasHeight)
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+
     // Render to canvas with gesture handling
     Canvas(
         modifier = modifier
@@ -166,11 +176,11 @@ fun IsometricScene(
                                             // If moved more than threshold, it's a drag
                                             if (!isDragging && delta.getDistance() > 8f) {
                                                 isDragging = true
-                                                onDragStart(start.x.toDouble(), start.y.toDouble())
+                                                currentOnDragStart(start.x.toDouble(), start.y.toDouble())
                                             }
 
                                             if (isDragging) {
-                                                onDrag(delta.x.toDouble(), delta.y.toDouble())
+                                                currentOnDrag(delta.x.toDouble(), delta.y.toDouble())
                                                 dragStartPos = position
                                                 event.changes.forEach { it.consume() }
                                             }
@@ -181,16 +191,18 @@ fun IsometricScene(
                                         val position = event.changes.first().position
 
                                         if (isDragging) {
-                                            onDragEnd()
+                                            currentOnDragEnd()
                                         } else {
                                             // It's a tap
                                             val hitNode = renderer.hitTest(
                                                 rootNode = rootNode,
                                                 x = position.x.toDouble(),
                                                 y = position.y.toDouble(),
-                                                context = renderContext
+                                                context = currentRenderContext,
+                                                width = currentCanvasWidth,
+                                                height = currentCanvasHeight
                                             )
-                                            onTap(position.x.toDouble(), position.y.toDouble(), hitNode)
+                                            currentOnTap(position.x.toDouble(), position.y.toDouble(), hitNode)
                                         }
 
                                         isDragging = false

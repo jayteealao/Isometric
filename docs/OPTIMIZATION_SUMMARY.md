@@ -181,8 +181,14 @@ fun hitTest(
     rootNode: GroupNode,
     x: Double,
     y: Double,
-    context: RenderContext
+    context: RenderContext,
+    width: Int,
+    height: Int
 ): IsometricNode? {
+    // Self-sufficient: rebuilds the cache if stale
+    ensurePreparedScene(rootNode, context, width, height)
+        ?: return null
+
     if (enableSpatialIndex && spatialIndex != null) {
         // Fast path: Use spatial index
         val candidates = spatialIndex!!.query(x, y) // O(1)
