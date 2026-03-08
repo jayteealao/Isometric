@@ -180,7 +180,7 @@ class IsometricRendererTest {
         val avgX = cmd.points.map { it.x }.average()
         val avgY = cmd.points.map { it.y }.average()
 
-        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest should find item when spatial index is enabled without path caching", hit)
     }
 
@@ -197,7 +197,7 @@ class IsometricRendererTest {
         val avgX = cmd.points.map { it.x }.average()
         val avgY = cmd.points.map { it.y }.average()
 
-        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest fast path should find item at shape center", hit)
     }
 
@@ -214,7 +214,7 @@ class IsometricRendererTest {
         val avgX = cmd.points.map { it.x }.average()
         val avgY = cmd.points.map { it.y }.average()
 
-        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest slow path should find item at shape center", hit)
     }
 
@@ -239,8 +239,8 @@ class IsometricRendererTest {
         val (testX, testY) = findCommandCentroid(fastRenderer.currentPreparedScene!!, inner)
             ?: error("Inner shape should have at least one command")
 
-        val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext)
-        val slowHit = slowRenderer.hitTest(root, testX, testY, defaultContext)
+        val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
 
         assertNotNull("Fast path should find a hit in the overlap region", fastHit)
         assertNotNull("Slow path should find a hit in the overlap region", slowHit)
@@ -259,23 +259,28 @@ class IsometricRendererTest {
 
         renderer.rebuildCache(root, defaultContext, 800, 600)
 
-        val hit = renderer.hitTest(root, 10.0, 10.0, defaultContext)
+        val hit = renderer.hitTest(root, 10.0, 10.0, defaultContext, 800, 600)
         assertNull("hitTest should return null for coordinates outside all shapes", hit)
     }
 
     @Test
-    fun `hitTest returns null when cache is not valid`() {
+    fun `hitTest returns null for non-positive dimensions`() {
         val engine = IsometricEngine()
         val renderer = IsometricRenderer(engine, enablePathCaching = false)
         val root = buildSceneRoot()
 
-        // No rebuild — cache is empty
-        val hit = renderer.hitTest(root, 400.0, 300.0, defaultContext)
-        assertNull("hitTest should return null when cache is not valid", hit)
+        val hit1 = renderer.hitTest(root, 400.0, 300.0, defaultContext, 0, 600)
+        assertNull("hitTest should return null for zero width", hit1)
+
+        val hit2 = renderer.hitTest(root, 400.0, 300.0, defaultContext, 800, 0)
+        assertNull("hitTest should return null for zero height", hit2)
+
+        val hit3 = renderer.hitTest(root, 400.0, 300.0, defaultContext, -1, -1)
+        assertNull("hitTest should return null for negative dimensions", hit3)
     }
 
     @Test
-    fun `invalidate clears all cached state`() {
+    fun `invalidate clears all cached state and hitTest auto-rebuilds`() {
         val engine = IsometricEngine()
         val renderer = IsometricRenderer(engine, enablePathCaching = false)
         val root = buildSceneRoot()
@@ -283,10 +288,139 @@ class IsometricRendererTest {
         renderer.rebuildCache(root, defaultContext, 800, 600)
         assertNotNull(renderer.currentPreparedScene)
 
+        // Grab a hittable centroid before invalidation
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
         renderer.invalidate()
         assertNull("invalidate should clear prepared scene", renderer.currentPreparedScene)
 
-        val hit = renderer.hitTest(root, 400.0, 300.0, defaultContext)
-        assertNull("hitTest should return null after invalidation", hit)
+        // hitTest with valid dimensions should auto-rebuild and find the shape
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
+        assertNotNull("hitTest should auto-rebuild after invalidation", hit)
+    }
+
+    // --- Self-sufficiency tests ---
+
+    @Test
+    fun `hitTest rebuilds when root is dirty`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        // Mark dirty — simulates a node tree mutation
+        root.markDirty()
+        assertTrue("Cache should need update after markDirty", renderer.needsUpdate(root, defaultContext, 800, 600))
+
+        // hitTest should rebuild automatically, not return null
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
+        assertNotNull("hitTest should rebuild and find shape when root is dirty", hit)
+    }
+
+    @Test
+    fun `hitTest rebuilds when renderOptions change`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        // Change renderOptions — cache becomes stale
+        val changedContext = defaultContext.copy(renderOptions = RenderOptions.Default)
+
+        // hitTest with new context should rebuild, not return null
+        val hit = renderer.hitTest(root, avgX, avgY, changedContext, 800, 600)
+        assertNotNull("hitTest should rebuild when renderOptions change", hit)
+    }
+
+    @Test
+    fun `hitTest rebuilds when lightDirection changes`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        val contextA = RenderContext(
+            width = 800, height = 600,
+            renderOptions = RenderOptions.Quality,
+            lightDirection = dirA
+        )
+        renderer.rebuildCache(root, contextA, 800, 600)
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        // Change light direction — cache becomes stale
+        val contextB = contextA.copy(lightDirection = dirB)
+
+        // hitTest with new light direction should rebuild, not return null
+        val hit = renderer.hitTest(root, avgX, avgY, contextB, 800, 600)
+        assertNotNull("hitTest should rebuild when lightDirection changes", hit)
+    }
+
+    @Test
+    fun `hitTest works without prior render call given valid size`() {
+        // Use a probe renderer to discover a hittable centroid
+        val probeEngine = IsometricEngine()
+        val probeRenderer = IsometricRenderer(probeEngine, enablePathCaching = false)
+        val root = buildSceneRoot()
+        probeRenderer.rebuildCache(root, defaultContext, 800, 600)
+        val scene = probeRenderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        // Fresh renderer — no prior rebuildCache or render()
+        root.markDirty()
+        val freshEngine = IsometricEngine()
+        val freshRenderer = IsometricRenderer(freshEngine, enablePathCaching = false, enableSpatialIndex = true)
+
+        val hit = freshRenderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
+        assertNotNull("hitTest should work without any prior render() call", hit)
+    }
+
+    @Test
+    fun `hitTest rebuilds when viewport size changes`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        // Build at 800x600
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        assertEquals(800, renderer.currentPreparedScene!!.viewportWidth)
+        assertEquals(600, renderer.currentPreparedScene!!.viewportHeight)
+
+        // Call hitTest at a different viewport size — coordinates don't matter,
+        // we just need hitTest to trigger a rebuild at the new size.
+        val newWidth = 1024
+        val newHeight = 768
+        renderer.hitTest(root, 0.0, 0.0, defaultContext, newWidth, newHeight)
+
+        // Verify the scene was rebuilt at the new viewport size
+        assertEquals("viewportWidth should be updated after hitTest with new size",
+            newWidth, renderer.currentPreparedScene!!.viewportWidth)
+        assertEquals("viewportHeight should be updated after hitTest with new size",
+            newHeight, renderer.currentPreparedScene!!.viewportHeight)
+
+        // Verify hit testing actually works at the new size by computing a fresh centroid
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext, newWidth, newHeight)
+        assertNotNull("hitTest should find shape at centroid after viewport resize", hit)
     }
 }
