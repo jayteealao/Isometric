@@ -100,11 +100,6 @@ abstract class IsometricNode {
      */
     abstract fun render(context: RenderContext): List<RenderCommand>
 
-    /**
-     * Perform hit testing on this node
-     * @return The node that was hit, or null
-     */
-    abstract fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode?
 }
 
 /**
@@ -131,25 +126,6 @@ class GroupNode : IsometricNode() {
         }
     }
 
-    override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
-        if (!isVisible) return null
-
-        val childContext = context.withTransform(
-            position = position,
-            rotation = rotation,
-            scale = scale,
-            rotationOrigin = rotationOrigin,
-            scaleOrigin = scaleOrigin
-        )
-
-        // Test children in reverse order (front to back) using thread-safe snapshot
-        for (child in childrenSnapshot.asReversed()) {
-            val hit = child.hitTest(x, y, childContext)
-            if (hit != null) return hit
-        }
-
-        return null
-    }
 }
 
 /**
@@ -192,10 +168,6 @@ class ShapeNode(
         }
     }
 
-    override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
-        if (!isVisible) return null
-        return null // Stub — will be implemented with engine's findItemAt
-    }
 }
 
 /**
@@ -242,10 +214,6 @@ class PathNode(
         )
     }
 
-    override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
-        if (!isVisible) return null
-        return null // Will be implemented with proper hit testing
-    }
 }
 
 /**
@@ -287,8 +255,4 @@ class BatchNode(
         }
     }
 
-    override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
-        if (!isVisible) return null
-        return null
-    }
 }

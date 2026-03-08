@@ -141,7 +141,7 @@ IsometricScene(
 }
 ```
 
-**Performance Impact:** 40-50% faster rendering on Android (but loses platform independence).
+**Performance Impact:** ~2x faster drawing on Android (~8ms → ~4ms per frame for 100 shapes), but loses platform independence.
 
 ---
 
@@ -350,15 +350,20 @@ fun MaxPerformanceScene() {
 
 ## Performance Comparison
 
-### Benchmark: 100 Animated Shapes
+### Theoretical Estimates: 100 Animated Shapes
 
-| Optimization Level | Frame Time | FPS | Memory/Frame |
-|-------------------|-----------|-----|--------------|
-| **Standard API** | 80ms | 12 fps | 2.5 MB |
-| **Runtime API** | 15ms | 60 fps | 1.2 MB |
-| **+ Path Caching** | 10ms | 60 fps | 0.8 MB |
-| **+ Native Canvas** | 5ms | 60 fps | 0.8 MB |
-| **+ Off-Thread** | **2ms** | **60 fps** | **0.5 MB** |
+*These are theoretical estimates, not measured benchmarks. Actual performance depends on
+scene complexity, device hardware, and workload. Always profile with Android Studio's profiler.*
+
+| Optimization Level | Est. Frame Time | FPS | Notes |
+|-------------------|----------------|-----|-------|
+| **Legacy API (rebuild engine)** | ~80ms | ~12 fps | Baseline (no caching) |
+| **Runtime API (stable engine)** | ~15ms | ~60 fps | Stable engine + scene caching |
+| **+ Path Caching** | ~12ms | ~60 fps | Avoids GC pressure |
+| **+ Native Canvas (Android)** | ~8ms | ~60 fps | Android-only, ~2x draw speed |
+
+*Off-thread computation moves work off the main thread but does not reduce total computation time.
+Spatial indexing improves hit testing performance (3-25x), not rendering frame time.*
 
 ### Benchmark: Hit Testing (500 shapes)
 
@@ -374,7 +379,7 @@ fun MaxPerformanceScene() {
 ### Native Canvas
 
 **Pros:**
-- ✅ 40-50% faster on Android
+- ✅ ~2x faster drawing on Android
 - ✅ Direct access to Android APIs
 
 **Cons:**
@@ -506,14 +511,16 @@ The **IsometricScene** composable provides **8 major optimizations** with smart 
 | Stable Engine | ✅ ON | 1.1-1.2x | Neutral | Always (enabled by default) |
 | Scene Caching | ✅ ON | 1.5-2x | Neutral | Always (enabled by default) |
 | Spatial Index | ✅ ON | 3-25x (hit test) | +10-20% | Always (enabled by default) |
-| Native Canvas | ❌ OFF | 1.4-1.5x | Neutral | Android-only apps |
+| Native Canvas | ❌ OFF | ~2x draw | Neutral | Android-only apps |
 | Batch Rendering | ✅ ON | 1.2-1.3x | Neutral | Always (automatic) |
 | Off-Thread | ❌ OFF | ~1x (async) | Neutral | Heavy animated scenes |
 | Layer Caching | Manual | 1.6-4x | +50% | Static backgrounds |
 
-**Combined:** Up to **5-10x** overall performance improvement for large, complex scenes.
+**Combined (theoretical):** Up to ~5-10x main-thread improvement on Android (with native canvas + all
+caching), ~3-5x cross-platform. Spatial indexing additionally provides 3-25x faster hit testing.
+These are estimates — always profile your specific use case.
 
 **Recommendation:**
 - **Default settings work great for most apps!** Path caching, scene caching, and spatial indexing are already enabled.
-- **Android-only apps:** Enable `useNativeCanvas = true` for 2x speedup
+- **Android-only apps:** Enable `useNativeCanvas = true` for ~2x draw speedup
 - **Heavy animations:** Enable `enableOffThreadComputation = true` to keep UI responsive

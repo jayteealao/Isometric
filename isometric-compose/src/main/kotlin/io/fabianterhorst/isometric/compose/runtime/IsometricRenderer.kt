@@ -23,6 +23,15 @@ import kotlin.math.min
  * - Path object caching
  * - Spatial indexing for hit testing
  * - Native canvas rendering (Android)
+ *
+ * **Platform notes:**
+ * - [DrawScope.render] uses Compose `DrawScope` APIs and is cross-platform compatible.
+ * - [DrawScope.renderNative] uses `android.graphics.Canvas` directly and is Android-only.
+ *   It provides ~2x faster rendering but will throw [NoClassDefFoundError] on non-Android platforms.
+ *
+ * TODO(KMP): When converting to Kotlin Multiplatform, extract renderNative() and its
+ *            Android-specific helpers (fillPaint, strokePaint, toNativePath, toAndroidColor)
+ *            into an androidMain source set. The render() method is already cross-platform.
  */
 class IsometricRenderer(
     private val engine: IsometricEngine,
@@ -49,7 +58,11 @@ class IsometricRenderer(
     // Spatial index for O(log n) hit testing
     private var spatialIndex: SpatialGrid? = null
 
-    // Reusable paint objects for native rendering (Android)
+    // Maps node IDs to nodes for O(1) hit test lookups
+    private var nodeIdMap: Map<String, IsometricNode> = emptyMap()
+
+    // TODO(KMP): Move to androidMain source set
+    // Reusable paint objects for native rendering (Android-only)
     private val fillPaint = Paint().apply {
         style = Paint.Style.FILL
         isAntiAlias = true
@@ -176,7 +189,7 @@ class IsometricRenderer(
                 )
 
                 if (hit != null && hit.id == commandId) {
-                    return findNodeById(rootNode, commandId)
+                    return findNodeByCommandId(commandId)
                 }
             }
         } else {
@@ -191,7 +204,7 @@ class IsometricRenderer(
             )
 
             if (hit != null) {
-                return findNodeById(rootNode, hit.id)
+                return findNodeByCommandId(hit.id)
             }
         }
 
@@ -206,6 +219,7 @@ class IsometricRenderer(
         cachedPreparedScene = null
         cachedPaths = null
         spatialIndex = null
+        nodeIdMap = emptyMap()
     }
 
     /**
@@ -223,10 +237,13 @@ class IsometricRenderer(
         // Collect all render commands from the tree
         val commands = rootNode.render(context)
 
-        // Add commands to engine
+        // Add commands to engine, preserving node-level IDs for hit testing
         commands.forEach { command ->
-            engine.add(command.originalPath, command.color, command.originalShape)
+            engine.add(command.originalPath, command.color, command.originalShape, command.id)
         }
+
+        // Build node ID lookup map for hit testing
+        nodeIdMap = buildNodeIdMap(rootNode)
 
         // Prepare scene (projects 3D -> 2D, sorts by depth)
         cachedPreparedScene = engine.prepare(
@@ -306,19 +323,28 @@ class IsometricRenderer(
     }
 
     /**
-     * Find a node by its ID or render command ID
+     * Find the node that produced a render command, using the cached ID map.
+     * Command IDs have the format "nodeId_suffix", so we match by prefix.
      */
-    private fun findNodeById(node: IsometricNode, id: String): IsometricNode? {
-        if (id.startsWith(node.nodeId)) {
-            return node
-        }
+    private fun findNodeByCommandId(commandId: String): IsometricNode? {
+        return nodeIdMap.entries.find { (nodeId, _) ->
+            commandId.startsWith(nodeId)
+        }?.value
+    }
 
-        for (child in node.children) {
-            val found = findNodeById(child, id)
-            if (found != null) return found
+    /**
+     * Build a flat map from nodeId to IsometricNode by walking the tree.
+     */
+    private fun buildNodeIdMap(root: IsometricNode): Map<String, IsometricNode> {
+        val map = mutableMapOf<String, IsometricNode>()
+        fun visit(node: IsometricNode) {
+            map[node.nodeId] = node
+            for (child in node.childrenSnapshot) {
+                visit(child)
+            }
         }
-
-        return null
+        visit(root)
+        return map
     }
 
     /**
@@ -376,6 +402,7 @@ private fun RenderCommand.toComposePath(): Path {
 
 /**
  * Extension: Convert RenderCommand to Android native Path
+ * TODO(KMP): Move to androidMain source set
  */
 private fun RenderCommand.toNativePath(): android.graphics.Path {
     return android.graphics.Path().apply {
@@ -432,6 +459,7 @@ private fun io.fabianterhorst.isometric.IsoColor.toComposeColor(): Color {
 
 /**
  * Extension: Convert IsoColor to Android Color
+ * TODO(KMP): Move to androidMain source set
  */
 private fun io.fabianterhorst.isometric.IsoColor.toAndroidColor(): Int {
     return android.graphics.Color.argb(

@@ -56,8 +56,8 @@ class IsometricEngine(
     /**
      * Add a path to the scene
      */
-    fun add(path: Path, color: IsoColor, originalShape: Shape? = null) {
-        items.add(SceneItem(path, color, originalShape, "item_${nextId++}"))
+    fun add(path: Path, color: IsoColor, originalShape: Shape? = null, id: String? = null) {
+        items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}"))
     }
 
     /**

@@ -184,10 +184,6 @@ class MultiShapeNode(
         }
     }
 
-    override fun hitTest(x: Double, y: Double, context: RenderContext): IsometricNode? {
-        if (!isVisible) return null
-        return null
-    }
 }
 
 /**

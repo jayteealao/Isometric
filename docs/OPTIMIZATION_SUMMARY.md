@@ -271,18 +271,21 @@ IsometricScene {
 }
 ```
 
-### Performance Comparison
+### Performance Comparison (Theoretical Estimates)
 
-| Optimization | Enabled | Frame Time | Speedup |
-|--------------|---------|-----------|---------|
-| None | - | 80ms | 1x |
-| Path Caching | ✅ | 55ms | 1.45x |
-| Scene Caching | ✅ | 30ms | 2.67x |
-| Native Canvas | ✅ | 15ms | 5.33x |
-| Spatial Index | ✅ | 10ms | 8x |
-| Off-Thread | ✅ | 2ms | **40x** |
+| Optimization | Enabled | Est. Frame Time | Cumulative Speedup |
+|--------------|---------|----------------|-------------------|
+| Legacy API (rebuild engine every frame) | - | ~80ms | 1x |
+| Runtime API (stable engine) | ✅ | ~15ms | ~5x |
+| + Path Caching | ✅ | ~12ms | ~7x |
+| + Native Canvas (Android) | ✅ | ~8ms | ~10x |
 
-**Total Speedup:** Up to **40x faster** for large animated scenes!
+*Spatial indexing improves hit testing performance (not rendering frame time).*
+*Off-thread computation reduces main-thread occupancy but not total computation time.*
+
+**Note:** These are theoretical estimates for a 100-shape scene. Actual performance
+depends on scene complexity, device hardware, and workload. Always profile with
+Android Studio's profiler for your specific use case.
 
 ---
 
@@ -325,4 +328,6 @@ All **9 recommended optimizations** have been implemented:
 8. ✅ Alpha optimization
 9. ✅ Off-thread computation
 
-**Result:** Up to **40x performance improvement** for large, complex, animated scenes! 🚀
+**Result:** Significant performance improvement — up to ~5-10x for rendering (with native canvas on Android),
+plus 3-25x faster hit testing via spatial indexing. Always profile your specific use case with
+Android Studio's profiler for accurate measurements.

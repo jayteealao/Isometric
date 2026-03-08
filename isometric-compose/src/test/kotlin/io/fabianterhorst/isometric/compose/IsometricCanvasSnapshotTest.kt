@@ -101,7 +101,7 @@ class IsometricCanvasSnapshotTest {
                     for (x in 0 until 10) {
                         add(
                             Path(
-                                arrayOf(
+                                listOf(
                                     Point(x.toDouble(), 0.0, 0.0),
                                     Point(x.toDouble(), 10.0, 0.0),
                                     Point(x.toDouble(), 0.0, 0.0)
@@ -114,7 +114,7 @@ class IsometricCanvasSnapshotTest {
                     for (y in 0 until 10) {
                         add(
                             Path(
-                                arrayOf(
+                                listOf(
                                     Point(0.0, y.toDouble(), 0.0),
                                     Point(10.0, y.toDouble(), 0.0),
                                     Point(0.0, y.toDouble(), 0.0)
@@ -126,7 +126,7 @@ class IsometricCanvasSnapshotTest {
                     add(Prism(Point.ORIGIN), MATERIAL_BLUE)
                     add(
                         Path(
-                            arrayOf(
+                            listOf(
                                 Point.ORIGIN,
                                 Point(0.0, 0.0, 10.0),
                                 Point.ORIGIN
@@ -148,7 +148,7 @@ class IsometricCanvasSnapshotTest {
                     add(Prism(Point.ORIGIN, 3.0, 3.0, 1.0), BLUE)
                     add(
                         Path(
-                            arrayOf(
+                            listOf(
                                 Point(1.0, 1.0, 1.0),
                                 Point(2.0, 1.0, 1.0),
                                 Point(2.0, 2.0, 1.0),
@@ -224,7 +224,7 @@ class IsometricCanvasSnapshotTest {
                     add(
                         Shape.extrude(
                             Path(
-                                arrayOf(
+                                listOf(
                                     Point(1.0, 1.0, 1.0),
                                     Point(2.0, 1.0, 1.0),
                                     Point(2.0, 3.0, 1.0)
