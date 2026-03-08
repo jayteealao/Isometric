@@ -66,22 +66,33 @@ class IsometricRenderer(
 
     internal val currentPreparedScene: PreparedScene? get() = cachedPreparedScene
 
-    // Spatial index for O(log n) hit testing
+    // Spatial index for O(k) hit testing
     private var spatialIndex: SpatialGrid? = null
 
-    // Maps node IDs to nodes for O(1) hit test lookups
+    // Maps command IDs to RenderCommands for O(1) lookup when building filtered scenes
+    private var commandIdMap: Map<String, RenderCommand> = emptyMap()
+
+    // Maps command IDs directly to the IsometricNode that produced them for O(1) hit-test resolution
+    private var commandToNodeMap: Map<String, IsometricNode> = emptyMap()
+
+    // Maps node IDs to nodes for building commandToNodeMap
     private var nodeIdMap: Map<String, IsometricNode> = emptyMap()
 
     // TODO(KMP): Move to androidMain source set
     // Reusable paint objects for native rendering (Android-only)
-    private val fillPaint = Paint().apply {
-        style = Paint.Style.FILL
-        isAntiAlias = true
+    // Lazy to avoid UnsatisfiedLinkError when constructing on non-Android JVM (e.g. unit tests)
+    private val fillPaint by lazy {
+        Paint().apply {
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
     }
 
-    private val strokePaint = Paint().apply {
-        style = Paint.Style.STROKE
-        isAntiAlias = true
+    private val strokePaint by lazy {
+        Paint().apply {
+            style = Paint.Style.STROKE
+            isAntiAlias = true
+        }
     }
 
     /**
@@ -174,22 +185,32 @@ class IsometricRenderer(
         }
 
         if (enableSpatialIndex && spatialIndex != null) {
-            // Fast path: Use spatial index O(1) + O(k)
-            val candidates = spatialIndex!!.query(x, y)
+            // Fast path: Use spatial index for O(k) hit testing
+            val candidateIds = spatialIndex!!.query(x, y)
 
-            // Test candidates in reverse order (front to back)
-            for (commandId in candidates.asReversed()) {
-                val hit = engine.findItemAt(
-                    preparedScene = cachedPreparedScene!!,
-                    x = x,
-                    y = y,
-                    reverseSort = true,
-                    useRadius = true,
-                    radius = 8.0
-                )
+            if (candidateIds.isNotEmpty()) {
+                // Resolve candidate IDs to commands, preserving grid insertion order (back-to-front)
+                val candidateCommands = candidateIds.mapNotNull { id -> commandIdMap[id] }
 
-                if (hit != null && hit.id == commandId) {
-                    return findNodeByCommandId(commandId)
+                if (candidateCommands.isNotEmpty()) {
+                    val filteredScene = PreparedScene(
+                        commands = candidateCommands,
+                        viewportWidth = cachedPreparedScene!!.viewportWidth,
+                        viewportHeight = cachedPreparedScene!!.viewportHeight
+                    )
+
+                    val hit = engine.findItemAt(
+                        preparedScene = filteredScene,
+                        x = x,
+                        y = y,
+                        reverseSort = true,
+                        useRadius = true,
+                        radius = 8.0
+                    )
+
+                    if (hit != null) {
+                        return findNodeByCommandId(hit.id)
+                    }
                 }
             }
         } else {
@@ -239,6 +260,8 @@ class IsometricRenderer(
         cachedPrepareInputs = null
         spatialIndex = null
         nodeIdMap = emptyMap()
+        commandIdMap = emptyMap()
+        commandToNodeMap = emptyMap()
     }
 
     /**
@@ -276,9 +299,14 @@ class IsometricRenderer(
         cachedHeight = height
         cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
 
-        // Build path cache and spatial index
+        // Build path cache (rendering optimization)
         if (enablePathCaching) {
-            buildCacheAndIndex(cachedPreparedScene!!)
+            buildPathCache(cachedPreparedScene!!)
+        }
+
+        // Build spatial index (hit-testing optimization) — independent of path caching
+        if (enableSpatialIndex) {
+            buildSpatialIndex(cachedPreparedScene!!)
         }
 
         // Clear dirty flags
@@ -287,10 +315,9 @@ class IsometricRenderer(
     }
 
     /**
-     * Pre-convert all paths and build spatial index
+     * Pre-convert all render commands to Compose Path objects for rendering.
      */
-    private fun buildCacheAndIndex(scene: PreparedScene) {
-        // Convert all render commands to cached paths
+    private fun buildPathCache(scene: PreparedScene) {
         cachedPaths = scene.commands.map { command ->
             CachedPath(
                 path = command.toComposePath(),
@@ -299,22 +326,53 @@ class IsometricRenderer(
                 commandId = command.id
             )
         }
+    }
 
-        // Build spatial index for fast hit testing
-        if (enableSpatialIndex) {
-            spatialIndex = SpatialGrid(
-                width = cachedWidth.toDouble(),
-                height = cachedHeight.toDouble(),
-                cellSize = 100.0 // Tune based on average shape size
-            )
+    /**
+     * Build spatial grid, command ID lookup map, and command-to-node map for O(k) hit testing.
+     */
+    private fun buildSpatialIndex(scene: PreparedScene) {
+        // Build command ID -> RenderCommand map for O(1) lookup
+        val cmdMap = HashMap<String, RenderCommand>(scene.commands.size)
+        for (command in scene.commands) {
+            cmdMap[command.id] = command
+        }
+        commandIdMap = cmdMap
 
-            scene.commands.forEach { command ->
-                val bounds = command.getBounds()
-                if (bounds != null) {
-                    spatialIndex!!.insert(command.id, bounds)
-                }
+        // Build command ID -> IsometricNode map for O(1) hit-test resolution
+        val cmdToNode = HashMap<String, IsometricNode>(scene.commands.size)
+        for (command in scene.commands) {
+            val node = resolveNodeForCommand(command.id)
+            if (node != null) {
+                cmdToNode[command.id] = node
             }
         }
+        commandToNodeMap = cmdToNode
+
+        // Build spatial grid
+        spatialIndex = SpatialGrid(
+            width = cachedWidth.toDouble(),
+            height = cachedHeight.toDouble(),
+            cellSize = 100.0 // Tune based on average shape size
+        )
+
+        for (command in scene.commands) {
+            val bounds = command.getBounds()
+            if (bounds != null) {
+                spatialIndex!!.insert(command.id, bounds)
+            }
+        }
+    }
+
+    /**
+     * Resolve the owning node for a command ID using prefix+separator matching.
+     * Used at build time to populate commandToNodeMap.
+     */
+    private fun resolveNodeForCommand(commandId: String): IsometricNode? {
+        return nodeIdMap.entries.find { (nodeId, _) ->
+            commandId == nodeId ||
+            (commandId.startsWith(nodeId) && commandId.length > nodeId.length && commandId[nodeId.length] == '_')
+        }?.value
     }
 
     /**
@@ -344,13 +402,16 @@ class IsometricRenderer(
     }
 
     /**
-     * Find the node that produced a render command, using the cached ID map.
-     * Command IDs have the format "nodeId_suffix", so we match by prefix.
+     * Find the node that produced a render command via O(1) map lookup.
+     * The commandToNodeMap is built at cache time in buildSpatialIndex().
+     * Falls back to prefix matching when the spatial index is disabled.
      */
     private fun findNodeByCommandId(commandId: String): IsometricNode? {
-        return nodeIdMap.entries.find { (nodeId, _) ->
-            commandId.startsWith(nodeId)
-        }?.value
+        // O(1) lookup when spatial index is built
+        commandToNodeMap[commandId]?.let { return it }
+
+        // Fallback for slow path (no spatial index) — uses corrected prefix+separator matching
+        return resolveNodeForCommand(commandId)
     }
 
     /**
@@ -369,7 +430,7 @@ class IsometricRenderer(
     }
 
     /**
-     * Spatial grid for O(1) hit testing
+     * Spatial grid for O(1) cell lookup, yielding k candidates for point-in-polygon testing.
      */
     private class SpatialGrid(
         private val width: Double,

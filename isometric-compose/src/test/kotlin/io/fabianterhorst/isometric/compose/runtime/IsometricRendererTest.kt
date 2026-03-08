@@ -8,6 +8,8 @@ import io.fabianterhorst.isometric.Vector
 import io.fabianterhorst.isometric.shapes.Prism
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,7 +33,7 @@ class IsometricRendererTest {
     @Test
     fun `rebuildCache produces different colors for different lightDirection`() {
         val engine = IsometricEngine()
-        val renderer = IsometricRenderer(engine)
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
         val root = buildSceneRoot()
 
         val contextA = RenderContext(
@@ -63,7 +65,7 @@ class IsometricRendererTest {
     @Test
     fun `needsUpdate detects lightDirection change even when tree is clean`() {
         val engine = IsometricEngine()
-        val renderer = IsometricRenderer(engine)
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
         val root = buildSceneRoot()
 
         val contextA = RenderContext(
@@ -99,7 +101,7 @@ class IsometricRendererTest {
     @Test
     fun `needsUpdate detects renderOptions change even when tree is clean`() {
         val engine = IsometricEngine()
-        val renderer = IsometricRenderer(engine)
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
         val root = buildSceneRoot()
 
         val context = RenderContext(
@@ -116,5 +118,175 @@ class IsometricRendererTest {
             "Different renderOptions should trigger update",
             renderer.needsUpdate(root, changed, 800, 600)
         )
+    }
+
+    // --- Hit testing helpers ---
+
+    private val defaultContext = RenderContext(
+        width = 800, height = 600,
+        renderOptions = RenderOptions.Quality,
+        lightDirection = dirA
+    )
+
+    /**
+     * Build a scene with two overlapping prisms. The inner prism is fully inside
+     * the outer's x,y footprint, guaranteeing screen-space overlap.
+     * Returns (root, outerShape, innerShape).
+     */
+    private fun buildOverlappingSceneRoot(): Triple<GroupNode, ShapeNode, ShapeNode> {
+        val root = GroupNode()
+        val outer = ShapeNode(
+            shape = Prism(Point.ORIGIN, 3.0, 3.0, 1.0),
+            color = IsoColor.BLUE
+        )
+        val inner = ShapeNode(
+            shape = Prism(Point(0.5, 0.5, 0.0), 1.0, 1.0, 1.0),
+            color = IsoColor.RED
+        )
+        root.children.add(outer)
+        outer.parent = root
+        root.children.add(inner)
+        inner.parent = root
+        root.updateChildrenSnapshot()
+        return Triple(root, outer, inner)
+    }
+
+    /** Find a hittable centroid from commands belonging to a given node. */
+    private fun findCommandCentroid(
+        scene: io.fabianterhorst.isometric.PreparedScene,
+        node: ShapeNode
+    ): Pair<Double, Double>? {
+        val cmd = scene.commands.firstOrNull { it.id.startsWith(node.nodeId) }
+            ?: return null
+        val cx = cmd.points.map { it.x }.average()
+        val cy = cmd.points.map { it.y }.average()
+        return cx to cy
+    }
+
+    // --- Hit testing tests ---
+
+    @Test
+    fun `hitTest with spatial index works independently of path caching`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val scene = renderer.currentPreparedScene!!
+        assertTrue("Scene should have commands", scene.commands.isNotEmpty())
+
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        assertNotNull("hitTest should find item when spatial index is enabled without path caching", hit)
+    }
+
+    @Test
+    fun `hitTest fast path returns correct node`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        assertNotNull("hitTest fast path should find item at shape center", hit)
+    }
+
+    @Test
+    fun `hitTest slow path returns correct node when spatial index is disabled`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = false)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val scene = renderer.currentPreparedScene!!
+        val cmd = scene.commands.first()
+        val avgX = cmd.points.map { it.x }.average()
+        val avgY = cmd.points.map { it.y }.average()
+
+        val hit = renderer.hitTest(root, avgX, avgY, defaultContext)
+        assertNotNull("hitTest slow path should find item at shape center", hit)
+    }
+
+    @Test
+    fun `hitTest fast path matches slow path on overlapping shapes`() {
+        val (root, _, inner) = buildOverlappingSceneRoot()
+
+        // Fast renderer: spatial index ON
+        val fastEngine = IsometricEngine()
+        val fastRenderer = IsometricRenderer(fastEngine, enablePathCaching = false, enableSpatialIndex = true)
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        // Slow renderer: spatial index OFF, path caching OFF
+        val slowEngine = IsometricEngine()
+        val slowRenderer = IsometricRenderer(slowEngine, enablePathCaching = false, enableSpatialIndex = false)
+        root.markDirty()
+        slowRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        // Find a deterministic overlap point: centroid of an inner shape command.
+        // Since the inner prism (0.5,0.5 -> 1.5,1.5) is fully inside the outer (0,0 -> 3,3),
+        // this point is guaranteed to be in the overlap region.
+        val (testX, testY) = findCommandCentroid(fastRenderer.currentPreparedScene!!, inner)
+            ?: error("Inner shape should have at least one command")
+
+        val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext)
+        val slowHit = slowRenderer.hitTest(root, testX, testY, defaultContext)
+
+        assertNotNull("Fast path should find a hit in the overlap region", fastHit)
+        assertNotNull("Slow path should find a hit in the overlap region", slowHit)
+        assertEquals(
+            "Fast path and slow path must return the same node (frontmost shape)",
+            slowHit!!.nodeId,
+            fastHit!!.nodeId
+        )
+    }
+
+    @Test
+    fun `hitTest returns null for miss`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val hit = renderer.hitTest(root, 10.0, 10.0, defaultContext)
+        assertNull("hitTest should return null for coordinates outside all shapes", hit)
+    }
+
+    @Test
+    fun `hitTest returns null when cache is not valid`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val root = buildSceneRoot()
+
+        // No rebuild — cache is empty
+        val hit = renderer.hitTest(root, 400.0, 300.0, defaultContext)
+        assertNull("hitTest should return null when cache is not valid", hit)
+    }
+
+    @Test
+    fun `invalidate clears all cached state`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val root = buildSceneRoot()
+
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        assertNotNull(renderer.currentPreparedScene)
+
+        renderer.invalidate()
+        assertNull("invalidate should clear prepared scene", renderer.currentPreparedScene)
+
+        val hit = renderer.hitTest(root, 400.0, 300.0, defaultContext)
+        assertNull("hitTest should return null after invalidation", hit)
     }
 }
