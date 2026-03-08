@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
+import io.fabianterhorst.isometric.RenderOptions
 import kotlin.math.max
 import kotlin.math.min
 
@@ -54,6 +55,7 @@ class IsometricRenderer(
     private var cachedWidth: Int = 0
     private var cachedHeight: Int = 0
     private var cacheValid: Boolean = false
+    private var cachedRenderOptions: RenderOptions? = null
 
     // Spatial index for O(log n) hit testing
     private var spatialIndex: SpatialGrid? = null
@@ -89,7 +91,8 @@ class IsometricRenderer(
         val needsUpdate = rootNode.isDirty ||
                 !cacheValid ||
                 width != cachedWidth ||
-                height != cachedHeight
+                height != cachedHeight ||
+                context.renderOptions != cachedRenderOptions
 
         if (needsUpdate) {
             rebuildCache(rootNode, context, width, height)
@@ -136,7 +139,8 @@ class IsometricRenderer(
             val needsUpdate = rootNode.isDirty ||
                     !cacheValid ||
                     width != cachedWidth ||
-                    height != cachedHeight
+                    height != cachedHeight ||
+                    context.renderOptions != cachedRenderOptions
 
             if (needsUpdate) {
                 rebuildCache(rootNode, context, width, height)
@@ -218,6 +222,7 @@ class IsometricRenderer(
         cacheValid = false
         cachedPreparedScene = null
         cachedPaths = null
+        cachedRenderOptions = null
         spatialIndex = null
         nodeIdMap = emptyMap()
     }
@@ -254,6 +259,7 @@ class IsometricRenderer(
 
         cachedWidth = width
         cachedHeight = height
+        cachedRenderOptions = context.renderOptions
 
         // Build path cache and spatial index
         if (enablePathCaching) {
