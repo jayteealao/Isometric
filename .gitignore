@@ -9,3 +9,19 @@
 /captures
 .externalNativeBuild
 .idea/*
+
+# Eclipse IDE
+.project
+.classpath
+.settings/
+bin/
+
+# Git worktrees
+.worktrees/
+
+# Benchmark output
+benchmark-results/
+benchmark-results-*/
+
+# Maestro screenshots
+screenshots/
