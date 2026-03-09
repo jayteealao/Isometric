@@ -1,6 +1,10 @@
 appId: io.fabianterhorst.isometric.sample
 name: "Runtime API - Hierarchy with rotating groups"
 ---
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
 # Navigate to Hierarchy tab
 - tapOn: "Hierarchy"
 - waitForAnimationToEnd

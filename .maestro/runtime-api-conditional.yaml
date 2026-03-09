@@ -1,6 +1,10 @@
 appId: io.fabianterhorst.isometric.sample
 name: "Runtime API - Conditional toggles change rendering"
 ---
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
 # Swipe tab row left to reveal Conditional tab
 - swipe:
     start: "80%, 7%"

@@ -1,6 +1,10 @@
 appId: io.fabianterhorst.isometric.sample
 name: "Runtime API - Animation updates visually"
 ---
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
 # Navigate to Animation tab
 - tapOn: "Animation"
 - waitForAnimationToEnd

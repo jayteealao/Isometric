@@ -1,6 +1,10 @@
 appId: io.fabianterhorst.isometric.sample
 name: "Runtime API - Performance grid size and animation"
 ---
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
 # Swipe tab row left to reveal Performance tab
 - swipe:
     start: "80%, 7%"
