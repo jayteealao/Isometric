@@ -42,6 +42,7 @@ import io.fabianterhorst.isometric.Vector
  * @param enablePathCaching Enable path object caching (default: true) - reduces GC pressure by 30-40%
  * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
  * @param useNativeCanvas Use Android native canvas for rendering (default: false) - 2x faster, Android-only
+ * @param forceRebuild Force cache rebuild every frame (benchmark use only, default: false)
  * @param onTap Callback when the scene is tapped (x, y, node)
  * @param onDragStart Callback when drag starts
  * @param onDrag Callback when dragging (delta x, delta y)
@@ -61,6 +62,7 @@ fun IsometricScene(
     enablePathCaching: Boolean = true,
     enableSpatialIndex: Boolean = true,
     useNativeCanvas: Boolean = false,
+    forceRebuild: Boolean = false,
     onTap: (x: Double, y: Double, node: IsometricNode?) -> Unit = { _, _, _ -> },
     onDragStart: (x: Double, y: Double) -> Unit = { _, _ -> },
     onDrag: (deltaX: Double, deltaY: Double) -> Unit = { _, _ -> },
@@ -87,6 +89,15 @@ fun IsometricScene(
     // increment sceneVersion to trigger Canvas invalidation.
     SideEffect {
         rootNode.onDirty = { sceneVersion++ }
+    }
+
+    // Wire benchmark hooks from CompositionLocal to the renderer.
+    // LocalBenchmarkHooks.current is read during composition (required for CompositionLocals),
+    // then assigned in SideEffect to bridge into the imperative renderer.
+    val currentBenchmarkHooks = LocalBenchmarkHooks.current
+    SideEffect {
+        renderer.benchmarkHooks = currentBenchmarkHooks
+        renderer.forceRebuild = forceRebuild
     }
 
     // Track canvas size

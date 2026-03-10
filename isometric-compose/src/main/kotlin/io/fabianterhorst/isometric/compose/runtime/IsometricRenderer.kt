@@ -17,6 +17,22 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
+ * Hooks for benchmark instrumentation of the rendering pipeline.
+ *
+ * All callbacks fire synchronously on the main thread within the Compose draw pass.
+ * Implementations should be lightweight (e.g., recording timestamps) to minimize
+ * measurement overhead.
+ */
+interface RenderBenchmarkHooks {
+    fun onPrepareStart()
+    fun onPrepareEnd()
+    fun onDrawStart()
+    fun onDrawEnd()
+    fun onCacheHit()
+    fun onCacheMiss()
+}
+
+/**
  * Renderer that converts the isometric node tree to visual output
  * using the IsometricEngine for projection and depth sorting.
  *
@@ -40,6 +56,18 @@ class IsometricRenderer(
     private val enablePathCaching: Boolean = true,
     private val enableSpatialIndex: Boolean = true
 ) {
+    /**
+     * Optional benchmark hooks for instrumentation. Set via [IsometricScene]'s SideEffect
+     * from [LocalBenchmarkHooks]. Null in production (zero overhead).
+     */
+    var benchmarkHooks: RenderBenchmarkHooks? = null
+
+    /**
+     * When true, forces a cache rebuild every frame (disables PreparedScene caching).
+     * Used by benchmarks to measure prepare() cost independently of caching.
+     */
+    var forceRebuild: Boolean = false
+
     /** Bundles inputs to engine.prepare() for cache invalidation. */
     private data class PrepareInputs(
         val renderOptions: RenderOptions,
@@ -77,8 +105,14 @@ class IsometricRenderer(
         height: Int
     ): PreparedScene? {
         if (width <= 0 || height <= 0) return null
+        if (forceRebuild) invalidate()
         if (needsUpdate(rootNode, context, width, height)) {
+            benchmarkHooks?.onCacheMiss()
+            benchmarkHooks?.onPrepareStart()
             rebuildCache(rootNode, context, width, height)
+            benchmarkHooks?.onPrepareEnd()
+        } else {
+            benchmarkHooks?.onCacheHit()
         }
         return cachedPreparedScene
     }
@@ -127,6 +161,8 @@ class IsometricRenderer(
         ensurePreparedScene(rootNode, context, width, height)
             ?: return
 
+        benchmarkHooks?.onDrawStart()
+
         // FAST PATH: Render from cached paths (minimal allocations!)
         if (enablePathCaching && cachedPaths != null) {
             val paths = cachedPaths!!
@@ -145,6 +181,8 @@ class IsometricRenderer(
                 renderPreparedScene(scene, strokeWidth, drawStroke)
             }
         }
+
+        benchmarkHooks?.onDrawEnd()
     }
 
     /**
@@ -168,6 +206,8 @@ class IsometricRenderer(
             ensurePreparedScene(rootNode, context, width, height)
                 ?: return@drawIntoCanvas
 
+            benchmarkHooks?.onDrawStart()
+
             // Render using native canvas (faster than Compose on Android)
             cachedPreparedScene?.commands?.forEach { command ->
                 val nativePath = command.toNativePath()
@@ -183,6 +223,8 @@ class IsometricRenderer(
                     canvas.nativeCanvas.drawPath(nativePath, strokePaint)
                 }
             }
+
+            benchmarkHooks?.onDrawEnd()
         }
     }
 

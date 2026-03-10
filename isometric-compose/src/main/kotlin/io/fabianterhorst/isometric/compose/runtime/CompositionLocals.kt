@@ -2,6 +2,7 @@ package io.fabianterhorst.isometric.compose.runtime
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
@@ -59,3 +60,12 @@ data class ColorPalette(
 val LocalColorPalette = compositionLocalOf {
     ColorPalette()
 }
+
+/**
+ * CompositionLocal for providing benchmark hooks to the renderer.
+ *
+ * Uses [staticCompositionLocalOf] because hooks are set once per benchmark run
+ * and rarely change, avoiding unnecessary recomposition tracking.
+ * Defaults to null (no instrumentation) in production.
+ */
+val LocalBenchmarkHooks = staticCompositionLocalOf<RenderBenchmarkHooks?> { null }
