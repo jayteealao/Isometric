@@ -40,12 +40,23 @@ class BenchmarkActivity : ComponentActivity() {
             Log.w(TAG, "enableBroadPhaseSort is set but not yet implemented in the engine (Phase 3)")
         }
 
+        val collector = MetricsCollector(config.measurementFrames)
+
         setContent {
             BenchmarkScreen(
                 config = config,
-                onComplete = { result ->
+                onComplete = { iterations ->
                     Log.i(TAG, "Benchmark complete: ${config.name}")
-                    setResult(Activity.RESULT_OK)
+
+                    // Export results
+                    ResultsExporter.export(this@BenchmarkActivity, config, iterations, collector)
+
+                    // Validate
+                    val validationResults = HarnessValidator.validate(config, iterations)
+                    val outputDir = ResultsExporter.getOutputDir(this@BenchmarkActivity)
+                    val allPassed = HarnessValidator.writeValidationLog(outputDir, config, validationResults)
+
+                    setResult(if (allPassed) Activity.RESULT_OK else Activity.RESULT_CANCELED)
                     finish()
                 }
             )
