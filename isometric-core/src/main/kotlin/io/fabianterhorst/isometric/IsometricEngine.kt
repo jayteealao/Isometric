@@ -283,6 +283,10 @@ class IsometricEngine(
 
     /**
      * Sort paths using intersection-based depth sorting algorithm
+     *
+     * The baseline path checks every prior item pair. When broad-phase sorting is enabled,
+     * we only prune candidate-pair generation; polygon intersection, depth comparison, and
+     * topological-sort behavior stay unchanged.
      */
     private fun sortPaths(items: List<TransformedItem>, options: RenderOptions): List<TransformedItem> {
         val sortedItems = mutableListOf<TransformedItem>()

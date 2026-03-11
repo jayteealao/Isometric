@@ -184,6 +184,34 @@ class IsometricEngineTest {
     }
 
     @Test
+    fun `broad phase sort preserves order for adjacent-cell overlap`() {
+        val baselineEngine = IsometricEngine()
+        baselineEngine.add(Prism(Point.ORIGIN, 1.2, 1.2, 1.0), IsoColor.BLUE)
+        baselineEngine.add(Prism(Point(0.75, 0.0, 0.0), 1.2, 1.2, 1.0), IsoColor.RED)
+        baselineEngine.add(Prism(Point(2.5, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.GREEN)
+
+        val broadPhaseEngine = IsometricEngine()
+        broadPhaseEngine.add(Prism(Point.ORIGIN, 1.2, 1.2, 1.0), IsoColor.BLUE)
+        broadPhaseEngine.add(Prism(Point(0.75, 0.0, 0.0), 1.2, 1.2, 1.0), IsoColor.RED)
+        broadPhaseEngine.add(Prism(Point(2.5, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.GREEN)
+
+        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Quality)
+        val optimized = broadPhaseEngine.prepare(
+            800,
+            600,
+            RenderOptions.Quality.copy(
+                enableBroadPhaseSort = true,
+                broadPhaseCellSize = 50.0
+            )
+        )
+
+        assertEquals(
+            baseline.commands.map { it.id },
+            optimized.commands.map { it.id }
+        )
+    }
+
+    @Test
     fun `render options reject non-positive broad phase cell size`() {
         try {
             RenderOptions(broadPhaseCellSize = 0.0)
