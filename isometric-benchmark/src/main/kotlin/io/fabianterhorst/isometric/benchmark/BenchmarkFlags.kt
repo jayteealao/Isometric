@@ -12,9 +12,9 @@ package io.fabianterhorst.isometric.benchmark
  * @property enableBroadPhaseSort Broad-phase depth sorting optimization (Phase 3 — not yet implemented in engine)
  */
 data class BenchmarkFlags(
-    val enablePathCaching: Boolean = true,
-    val enableSpatialIndex: Boolean = true,
-    val enablePreparedSceneCache: Boolean = true,
+    val enablePathCaching: Boolean = false,
+    val enableSpatialIndex: Boolean = false,
+    val enablePreparedSceneCache: Boolean = false,
     val enableNativeCanvas: Boolean = false,
     val enableBroadPhaseSort: Boolean = false
 ) {

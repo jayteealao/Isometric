@@ -42,7 +42,7 @@ data class Scenario(
  */
 data class BenchmarkConfig(
     val scenario: Scenario,
-    val flags: BenchmarkFlags = BenchmarkFlags.ALL_ON,
+    val flags: BenchmarkFlags = BenchmarkFlags.ALL_OFF,
     val name: String = buildDefaultName(scenario, flags),
     val iterations: Int = 3,
     val measurementFrames: Int = 500,
@@ -56,7 +56,11 @@ data class BenchmarkConfig(
             val size = "N${scenario.sceneSize}"
             val mutation = if (scenario.mutationRate > 0.0) "mut${(scenario.mutationRate * 100).toInt()}" else "static"
             val interaction = scenario.interactionPattern.name.lowercase()
-            val flagSuffix = if (flags == BenchmarkFlags.ALL_ON) "allOn" else "custom"
+            val flagSuffix = when (flags) {
+                BenchmarkFlags.ALL_OFF -> "baseline"
+                BenchmarkFlags.ALL_ON -> "allOn"
+                else -> "custom"
+            }
             return "${size}_${mutation}_${interaction}_$flagSuffix"
         }
     }

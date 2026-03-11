@@ -1,6 +1,7 @@
 package io.fabianterhorst.isometric.benchmark
 
 import android.util.Log
+import io.fabianterhorst.isometric.compose.runtime.IsometricNode
 import kotlinx.coroutines.delay
 
 /**
@@ -12,7 +13,7 @@ import kotlinx.coroutines.delay
  *
  * Per-frame work:
  * - Applies mutations via [MutationSimulator]
- * - Injects hit-test taps via [InteractionSimulator]
+ * - Injects hit-test taps via [InteractionSimulator] calling [renderer.hitTest] directly
  * - Records vsync frame times via [FramePacer]
  * - Advances [MetricsCollector]
  *
@@ -21,7 +22,8 @@ import kotlinx.coroutines.delay
  */
 class BenchmarkOrchestrator(
     private val config: BenchmarkConfig,
-    private val collector: MetricsCollector
+    private val collector: MetricsCollector,
+    private val getDrawPassCount: () -> Long
 ) {
     companion object {
         private const val TAG = "IsoBenchmark"
@@ -30,21 +32,39 @@ class BenchmarkOrchestrator(
     }
 
     /**
+     * Hit-test function provided by BenchmarkScreen via IsometricScene's onHitTestReady.
+     * Set before the measurement loop starts. Calls renderer.hitTest() directly,
+     * bypassing Compose pointer input overhead.
+     */
+    var hitTestFn: ((x: Double, y: Double) -> IsometricNode?)? = null
+
+    /** Actual viewport dimensions from IsometricScene (updated via onFlagsReady) */
+    var viewportWidth: Int = 1920
+    var viewportHeight: Int = 1080
+
+    /** Per-iteration raw timings captured before collector.reset() */
+    val iterationRawTimings = mutableListOf<RawTimings>()
+
+    /**
      * Run the full benchmark lifecycle.
      *
      * Must be called from the main thread (uses Choreographer).
      *
      * @param items Current scene items (read-only for interaction simulation)
      * @param onMutate Callback to apply mutations to the scene's SnapshotStateList
+     * @param onResetScene Callback to restore the scene to its deterministic initial state
      * @param onComplete Called with per-iteration metrics when all iterations complete
      */
     suspend fun run(
         items: List<GeneratedItem>,
         onMutate: (List<MutationResult>) -> Unit,
+        onResetScene: () -> Unit,
+        onFrame: () -> Unit,
         onComplete: (List<FrameMetrics>) -> Unit
     ) {
         val framePacer = FramePacer()
         val iterationResults = mutableListOf<FrameMetrics>()
+        iterationRawTimings.clear()
 
         Log.i(TAG, "=== Benchmark: ${config.name} ===")
         Log.i(TAG, "Scene: N=${config.scenario.sceneSize}, mutation=${config.scenario.mutationRate}, " +
@@ -52,7 +72,7 @@ class BenchmarkOrchestrator(
         Log.i(TAG, "Config: ${config.iterations} iterations × ${config.measurementFrames} frames")
 
         // Phase 1: Warmup
-        val warmupFrames = runWarmup(framePacer, items, onMutate)
+        val warmupFrames = runWarmup(framePacer, items, onMutate, onFrame)
         Log.i(TAG, "Warmup complete: $warmupFrames frames")
 
         // Phase 2-3: Measurement iterations
@@ -60,21 +80,29 @@ class BenchmarkOrchestrator(
             // Cooldown between iterations
             if (iteration > 1) {
                 Log.i(TAG, "Cooldown: ${config.cooldownSeconds}s")
+                @Suppress("BlockingMethodInNonBlockingContext")
+                System.gc()
                 delay(config.cooldownSeconds * 1000L)
             }
+
+            // Reset scene to deterministic initial state before each iteration
+            // so iterations are statistically independent
+            onResetScene()
 
             Log.i(TAG, "Iteration $iteration/${config.iterations}: measuring ${config.measurementFrames} frames")
             collector.reset()
             collector.warmupFrames = warmupFrames
 
-            runMeasurement(framePacer, items, onMutate)
+            runMeasurement(framePacer, items, onMutate, onFrame)
 
-            val metrics = collector.snapshot()
+            val metrics = collector.snapshot(sceneSize = config.scenario.sceneSize)
+            iterationRawTimings.add(collector.rawTimings())
             iterationResults.add(metrics)
 
             Log.i(TAG, "  prepare: ${formatMs(metrics.prepareTimeMs.mean)}ms (p95=${formatMs(metrics.prepareTimeMs.p95)}ms)")
             Log.i(TAG, "  draw: ${formatMs(metrics.drawTimeMs.mean)}ms (p95=${formatMs(metrics.drawTimeMs.p95)}ms)")
             Log.i(TAG, "  frame: ${formatMs(metrics.frameTimeMs.mean)}ms (p95=${formatMs(metrics.frameTimeMs.p95)}ms)")
+            Log.i(TAG, "  hitTest: ${formatMs(metrics.hitTestTimeMs.mean)}ms (p95=${formatMs(metrics.hitTestTimeMs.p95)}ms)")
             Log.i(TAG, "  cache hit rate: ${(metrics.cacheHitRate * 100).toInt()}%")
         }
 
@@ -95,7 +123,8 @@ class BenchmarkOrchestrator(
     private suspend fun runWarmup(
         framePacer: FramePacer,
         items: List<GeneratedItem>,
-        onMutate: (List<MutationResult>) -> Unit
+        onMutate: (List<MutationResult>) -> Unit,
+        onFrame: () -> Unit
     ): Int {
         val warmupCollector = MetricsCollector(config.warmupMaxFrames)
         val startTime = System.nanoTime()
@@ -114,16 +143,20 @@ class BenchmarkOrchestrator(
                 break
             }
 
+            val drawCountBeforeFrame = getDrawPassCount()
             framePacer.awaitNextFrame { frameTimeNanos ->
                 val elapsed = frameTimeNanos - lastFrameNanos
                 lastFrameNanos = frameTimeNanos
 
                 // Apply mutations during warmup too
                 applyFrameWork(frameCount, items, onMutate)
+                onFrame()
 
                 warmupCollector.recordFrameTime(elapsed)
-                warmupCollector.advanceFrame()
             }
+
+            awaitNextDraw(framePacer, drawCountBeforeFrame)
+            warmupCollector.advanceFrame()
 
             frameCount++
 
@@ -146,58 +179,80 @@ class BenchmarkOrchestrator(
     private suspend fun runMeasurement(
         framePacer: FramePacer,
         items: List<GeneratedItem>,
-        onMutate: (List<MutationResult>) -> Unit
+        onMutate: (List<MutationResult>) -> Unit,
+        onFrame: () -> Unit
     ) {
         var lastFrameNanos = System.nanoTime()
 
         for (frame in 0 until config.measurementFrames) {
+            val drawCountBeforeFrame = getDrawPassCount()
             framePacer.awaitNextFrame { frameTimeNanos ->
                 val elapsed = frameTimeNanos - lastFrameNanos
                 lastFrameNanos = frameTimeNanos
 
                 collector.recordFrameTime(elapsed)
 
-                // Apply per-frame work
+                // Apply per-frame work (mutations + hit testing)
                 applyFrameWork(frame, items, onMutate)
-
-                collector.advanceFrame()
+                onFrame()
             }
+
+            awaitNextDraw(framePacer, drawCountBeforeFrame)
+            collector.advanceFrame()
         }
     }
 
     /**
-     * Per-frame work: mutations and interaction simulation.
+     * Wait until a draw pass completes after the current frame's work invalidated the scene.
+     * This keeps measurement aligned to actual rendered frames instead of only Choreographer callbacks.
+     */
+    private suspend fun awaitNextDraw(framePacer: FramePacer, previousDrawPassCount: Long) {
+        while (getDrawPassCount() <= previousDrawPassCount) {
+            framePacer.awaitNextFrame { }
+        }
+    }
+
+    /**
+     * Per-frame work: mutations and interaction simulation with real hit testing.
      */
     private fun applyFrameWork(
         frameIndex: Int,
         items: List<GeneratedItem>,
         onMutate: (List<MutationResult>) -> Unit
     ) {
-        // Apply mutations
+        // Apply mutations and record count for validation
         val mutations = MutationSimulator.mutate(
             items = items,
             mutationRate = config.scenario.mutationRate,
             frameIndex = frameIndex
         )
+        collector.recordMutationCount(mutations.size)
         if (mutations.isNotEmpty()) {
             onMutate(mutations)
         }
 
-        // Interaction simulation (hit test timing recorded by hooks)
+        // Interaction simulation — call renderer.hitTest() directly
         val interaction = InteractionSimulator.nextTap(
             frameIndex = frameIndex,
             pattern = config.scenario.interactionPattern,
             items = items,
-            viewportWidth = 1920,  // Landscape default
-            viewportHeight = 1080
+            viewportWidth = viewportWidth,
+            viewportHeight = viewportHeight
         )
 
         if (interaction != null) {
-            val hitTestStart = System.nanoTime()
-            // Note: hit test is performed by the renderer's ensurePreparedScene + engine.findItemAt
-            // during the next draw pass. We record the interaction simulation time here.
-            val hitTestEnd = System.nanoTime()
-            collector.recordHitTestTime(hitTestEnd - hitTestStart)
+            val fn = hitTestFn
+            if (fn != null) {
+                val hitTestStart = System.nanoTime()
+                val hitNode = fn(interaction.tapX, interaction.tapY)
+                val hitTestEnd = System.nanoTime()
+                collector.recordHitTestTime(hitTestEnd - hitTestStart)
+
+                // Lightweight validation: if we expected a hit, log misses
+                if (interaction.expectedHit && hitNode == null) {
+                    Log.d(TAG, "Hit-test miss at (${interaction.tapX}, ${interaction.tapY}) frame $frameIndex")
+                }
+            }
         }
     }
 

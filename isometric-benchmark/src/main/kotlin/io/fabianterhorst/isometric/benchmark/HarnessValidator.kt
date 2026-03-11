@@ -1,6 +1,7 @@
 package io.fabianterhorst.isometric.benchmark
 
 import android.util.Log
+import io.fabianterhorst.isometric.compose.runtime.RuntimeFlagSnapshot
 import java.io.File
 
 /**
@@ -9,9 +10,9 @@ import java.io.File
  * Five validation checks:
  * 1. **Cache validation**: If cache enabled AND mutationRate=0, hit rate > 95%
  * 2. **Flag validation**: Flags in output match flags in config
- * 3. **Consistency**: CV < 15% across iterations for key metrics
- * 4. **Sanity**: avgFrameMs < 20ms for N ≤ 50
- * 5. **Mutation validation**: Observed mutation rate ≈ configured rate ±5%
+ * 3. **Consistency**: CV < 15% across iterations (warning only, not a hard failure)
+ * 4. **Sanity**: avgFrameMs < 20ms for N=10 all-flags-disabled baseline only
+ * 5. **Mutation validation**: Observed mutation rate ≈ configured rate ±2%
  *
  * Self-test scenarios are defined as companion constants and must pass
  * before any benchmark matrix run proceeds.
@@ -36,11 +37,18 @@ object HarnessValidator {
         warmupMaxSeconds = 10
     )
 
-    /** Self-test: sanity check (N=10, all flags OFF, 100 frames, 1 iteration) */
+    /**
+     * Self-test: sanity check (N=10, all flags OFF, mutationRate=0.10, 100 frames, 1 iteration).
+     *
+     * Uses mutationRate=0.10 to exercise the mutation path. All flags OFF means
+     * `enablePreparedSceneCache = false` → `forceRebuild = true`, so every frame
+     * does a full rebuild (100% cache miss). Validates that even a full-rebuild
+     * path on a 10-shape scene stays under 20ms.
+     */
     val SELFTEST_SANITY = BenchmarkConfig(
         scenario = Scenario(
             sceneSize = 10,
-            mutationRate = 0.0,
+            mutationRate = 0.10,
             interactionPattern = InteractionPattern.NONE
         ),
         flags = BenchmarkFlags.ALL_OFF,
@@ -66,16 +74,18 @@ object HarnessValidator {
      *
      * @param config The benchmark config used
      * @param iterations Per-iteration metrics
+     * @param runtimeFlags Actual runtime flag snapshot from IsometricScene (null if unavailable)
      * @return List of validation results (one per check)
      */
     fun validate(
         config: BenchmarkConfig,
-        iterations: List<FrameMetrics>
+        iterations: List<FrameMetrics>,
+        runtimeFlags: RuntimeFlagSnapshot? = null
     ): List<ValidationResult> {
         val results = mutableListOf<ValidationResult>()
 
         results.add(validateCache(config, iterations))
-        results.add(validateFlags(config))
+        results.add(validateFlags(config, runtimeFlags))
         results.add(validateConsistency(iterations))
         results.add(validateSanity(config, iterations))
         results.add(validateMutation(config, iterations))
@@ -97,7 +107,7 @@ object HarnessValidator {
         val sb = StringBuilder()
 
         sb.appendLine("Validation Report: ${config.name}")
-        sb.appendLine("=" .repeat(60))
+        sb.appendLine("=".repeat(60))
 
         var allPassed = true
         results.forEach { result ->
@@ -106,7 +116,7 @@ object HarnessValidator {
             sb.appendLine("[$status] ${result.check}: ${result.message}")
         }
 
-        sb.appendLine("=" .repeat(60))
+        sb.appendLine("=".repeat(60))
         sb.appendLine(if (allPassed) "OVERALL: PASS" else "OVERALL: FAIL")
 
         file.writeText(sb.toString())
@@ -139,16 +149,34 @@ object HarnessValidator {
         )
     }
 
-    private fun validateFlags(config: BenchmarkConfig): ValidationResult {
-        // Flags are embedded in config — just verify they're valid
-        val flags = config.flags
-        val valid = BenchmarkFlags.FLAG_NAMES.size == flags.toValueList().size
+    private fun validateFlags(config: BenchmarkConfig, runtimeFlags: RuntimeFlagSnapshot?): ValidationResult {
+        if (runtimeFlags == null) {
+            return ValidationResult("flags", false, "No runtime flag snapshot available")
+        }
 
-        return ValidationResult(
-            "flags",
-            valid,
-            "Flag count: ${flags.toValueList().size}/${BenchmarkFlags.FLAG_NAMES.size}"
-        )
+        val mismatches = mutableListOf<String>()
+        val flags = config.flags
+
+        if (runtimeFlags.enablePathCaching != flags.enablePathCaching) {
+            mismatches.add("enablePathCaching: config=${flags.enablePathCaching}, runtime=${runtimeFlags.enablePathCaching}")
+        }
+        if (runtimeFlags.enableSpatialIndex != flags.enableSpatialIndex) {
+            mismatches.add("enableSpatialIndex: config=${flags.enableSpatialIndex}, runtime=${runtimeFlags.enableSpatialIndex}")
+        }
+        // forceRebuild should be the inverse of enablePreparedSceneCache
+        val expectedForceRebuild = !flags.enablePreparedSceneCache
+        if (runtimeFlags.forceRebuild != expectedForceRebuild) {
+            mismatches.add("forceRebuild: expected=$expectedForceRebuild, runtime=${runtimeFlags.forceRebuild}")
+        }
+        if (runtimeFlags.useNativeCanvas != flags.enableNativeCanvas) {
+            mismatches.add("useNativeCanvas: config=${flags.enableNativeCanvas}, runtime=${runtimeFlags.useNativeCanvas}")
+        }
+
+        return if (mismatches.isEmpty()) {
+            ValidationResult("flags", true, "All runtime flags match config")
+        } else {
+            ValidationResult("flags", false, "Flag mismatches: ${mismatches.joinToString("; ")}")
+        }
     }
 
     private fun validateConsistency(iterations: List<FrameMetrics>): ValidationResult {
@@ -165,18 +193,22 @@ object HarnessValidator {
         val variance = frameMeans.map { (it - mean) * (it - mean) }.average()
         val stdDev = kotlin.math.sqrt(variance)
         val cv = stdDev / mean
-        val passed = cv < 0.15
 
-        return ValidationResult(
-            "consistency",
-            passed,
-            "Frame time CV across iterations: ${"%.1f".format(cv * 100)}% (threshold: <15%)"
-        )
+        // Per plan: CV > 15% is a warning for investigation, not a hard failure.
+        // High CV indicates thermal throttling, GC pressure, or background processes.
+        val message = "Frame time CV across iterations: ${"%.1f".format(cv * 100)}% (threshold: <15%)"
+        return if (cv >= 0.15) {
+            ValidationResult("consistency", true, "WARNING: $message — flag for investigation")
+        } else {
+            ValidationResult("consistency", true, message)
+        }
     }
 
     private fun validateSanity(config: BenchmarkConfig, iterations: List<FrameMetrics>): ValidationResult {
-        if (config.scenario.sceneSize > 50) {
-            return ValidationResult("sanity", true, "Skipped (N > 50)")
+        // Per plan: sanity check only applies to the N=10, all-flags-disabled baseline.
+        // It guards against fundamentally broken harness/device, not general performance.
+        if (config.scenario.sceneSize != 10 || config.flags != BenchmarkFlags.ALL_OFF) {
+            return ValidationResult("sanity", true, "Skipped (not N=10 baseline)")
         }
 
         val avgFrameMs = iterations.map { it.frameTimeMs.mean }.average()
@@ -185,32 +217,36 @@ object HarnessValidator {
         return ValidationResult(
             "sanity",
             passed,
-            "Avg frame time: ${"%.2f".format(avgFrameMs)}ms for N=${config.scenario.sceneSize} (threshold: <20ms)"
+            "Avg frame time: ${"%.2f".format(avgFrameMs)}ms for N=10 baseline (threshold: <20ms)"
         )
     }
 
+    /**
+     * Mutation validation: verify observed mutation rate matches configured rate ±2%.
+     *
+     * Uses actual mutation counts recorded per frame by the orchestrator from
+     * MutationSimulator.mutate() results. Validates that mean(mutationCount) / sceneSize
+     * is within ±2% of the configured mutation rate.
+     */
     private fun validateMutation(config: BenchmarkConfig, iterations: List<FrameMetrics>): ValidationResult {
         if (config.scenario.mutationRate == 0.0) {
             return ValidationResult("mutation", true, "Skipped (no mutations)")
         }
 
-        // For mutation validation, we check that cache misses occurred
-        // (mutations should invalidate the cache)
-        val totalMisses = iterations.sumOf { it.cacheMisses }
-        val totalOps = iterations.sumOf { it.cacheHits + it.cacheMisses }
-
-        if (totalOps == 0L) {
-            return ValidationResult("mutation", false, "No cache operations recorded")
-        }
-
-        val missRate = totalMisses.toDouble() / totalOps
-        // With mutations, we expect some cache misses
-        val passed = missRate > (config.scenario.mutationRate * 0.5)  // Generous tolerance
+        val observedRates = iterations.map { it.observedMutationRate }
+        val avgObservedRate = observedRates.average()
+        val expectedRate = config.scenario.mutationRate
+        val tolerance = 0.02  // ±2% per plan
+        val diff = kotlin.math.abs(avgObservedRate - expectedRate)
+        val passed = diff <= tolerance
 
         return ValidationResult(
             "mutation",
             passed,
-            "Cache miss rate: ${"%.1f".format(missRate * 100)}% with mutation rate ${"%.0f".format(config.scenario.mutationRate * 100)}%"
+            "Observed mutation rate: ${"%.1f".format(avgObservedRate * 100)}% " +
+                    "(expected: ${"%.0f".format(expectedRate * 100)}%, " +
+                    "tolerance: ±${"%.0f".format(tolerance * 100)}%, " +
+                    "diff: ${"%.1f".format(diff * 100)}%)"
         )
     }
 }

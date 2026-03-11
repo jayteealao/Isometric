@@ -24,6 +24,19 @@ import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 
 /**
+ * Snapshot of the actual runtime flag configuration applied to the renderer.
+ * Used by benchmarks to validate that flags took effect.
+ */
+data class RuntimeFlagSnapshot(
+    val enablePathCaching: Boolean,
+    val enableSpatialIndex: Boolean,
+    val forceRebuild: Boolean,
+    val useNativeCanvas: Boolean,
+    val canvasWidth: Int,
+    val canvasHeight: Int
+)
+
+/**
  * Main composable for creating isometric scenes using the runtime-level API.
  *
  * This uses a custom Applier to build a node tree that is efficiently rendered
@@ -43,6 +56,12 @@ import io.fabianterhorst.isometric.Vector
  * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
  * @param useNativeCanvas Use Android native canvas for rendering (default: false) - 2x faster, Android-only
  * @param forceRebuild Force cache rebuild every frame (benchmark use only, default: false)
+ * @param frameVersion External redraw signal. When this value changes, the Canvas is
+ *   invalidated even if the node tree itself is unchanged. Used by benchmarks to ensure
+ *   static scenes still render every measured frame so cache hits are observable.
+ * @param onHitTestReady Callback providing a hit-test function when the renderer is ready.
+ *   The provided function accepts (x, y) screen coordinates and returns the hit node or null.
+ *   Used by benchmarks to invoke hit tests directly without Compose pointer input overhead.
  * @param onTap Callback when the scene is tapped (x, y, node)
  * @param onDragStart Callback when drag starts
  * @param onDrag Callback when dragging (delta x, delta y)
@@ -63,6 +82,9 @@ fun IsometricScene(
     enableSpatialIndex: Boolean = true,
     useNativeCanvas: Boolean = false,
     forceRebuild: Boolean = false,
+    frameVersion: Long = 0L,
+    onHitTestReady: ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? = null,
+    onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
     onTap: (x: Double, y: Double, node: IsometricNode?) -> Unit = { _, _, _ -> },
     onDragStart: (x: Double, y: Double) -> Unit = { _, _ -> },
     onDrag: (deltaX: Double, deltaY: Double) -> Unit = { _, _ -> },
@@ -114,6 +136,33 @@ fun IsometricScene(
         )
     }
 
+    // Provide hit-test function to benchmarks (bypasses Compose pointer input overhead)
+    SideEffect {
+        onHitTestReady?.invoke { x, y ->
+            renderer.hitTest(
+                rootNode = rootNode,
+                x = x, y = y,
+                context = renderContext,
+                width = canvasWidth,
+                height = canvasHeight
+            )
+        }
+    }
+
+    // Report actual runtime flag state to benchmarks for validation
+    SideEffect {
+        onFlagsReady?.invoke(
+            RuntimeFlagSnapshot(
+                enablePathCaching = enablePathCaching,
+                enableSpatialIndex = enableSpatialIndex,
+                forceRebuild = renderer.forceRebuild,
+                useNativeCanvas = useNativeCanvas,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasHeight
+            )
+        )
+    }
+
     // Setup composition with custom applier
     val compositionContext = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
@@ -122,9 +171,10 @@ fun IsometricScene(
         Composition(IsometricApplier(rootNode), compositionContext)
     }
 
-    // Set content on every recomposition — captures the latest lambda via rememberUpdatedState.
-    // Compose's snapshot system ensures the sub-composition recomposes when read state changes.
-    SideEffect {
+    // Create the sub-composition once when this composable enters the tree.
+    // The lambda reads rememberUpdatedState-backed values, so the child composition
+    // still recomposes when those values change without re-calling setContent().
+    DisposableEffect(composition) {
         composition.setContent {
             CompositionLocalProvider(
                 LocalDefaultColor provides defaultColor,
@@ -137,10 +187,6 @@ fun IsometricScene(
                 IsometricScopeImpl.currentContent()
             }
         }
-    }
-
-    // Dispose the sub-composition when this composable leaves the tree
-    DisposableEffect(composition) {
         onDispose {
             composition.dispose()
         }
@@ -232,6 +278,11 @@ fun IsometricScene(
         // When any node calls markDirty(), this triggers a Canvas redraw.
         @Suppress("UNUSED_EXPRESSION")
         sceneVersion
+
+        // Read frameVersion to subscribe to external redraw requests.
+        // Benchmarks use this to render static scenes every frame without mutating the tree.
+        @Suppress("UNUSED_EXPRESSION")
+        frameVersion
 
         // Update canvas size
         canvasWidth = size.width.toInt()

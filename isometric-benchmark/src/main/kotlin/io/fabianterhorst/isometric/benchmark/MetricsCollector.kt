@@ -13,6 +13,7 @@ data class FrameMetrics(
     val cacheHits: Long,
     val cacheMisses: Long,
     val cacheHitRate: Double,
+    val observedMutationRate: Double,
     val allocatedMB: Double,
     val gcInvocations: Long,
     val frameCount: Int,
@@ -53,6 +54,7 @@ class MetricsCollector(private val maxFrames: Int) {
     private val drawTimes = LongArray(maxFrames)
     private val frameTimes = LongArray(maxFrames)
     private val hitTestTimes = LongArray(maxFrames)
+    private val mutationCounts = IntArray(maxFrames)
 
     private var frameIndex = 0
     var cacheHits: Long = 0
@@ -94,6 +96,25 @@ class MetricsCollector(private val maxFrames: Int) {
     fun recordCacheHit() { cacheHits++ }
     fun recordCacheMiss() { cacheMisses++ }
 
+    /** Record actual mutation count for the current frame */
+    fun recordMutationCount(count: Int) {
+        if (frameIndex < maxFrames) {
+            mutationCounts[frameIndex] = count
+        }
+    }
+
+    /**
+     * Compute the observed mean mutation rate across all recorded frames.
+     *
+     * @param sceneSize Number of items in the scene
+     * @return Mean mutation count / sceneSize, or 0.0 if no frames recorded
+     */
+    fun observedMutationRate(sceneSize: Int): Double {
+        if (frameIndex == 0 || sceneSize == 0) return 0.0
+        val totalMutations = mutationCounts.take(frameIndex).sum()
+        return totalMutations.toDouble() / (frameIndex * sceneSize)
+    }
+
     /** Advance to the next frame. Call after all per-frame recordings are done. */
     fun advanceFrame() {
         if (frameIndex < maxFrames) {
@@ -116,9 +137,10 @@ class MetricsCollector(private val maxFrames: Int) {
     /**
      * Compute a snapshot of all collected metrics.
      *
+     * @param sceneSize Number of items in the scene (for mutation rate calculation)
      * @return [FrameMetrics] with statistical summaries for each metric
      */
-    fun snapshot(): FrameMetrics {
+    fun snapshot(sceneSize: Int = 0): FrameMetrics {
         val count = frameIndex
         val totalCacheOps = cacheHits + cacheMisses
 
@@ -141,6 +163,7 @@ class MetricsCollector(private val maxFrames: Int) {
             cacheHits = cacheHits,
             cacheMisses = cacheMisses,
             cacheHitRate = if (totalCacheOps > 0) cacheHits.toDouble() / totalCacheOps else 0.0,
+            observedMutationRate = observedMutationRate(sceneSize),
             allocatedMB = allocatedMB,
             gcInvocations = gcInvocations,
             frameCount = count,

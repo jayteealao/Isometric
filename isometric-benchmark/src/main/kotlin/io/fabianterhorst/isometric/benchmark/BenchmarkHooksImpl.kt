@@ -16,6 +16,8 @@ class BenchmarkHooksImpl(
 
     private var prepareStartNanos: Long = 0
     private var drawStartNanos: Long = 0
+    var drawPassCount: Long = 0
+        private set
 
     override fun onPrepareStart() {
         prepareStartNanos = System.nanoTime()
@@ -33,6 +35,7 @@ class BenchmarkHooksImpl(
     override fun onDrawEnd() {
         val elapsed = System.nanoTime() - drawStartNanos
         collector.recordDrawTime(elapsed)
+        drawPassCount++
     }
 
     override fun onCacheHit() {

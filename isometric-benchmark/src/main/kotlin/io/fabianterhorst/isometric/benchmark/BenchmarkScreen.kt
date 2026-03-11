@@ -5,41 +5,58 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.compose.runtime.ForEach
 import io.fabianterhorst.isometric.compose.runtime.IsometricScene
-import io.fabianterhorst.isometric.compose.runtime.IsometricScope
 import io.fabianterhorst.isometric.compose.runtime.LocalBenchmarkHooks
+import io.fabianterhorst.isometric.compose.runtime.RuntimeFlagSnapshot
 import io.fabianterhorst.isometric.compose.runtime.Shape
+
+/**
+ * Result of a benchmark run, bundling per-iteration metrics with raw timing
+ * arrays and the runtime flag snapshot for validation.
+ */
+data class BenchmarkResult(
+    val iterations: List<FrameMetrics>,
+    val iterationRawTimings: List<RawTimings>,
+    val runtimeFlags: RuntimeFlagSnapshot?
+)
 
 /**
  * Composable that renders the benchmark scene and drives the orchestrator.
  *
- * The scene is populated via [SceneGenerator] and mutated per-frame by the
- * orchestrator using [MutationSimulator]. Hit-test interactions are injected
- * by [InteractionSimulator].
+ * Owns the single [MetricsCollector] instance that both the [BenchmarkHooksImpl]
+ * and [BenchmarkOrchestrator] write to. Per-iteration raw timings are captured
+ * by the orchestrator and included in [BenchmarkResult].
  *
  * @param config The benchmark configuration
- * @param onComplete Called when the benchmark run is finished
+ * @param onComplete Called when the benchmark run is finished, with per-iteration results
  */
 @Composable
 fun BenchmarkScreen(
     config: BenchmarkConfig,
-    onComplete: (List<FrameMetrics>) -> Unit
+    onComplete: (BenchmarkResult) -> Unit
 ) {
     val items = remember { mutableStateListOf<GeneratedItem>() }
     val flags = config.flags
 
-    // Create metrics collector and hooks
+    // Single collector instance — shared by hooks and orchestrator
     val collector = remember { MetricsCollector(config.measurementFrames) }
     val benchmarkHooks = remember(collector) { BenchmarkHooksImpl(collector) }
 
-    // Create orchestrator
-    val orchestrator = remember(config) {
-        BenchmarkOrchestrator(config, collector)
+    // Runtime flag snapshot — populated by IsometricScene's onFlagsReady callback
+    var runtimeFlagSnapshot: RuntimeFlagSnapshot? = remember { null }
+    var frameVersion by remember { mutableStateOf(0L) }
+
+    // Create orchestrator with the same collector
+    val orchestrator = remember(config, collector, benchmarkHooks) {
+        BenchmarkOrchestrator(config, collector) { benchmarkHooks.drawPassCount }
     }
 
     // Generate initial scene
@@ -61,7 +78,15 @@ fun BenchmarkScreen(
                     items[mutation.index] = mutation.newItem
                 }
             },
-            onComplete = onComplete
+            onResetScene = {
+                val generated = SceneGenerator.generate(config.scenario.sceneSize)
+                items.clear()
+                items.addAll(generated)
+            },
+            onFrame = { frameVersion++ },
+            onComplete = { iterations ->
+                onComplete(BenchmarkResult(iterations, orchestrator.iterationRawTimings.toList(), runtimeFlagSnapshot))
+            }
         )
     }
 
@@ -73,8 +98,16 @@ fun BenchmarkScreen(
             enableSpatialIndex = flags.enableSpatialIndex,
             useNativeCanvas = flags.enableNativeCanvas,
             forceRebuild = !flags.enablePreparedSceneCache,
+            frameVersion = frameVersion,
             renderOptions = RenderOptions.Default,
             enableGestures = false,
+            onHitTestReady = { hitTest -> orchestrator.hitTestFn = hitTest },
+            onFlagsReady = { snapshot ->
+                runtimeFlagSnapshot = snapshot
+                // Also provide viewport dimensions to orchestrator
+                orchestrator.viewportWidth = snapshot.canvasWidth
+                orchestrator.viewportHeight = snapshot.canvasHeight
+            },
             onTap = { _, _, _ -> /* interaction responses handled by orchestrator */ }
         ) {
             ForEach(items, key = { it.id }) { item ->

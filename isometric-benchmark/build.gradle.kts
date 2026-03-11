@@ -67,4 +67,8 @@ dependencies {
     implementation("org.json:json:20231013")
 
     debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.truth:truth:1.1.3")
 }
