@@ -132,4 +132,65 @@ class IsometricEngineTest {
         // With culling should have fewer or equal commands
         assertTrue(withCulling.commands.size <= withoutCulling.commands.size)
     }
+
+    @Test
+    fun `broad phase sort preserves order for sparse scene`() {
+        val baselineEngine = IsometricEngine()
+        baselineEngine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        baselineEngine.add(Prism(Point(5.0, 0.0, 0.0)), IsoColor.RED)
+        baselineEngine.add(Prism(Point(0.0, 5.0, 0.0)), IsoColor.GREEN)
+
+        val broadPhaseEngine = IsometricEngine()
+        broadPhaseEngine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+        broadPhaseEngine.add(Prism(Point(5.0, 0.0, 0.0)), IsoColor.RED)
+        broadPhaseEngine.add(Prism(Point(0.0, 5.0, 0.0)), IsoColor.GREEN)
+
+        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Default)
+        val optimized = broadPhaseEngine.prepare(
+            800,
+            600,
+            RenderOptions.Default.copy(enableBroadPhaseSort = true)
+        )
+
+        assertEquals(
+            baseline.commands.map { it.id },
+            optimized.commands.map { it.id }
+        )
+    }
+
+    @Test
+    fun `broad phase sort preserves order for overlapping scene`() {
+        val baselineEngine = IsometricEngine()
+        baselineEngine.add(Prism(Point.ORIGIN, 3.0, 3.0, 1.0), IsoColor.BLUE)
+        baselineEngine.add(Prism(Point(0.5, 0.5, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+        baselineEngine.add(Prism(Point(1.0, 1.0, 0.0), 1.5, 1.5, 1.0), IsoColor.GREEN)
+
+        val broadPhaseEngine = IsometricEngine()
+        broadPhaseEngine.add(Prism(Point.ORIGIN, 3.0, 3.0, 1.0), IsoColor.BLUE)
+        broadPhaseEngine.add(Prism(Point(0.5, 0.5, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+        broadPhaseEngine.add(Prism(Point(1.0, 1.0, 0.0), 1.5, 1.5, 1.0), IsoColor.GREEN)
+
+        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Quality)
+        val optimized = broadPhaseEngine.prepare(
+            800,
+            600,
+            RenderOptions.Quality.copy(enableBroadPhaseSort = true)
+        )
+
+        assertEquals(
+            baseline.commands.map { it.id },
+            optimized.commands.map { it.id }
+        )
+    }
+
+    @Test
+    fun `render options reject non-positive broad phase cell size`() {
+        try {
+            RenderOptions(broadPhaseCellSize = 0.0)
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("broadPhaseCellSize"))
+            return
+        }
+        throw AssertionError("Expected IllegalArgumentException for non-positive broadPhaseCellSize")
+    }
 }

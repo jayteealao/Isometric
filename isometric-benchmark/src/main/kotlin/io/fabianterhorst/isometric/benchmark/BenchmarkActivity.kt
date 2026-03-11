@@ -45,10 +45,6 @@ class BenchmarkActivity : ComponentActivity() {
         val config = parseConfig()
         Log.i(TAG, "Starting benchmark: ${config.name}")
 
-        if (config.flags.enableBroadPhaseSort) {
-            Log.w(TAG, "enableBroadPhaseSort is set but not yet implemented in the engine (Phase 3)")
-        }
-
         setContent {
             BenchmarkScreen(
                 config = config,
