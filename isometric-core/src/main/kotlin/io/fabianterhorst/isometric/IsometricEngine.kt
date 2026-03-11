@@ -28,7 +28,8 @@ class IsometricEngine(
         val path: Path,
         val baseColor: IsoColor,
         val originalShape: Shape?,
-        val id: String  // Stable ID for hit testing
+        val id: String,  // Stable ID for hit testing
+        val ownerNodeId: String? = null
     )
 
     private val items = mutableListOf<SceneItem>()
@@ -61,8 +62,14 @@ class IsometricEngine(
     /**
      * Add a path to the scene
      */
-    fun add(path: Path, color: IsoColor, originalShape: Shape? = null, id: String? = null) {
-        items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}"))
+    fun add(
+        path: Path,
+        color: IsoColor,
+        originalShape: Shape? = null,
+        id: String? = null,
+        ownerNodeId: String? = null
+    ) {
+        items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId))
     }
 
     /**
@@ -126,7 +133,8 @@ class IsometricEngine(
                     points = transformedItem.transformedPoints,
                     color = transformedItem.litColor,
                     originalPath = transformedItem.item.path,
-                    originalShape = transformedItem.item.originalShape
+                    originalShape = transformedItem.item.originalShape,
+                    ownerNodeId = transformedItem.item.ownerNodeId
                 )
             )
         }

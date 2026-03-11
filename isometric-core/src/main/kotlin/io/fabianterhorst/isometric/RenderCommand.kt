@@ -15,5 +15,6 @@ data class RenderCommand(
     val points: List<Point2D>,
     val color: IsoColor,
     val originalPath: Path,
-    val originalShape: Shape?
+    val originalShape: Shape?,
+    val ownerNodeId: String? = null
 )

@@ -2,6 +2,7 @@ package io.fabianterhorst.isometric.compose.runtime
 
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
+import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
@@ -25,6 +26,24 @@ class IsometricRendererTest {
         shape.parent = root
         root.updateChildrenSnapshot()
         return root
+    }
+
+    private fun buildPathNodeRoot(path: Path): Pair<GroupNode, PathNode> {
+        val root = GroupNode()
+        val node = PathNode(path = path, color = IsoColor.BLUE)
+        root.children.add(node)
+        node.parent = root
+        root.updateChildrenSnapshot()
+        return root to node
+    }
+
+    private fun buildBatchNodeRoot(shapes: List<io.fabianterhorst.isometric.Shape>): Pair<GroupNode, BatchNode> {
+        val root = GroupNode()
+        val node = BatchNode(shapes = shapes, color = IsoColor.BLUE)
+        root.children.add(node)
+        node.parent = root
+        root.updateChildrenSnapshot()
+        return root to node
     }
 
     private val dirA = Vector(2.0, -1.0, 3.0).normalize()
@@ -154,9 +173,9 @@ class IsometricRendererTest {
     /** Find a hittable centroid from commands belonging to a given node. */
     private fun findCommandCentroid(
         scene: io.fabianterhorst.isometric.PreparedScene,
-        node: ShapeNode
+        nodeId: String
     ): Pair<Double, Double>? {
-        val cmd = scene.commands.firstOrNull { it.id.startsWith(node.nodeId) }
+        val cmd = scene.commands.firstOrNull { it.ownerNodeId == nodeId }
             ?: return null
         val cx = cmd.points.map { it.x }.average()
         val cy = cmd.points.map { it.y }.average()
@@ -236,7 +255,7 @@ class IsometricRendererTest {
         // Find a deterministic overlap point: centroid of an inner shape command.
         // Since the inner prism (0.5,0.5 -> 1.5,1.5) is fully inside the outer (0,0 -> 3,3),
         // this point is guaranteed to be in the overlap region.
-        val (testX, testY) = findCommandCentroid(fastRenderer.currentPreparedScene!!, inner)
+        val (testX, testY) = findCommandCentroid(fastRenderer.currentPreparedScene!!, inner.nodeId)
             ?: error("Inner shape should have at least one command")
 
         val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
@@ -289,6 +308,86 @@ class IsometricRendererTest {
     }
 
     @Test
+    fun `hitTest resolves PathNode via exact owner id`() {
+        val path = Prism(Point.ORIGIN, 1.0, 1.0, 1.0).paths.first()
+        val (root, node) = buildPathNodeRoot(path)
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val (x, y) = findCommandCentroid(fastRenderer.currentPreparedScene!!, node.nodeId)
+            ?: error("PathNode should have a prepared command")
+
+        val hit = fastRenderer.hitTest(root, x, y, defaultContext, 800, 600)
+        assertNotNull("PathNode should be hittable via exact command ownership", hit)
+        assertEquals(node.nodeId, hit!!.nodeId)
+    }
+
+    @Test
+    fun `hitTest resolves BatchNode via owner id`() {
+        val shapes = listOf(
+            Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+            Prism(Point(1.25, 0.0, 0.0), 1.0, 1.0, 1.0)
+        )
+        val (root, node) = buildBatchNodeRoot(shapes)
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val (x, y) = findCommandCentroid(fastRenderer.currentPreparedScene!!, node.nodeId)
+            ?: error("BatchNode should have prepared commands")
+
+        val hit = fastRenderer.hitTest(root, x, y, defaultContext, 800, 600)
+        assertNotNull("BatchNode should be hittable via command ownership", hit)
+        assertEquals(node.nodeId, hit!!.nodeId)
+    }
+
+    @Test
+    fun `multi-cell query deduplicates candidates and matches slow path`() {
+        val root = buildSceneRoot()
+        val cellSize = 3.0
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true,
+            spatialIndexCellSize = cellSize
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val slowRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        root.markDirty()
+        slowRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val command = fastRenderer.currentPreparedScene!!.commands.first()
+        val centerX = command.points.map { it.x }.average()
+        val centerY = command.points.map { it.y }.average()
+
+        val fastHit = fastRenderer.hitTest(root, centerX, centerY, defaultContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, centerX, centerY, defaultContext, 800, 600)
+
+        assertNotNull(fastHit)
+        assertNotNull(slowHit)
+        assertEquals(
+            "A command spanning many cells should still resolve once to the same node",
+            slowHit!!.nodeId,
+            fastHit!!.nodeId
+        )
+    }
+
+    @Test
     fun `hitTest returns null for miss`() {
         val engine = IsometricEngine()
         val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
@@ -298,6 +397,89 @@ class IsometricRendererTest {
 
         val hit = renderer.hitTest(root, 10.0, 10.0, defaultContext, 800, 600)
         assertNull("hitTest should return null for coordinates outside all shapes", hit)
+    }
+
+    @Test
+    fun `hitTest matches slow path for negative screen coordinates`() {
+        val root = buildSceneRoot()
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val slowRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        root.markDirty()
+        slowRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val fastHit = fastRenderer.hitTest(root, -1.0, -1.0, defaultContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, -1.0, -1.0, defaultContext, 800, 600)
+
+        assertEquals(slowHit?.nodeId, fastHit?.nodeId)
+    }
+
+    @Test
+    fun `hitTest matches slow path for out of bounds coordinates`() {
+        val root = buildSceneRoot()
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val slowRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        root.markDirty()
+        slowRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val fastHit = fastRenderer.hitTest(root, 900.0, 700.0, defaultContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, 900.0, 700.0, defaultContext, 800, 600)
+
+        assertEquals("Fast and slow paths should agree out of bounds", slowHit?.nodeId, fastHit?.nodeId)
+    }
+
+    @Test
+    fun `hitTest matches slow path with culling and bounds checking enabled`() {
+        val root = buildSceneRoot()
+        val cullingContext = defaultContext.copy(renderOptions = RenderOptions.Default)
+
+        val fastRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = true
+        )
+        fastRenderer.rebuildCache(root, cullingContext, 800, 600)
+
+        val slowRenderer = IsometricRenderer(
+            IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        root.markDirty()
+        slowRenderer.rebuildCache(root, cullingContext, 800, 600)
+
+        val scene = fastRenderer.currentPreparedScene!!
+        assertTrue("Culling-enabled scene should still produce commands", scene.commands.isNotEmpty())
+
+        val command = scene.commands.first()
+        val x = command.points.map { it.x }.average()
+        val y = command.points.map { it.y }.average()
+
+        val fastHit = fastRenderer.hitTest(root, x, y, cullingContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, x, y, cullingContext, 800, 600)
+
+        assertEquals("Fast and slow paths should match with RenderOptions.Default", slowHit?.nodeId, fastHit?.nodeId)
     }
 
     @Test

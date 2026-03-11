@@ -139,7 +139,7 @@ class IsometricRenderer(
     // Maps command IDs directly to the IsometricNode that produced them for O(1) hit-test resolution
     private var commandToNodeMap: Map<String, IsometricNode> = emptyMap()
 
-    // Maps node IDs to nodes for building commandToNodeMap
+    // Maps node IDs to nodes for O(1) command-to-node resolution
     private var nodeIdMap: Map<String, IsometricNode> = emptyMap()
 
     // TODO(KMP): Move to androidMain source set
@@ -368,7 +368,13 @@ class IsometricRenderer(
 
         // Add commands to engine, preserving node-level IDs for hit testing
         commands.forEach { command ->
-            engine.add(command.originalPath, command.color, command.originalShape, command.id)
+            engine.add(
+                path = command.originalPath,
+                color = command.color,
+                originalShape = command.originalShape,
+                id = command.id,
+                ownerNodeId = command.ownerNodeId
+            )
         }
 
         // Build node ID lookup map for hit testing
@@ -385,6 +391,9 @@ class IsometricRenderer(
         cachedWidth = width
         cachedHeight = height
         cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+
+        // Build command maps used by both slow and fast hit-test paths.
+        buildCommandMaps(cachedPreparedScene!!)
 
         // Build path cache (rendering optimization)
         if (enablePathCaching) {
@@ -416,29 +425,29 @@ class IsometricRenderer(
     }
 
     /**
-     * Build spatial grid, command ID lookup map, and command-to-node map for O(k) hit testing.
+     * Build command maps used by both fast and slow hit-test paths.
      */
-    private fun buildSpatialIndex(scene: PreparedScene) {
-        // Build command ID -> RenderCommand map for O(1) lookup
+    private fun buildCommandMaps(scene: PreparedScene) {
         val cmdMap = HashMap<String, RenderCommand>(scene.commands.size)
         val orderMap = HashMap<String, Int>(scene.commands.size)
+        val cmdToNode = HashMap<String, IsometricNode>(scene.commands.size)
+
         for ((index, command) in scene.commands.withIndex()) {
             cmdMap[command.id] = command
             orderMap[command.id] = index
+            command.ownerNodeId
+                ?.let { nodeIdMap[it] }
+                ?.let { node -> cmdToNode[command.id] = node }
         }
         commandIdMap = cmdMap
         commandOrderMap = orderMap
-
-        // Build command ID -> IsometricNode map for O(1) hit-test resolution
-        val cmdToNode = HashMap<String, IsometricNode>(scene.commands.size)
-        for (command in scene.commands) {
-            val node = resolveNodeForCommand(command.id)
-            if (node != null) {
-                cmdToNode[command.id] = node
-            }
-        }
         commandToNodeMap = cmdToNode
+    }
 
+    /**
+     * Build spatial grid for O(k) hit testing.
+     */
+    private fun buildSpatialIndex(scene: PreparedScene) {
         // Build spatial grid
         spatialIndex = SpatialGrid(
             width = cachedWidth.toDouble(),
@@ -452,17 +461,6 @@ class IsometricRenderer(
                 spatialIndex!!.insert(command.id, bounds)
             }
         }
-    }
-
-    /**
-     * Resolve the owning node for a command ID using prefix+separator matching.
-     * Used at build time to populate commandToNodeMap.
-     */
-    private fun resolveNodeForCommand(commandId: String): IsometricNode? {
-        return nodeIdMap.entries.find { (nodeId, _) ->
-            commandId == nodeId ||
-            (commandId.startsWith(nodeId) && commandId.length > nodeId.length && commandId[nodeId.length] == '_')
-        }?.value
     }
 
     /**
@@ -493,15 +491,9 @@ class IsometricRenderer(
 
     /**
      * Find the node that produced a render command via O(1) map lookup.
-     * The commandToNodeMap is built at cache time in buildSpatialIndex().
-     * Falls back to prefix matching when the spatial index is disabled.
      */
     private fun findNodeByCommandId(commandId: String): IsometricNode? {
-        // O(1) lookup when spatial index is built
-        commandToNodeMap[commandId]?.let { return it }
-
-        // Fallback for slow path (no spatial index) — uses corrected prefix+separator matching
-        return resolveNodeForCommand(commandId)
+        return commandToNodeMap[commandId]
     }
 
     /**
@@ -625,6 +617,10 @@ private fun RenderCommand.getBounds(): ShapeBounds? {
         minY = min(minY, point.y)
         maxX = max(maxX, point.x)
         maxY = max(maxY, point.y)
+    }
+
+    if (minX.isNaN() || minY.isNaN() || maxX.isNaN() || maxY.isNaN()) {
+        return null
     }
 
     return ShapeBounds(minX, minY, maxX, maxY)

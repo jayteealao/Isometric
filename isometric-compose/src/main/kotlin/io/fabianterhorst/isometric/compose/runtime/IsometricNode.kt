@@ -163,7 +163,8 @@ class ShapeNode(
                 points = emptyList(), // Will be filled by engine
                 color = color,
                 originalPath = path,
-                originalShape = transformedShape
+                originalShape = transformedShape,
+                ownerNodeId = nodeId
             )
         }
     }
@@ -209,7 +210,8 @@ class PathNode(
                 points = emptyList(), // Will be filled by engine
                 color = color,
                 originalPath = transformedPath,
-                originalShape = null
+                originalShape = null,
+                ownerNodeId = nodeId
             )
         )
     }
@@ -249,7 +251,8 @@ class BatchNode(
                     points = emptyList(),
                     color = color,
                     originalPath = path,
-                    originalShape = transformedShape
+                    originalShape = transformedShape,
+                    ownerNodeId = nodeId
                 )
             }
         }

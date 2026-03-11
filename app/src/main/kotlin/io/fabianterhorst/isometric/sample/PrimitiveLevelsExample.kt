@@ -178,7 +178,8 @@ class MultiShapeNode(
                     points = emptyList(),
                     color = color,
                     originalPath = path,
-                    originalShape = transformedShape
+                    originalShape = transformedShape,
+                    ownerNodeId = nodeId
                 )
             }
         }
