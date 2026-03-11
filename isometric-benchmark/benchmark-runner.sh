@@ -15,12 +15,13 @@ set -euo pipefail
 
 PACKAGE="io.fabianterhorst.isometric.benchmark"
 ACTIVITY="${PACKAGE}/.BenchmarkActivity"
-RESULTS_DIR="benchmark-results"
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+RESULTS_DIR="benchmark-results/${TIMESTAMP}"
 DEVICE_RESULTS="/sdcard/Android/data/${PACKAGE}/files/benchmark-results"
 
-# Defaults
-SIZES=(10 50 200 1000)
-MUTATION_RATES=(0.0 0.1)
+# Plan-specified defaults: sizes 10,50,100,200; mutation rates 0.10,0.50
+SIZES=(10 50 100 200)
+MUTATION_RATES=(0.10 0.50)
 INTERACTION_PATTERNS=(NONE OCCASIONAL CONTINUOUS)
 SKIP_SELFTESTS=false
 
@@ -34,6 +35,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "=== Isometric Benchmark Runner ==="
+echo "Timestamp: ${TIMESTAMP}"
 echo "Sizes: ${SIZES[*]}"
 echo "Mutation rates: ${MUTATION_RATES[*]}"
 echo "Interaction patterns: ${INTERACTION_PATTERNS[*]}"
@@ -42,41 +44,122 @@ echo ""
 # Create local results directory
 mkdir -p "$RESULTS_DIR"
 
+RESULT_POLL_INTERVAL=2   # seconds between polls
+# Allow enough headroom for the heaviest baseline workload on real devices.
+# s200_m50_continuous exceeded 5 minutes in practice while still completing successfully.
+RESULT_POLL_TIMEOUT=600  # 10 minutes max wait per scenario
+
+resolve_adb() {
+    if command -v adb >/dev/null 2>&1; then
+        echo "adb"
+        return 0
+    fi
+    if command -v adb.exe >/dev/null 2>&1; then
+        echo "adb.exe"
+        return 0
+    fi
+    return 1
+}
+
+ADB_BIN="$(resolve_adb)" || {
+    echo "ERROR: Could not find adb or adb.exe on PATH."
+    exit 1
+}
+
+adb_cmd() {
+    if [ -n "${MSYSTEM:-}" ]; then
+        MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$ADB_BIN" "$@"
+    else
+        "$ADB_BIN" "$@"
+    fi
+}
+
 run_scenario() {
     local config_json="$1"
+    local config_base64
     local name="$2"
+    local result_marker="${DEVICE_RESULTS}/${TIMESTAMP}/${name}.result"
+
+    config_base64=$(printf '%s' "$config_json" | base64 | tr -d '\r\n' | tr '+/' '-_' | tr -d '=')
 
     echo "[$(date +%H:%M:%S)] Running: $name"
 
-    adb shell am start -W -n "$ACTIVITY" \
-        --es config "$config_json" \
-        > /dev/null 2>&1
+    # Launch the activity. Use URL-safe base64 for config payload transport so the
+    # intent extra survives Windows host quoting without needing a remote shell string.
+    if ! adb_cmd shell am start -W -n "$ACTIVITY" \
+        --es configBase64 "$config_base64" \
+        --es runTimestamp "$TIMESTAMP" > /dev/null 2>&1; then
+        echo "[$(date +%H:%M:%S)] FAILED: $name (launch command failed)"
+        return 1
+    fi
 
-    # Small delay to let file writes complete
-    sleep 1
+    # Poll for the file-based result marker written by BenchmarkActivity on completion.
+    # This is the reliable completion contract — it works regardless of whether
+    # am start -W blocked until finish() or returned early.
+    local elapsed=0
+    local result_content=""
 
-    echo "[$(date +%H:%M:%S)] Completed: $name"
+    while [ "$elapsed" -lt "$RESULT_POLL_TIMEOUT" ]; do
+        result_content=$(adb_cmd shell cat "$result_marker" 2>/dev/null | tr -d '\r') || result_content=""
+
+        if [ "$result_content" = "PASS" ]; then
+            echo "[$(date +%H:%M:%S)] Completed: $name"
+            return 0
+        elif [ "$result_content" = "FAIL" ]; then
+            echo "[$(date +%H:%M:%S)] FAILED: $name (validation failed)"
+            return 1
+        fi
+
+        sleep "$RESULT_POLL_INTERVAL"
+        elapsed=$((elapsed + RESULT_POLL_INTERVAL))
+    done
+
+    echo "[$(date +%H:%M:%S)] FAILED: $name (timed out after ${RESULT_POLL_TIMEOUT}s — no result marker)"
+    return 1
 }
 
 # --- Self-tests ---
 if [ "$SKIP_SELFTESTS" = false ]; then
     echo "--- Running self-tests ---"
+    echo "Self-tests must pass before the benchmark matrix proceeds."
+    echo ""
 
-    run_scenario \
-        '{"sceneSize":10,"mutationRate":0.0,"interactionPattern":"NONE","name":"selftest_cache","iterations":1,"measurementFrames":100}' \
-        "selftest_cache"
+    SELFTEST_FAILED=false
 
-    run_scenario \
-        '{"sceneSize":10,"mutationRate":0.0,"interactionPattern":"NONE","name":"selftest_sanity","iterations":1,"measurementFrames":100,"flags":{"enablePathCaching":false,"enableSpatialIndex":false,"enablePreparedSceneCache":false,"enableNativeCanvas":false,"enableBroadPhaseSort":false}}' \
-        "selftest_sanity"
+    # S1: selftest_cache — N=10, cache ON (ALL_ON), mutationRate=0.0, 100 frames, 1 iteration
+    if ! run_scenario \
+        '{"sceneSize":10,"mutationRate":0.0,"interactionPattern":"NONE","name":"selftest_cache","iterations":1,"measurementFrames":100,"flags":{"enablePathCaching":true,"enableSpatialIndex":true,"enablePreparedSceneCache":true,"enableNativeCanvas":false,"enableBroadPhaseSort":false}}' \
+        "selftest_cache"; then
+        echo "ABORT: selftest_cache FAILED — cache hit rate check did not pass."
+        SELFTEST_FAILED=true
+    fi
 
-    echo "--- Self-tests complete ---"
+    # S2: selftest_sanity — N=10, all flags OFF, mutationRate=0.10, 100 frames, 1 iteration
+    if ! run_scenario \
+        '{"sceneSize":10,"mutationRate":0.10,"interactionPattern":"NONE","name":"selftest_sanity","iterations":1,"measurementFrames":100,"flags":{"enablePathCaching":false,"enableSpatialIndex":false,"enablePreparedSceneCache":false,"enableNativeCanvas":false,"enableBroadPhaseSort":false}}' \
+        "selftest_sanity"; then
+        echo "ABORT: selftest_sanity FAILED — baseline frame time check did not pass."
+        SELFTEST_FAILED=true
+    fi
+
+    if [ "$SELFTEST_FAILED" = true ]; then
+        echo ""
+        echo "=== ABORT: Self-test failed. Fix harness before benchmarking. ==="
+        echo "Pull self-test results for diagnostics:"
+        echo "  ${ADB_BIN} pull ${DEVICE_RESULTS}/ ${RESULTS_DIR}/"
+        adb_cmd pull "${DEVICE_RESULTS}/" "${RESULTS_DIR}/" 2>/dev/null || true
+        exit 1
+    fi
+
+    echo ""
+    echo "--- Self-tests passed. Starting benchmark matrix ---"
     echo ""
 fi
 
 # --- Main benchmark matrix ---
 total=$(( ${#SIZES[@]} * ${#MUTATION_RATES[@]} * ${#INTERACTION_PATTERNS[@]} ))
 current=0
+failed=0
 
 echo "--- Running $total scenarios ---"
 
@@ -85,37 +168,42 @@ for size in "${SIZES[@]}"; do
         for pattern in "${INTERACTION_PATTERNS[@]}"; do
             current=$((current + 1))
 
-            # Build scenario name
-            if [ "$rate" = "0.0" ]; then
-                mut_label="static"
-            else
-                mut_pct=$(echo "$rate * 100" | bc | cut -d. -f1)
-                mut_label="mut${mut_pct}"
-            fi
-            name="N${size}_${mut_label}_$(echo "$pattern" | tr '[:upper:]' '[:lower:]')_allOn"
+            # Build scenario name matching plan convention: s{size}_m{rate}_${pattern}
+            mut_pct=$((10#${rate/./}))
+            name="s${size}_m${mut_pct}_$(echo "$pattern" | tr '[:upper:]' '[:lower:]')"
 
             echo ""
             echo "[$current/$total] $name"
 
-            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500}"
+            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500,\"flags\":{\"enablePathCaching\":false,\"enableSpatialIndex\":false,\"enablePreparedSceneCache\":false,\"enableNativeCanvas\":false,\"enableBroadPhaseSort\":false}}"
 
-            run_scenario "$config_json" "$name"
+            if ! run_scenario "$config_json" "$name"; then
+                failed=$((failed + 1))
+                echo "WARNING: $name failed validation (continuing with remaining scenarios)"
+            fi
         done
     done
 done
 
 echo ""
 echo "--- Pulling results from device ---"
-adb pull "$DEVICE_RESULTS/" "$RESULTS_DIR/" 2>/dev/null || echo "Warning: Could not pull results (check device path)"
+adb_cmd pull "${DEVICE_RESULTS}/" "${RESULTS_DIR}/" 2>/dev/null || echo "Warning: Could not pull results (check device path)"
 
 echo ""
 echo "=== Benchmark run complete ==="
 echo "Results: $(pwd)/$RESULTS_DIR/"
 echo "Scenarios run: $total"
+echo "Scenarios failed: $failed"
 
 # List result files
 if [ -d "$RESULTS_DIR" ]; then
     echo ""
     echo "Files:"
-    ls -la "$RESULTS_DIR/"*.csv 2>/dev/null || echo "  (no CSV files found)"
+    find "$RESULTS_DIR" -type f \( -name "*.csv" -o -name "*.json" -o -name "*.log" -o -name "*.result" \) 2>/dev/null | sort
+fi
+
+if [ "$failed" -gt 0 ]; then
+    echo ""
+    echo "WARNING: $failed scenario(s) failed validation. Check validation logs."
+    exit 1
 fi
