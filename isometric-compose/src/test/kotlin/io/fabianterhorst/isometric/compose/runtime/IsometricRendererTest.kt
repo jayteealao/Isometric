@@ -252,6 +252,43 @@ class IsometricRendererTest {
     }
 
     @Test
+    fun `hitTest fast path matches slow path near cell boundary within hit radius`() {
+        val cellSize = 4.0
+        val root = buildSceneRoot()
+
+        val fastEngine = IsometricEngine()
+        val fastRenderer = IsometricRenderer(
+            fastEngine,
+            enablePathCaching = false,
+            enableSpatialIndex = true,
+            spatialIndexCellSize = cellSize
+        )
+        fastRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val slowEngine = IsometricEngine()
+        val slowRenderer = IsometricRenderer(
+            slowEngine,
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        root.markDirty()
+        slowRenderer.rebuildCache(root, defaultContext, 800, 600)
+
+        val command = fastRenderer.currentPreparedScene!!.commands.first()
+        val leftMostPoint = command.points.minBy { it.x }
+        val boundaryX = kotlin.math.floor(leftMostPoint.x / cellSize) * cellSize
+        val testX = boundaryX - 1.0
+        val testY = leftMostPoint.y
+
+        val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+        val slowHit = slowRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+
+        assertNotNull("Slow path should hit within radius near boundary", slowHit)
+        assertNotNull("Fast path should match slow path near boundary", fastHit)
+        assertEquals(slowHit!!.nodeId, fastHit!!.nodeId)
+    }
+
+    @Test
     fun `hitTest returns null for miss`() {
         val engine = IsometricEngine()
         val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = true)
@@ -422,5 +459,21 @@ class IsometricRendererTest {
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, newWidth, newHeight)
         assertNotNull("hitTest should find shape at centroid after viewport resize", hit)
+    }
+
+    @Test
+    fun `constructor rejects non-positive spatial index cell size`() {
+        try {
+            IsometricRenderer(
+                engine = IsometricEngine(),
+                enablePathCaching = false,
+                enableSpatialIndex = true,
+                spatialIndexCellSize = 0.0
+            )
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("spatialIndexCellSize"))
+            return
+        }
+        throw AssertionError("Expected IllegalArgumentException for non-positive cell size")
     }
 }

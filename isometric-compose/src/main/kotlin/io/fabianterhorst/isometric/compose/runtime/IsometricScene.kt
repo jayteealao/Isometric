@@ -54,6 +54,8 @@ data class RuntimeFlagSnapshot(
  * @param enableGestures Whether to enable gesture handling
  * @param enablePathCaching Enable path object caching (default: true) - reduces GC pressure by 30-40%
  * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
+ * @param spatialIndexCellSize Spatial-index grid cell size in pixels (default: 100.0).
+ *   Smaller cells reduce candidate counts but increase grid fan-out and rebuild work.
  * @param useNativeCanvas Use Android native canvas for rendering (default: false) - 2x faster, Android-only
  * @param forceRebuild Force cache rebuild every frame (benchmark use only, default: false)
  * @param frameVersion External redraw signal. When this value changes, the Canvas is
@@ -80,6 +82,7 @@ fun IsometricScene(
     enableGestures: Boolean = true,
     enablePathCaching: Boolean = true,
     enableSpatialIndex: Boolean = true,
+    spatialIndexCellSize: Double = IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE,
     useNativeCanvas: Boolean = false,
     forceRebuild: Boolean = false,
     frameVersion: Long = 0L,
@@ -94,11 +97,12 @@ fun IsometricScene(
     // Create root node and applier
     val rootNode = remember { GroupNode() }
     val engine = remember { IsometricEngine() }
-    val renderer = remember(engine, enablePathCaching, enableSpatialIndex) {
+    val renderer = remember(engine, enablePathCaching, enableSpatialIndex, spatialIndexCellSize) {
         IsometricRenderer(
             engine = engine,
             enablePathCaching = enablePathCaching,
-            enableSpatialIndex = enableSpatialIndex
+            enableSpatialIndex = enableSpatialIndex,
+            spatialIndexCellSize = spatialIndexCellSize
         )
     }
 

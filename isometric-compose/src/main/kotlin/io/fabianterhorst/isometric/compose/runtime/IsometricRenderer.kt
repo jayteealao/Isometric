@@ -13,6 +13,7 @@ import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -54,8 +55,17 @@ interface RenderBenchmarkHooks {
 class IsometricRenderer(
     private val engine: IsometricEngine,
     private val enablePathCaching: Boolean = true,
-    private val enableSpatialIndex: Boolean = true
+    private val enableSpatialIndex: Boolean = true,
+    private val spatialIndexCellSize: Double = DEFAULT_SPATIAL_INDEX_CELL_SIZE
 ) {
+    init {
+        require(spatialIndexCellSize > 0.0) { "spatialIndexCellSize must be > 0" }
+    }
+
+    companion object {
+        const val DEFAULT_SPATIAL_INDEX_CELL_SIZE: Double = 100.0
+        private const val HIT_TEST_RADIUS_PX: Double = 8.0
+    }
     /**
      * Optional benchmark hooks for instrumentation. Set via [IsometricScene]'s SideEffect
      * from [LocalBenchmarkHooks]. Null in production (zero overhead).
@@ -122,6 +132,9 @@ class IsometricRenderer(
 
     // Maps command IDs to RenderCommands for O(1) lookup when building filtered scenes
     private var commandIdMap: Map<String, RenderCommand> = emptyMap()
+
+    // Maps command IDs to stable scene order for preserving hit-test precedence
+    private var commandOrderMap: Map<String, Int> = emptyMap()
 
     // Maps command IDs directly to the IsometricNode that produced them for O(1) hit-test resolution
     private var commandToNodeMap: Map<String, IsometricNode> = emptyMap()
@@ -256,11 +269,14 @@ class IsometricRenderer(
 
         if (enableSpatialIndex && spatialIndex != null) {
             // Fast path: Use spatial index for O(k) hit testing
-            val candidateIds = spatialIndex!!.query(x, y)
+            val candidateIds = spatialIndex!!.query(x, y, HIT_TEST_RADIUS_PX)
 
             if (candidateIds.isNotEmpty()) {
-                // Resolve candidate IDs to commands, preserving grid insertion order (back-to-front)
-                val candidateCommands = candidateIds.mapNotNull { id -> commandIdMap[id] }
+                // Resolve candidate IDs to commands, preserving the original scene order so
+                // engine.findItemAt(reverseSort = true) still returns the frontmost command.
+                val candidateCommands = candidateIds
+                    .mapNotNull { id -> commandIdMap[id] }
+                    .sortedBy { command -> commandOrderMap[command.id] ?: Int.MAX_VALUE }
 
                 if (candidateCommands.isNotEmpty()) {
                     val filteredScene = PreparedScene(
@@ -275,7 +291,7 @@ class IsometricRenderer(
                         y = y,
                         reverseSort = true,
                         useRadius = true,
-                        radius = 8.0
+                        radius = HIT_TEST_RADIUS_PX
                     )
 
                     if (hit != null) {
@@ -291,7 +307,7 @@ class IsometricRenderer(
                 y = y,
                 reverseSort = true,
                 useRadius = true,
-                radius = 8.0
+                radius = HIT_TEST_RADIUS_PX
             )
 
             if (hit != null) {
@@ -331,6 +347,7 @@ class IsometricRenderer(
         spatialIndex = null
         nodeIdMap = emptyMap()
         commandIdMap = emptyMap()
+        commandOrderMap = emptyMap()
         commandToNodeMap = emptyMap()
     }
 
@@ -404,10 +421,13 @@ class IsometricRenderer(
     private fun buildSpatialIndex(scene: PreparedScene) {
         // Build command ID -> RenderCommand map for O(1) lookup
         val cmdMap = HashMap<String, RenderCommand>(scene.commands.size)
-        for (command in scene.commands) {
+        val orderMap = HashMap<String, Int>(scene.commands.size)
+        for ((index, command) in scene.commands.withIndex()) {
             cmdMap[command.id] = command
+            orderMap[command.id] = index
         }
         commandIdMap = cmdMap
+        commandOrderMap = orderMap
 
         // Build command ID -> IsometricNode map for O(1) hit-test resolution
         val cmdToNode = HashMap<String, IsometricNode>(scene.commands.size)
@@ -423,7 +443,7 @@ class IsometricRenderer(
         spatialIndex = SpatialGrid(
             width = cachedWidth.toDouble(),
             height = cachedHeight.toDouble(),
-            cellSize = 100.0 // Tune based on average shape size
+            cellSize = spatialIndexCellSize
         )
 
         for (command in scene.commands) {
@@ -512,10 +532,14 @@ class IsometricRenderer(
         private val grid = Array(rows) { Array(cols) { mutableListOf<String>() } }
 
         fun insert(id: String, bounds: ShapeBounds) {
-            val minCol = max(0, (bounds.minX / cellSize).toInt())
-            val maxCol = min(cols - 1, (bounds.maxX / cellSize).toInt())
-            val minRow = max(0, (bounds.minY / cellSize).toInt())
-            val maxRow = min(rows - 1, (bounds.maxY / cellSize).toInt())
+            val minCol = max(0, floor(bounds.minX / cellSize).toInt())
+            val maxCol = min(cols - 1, floor(bounds.maxX / cellSize).toInt())
+            val minRow = max(0, floor(bounds.minY / cellSize).toInt())
+            val maxRow = min(rows - 1, floor(bounds.maxY / cellSize).toInt())
+
+            if (minCol > maxCol || minRow > maxRow) {
+                return
+            }
 
             for (row in minRow..maxRow) {
                 for (col in minCol..maxCol) {
@@ -524,15 +548,24 @@ class IsometricRenderer(
             }
         }
 
-        fun query(x: Double, y: Double): List<String> {
-            val col = (x / cellSize).toInt()
-            val row = (y / cellSize).toInt()
+        fun query(x: Double, y: Double, radius: Double = 0.0): List<String> {
+            val minCol = max(0, floor((x - radius) / cellSize).toInt())
+            val maxCol = min(cols - 1, floor((x + radius) / cellSize).toInt())
+            val minRow = max(0, floor((y - radius) / cellSize).toInt())
+            val maxRow = min(rows - 1, floor((y + radius) / cellSize).toInt())
 
-            if (row < 0 || row >= rows || col < 0 || col >= cols) {
+            if (maxRow < 0 || maxCol < 0 || minRow >= rows || minCol >= cols) {
                 return emptyList()
             }
 
-            return grid[row][col]
+            val ids = LinkedHashSet<String>()
+            for (row in minRow..maxRow) {
+                for (col in minCol..maxCol) {
+                    ids.addAll(grid[row][col])
+                }
+            }
+
+            return ids.toList()
         }
     }
 }
@@ -582,10 +615,10 @@ private data class ShapeBounds(
 private fun RenderCommand.getBounds(): ShapeBounds? {
     if (points.isEmpty()) return null
 
-    var minX = Double.MAX_VALUE
-    var minY = Double.MAX_VALUE
-    var maxX = Double.MIN_VALUE
-    var maxY = Double.MIN_VALUE
+    var minX = Double.POSITIVE_INFINITY
+    var minY = Double.POSITIVE_INFINITY
+    var maxX = Double.NEGATIVE_INFINITY
+    var maxY = Double.NEGATIVE_INFINITY
 
     points.forEach { point ->
         minX = min(minX, point.x)
