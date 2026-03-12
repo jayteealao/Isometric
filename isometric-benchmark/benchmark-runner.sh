@@ -3,7 +3,9 @@
 # Benchmark Runner — Iterates the 24-scenario matrix with self-tests.
 #
 # Usage:
-#   ./isometric-benchmark/benchmark-runner.sh [--skip-selftests] [--sizes "10 50"]
+#   ./isometric-benchmark/benchmark-runner.sh [--skip-selftests] [--sizes "10 50"] [--label NAME]
+#     [--enable-spatial-index] [--enable-prepared-scene-cache]
+#     [--enable-path-caching] [--enable-native-canvas] [--enable-broad-phase-sort]
 #
 # Prerequisites:
 #   - Android device connected via ADB
@@ -16,8 +18,13 @@ set -euo pipefail
 PACKAGE="io.fabianterhorst.isometric.benchmark"
 ACTIVITY="${PACKAGE}/.BenchmarkActivity"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-RESULTS_DIR="benchmark-results/${TIMESTAMP}"
 DEVICE_RESULTS="/sdcard/Android/data/${PACKAGE}/files/benchmark-results"
+ENABLE_SPATIAL_INDEX=false
+ENABLE_PREPARED_SCENE_CACHE=false
+ENABLE_PATH_CACHING=false
+ENABLE_NATIVE_CANVAS=false
+ENABLE_BROAD_PHASE_SORT=false
+LABEL=""
 
 # Plan-specified defaults: sizes 10,50,100,200; mutation rates 0.10,0.50
 SIZES=(10 50 100 200)
@@ -30,15 +37,32 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --skip-selftests) SKIP_SELFTESTS=true; shift ;;
         --sizes) IFS=' ' read -ra SIZES <<< "$2"; shift 2 ;;
+        --enable-spatial-index) ENABLE_SPATIAL_INDEX=true; shift ;;
+        --enable-prepared-scene-cache) ENABLE_PREPARED_SCENE_CACHE=true; shift ;;
+        --enable-path-caching) ENABLE_PATH_CACHING=true; shift ;;
+        --enable-native-canvas) ENABLE_NATIVE_CANVAS=true; shift ;;
+        --enable-broad-phase-sort) ENABLE_BROAD_PHASE_SORT=true; shift ;;
+        --label) LABEL="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
+RUN_ID="${TIMESTAMP}"
+if [ -n "$LABEL" ]; then
+    RUN_ID="${TIMESTAMP}-${LABEL}"
+fi
+RESULTS_DIR="benchmark-results/${RUN_ID}"
+
 echo "=== Isometric Benchmark Runner ==="
-echo "Timestamp: ${TIMESTAMP}"
+echo "Timestamp: ${RUN_ID}"
 echo "Sizes: ${SIZES[*]}"
 echo "Mutation rates: ${MUTATION_RATES[*]}"
 echo "Interaction patterns: ${INTERACTION_PATTERNS[*]}"
+echo "enableSpatialIndex: ${ENABLE_SPATIAL_INDEX}"
+echo "enablePreparedSceneCache: ${ENABLE_PREPARED_SCENE_CACHE}"
+echo "enablePathCaching: ${ENABLE_PATH_CACHING}"
+echo "enableNativeCanvas: ${ENABLE_NATIVE_CANVAS}"
+echo "enableBroadPhaseSort: ${ENABLE_BROAD_PHASE_SORT}"
 echo ""
 
 # Create local results directory
@@ -78,7 +102,7 @@ run_scenario() {
     local config_json="$1"
     local config_base64
     local name="$2"
-    local result_marker="${DEVICE_RESULTS}/${TIMESTAMP}/${name}.result"
+    local result_marker="${DEVICE_RESULTS}/${RUN_ID}/${name}.result"
 
     config_base64=$(printf '%s' "$config_json" | base64 | tr -d '\r\n' | tr '+/' '-_' | tr -d '=')
 
@@ -88,7 +112,7 @@ run_scenario() {
     # intent extra survives Windows host quoting without needing a remote shell string.
     if ! adb_cmd shell am start -W -n "$ACTIVITY" \
         --es configBase64 "$config_base64" \
-        --es runTimestamp "$TIMESTAMP" > /dev/null 2>&1; then
+        --es runTimestamp "$RUN_ID" > /dev/null 2>&1; then
         echo "[$(date +%H:%M:%S)] FAILED: $name (launch command failed)"
         return 1
     fi
@@ -175,7 +199,7 @@ for size in "${SIZES[@]}"; do
             echo ""
             echo "[$current/$total] $name"
 
-            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500,\"flags\":{\"enablePathCaching\":false,\"enableSpatialIndex\":false,\"enablePreparedSceneCache\":false,\"enableNativeCanvas\":false,\"enableBroadPhaseSort\":false}}"
+            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500,\"flags\":{\"enablePathCaching\":${ENABLE_PATH_CACHING},\"enableSpatialIndex\":${ENABLE_SPATIAL_INDEX},\"enablePreparedSceneCache\":${ENABLE_PREPARED_SCENE_CACHE},\"enableNativeCanvas\":${ENABLE_NATIVE_CANVAS},\"enableBroadPhaseSort\":${ENABLE_BROAD_PHASE_SORT}}}"
 
             if ! run_scenario "$config_json" "$name"; then
                 failed=$((failed + 1))
