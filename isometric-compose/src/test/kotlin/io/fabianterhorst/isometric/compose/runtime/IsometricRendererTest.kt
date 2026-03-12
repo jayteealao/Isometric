@@ -16,6 +16,32 @@ import org.junit.Test
 
 class IsometricRendererTest {
 
+    private class CountingHooks : RenderBenchmarkHooks {
+        var prepareStarts = 0
+        var prepareEnds = 0
+        var cacheHits = 0
+        var cacheMisses = 0
+
+        override fun onPrepareStart() {
+            prepareStarts++
+        }
+
+        override fun onPrepareEnd() {
+            prepareEnds++
+        }
+
+        override fun onDrawStart() = Unit
+        override fun onDrawEnd() = Unit
+
+        override fun onCacheHit() {
+            cacheHits++
+        }
+
+        override fun onCacheMiss() {
+            cacheMisses++
+        }
+    }
+
     private fun buildSceneRoot(): GroupNode {
         val root = GroupNode()
         val shape = ShapeNode(
@@ -641,6 +667,62 @@ class IsometricRendererTest {
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, newWidth, newHeight)
         assertNotNull("hitTest should find shape at centroid after viewport resize", hit)
+    }
+
+    fun `stable hitTest reuses prepared scene unless forceRebuild is enabled`() {
+        val root = buildSceneRoot()
+
+        fun commandCentroid(): Pair<Double, Double> {
+            val probeRenderer = IsometricRenderer(
+                engine = IsometricEngine(),
+                enablePathCaching = false,
+                enableSpatialIndex = false
+            )
+            probeRenderer.rebuildCache(root, defaultContext, 800, 600)
+            val scene = probeRenderer.currentPreparedScene!!
+            val cmd = scene.commands.first()
+            return cmd.points.map { it.x }.average() to cmd.points.map { it.y }.average()
+        }
+
+        val (testX, testY) = commandCentroid()
+
+        val stableRenderer = IsometricRenderer(
+            engine = IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        val stableHooks = CountingHooks()
+        stableRenderer.benchmarkHooks = stableHooks
+        stableRenderer.forceRebuild = false
+
+        root.clearDirty()
+        stableRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+        root.clearDirty()
+        stableRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+
+        assertEquals("Stable scene should miss cache only on first access", 1, stableHooks.cacheMisses)
+        assertEquals("Stable scene should hit cache on second access", 1, stableHooks.cacheHits)
+        assertEquals("Stable scene should rebuild only once", 1, stableHooks.prepareStarts)
+        assertEquals("Stable scene should complete one prepare", 1, stableHooks.prepareEnds)
+
+        val forceRenderer = IsometricRenderer(
+            engine = IsometricEngine(),
+            enablePathCaching = false,
+            enableSpatialIndex = false
+        )
+        val forceHooks = CountingHooks()
+        forceRenderer.benchmarkHooks = forceHooks
+        forceRenderer.forceRebuild = true
+
+        root.clearDirty()
+        forceRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+        root.clearDirty()
+        forceRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
+
+        assertEquals("forceRebuild should miss cache on every stable access", 2, forceHooks.cacheMisses)
+        assertEquals("forceRebuild should prevent cache hits", 0, forceHooks.cacheHits)
+        assertEquals("forceRebuild should rebuild on every access", 2, forceHooks.prepareStarts)
+        assertEquals("forceRebuild should complete two prepares", 2, forceHooks.prepareEnds)
     }
 
     @Test

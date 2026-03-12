@@ -321,6 +321,14 @@ class IsometricRenderer(
     /**
      * Check whether the cache is stale and needs a rebuild.
      * Extracted so both render paths share one check and tests can verify it.
+     *
+     * Cache reuse is allowed only when all prepare inputs are stable:
+     * - the node tree is clean
+     * - viewport width/height are unchanged
+     * - render options are unchanged
+     * - light direction is unchanged
+     *
+     * External redraw requests alone do not invalidate the prepared-scene cache.
      */
     internal fun needsUpdate(
         rootNode: GroupNode,
