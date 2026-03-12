@@ -49,6 +49,7 @@ def gitUrl = 'https://github.com/FabianTerhorst/Isometric.git'
 
 version = "0.0.9"
 group = "io.fabianterhorst"
+def androidExtension = project.extensions.getByName("android")
 //
 //install {
 //    repositories.mavenInstaller {
@@ -109,13 +110,13 @@ group = "io.fabianterhorst"
 //}
 
 task sourcesJar(type: Jar) {
-    from android.sourceSets.main.java.srcDirs
+    from androidExtension.sourceSets.main.java.srcDirs
     archiveClassifier = 'sources'
 }
 
 task javadoc(type: Javadoc) {
-    source = android.sourceSets.main.java.srcDirs
-    classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+    source = androidExtension.sourceSets.main.java.srcDirs
+    classpath += project.files(androidExtension.getBootClasspath().join(File.pathSeparator))
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
