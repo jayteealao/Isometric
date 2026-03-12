@@ -420,6 +420,10 @@ class IsometricRenderer(
 
     /**
      * Pre-convert all render commands to Compose Path objects for rendering.
+     *
+     * Note: when benchmarks run with prepared-scene caching disabled (`forceRebuild=true`),
+     * this cache is rebuilt every frame. In that mode path caching measures per-frame
+     * path pre-conversion plus draw reuse, not long-lived cross-frame path reuse.
      */
     private fun buildPathCache(scene: PreparedScene) {
         cachedPaths = scene.commands.map { command ->
