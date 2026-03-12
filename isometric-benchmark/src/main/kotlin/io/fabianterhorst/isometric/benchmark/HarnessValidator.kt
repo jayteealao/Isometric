@@ -163,6 +163,9 @@ object HarnessValidator {
         if (runtimeFlags.enableSpatialIndex != flags.enableSpatialIndex) {
             mismatches.add("enableSpatialIndex: config=${flags.enableSpatialIndex}, runtime=${runtimeFlags.enableSpatialIndex}")
         }
+        if (runtimeFlags.enableBroadPhaseSort != flags.enableBroadPhaseSort) {
+            mismatches.add("enableBroadPhaseSort: config=${flags.enableBroadPhaseSort}, runtime=${runtimeFlags.enableBroadPhaseSort}")
+        }
         // forceRebuild should be the inverse of enablePreparedSceneCache
         val expectedForceRebuild = !flags.enablePreparedSceneCache
         if (runtimeFlags.forceRebuild != expectedForceRebuild) {

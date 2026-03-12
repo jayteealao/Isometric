@@ -30,6 +30,7 @@ import io.fabianterhorst.isometric.Vector
 data class RuntimeFlagSnapshot(
     val enablePathCaching: Boolean,
     val enableSpatialIndex: Boolean,
+    val enableBroadPhaseSort: Boolean,
     val forceRebuild: Boolean,
     val useNativeCanvas: Boolean,
     val canvasWidth: Int,
@@ -159,6 +160,7 @@ fun IsometricScene(
             RuntimeFlagSnapshot(
                 enablePathCaching = enablePathCaching,
                 enableSpatialIndex = enableSpatialIndex,
+                enableBroadPhaseSort = renderOptions.enableBroadPhaseSort,
                 forceRebuild = renderer.forceRebuild,
                 useNativeCanvas = useNativeCanvas,
                 canvasWidth = canvasWidth,

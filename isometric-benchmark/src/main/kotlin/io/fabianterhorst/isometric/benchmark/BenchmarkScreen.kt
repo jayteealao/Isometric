@@ -99,7 +99,9 @@ fun BenchmarkScreen(
             useNativeCanvas = flags.enableNativeCanvas,
             forceRebuild = !flags.enablePreparedSceneCache,
             frameVersion = frameVersion,
-            renderOptions = RenderOptions.Default,
+            renderOptions = RenderOptions.Default.copy(
+                enableBroadPhaseSort = flags.enableBroadPhaseSort
+            ),
             enableGestures = false,
             onHitTestReady = { hitTest -> orchestrator.hitTestFn = hitTest },
             onFlagsReady = { snapshot ->

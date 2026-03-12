@@ -10,9 +10,17 @@ package io.fabianterhorst.isometric
 data class RenderOptions(
     val enableDepthSorting: Boolean = true,
     val enableBackfaceCulling: Boolean = true,
-    val enableBoundsChecking: Boolean = true
+    val enableBoundsChecking: Boolean = true,
+    val enableBroadPhaseSort: Boolean = false,
+    val broadPhaseCellSize: Double = DEFAULT_BROAD_PHASE_CELL_SIZE
 ) {
+    init {
+        require(broadPhaseCellSize > 0.0) { "broadPhaseCellSize must be > 0" }
+    }
+
     companion object {
+        const val DEFAULT_BROAD_PHASE_CELL_SIZE: Double = 100.0
+
         /**
          * Default options: all optimizations enabled
          */
@@ -25,7 +33,8 @@ data class RenderOptions(
         val Performance = RenderOptions(
             enableDepthSorting = false,
             enableBackfaceCulling = true,
-            enableBoundsChecking = true
+            enableBoundsChecking = true,
+            enableBroadPhaseSort = false
         )
 
         /**
@@ -34,7 +43,8 @@ data class RenderOptions(
         val Quality = RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
-            enableBoundsChecking = false     // Render everything
+            enableBoundsChecking = false,    // Render everything
+            enableBroadPhaseSort = false
         )
     }
 }
