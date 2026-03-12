@@ -204,6 +204,11 @@ class IsometricRenderer(
      * **ANDROID-ONLY:** This function uses `android.graphics.Canvas` and will not work
      * on non-Android platforms. Use `render()` for cross-platform compatibility.
      *
+     * Note: when benchmarks run with prepared-scene caching disabled (`forceRebuild=true`),
+     * this path still rebuilds the prepared scene every frame and converts each command to a
+     * native `android.graphics.Path` during draw. In that mode the benchmark measures native
+     * draw-path overhead, not cross-frame native-path reuse.
+     *
      * @throws NoClassDefFoundError on non-Android platforms
      */
     fun DrawScope.renderNative(
