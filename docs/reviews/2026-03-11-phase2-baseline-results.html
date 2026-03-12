@@ -6,63 +6,65 @@
 <title>Phase 2 Baseline Benchmark Results</title>
 <style>
 :root {
-  --bg: #f3efe6;
+  --bg: #f5efe4;
   --panel: #fffaf1;
-  --ink: #182028;
-  --muted: #5b6570;
-  --line: #d7cdbd;
-  --blue: #2563eb;
+  --ink: #17212b;
+  --muted: #5e6872;
+  --line: #d8cfbf;
   --teal: #0f766e;
+  --blue: #2563eb;
   --red: #dc2626;
-  --amber: #d29922;
-  --violet: #7c3aed;
-  --shadow: 0 10px 30px rgba(63, 44, 17, 0.08);
+  --amber: #b7791f;
+  --slate: #334155;
+  --shadow: 0 12px 30px rgba(47, 31, 10, 0.08);
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: Georgia, 'Times New Roman', serif; color: var(--ink); background: radial-gradient(circle at top left, #fff8eb, var(--bg) 55%); }
-main { max-width: 1380px; margin: 0 auto; padding: 32px 24px 80px; }
-.hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; margin-bottom: 24px; }
+body { margin: 0; color: var(--ink); background: radial-gradient(circle at top left, #fff8ed, var(--bg) 58%); font-family: Georgia, 'Times New Roman', serif; }
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px 72px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
-.hero-copy { padding: 28px 30px; }
-.kicker { font: 700 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--teal); }
+.hero { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; margin-bottom: 24px; }
+.hero-copy { padding: 30px; }
+.kicker { font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--teal); }
 h1 { margin: 10px 0 12px; font-size: 42px; line-height: 1.02; }
-.subtitle { font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 62ch; }
+.subtitle { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.55; max-width: 64ch; }
 .meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.pill { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; font: 600 12px/1.2 ui-monospace, monospace; background: rgba(255,255,255,.55); }
+.pill { border: 1px solid var(--line); background: rgba(255,255,255,.55); border-radius: 999px; padding: 8px 12px; font: 600 12px/1.2 ui-monospace, monospace; }
 .scoreboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 18px; }
-.stat { padding: 16px; border-radius: 18px; background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(243,239,230,.6)); border: 1px solid var(--line); }
-.stat .label { color: var(--muted); font: 700 12px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
-.stat .value { margin-top: 8px; font-size: 28px; font-weight: 700; }
-.stat .small { margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.stat { padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(243,239,230,.58)); }
+.label { color: var(--muted); font: 700 12px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
+.value { margin-top: 8px; font-size: 28px; font-weight: 700; }
+.small { margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; }
 section { margin-top: 24px; }
-.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 14px; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
 .section-head h2 { margin: 0; font-size: 28px; }
 .section-head p { margin: 0; color: var(--muted); }
-.columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .card { padding: 20px; }
 .card h3 { margin: 0 0 10px; font-size: 22px; }
-.card p, .card li { color: var(--muted); line-height: 1.5; }
-.card ul { padding-left: 18px; margin: 10px 0 0; }
-.cards-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.chart-wrap { padding: 18px; }
-.chart { width: 100%; height: auto; display: block; }
-.chart-title { font-size: 18px; font-weight: 700; fill: var(--ink); }
-.chart-subtitle { font-size: 12px; fill: var(--muted); }
-.axis, .legend, .xlab { font-size: 11px; fill: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; }
-.grid { stroke: #e3dbcd; stroke-width: 1; }
-.grid-vert { stroke: #f0e8da; stroke-width: 1; }
+.card p, .card li { color: var(--muted); line-height: 1.55; }
+.card ul { margin: 10px 0 0; padding-left: 18px; }
+.columns-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.columns-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .banner { padding: 18px 20px; border-left: 6px solid var(--amber); background: #fff6df; border-radius: 18px; }
-.banner strong { display: block; margin-bottom: 4px; }
+.bar-group { padding: 20px; }
+.bar-group h3 { margin: 0 0 12px; font-size: 20px; }
+.bar-row { display: grid; grid-template-columns: 70px 1fr 90px; gap: 12px; align-items: center; margin: 10px 0; }
+.bar-label, .bar-value { font: 600 13px/1.2 ui-monospace, monospace; color: var(--slate); }
+.bar-track { position: relative; height: 14px; background: #ede4d5; border-radius: 999px; overflow: hidden; }
+.bar { height: 100%; border-radius: 999px; }
+.bar.prepare { background: linear-gradient(90deg, #0f766e, #14b8a6); }
+.bar.hit { background: linear-gradient(90deg, #dc2626, #f97316); }
+.bar.frame { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+.table-wrap { max-height: 700px; overflow: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
 .data-table th:first-child, .data-table td:first-child { text-align: left; }
 .data-table th:nth-child(4), .data-table td:nth-child(4) { text-align: left; }
 .data-table thead th { position: sticky; top: 0; background: #f9f2e6; z-index: 1; }
-.table-wrap { max-height: 620px; overflow: auto; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); }
-.note-list { margin: 0; padding-left: 20px; }
 .footer-note { margin-top: 12px; color: var(--muted); font-size: 13px; }
+.note-list { margin: 0; padding-left: 20px; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; }
 @media (max-width: 1100px) {
-  .hero, .columns, .cards-2 { grid-template-columns: 1fr; }
+  .hero, .columns-3, .columns-2 { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -70,72 +72,144 @@ section { margin-top: 24px; }
 <main>
   <section class="hero">
     <div class="panel hero-copy">
-      <div class="kicker">Phase 2 Baseline Run</div>
-      <h1>Baseline benchmark outcome, cleaned metrics, and optimization priorities</h1>
-      <p class="subtitle">This report summarizes the completed physical-device Phase 2 baseline run from <code>20260311-164101</code>. It combines the final outcome, all matrix results, and a ranking of where optimization effort should go based on measured cost contribution.</p>
+      <div class="kicker">Phase 2 Baseline Refresh</div>
+      <h1>Refreshed harness baseline on the physical device</h1>
+      <p class="subtitle">This report replaces the older Phase 2 baseline summary with the refreshed run from <code>20260312-231000-baseline-refresh</code> on the updated <code>perf/benchmark-harness</code> branch. It is now the comparison source for the rebased Phase 3 branches.</p>
       <div class="meta">
         <div class="pill">Device: SM-F956B</div>
         <div class="pill">Android 34</div>
-        <div class="pill">Run rows: 26</div>
-        <div class="pill">Matrix rows: 24</div>
-        <div class="pill">Source: benchmark-results/20260311-164101-refresh/summary.csv</div>
+        <div class="pill">Rows: 26</div>
+        <div class="pill">Matrix: 24 / 24 PASS</div>
+        <div class="pill">Source: benchmark-results/20260312-231000-baseline-refresh/benchmark-results/20260312-231000-baseline-refresh/summary.csv</div>
       </div>
     </div>
     <div class="panel scoreboard">
-      <div class="stat"><div class="label">Self-tests</div><div class="value">2 / 2 PASS</div><div class="small">Cache validation and sanity validation both passed on the real device.</div></div>
-      <div class="stat"><div class="label">Matrix</div><div class="value">24 / 24 PASS</div><div class="small">All scenario result markers are present and PASS in the refreshed artifact copy.</div></div>
-      <div class="stat"><div class="label">Best Frame Avg</div><div class="value">8.3361ms</div><div class="small">s10_m10_none</div></div>
-      <div class="stat"><div class="label">Worst Frame Avg</div><div class="value">224.9124ms</div><div class="small">s200_m50_continuous</div></div>
+      <div class="stat"><div class="label">Self-tests</div><div class="value">2 / 2 PASS</div><div class="small">Cache validation and sanity validation both passed on the physical device.</div></div>
+      <div class="stat"><div class="label">Matrix</div><div class="value">24 / 24 PASS</div><div class="small">No failed scenario markers in the refreshed baseline matrix.</div></div>
+      <div class="stat"><div class="label">Best Frame Avg</div><div class="value">8.3347ms</div><div class="small">s10_m50_none</div></div>
+      <div class="stat"><div class="label">Worst Frame Avg</div><div class="value">225.5450ms</div><div class="small">s200_m50_continuous</div></div>
     </div>
   </section>
 
   <section>
-    <div class="section-head"><h2>1. Executive Summary</h2><p>Short version of the run outcome.</p></div>
+    <div class="section-head"><h2>1. Executive Summary</h2><p>What materially changed in the refreshed baseline.</p></div>
     <div class="panel card">
       <ul class="note-list">
-        <li>Run completed on physical device SM-F956B (Android 34), not emulator.</li><li>All 26 result rows passed: 2 self-tests + 24 baseline scenarios.</li><li>Prepared-scene cache behavior is correct: self-test cache hit rate was 99.0%, while all baseline scenarios remained at 0.0%.</li><li>Best frame result in the matrix was s10_m10_none at 8.3361ms avg.</li><li>Worst frame result in the matrix was s200_m50_continuous at 224.9124ms avg.</li><li>Fastest prepare row was s10_m50_continuous at 1.4786ms; slowest was s200_m50_continuous at 106.5019ms.</li><li>Fastest interactive hit-test row was s10_m50_occasional at 0.0407ms; slowest was s200_m50_continuous at 106.1012ms.</li>
+        <li>The refreshed baseline completed on physical device <strong>SM-F956B</strong> (Android 34), not emulator.</li>
+        <li>All 26 rows passed: 2 self-tests and 24 baseline scenarios.</li>
+        <li><code>selftest_cache</code> still proves cache semantics are healthy on the harness: cache hit rate was <strong>0.9900</strong>.</li>
+        <li>All baseline scenarios stayed at <strong>0.0000</strong> cache hit rate, which is correct for the all-off baseline matrix.</li>
+        <li>The fastest matrix row was <strong>s10_m50_none</strong> at <strong>8.3347ms</strong> average frame time.</li>
+        <li>The heaviest row was <strong>s200_m50_continuous</strong> at <strong>225.5450ms</strong> average frame time, with <strong>106.0160ms</strong> prepare and <strong>106.7288ms</strong> hit-test cost.</li>
+        <li>Average non-interactive prepare cost is <strong>36.6401ms</strong>. Average continuous hit-test cost is <strong>38.3472ms</strong>.</li>
       </ul>
     </div>
   </section>
 
   <section>
-    <div class="section-head"><h2>2. Visual Overview</h2><p>Scaling trends and where time is really going.</p></div>
-    <div class="cards-2">
-      <div class="panel chart-wrap"><svg viewBox="0 0 860 340" class="chart" role="img" aria-label="Scaling Trend By Scene Size"><text x="70" y="20" class="chart-title">Scaling Trend By Scene Size</text><text x="70" y="38" class="chart-subtitle">Prepare and hit-test costs dominate as scene size grows; draw remains comparatively small.</text><line x1="70" y1="28.0" x2="840" y2="28.0" class="grid" /><text x="60" y="32.0" text-anchor="end" class="axis">148</text><line x1="70" y1="79.2" x2="840" y2="79.2" class="grid" /><text x="60" y="83.2" text-anchor="end" class="axis">119</text><line x1="70" y1="130.4" x2="840" y2="130.4" class="grid" /><text x="60" y="134.4" text-anchor="end" class="axis">89</text><line x1="70" y1="181.6" x2="840" y2="181.6" class="grid" /><text x="60" y="185.6" text-anchor="end" class="axis">59</text><line x1="70" y1="232.8" x2="840" y2="232.8" class="grid" /><text x="60" y="236.8" text-anchor="end" class="axis">30</text><line x1="70" y1="284.0" x2="840" y2="284.0" class="grid" /><text x="60" y="288.0" text-anchor="end" class="axis">0</text><line x1="70.0" y1="28" x2="70.0" y2="284" class="grid-vert" /><text x="70.0" y="322" text-anchor="middle" class="axis">N=10</text><line x1="326.7" y1="28" x2="326.7" y2="284" class="grid-vert" /><text x="326.7" y="322" text-anchor="middle" class="axis">N=50</text><line x1="583.3" y1="28" x2="583.3" y2="284" class="grid-vert" /><text x="583.3" y="322" text-anchor="middle" class="axis">N=100</text><line x1="840.0" y1="28" x2="840.0" y2="284" class="grid-vert" /><text x="840.0" y="322" text-anchor="middle" class="axis">N=200</text><line x1="630" y1="16" x2="650" y2="16" stroke="#0f766e" stroke-width="3" /><text x="658" y="20" class="legend">Prepare mean by size</text><line x1="630" y1="34" x2="650" y2="34" stroke="#2563eb" stroke-width="3" /><text x="658" y="38" class="legend">Frame mean by size</text><line x1="630" y1="52" x2="650" y2="52" stroke="#dc2626" stroke-width="3" /><text x="658" y="56" class="legend">Interactive hit-test mean by size</text><polyline fill="none" stroke="#0f766e" stroke-width="3" points="70.0,280.8 326.7,268.0 583.3,223.6 840.0,121.8" /><circle cx="70.0" cy="280.8" r="4.5" fill="#0f766e"><title>Prepare mean by size N=10: 1.8381ms</title></circle><circle cx="326.7" cy="268.0" r="4.5" fill="#0f766e"><title>Prepare mean by size N=50: 9.2513ms</title></circle><circle cx="583.3" cy="223.6" r="4.5" fill="#0f766e"><title>Prepare mean by size N=100: 34.9856ms</title></circle><circle cx="840.0" cy="121.8" r="4.5" fill="#0f766e"><title>Prepare mean by size N=200: 93.8549ms</title></circle><polyline fill="none" stroke="#2563eb" stroke-width="3" points="70.0,269.6 326.7,247.2 583.3,175.5 840.0,28.0" /><circle cx="70.0" cy="269.6" r="4.5" fill="#2563eb"><title>Frame mean by size N=10: 8.3410ms</title></circle><circle cx="326.7" cy="247.2" r="4.5" fill="#2563eb"><title>Frame mean by size N=50: 21.3125ms</title></circle><circle cx="583.3" cy="175.5" r="4.5" fill="#2563eb"><title>Frame mean by size N=100: 62.7827ms</title></circle><circle cx="840.0" cy="28.0" r="4.5" fill="#2563eb"><title>Frame mean by size N=200: 148.1617ms</title></circle><polyline fill="none" stroke="#dc2626" stroke-width="3" points="70.0,282.6 326.7,275.4 583.3,253.7 840.0,198.7" /><circle cx="70.0" cy="282.6" r="4.5" fill="#dc2626"><title>Interactive hit-test mean by size N=10: 0.8259ms</title></circle><circle cx="326.7" cy="275.4" r="4.5" fill="#dc2626"><title>Interactive hit-test mean by size N=50: 5.0046ms</title></circle><circle cx="583.3" cy="253.7" r="4.5" fill="#dc2626"><title>Interactive hit-test mean by size N=100: 17.5566ms</title></circle><circle cx="840.0" cy="198.7" r="4.5" fill="#dc2626"><title>Interactive hit-test mean by size N=200: 49.3719ms</title></circle></svg></div>
-      <div class="panel chart-wrap"><svg viewBox="0 0 860 320" class="chart" role="img" aria-label="Prepare Cost In Non-Interactive Baseline"><text x="70" y="20" class="chart-title">Prepare Cost In Non-Interactive Baseline</text><text x="70" y="38" class="chart-subtitle">Even without hit-testing, prepare cost scales hard with scene size and mutation rate.</text><line x1="70" y1="28.0" x2="840" y2="28.0" class="grid" /><text x="60" y="32.0" text-anchor="end" class="axis">93</text><line x1="70" y1="75.6" x2="840" y2="75.6" class="grid" /><text x="60" y="79.6" text-anchor="end" class="axis">74</text><line x1="70" y1="123.2" x2="840" y2="123.2" class="grid" /><text x="60" y="127.2" text-anchor="end" class="axis">56</text><line x1="70" y1="170.8" x2="840" y2="170.8" class="grid" /><text x="60" y="174.8" text-anchor="end" class="axis">37</text><line x1="70" y1="218.4" x2="840" y2="218.4" class="grid" /><text x="60" y="222.4" text-anchor="end" class="axis">19</text><line x1="70" y1="266.0" x2="840" y2="266.0" class="grid" /><text x="60" y="270.0" text-anchor="end" class="axis">0</text><rect x="86.4" y="260.8" width="63.5" height="5.2" rx="6" fill="#1f6feb"><title>s10_m10_none: 2.0111ms</title></rect><text x="118.1" y="302" text-anchor="middle" class="xlab">S10 m10 none</text><rect x="182.6" y="260.8" width="63.5" height="5.2" rx="6" fill="#1f6feb"><title>s10_m50_none: 2.0119ms</title></rect><text x="214.4" y="302" text-anchor="middle" class="xlab">S10 m50 none</text><rect x="278.9" y="246.1" width="63.5" height="19.9" rx="6" fill="#1f6feb"><title>s50_m10_none: 7.7495ms</title></rect><text x="310.6" y="302" text-anchor="middle" class="xlab">S50 m10 none</text><rect x="375.1" y="243.2" width="63.5" height="22.8" rx="6" fill="#1f6feb"><title>s50_m50_none: 8.8766ms</title></rect><text x="406.9" y="302" text-anchor="middle" class="xlab">S50 m50 none</text><rect x="471.4" y="180.9" width="63.5" height="85.1" rx="6" fill="#1f6feb"><title>s100_m10_none: 33.0710ms</title></rect><text x="503.1" y="302" text-anchor="middle" class="xlab">S100 m10 none</text><rect x="567.6" y="171.6" width="63.5" height="94.4" rx="6" fill="#1f6feb"><title>s100_m50_none: 36.6869ms</title></rect><text x="599.4" y="302" text-anchor="middle" class="xlab">S100 m50 none</text><rect x="663.9" y="56.3" width="63.5" height="209.7" rx="6" fill="#1f6feb"><title>s200_m10_none: 81.5358ms</title></rect><text x="695.6" y="302" text-anchor="middle" class="xlab">S200 m10 none</text><rect x="760.1" y="28.0" width="63.5" height="238.0" rx="6" fill="#1f6feb"><title>s200_m50_none: 92.5369ms</title></rect><text x="791.9" y="302" text-anchor="middle" class="xlab">S200 m50 none</text></svg></div>
+    <div class="section-head"><h2>2. Visual Overview</h2><p>Scaling trends by size and subsystem.</p></div>
+    <div class="columns-3">
+      <div class="panel bar-group"><h3>Frame Mean By Size</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar frame' style='width:5.7%'></div></div><div class='bar-value'>8.3376ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar frame' style='width:10.8%'></div></div><div class='bar-value'>15.8042ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar frame' style='width:37.0%'></div></div><div class='bar-value'>54.2002ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar frame' style='width:100.0%'></div></div><div class='bar-value'>146.5713ms</div></div></div>
+      <div class="panel bar-group"><h3>Prepare Mean In NONE Rows</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar prepare' style='width:2.0%'></div></div><div class='bar-value'>1.9558ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar prepare' style='width:8.4%'></div></div><div class='bar-value'>8.3640ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar prepare' style='width:36.3%'></div></div><div class='bar-value'>36.2600ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar prepare' style='width:100.0%'></div></div><div class='bar-value'>99.9806ms</div></div></div>
+      <div class="panel bar-group"><h3>Hit-Test Mean In CONTINUOUS Rows</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar hit' style='width:1.5%'></div></div><div class='bar-value'>1.5757ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar hit' style='width:10.3%'></div></div><div class='bar-value'>10.7664ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar hit' style='width:35.1%'></div></div><div class='bar-value'>36.6517ms</div></div>
+<div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar hit' style='width:100.0%'></div></div><div class='bar-value'>104.3949ms</div></div></div>
     </div>
-    <div class="panel chart-wrap" style="margin-top:16px"><svg viewBox="0 0 860 320" class="chart" role="img" aria-label="Continuous Hit-Test Cost By Scenario"><text x="70" y="20" class="chart-title">Continuous Hit-Test Cost By Scenario</text><text x="70" y="38" class="chart-subtitle">Continuous interaction is the clearest stress path for hit-test cost.</text><line x1="70" y1="28.0" x2="840" y2="28.0" class="grid" /><text x="60" y="32.0" text-anchor="end" class="axis">106</text><line x1="70" y1="75.6" x2="840" y2="75.6" class="grid" /><text x="60" y="79.6" text-anchor="end" class="axis">85</text><line x1="70" y1="123.2" x2="840" y2="123.2" class="grid" /><text x="60" y="127.2" text-anchor="end" class="axis">64</text><line x1="70" y1="170.8" x2="840" y2="170.8" class="grid" /><text x="60" y="174.8" text-anchor="end" class="axis">42</text><line x1="70" y1="218.4" x2="840" y2="218.4" class="grid" /><text x="60" y="222.4" text-anchor="end" class="axis">21</text><line x1="70" y1="266.0" x2="840" y2="266.0" class="grid" /><text x="60" y="270.0" text-anchor="end" class="axis">0</text><rect x="86.4" y="262.3" width="63.5" height="3.7" rx="6" fill="#d73a49"><title>s10_m10_continuous: 1.6336ms</title></rect><text x="118.1" y="302" text-anchor="middle" class="xlab">S10 m10 continuouS</text><rect x="182.6" y="262.4" width="63.5" height="3.6" rx="6" fill="#d73a49"><title>s10_m50_continuous: 1.5875ms</title></rect><text x="214.4" y="302" text-anchor="middle" class="xlab">S10 m50 continuouS</text><rect x="278.9" y="242.6" width="63.5" height="23.4" rx="6" fill="#d73a49"><title>s50_m10_continuous: 10.4155ms</title></rect><text x="310.6" y="302" text-anchor="middle" class="xlab">S50 m10 continuouS</text><rect x="375.1" y="245.3" width="63.5" height="20.7" rx="6" fill="#d73a49"><title>s50_m50_continuous: 9.2170ms</title></rect><text x="406.9" y="302" text-anchor="middle" class="xlab">S50 m50 continuouS</text><rect x="471.4" y="188.2" width="63.5" height="77.8" rx="6" fill="#d73a49"><title>s100_m10_continuous: 34.6897ms</title></rect><text x="503.1" y="302" text-anchor="middle" class="xlab">S100 m10 continuouS</text><rect x="567.6" y="189.2" width="63.5" height="76.8" rx="6" fill="#d73a49"><title>s100_m50_continuous: 34.2510ms</title></rect><text x="599.4" y="302" text-anchor="middle" class="xlab">S100 m50 continuouS</text><rect x="663.9" y="68.8" width="63.5" height="197.2" rx="6" fill="#d73a49"><title>s200_m10_continuous: 87.8970ms</title></rect><text x="695.6" y="302" text-anchor="middle" class="xlab">S200 m10 continuouS</text><rect x="760.1" y="28.0" width="63.5" height="238.0" rx="6" fill="#d73a49"><title>s200_m50_continuous: 106.1012ms</title></rect><text x="791.9" y="302" text-anchor="middle" class="xlab">S200 m50 continuouS</text></svg></div>
   </section>
 
   <section>
-    <div class="section-head"><h2>3. Optimization Priority Ranking</h2><p>Ordered by expected end-to-end impact, not by implementation convenience.</p></div>
-    <div class="columns">
-      <article class="panel card"><h3>1. Reduce Hit-Test Cost First</h3><p>Continuous interaction becomes the dominant cost from N=100 upward. At N=200, avg hit-test reaches 87.8970ms for 10% mutation and 106.1012ms for 50% mutation.</p><ul><li>s100_m10_continuous: hit-test 34.6897ms, frame 76.1760ms</li><li>s200_m10_continuous: hit-test 87.8970ms, frame 184.2846ms</li><li>s200_m50_continuous: hit-test 106.1012ms, frame 224.9124ms</li></ul><p><strong>Recommended direction:</strong> Prioritize spatial index and broad-phase hit-test improvements before draw-path work. Continuous interaction cost is large enough to dominate total frame time.</p></article><article class="panel card"><h3>2. Reduce Prepare/Rebuild Cost Next</h3><p>Prepare cost scales steeply with scene size even when hit-testing is absent. None/occasional scenarios at N=100 and N=200 are already dominated by prepare time.</p><ul><li>s100_m10_none: prepare 33.0710ms, draw 1.3986ms</li><li>s200_m10_none: prepare 81.5358ms, draw 1.9839ms</li><li>s200_m50_occasional: prepare 104.7756ms, draw 2.6080ms</li></ul><p><strong>Recommended direction:</strong> Prepared-scene caching, lower invalidation frequency, and cheaper engine.prepare() paths will move the needle much more than draw optimizations in baseline scenes.</p></article><article class="panel card"><h3>3. Draw Cost Is Not The Primary Bottleneck</h3><p>Across the whole matrix, draw stays relatively small: roughly 0.28ms to 2.61ms. It is consistently much lower than prepare and hit-test costs.</p><ul><li>Highest avg draw row: s200_m50_occasional at 2.6080ms</li><li>Lowest avg draw row: s10_m50_continuous at 0.2758ms</li></ul><p><strong>Recommended direction:</strong> Path caching and native canvas can still help, but they are lower priority than prepare/hit-test work if the goal is largest end-to-end frame wins.</p></article>
+    <div class="section-head"><h2>3. Optimization Priority Ranking</h2><p>Ordered by end-to-end impact, not implementation convenience.</p></div>
+    <div class="columns-3"><article class='panel card'><h3>1. Attack Hit-Test Cost First</h3><p>Continuous interaction is still the clearest end-to-end bottleneck. The branch-independent refreshed baseline averages 38.3472ms hit-test time across continuous rows, with the worst case at s200_m50_continuous (106.7288ms hit-test, 225.5450ms frame).</p><ul><li>s200_m50_continuous: hit-test 106.7288ms, frame 225.5450ms</li><li>s200_m10_continuous: hit-test 102.0609ms, frame 212.4941ms</li><li>s100_m50_continuous: hit-test 37.5431ms, frame 81.9583ms</li></ul><p><strong>Best next branches: spatial-index and broad-phase-sort. Continuous interaction dominates total frame cost from N=100 upward.</strong></p></article>
+<article class='panel card'><h3>2. Prepare/Rebuild Cost Still Dominates Non-Interactive Work</h3><p>Even with hit-testing absent, non-interactive scenarios average 36.6401ms prepare time. At N=200, non-interactive prepare cost is already around 99.9806ms before interactive overhead is added.</p><ul><li>s200_m50_none: prepare 102.8262ms, frame 113.6884ms</li><li>s200_m10_none: prepare 97.1350ms, frame 105.1487ms</li><li>s100_m50_none: prepare 37.1022ms, frame 42.5213ms</li></ul><p><strong>Best next branch: prepared-scene-cache. This is the biggest likely win for steady-state frames.</strong></p></article>
+<article class='panel card'><h3>3. Draw Cost Is Secondary, But Allocation Pressure Is Not</h3><p>Average draw time across the matrix is only 1.2253ms, and the worst draw row is s200_m50_continuous at 2.5526ms. The stronger signal here is allocation and GC churn: matrix rows average 13.19MB allocated and 11364 GC invocations.</p><ul><li>s200_m50_continuous: 18.37MB allocated, 42338 GC invocations</li><li>s200_m50_continuous: draw 2.5526ms, frame 225.5450ms</li><li>Occasional interaction average hit-test cost is only 0.6724ms</li></ul><p><strong>Path-caching and native-canvas are still valid branches, but they need to show real frame-time or allocation wins to outrank hit-test and prepare work.</strong></p></article></div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>4. Size-Level Summary</h2><p>How the refreshed baseline scales with scene size.</p></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Size</th><th>Frame Avg Range</th><th>Prepare Avg Range</th><th>Interactive Hit-Test Avg</th><th>Avg Allocated</th><th>Avg GC Count</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>N=10</td><td>8.3347 to 8.3401ms</td><td>1.4864 to 2.0654ms</td><td>0.8067ms</td><td>9.24MB</td><td>305</td></tr>
+<tr><td>N=50</td><td>8.9585 to 25.4735ms</td><td>7.1002 to 10.3528ms</td><td>5.4730ms</td><td>13.22MB</td><td>2775</td></tr>
+<tr><td>N=100</td><td>39.8387 to 81.9583ms</td><td>35.4177 to 37.7312ms</td><td>18.6596ms</td><td>10.82MB</td><td>11463</td></tr>
+<tr><td>N=200</td><td>104.6724 to 225.5450ms</td><td>94.9409 to 106.0160ms</td><td>53.0998ms</td><td>19.47MB</td><td>30913</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
   <section>
-    <div class="section-head"><h2>4. Cleaned Metrics View</h2><p>Focus on avg, p50, and p95 instead of the noisier full stat surface.</p></div>
+    <div class="section-head"><h2>5. Self-Test Results</h2><p>Harness integrity checks on the refreshed baseline.</p></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Scenario</th><th>Avg Prepare</th><th>Avg Draw</th><th>Avg Frame</th><th>Cache Hit Rate</th><th>Allocated MB</th><th>GC Count</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>selftest_cache</td><td>0.0723</td><td>0.2821</td><td>8.3142</td><td>0.9900</td><td>11.26</td><td>0</td></tr>
+<tr><td>selftest_sanity</td><td>1.0603</td><td>0.4174</td><td>8.3028</td><td>0.0000</td><td>48.27</td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>6. Cleaned Matrix Metrics</h2><p>Primary comparison table for Phase 3 branches.</p></div>
     <div class="banner panel">
       <strong>Interpretation note</strong>
-      Some rows show outlier-heavy frame behavior, so <code>avgFrameMs</code> can look worse than the central tendency. Use the cleaned table below for comparison, then consult the full table only when you need raw detail.
+      Use this table as the refreshed baseline reference for rebased Phase 3 branches. The matrix is still all-off: <code>enablePathCaching=false</code>, <code>enableSpatialIndex=false</code>, <code>enablePreparedSceneCache=false</code>, <code>enableNativeCanvas=false</code>, and <code>enableBroadPhaseSort=false</code> for every non-self-test row.
     </div>
-    <div class="table-wrap" style="margin-top:16px"><table class="data-table "><thead><tr><th>Scenario</th><th>Prepare Avg</th><th>Prepare P50</th><th>Prepare P95</th><th>Frame Avg</th><th>Frame P50</th><th>Frame P95</th><th>Hit Avg</th><th>Hit P95</th><th>Observed Mut.</th></tr></thead><tbody><tr><td>s10_m10_none</td><td>2.0111</td><td>2.0814</td><td>2.7155</td><td>8.3361</td><td>8.3437</td><td>8.3453</td><td>0.0000</td><td>0.0000</td><td>10.6%</td></tr><tr><td>s10_m10_occasional</td><td>1.9800</td><td>1.9809</td><td>2.7460</td><td>8.3387</td><td>8.3432</td><td>8.3453</td><td>0.0417</td><td>0.0000</td><td>10.6%</td></tr><tr><td>s10_m10_continuous</td><td>1.5199</td><td>1.5222</td><td>2.2168</td><td>8.3364</td><td>8.3426</td><td>8.3452</td><td>1.6336</td><td>2.3502</td><td>10.6%</td></tr><tr><td>s10_m50_none</td><td>2.0119</td><td>2.0015</td><td>2.8535</td><td>8.3397</td><td>8.3433</td><td>8.3452</td><td>0.0000</td><td>0.0000</td><td>50.6%</td></tr><tr><td>s10_m50_occasional</td><td>2.0271</td><td>2.1014</td><td>2.9366</td><td>8.3558</td><td>8.3433</td><td>8.3452</td><td>0.0407</td><td>0.0000</td><td>50.6%</td></tr><tr><td>s10_m50_continuous</td><td>1.4786</td><td>1.4894</td><td>2.1126</td><td>8.3396</td><td>8.3430</td><td>8.3451</td><td>1.5875</td><td>2.3046</td><td>50.6%</td></tr><tr><td>s50_m10_none</td><td>7.7495</td><td>7.1534</td><td>10.4785</td><td>9.7042</td><td>8.3436</td><td>16.6873</td><td>0.0000</td><td>0.0000</td><td>10.2%</td></tr><tr><td>s50_m10_occasional</td><td>10.7135</td><td>10.2136</td><td>14.2808</td><td>13.5173</td><td>13.9049</td><td>19.4673</td><td>0.2071</td><td>0.0000</td><td>10.2%</td></tr><tr><td>s50_m10_continuous</td><td>10.0632</td><td>9.5856</td><td>13.0999</td><td>23.9996</td><td>25.0295</td><td>30.5958</td><td>10.4155</td><td>13.5298</td><td>10.2%</td></tr><tr><td>s50_m50_none</td><td>8.8766</td><td>8.3187</td><td>12.3306</td><td>11.3096</td><td>8.3458</td><td>16.6895</td><td>0.0000</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s50_m50_occasional</td><td>9.2322</td><td>8.6903</td><td>13.1539</td><td>48.0268</td><td>8.6318</td><td>16.6883</td><td>0.1789</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s50_m50_continuous</td><td>8.8726</td><td>8.5029</td><td>12.0817</td><td>21.3173</td><td>22.2468</td><td>27.8120</td><td>9.2170</td><td>12.4316</td><td>49.9%</td></tr><tr><td>s100_m10_none</td><td>33.0710</td><td>33.3357</td><td>36.8536</td><td>37.7948</td><td>36.1545</td><td>41.7192</td><td>0.0000</td><td>0.0000</td><td>10.0%</td></tr><tr><td>s100_m10_occasional</td><td>33.6447</td><td>33.6608</td><td>37.3056</td><td>39.0129</td><td>38.9301</td><td>44.4956</td><td>0.6290</td><td>0.0000</td><td>10.0%</td></tr><tr><td>s100_m10_continuous</td><td>34.9708</td><td>34.8491</td><td>39.3363</td><td>76.1760</td><td>75.0875</td><td>83.4349</td><td>34.6897</td><td>39.0240</td><td>10.0%</td></tr><tr><td>s100_m50_none</td><td>36.6869</td><td>35.3664</td><td>44.9206</td><td>104.1306</td><td>41.7112</td><td>52.8399</td><td>0.0000</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s100_m50_occasional</td><td>36.9512</td><td>37.1682</td><td>40.3452</td><td>43.1765</td><td>41.7167</td><td>50.0636</td><td>0.6568</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s100_m50_continuous</td><td>34.5887</td><td>34.9014</td><td>38.8844</td><td>76.4051</td><td>77.8683</td><td>86.2212</td><td>34.2510</td><td>38.2003</td><td>49.9%</td></tr><tr><td>s200_m10_none</td><td>81.5358</td><td>79.1543</td><td>94.2613</td><td>162.3605</td><td>86.2193</td><td>102.9026</td><td>0.0000</td><td>0.0000</td><td>10.1%</td></tr><tr><td>s200_m10_occasional</td><td>89.3811</td><td>89.0659</td><td>100.1616</td><td>97.6222</td><td>91.7844</td><td>119.5763</td><td>1.6104</td><td>0.0000</td><td>10.1%</td></tr><tr><td>s200_m10_continuous</td><td>88.3980</td><td>87.7422</td><td>100.0302</td><td>184.2846</td><td>180.7654</td><td>208.5969</td><td>87.8970</td><td>99.7630</td><td>10.1%</td></tr><tr><td>s200_m50_none</td><td>92.5369</td><td>92.6118</td><td>100.2806</td><td>102.0440</td><td>105.6680</td><td>125.1281</td><td>0.0000</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s200_m50_occasional</td><td>104.7756</td><td>104.5444</td><td>114.3015</td><td>117.7465</td><td>122.3627</td><td>125.1825</td><td>1.8791</td><td>0.0000</td><td>49.9%</td></tr><tr><td>s200_m50_continuous</td><td>106.5019</td><td>106.0587</td><td>114.4866</td><td>224.9124</td><td>208.5859</td><td>250.3006</td><td>106.1012</td><td>114.0540</td><td>49.9%</td></tr></tbody></table></div>
-    <div class="footer-note">Rows with especially visible outlier skew in frame timing: s50_m50_occasional, s100_m50_none, s200_m10_none.</div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>5. All Results</h2><p>Complete scenario-level result set from the refreshed artifact copy.</p></div>
-    <div class="table-wrap"><table class="data-table "><thead><tr><th>Scenario</th><th>N</th><th>Mut.</th><th>Pattern</th><th>Prepare Avg</th><th>Draw Avg</th><th>Frame Avg</th><th>Hit Avg</th><th>Cache Hit</th><th>Observed Mut.</th><th>Warmup</th><th>Frames</th><th>Iters</th></tr></thead><tbody><tr><td>selftest_cache</td><td>10.0000</td><td>0.0%</td><td>NONE</td><td>0.0751</td><td>0.2962</td><td>8.3033</td><td>0.0000</td><td>99.0%</td><td>0.0%</td><td>30.0000</td><td>100.0000</td><td>1.0000</td></tr><tr><td>selftest_sanity</td><td>10.0000</td><td>10.0%</td><td>NONE</td><td>1.0382</td><td>0.4441</td><td>8.3060</td><td>0.0000</td><td>0.0%</td><td>9.4%</td><td>30.0000</td><td>100.0000</td><td>1.0000</td></tr><tr><td>s10_m10_none</td><td>10.0000</td><td>10.0%</td><td>NONE</td><td>2.0111</td><td>0.4187</td><td>8.3361</td><td>0.0000</td><td>0.0%</td><td>10.6%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s10_m10_occasional</td><td>10.0000</td><td>10.0%</td><td>OCCASIONAL</td><td>1.9800</td><td>0.3574</td><td>8.3387</td><td>0.0417</td><td>0.0%</td><td>10.6%</td><td>31.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s10_m10_continuous</td><td>10.0000</td><td>10.0%</td><td>CONTINUOUS</td><td>1.5199</td><td>0.2782</td><td>8.3364</td><td>1.6336</td><td>0.0%</td><td>10.6%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s10_m50_none</td><td>10.0000</td><td>50.0%</td><td>NONE</td><td>2.0119</td><td>0.3617</td><td>8.3397</td><td>0.0000</td><td>0.0%</td><td>50.6%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s10_m50_occasional</td><td>10.0000</td><td>50.0%</td><td>OCCASIONAL</td><td>2.0271</td><td>0.3708</td><td>8.3558</td><td>0.0407</td><td>0.0%</td><td>50.6%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s10_m50_continuous</td><td>10.0000</td><td>50.0%</td><td>CONTINUOUS</td><td>1.4786</td><td>0.2758</td><td>8.3396</td><td>1.5875</td><td>0.0%</td><td>50.6%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m10_none</td><td>50.0000</td><td>10.0%</td><td>NONE</td><td>7.7495</td><td>0.4951</td><td>9.7042</td><td>0.0000</td><td>0.0%</td><td>10.2%</td><td>31.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m10_occasional</td><td>50.0000</td><td>10.0%</td><td>OCCASIONAL</td><td>10.7135</td><td>0.7127</td><td>13.5173</td><td>0.2071</td><td>0.0%</td><td>10.2%</td><td>95.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m10_continuous</td><td>50.0000</td><td>10.0%</td><td>CONTINUOUS</td><td>10.0632</td><td>0.6946</td><td>23.9996</td><td>10.4155</td><td>0.0%</td><td>10.2%</td><td>233.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m50_none</td><td>50.0000</td><td>50.0%</td><td>NONE</td><td>8.8766</td><td>0.5761</td><td>11.3096</td><td>0.0000</td><td>0.0%</td><td>49.9%</td><td>37.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m50_occasional</td><td>50.0000</td><td>50.0%</td><td>OCCASIONAL</td><td>9.2322</td><td>0.5936</td><td>48.0268</td><td>0.1789</td><td>0.0%</td><td>49.9%</td><td>500.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s50_m50_continuous</td><td>50.0000</td><td>50.0%</td><td>CONTINUOUS</td><td>8.8726</td><td>0.5918</td><td>21.3173</td><td>9.2170</td><td>0.0%</td><td>49.9%</td><td>500.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m10_none</td><td>100.0000</td><td>10.0%</td><td>NONE</td><td>33.0710</td><td>1.3986</td><td>37.7948</td><td>0.0000</td><td>0.0%</td><td>10.0%</td><td>86.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m10_occasional</td><td>100.0000</td><td>10.0%</td><td>OCCASIONAL</td><td>33.6447</td><td>1.4546</td><td>39.0129</td><td>0.6290</td><td>0.0%</td><td>10.0%</td><td>151.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m10_continuous</td><td>100.0000</td><td>10.0%</td><td>CONTINUOUS</td><td>34.9708</td><td>1.4477</td><td>76.1760</td><td>34.6897</td><td>0.0%</td><td>10.0%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m50_none</td><td>100.0000</td><td>50.0%</td><td>NONE</td><td>36.6869</td><td>1.3837</td><td>104.1306</td><td>0.0000</td><td>0.0%</td><td>49.9%</td><td>109.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m50_occasional</td><td>100.0000</td><td>50.0%</td><td>OCCASIONAL</td><td>36.9512</td><td>1.5773</td><td>43.1765</td><td>0.6568</td><td>0.0%</td><td>49.9%</td><td>103.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s100_m50_continuous</td><td>100.0000</td><td>50.0%</td><td>CONTINUOUS</td><td>34.5887</td><td>1.5134</td><td>76.4051</td><td>34.2510</td><td>0.0%</td><td>49.9%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m10_none</td><td>200.0000</td><td>10.0%</td><td>NONE</td><td>81.5358</td><td>1.9839</td><td>162.3605</td><td>0.0000</td><td>0.0%</td><td>10.1%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m10_occasional</td><td>200.0000</td><td>10.0%</td><td>OCCASIONAL</td><td>89.3811</td><td>2.1652</td><td>97.6222</td><td>1.6104</td><td>0.0%</td><td>10.1%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m10_continuous</td><td>200.0000</td><td>10.0%</td><td>CONTINUOUS</td><td>88.3980</td><td>2.1917</td><td>184.2846</td><td>87.8970</td><td>0.0%</td><td>10.1%</td><td>47.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m50_none</td><td>200.0000</td><td>50.0%</td><td>NONE</td><td>92.5369</td><td>2.2552</td><td>102.0440</td><td>0.0000</td><td>0.0%</td><td>49.9%</td><td>31.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m50_occasional</td><td>200.0000</td><td>50.0%</td><td>OCCASIONAL</td><td>104.7756</td><td>2.6080</td><td>117.7465</td><td>1.8791</td><td>0.0%</td><td>49.9%</td><td>30.0000</td><td>500.0000</td><td>3.0000</td></tr><tr><td>s200_m50_continuous</td><td>200.0000</td><td>50.0%</td><td>CONTINUOUS</td><td>106.5019</td><td>2.5775</td><td>224.9124</td><td>106.1012</td><td>0.0%</td><td>49.9%</td><td>46.0000</td><td>500.0000</td><td>3.0000</td></tr></tbody></table></div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>6. Practical Read</h2><p>What the numbers mean in engineering terms.</p></div>
-    <div class="columns">
-      <article class="panel card"><h3>Small scenes are cheap</h3><p>N=10 stays close to vsync budget in every baseline scenario. Prepare stays around 1.48ms to 2.03ms, and continuous hit-test stays around 1.59ms to 1.63ms.</p></article>
-      <article class="panel card"><h3>Hit-testing becomes dominant early</h3><p>By N=50, continuous hit-testing already costs about 9.22ms to 10.42ms on average. By N=100 it reaches ~34ms, and by N=200 it reaches ~88ms to ~106ms.</p></article>
-      <article class="panel card"><h3>Prepare dominates non-interactive baseline</h3><p>With interaction removed, prepare still grows from ~7.75ms at N=50 to ~81.54ms to ~106.50ms at N=200. That makes prepare-path work the main baseline optimization lever.</p></article>
+    <div class="table-wrap" style="margin-top:16px">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Scenario</th><th>Size</th><th>Mut %</th><th>Interaction</th>
+            <th>Avg Prepare</th><th>P50 Prepare</th><th>P95 Prepare</th>
+            <th>Avg Draw</th>
+            <th>Avg Frame</th><th>P50 Frame</th><th>P95 Frame</th>
+            <th>Avg Hit</th><th>P95 Hit</th>
+            <th>Alloc MB</th><th>GC</th><th>Observed Mutation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>s10_m10_none</td><td>10</td><td>10</td><td>NONE</td><td>1.8462</td><td>1.8139</td><td>2.7634</td><td>0.3699</td><td>8.3401</td><td>8.3436</td><td>8.3457</td><td>0.0000</td><td>0.0000</td><td>9.17</td><td>72</td><td>0.1064</td></tr>
+<tr><td>s10_m10_occasional</td><td>10</td><td>10</td><td>OCCASIONAL</td><td>1.9267</td><td>1.9709</td><td>2.7514</td><td>0.3317</td><td>8.3363</td><td>8.3430</td><td>8.3450</td><td>0.0394</td><td>0.0000</td><td>9.21</td><td>145</td><td>0.1064</td></tr>
+<tr><td>s10_m10_continuous</td><td>10</td><td>10</td><td>CONTINUOUS</td><td>1.5327</td><td>1.5754</td><td>2.1685</td><td>0.2735</td><td>8.3381</td><td>8.3429</td><td>8.3444</td><td>1.6093</td><td>2.3157</td><td>9.68</td><td>279</td><td>0.1064</td></tr>
+<tr><td>s10_m50_none</td><td>10</td><td>50</td><td>NONE</td><td>2.0654</td><td>2.2009</td><td>2.9829</td><td>0.3655</td><td>8.3347</td><td>8.3426</td><td>8.3455</td><td>0.0000</td><td>0.0000</td><td>10.32</td><td>351</td><td>0.5062</td></tr>
+<tr><td>s10_m50_occasional</td><td>10</td><td>50</td><td>OCCASIONAL</td><td>1.7779</td><td>1.5312</td><td>2.6352</td><td>0.3175</td><td>8.3388</td><td>8.3431</td><td>8.3447</td><td>0.0360</td><td>0.0000</td><td>7.92</td><td>425</td><td>0.5062</td></tr>
+<tr><td>s10_m50_continuous</td><td>10</td><td>50</td><td>CONTINUOUS</td><td>1.4864</td><td>1.4623</td><td>2.1710</td><td>0.2698</td><td>8.3374</td><td>8.3431</td><td>8.3445</td><td>1.5422</td><td>2.2599</td><td>9.12</td><td>560</td><td>0.5062</td></tr>
+<tr><td>s50_m10_none</td><td>50</td><td>10</td><td>NONE</td><td>7.1002</td><td>6.6032</td><td>9.9209</td><td>0.4519</td><td>8.9585</td><td>8.3427</td><td>13.9044</td><td>0.0000</td><td>0.0000</td><td>17.25</td><td>1018</td><td>0.1016</td></tr>
+<tr><td>s50_m10_occasional</td><td>50</td><td>10</td><td>OCCASIONAL</td><td>9.2697</td><td>8.6697</td><td>12.5750</td><td>0.6222</td><td>11.8170</td><td>13.9031</td><td>16.6890</td><td>0.1764</td><td>0.0000</td><td>15.09</td><td>1535</td><td>0.1016</td></tr>
+<tr><td>s50_m10_continuous</td><td>50</td><td>10</td><td>CONTINUOUS</td><td>9.8492</td><td>9.4434</td><td>13.1509</td><td>0.6729</td><td>23.6103</td><td>25.0291</td><td>30.5945</td><td>10.3954</td><td>13.9791</td><td>12.73</td><td>2590</td><td>0.1016</td></tr>
+<tr><td>s50_m50_none</td><td>50</td><td>50</td><td>NONE</td><td>9.6277</td><td>9.0445</td><td>12.9982</td><td>0.6438</td><td>12.3932</td><td>13.9047</td><td>16.6885</td><td>0.0000</td><td>0.0000</td><td>8.45</td><td>3136</td><td>0.4989</td></tr>
+<tr><td>s50_m50_occasional</td><td>50</td><td>50</td><td>OCCASIONAL</td><td>9.6567</td><td>8.9345</td><td>13.3404</td><td>0.6595</td><td>12.5727</td><td>13.9051</td><td>16.6908</td><td>0.1828</td><td>0.0000</td><td>9.67</td><td>3659</td><td>0.4989</td></tr>
+<tr><td>s50_m50_continuous</td><td>50</td><td>50</td><td>CONTINUOUS</td><td>10.3528</td><td>10.0002</td><td>13.7965</td><td>0.7046</td><td>25.4735</td><td>25.0281</td><td>33.3727</td><td>11.1374</td><td>15.2492</td><td>16.10</td><td>4714</td><td>0.4989</td></tr>
+<tr><td>s100_m10_none</td><td>100</td><td>10</td><td>NONE</td><td>35.4177</td><td>36.3033</td><td>39.0058</td><td>1.4267</td><td>39.8387</td><td>41.7133</td><td>44.5000</td><td>0.0000</td><td>0.0000</td><td>9.05</td><td>6242</td><td>0.1004</td></tr>
+<tr><td>s100_m10_occasional</td><td>100</td><td>10</td><td>OCCASIONAL</td><td>35.7028</td><td>36.7377</td><td>39.7260</td><td>1.4716</td><td>41.0627</td><td>41.7138</td><td>47.2821</td><td>0.6660</td><td>0.0000</td><td>9.77</td><td>7802</td><td>0.1004</td></tr>
+<tr><td>s100_m10_continuous</td><td>100</td><td>10</td><td>CONTINUOUS</td><td>36.0763</td><td>36.2345</td><td>39.8149</td><td>1.4293</td><td>77.5381</td><td>77.8645</td><td>86.2132</td><td>35.7603</td><td>39.5146</td><td>20.63</td><td>10889</td><td>0.1004</td></tr>
+<tr><td>s100_m50_none</td><td>100</td><td>50</td><td>NONE</td><td>37.1022</td><td>37.3672</td><td>40.6787</td><td>1.4553</td><td>42.5213</td><td>41.7141</td><td>47.2826</td><td>0.0000</td><td>0.0000</td><td>9.48</td><td>12552</td><td>0.4988</td></tr>
+<tr><td>s100_m50_occasional</td><td>100</td><td>50</td><td>OCCASIONAL</td><td>36.0194</td><td>36.5379</td><td>40.4237</td><td>1.4471</td><td>42.2821</td><td>41.7152</td><td>50.0590</td><td>0.6689</td><td>0.0000</td><td>9.85</td><td>14111</td><td>0.4988</td></tr>
+<tr><td>s100_m50_continuous</td><td>100</td><td>50</td><td>CONTINUOUS</td><td>37.7312</td><td>38.0185</td><td>41.8141</td><td>1.5800</td><td>81.9583</td><td>83.4190</td><td>91.7639</td><td>37.5431</td><td>41.2441</td><td>6.13</td><td>17181</td><td>0.4988</td></tr>
+<tr><td>s200_m10_none</td><td>200</td><td>10</td><td>NONE</td><td>97.1350</td><td>96.9444</td><td>106.7584</td><td>2.4155</td><td>105.1487</td><td>116.7876</td><td>125.1517</td><td>0.0000</td><td>0.0000</td><td>24.37</td><td>20430</td><td>0.1006</td></tr>
+<tr><td>s200_m10_occasional</td><td>200</td><td>10</td><td>OCCASIONAL</td><td>94.9409</td><td>94.8564</td><td>104.2327</td><td>2.3847</td><td>104.6724</td><td>108.4542</td><td>125.1514</td><td>1.7163</td><td>0.0000</td><td>17.04</td><td>23739</td><td>0.1006</td></tr>
+<tr><td>s200_m10_continuous</td><td>200</td><td>10</td><td>CONTINUOUS</td><td>101.1354</td><td>100.6380</td><td>110.6189</td><td>2.5240</td><td>212.4941</td><td>208.5871</td><td>250.3063</td><td>102.0609</td><td>112.0060</td><td>25.00</td><td>29810</td><td>0.1006</td></tr>
+<tr><td>s200_m50_none</td><td>200</td><td>50</td><td>NONE</td><td>102.8262</td><td>102.0931</td><td>112.3271</td><td>2.4895</td><td>113.6884</td><td>125.1305</td><td>125.1555</td><td>0.0000</td><td>0.0000</td><td>17.88</td><td>32969</td><td>0.4985</td></tr>
+<tr><td>s200_m50_occasional</td><td>200</td><td>50</td><td>OCCASIONAL</td><td>104.7177</td><td>104.5235</td><td>115.2114</td><td>2.5474</td><td>117.8795</td><td>125.1427</td><td>125.1702</td><td>1.8933</td><td>0.0000</td><td>14.16</td><td>36192</td><td>0.4985</td></tr>
+<tr><td>s200_m50_continuous</td><td>200</td><td>50</td><td>CONTINUOUS</td><td>106.0160</td><td>105.5395</td><td>114.9276</td><td>2.5526</td><td>225.5450</td><td>208.5914</td><td>250.3106</td><td>106.7288</td><td>115.3485</td><td>18.37</td><td>42338</td><td>0.4985</td></tr>
+        </tbody>
+      </table>
     </div>
+    <div class="footer-note">Local pull layout is still nested because <code>adb pull</code> preserves the device-side <code>benchmark-results/&lt;run-id&gt;</code> path under the requested output directory.</div>
   </section>
 </main>
 </body>
