@@ -14,6 +14,7 @@ import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 import io.fabianterhorst.isometric.shapes.Prism
+import io.fabianterhorst.isometric.compose.runtime.Shape
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
