@@ -237,6 +237,28 @@ re-reviewing the Kotlin harness.
 - Battery > 50% or connected to power (thermal throttling under low battery)
 - No other apps running in foreground
 
+### 2.1.1 Windows Shell Note
+
+If Phase 2 is being run from a Windows host, use **Git Bash** for
+`isometric-benchmark/benchmark-runner.sh`. Do **not** assume WSL bash is equivalent here.
+
+Operationally, WSL bash failed to execute `adb.exe` correctly on this machine. The visible
+symptom was `launch command failed` from the runner even though:
+- the APK was installed correctly
+- the physical device was connected correctly
+- direct `adb shell am start ...` launches from PowerShell worked
+
+The successful Windows invocation pattern was:
+
+```powershell
+$env:ANDROID_SERIAL='100.73.175.9:43771'
+$env:PATH='C:\Users\jayte\AppData\Local\Android\Sdk\platform-tools;' + $env:PATH
+& 'C:\Program Files\Git\bin\bash.exe' -lc 'cd /c/Users/jayte/Documents/dev/Isometric && ./isometric-benchmark/benchmark-runner.sh --label baseline-refresh'
+```
+
+Treat this as the default pattern for future physical-device branch runs from Windows unless
+the host shell behavior is revalidated.
+
 ### 2.2 Device Preparation
 
 Before running benchmarks, minimize noise sources:

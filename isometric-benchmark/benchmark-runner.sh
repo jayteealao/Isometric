@@ -12,6 +12,9 @@
 #   - Benchmark APK installed:
 #     ./gradlew :isometric-benchmark:assembleDebug
 #     adb install isometric-benchmark/build/outputs/apk/debug/isometric-benchmark-debug.apk
+#   - Windows host note: prefer Git Bash for this script. WSL bash failed to execute
+#     adb.exe correctly on this machine, which caused launch failures despite the app
+#     and device being healthy.
 
 set -euo pipefail
 
