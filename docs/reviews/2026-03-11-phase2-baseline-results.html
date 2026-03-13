@@ -3,279 +3,1819 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Phase 2 Baseline Benchmark Results</title>
+<title>Isometric Renderer — Performance Benchmark Report</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
+
 :root {
-  --bg: #f5efe4;
-  --panel: #fffaf1;
-  --ink: #17212b;
-  --muted: #5e6872;
-  --line: #d8cfbf;
-  --teal: #0f766e;
-  --blue: #2563eb;
-  --red: #dc2626;
-  --amber: #b7791f;
-  --slate: #334155;
-  --shadow: 0 12px 30px rgba(47, 31, 10, 0.08);
+  --bg: #0c0e12;
+  --surface: #14171d;
+  --surface-2: #1a1e26;
+  --surface-3: #21262f;
+  --border: #2a3040;
+  --border-subtle: #1e2330;
+  --text: #e8eaf0;
+  --text-secondary: #8b92a0;
+  --text-tertiary: #5c6370;
+  --accent: #6c9bff;
+  --accent-dim: rgba(108,155,255,.12);
+  --green: #34d399;
+  --green-dim: rgba(52,211,153,.10);
+  --green-mid: rgba(52,211,153,.25);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,.10);
+  --red-mid: rgba(248,113,113,.25);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251,191,36,.10);
+  --amber-mid: rgba(251,191,36,.25);
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Source Serif 4', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --shadow: 0 2px 16px rgba(0,0,0,.35);
 }
-* { box-sizing: border-box; }
-body { margin: 0; color: var(--ink); background: radial-gradient(circle at top left, #fff8ed, var(--bg) 58%); font-family: Georgia, 'Times New Roman', serif; }
-main { max-width: 1460px; margin: 0 auto; padding: 32px 24px 72px; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
-.hero { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; margin-bottom: 24px; }
-.hero-copy { padding: 30px; }
-.kicker { font: 700 12px/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--teal); }
-h1 { margin: 10px 0 12px; font-size: 42px; line-height: 1.02; }
-.subtitle { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.55; max-width: 68ch; }
-.meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.pill { border: 1px solid var(--line); background: rgba(255,255,255,.55); border-radius: 999px; padding: 8px 12px; font: 600 12px/1.2 ui-monospace, monospace; }
-.scoreboard { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 18px; }
-.stat { padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(243,239,230,.58)); }
-.label { color: var(--muted); font: 700 12px/1.2 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; }
-.value { margin-top: 8px; font-size: 28px; font-weight: 700; }
-.small { margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.4; }
-section { margin-top: 24px; }
-.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
-.section-head h2 { margin: 0; font-size: 28px; }
-.section-head p { margin: 0; color: var(--muted); }
-.card { padding: 20px; }
-.card h3 { margin: 0 0 10px; font-size: 22px; }
-.card p, .card li { color: var(--muted); line-height: 1.55; }
-.card ul { margin: 10px 0 0; padding-left: 18px; }
-.columns-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.columns-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-.banner { padding: 18px 20px; border-left: 6px solid var(--amber); background: #fff6df; border-radius: 18px; }
-.banner strong { display: block; margin-bottom: 4px; }
-.bar-group { padding: 20px; }
-.bar-group h3 { margin: 0 0 12px; font-size: 20px; }
-.bar-row { display: grid; grid-template-columns: 70px 1fr 90px; gap: 12px; align-items: center; margin: 10px 0; }
-.bar-label, .bar-value { font: 600 13px/1.2 ui-monospace, monospace; color: var(--slate); }
-.bar-track { position: relative; height: 14px; background: #ede4d5; border-radius: 999px; overflow: hidden; }
-.bar { height: 100%; border-radius: 999px; }
-.bar.prepare { background: linear-gradient(90deg, #0f766e, #14b8a6); }
-.bar.hit { background: linear-gradient(90deg, #dc2626, #f97316); }
-.bar.frame { background: linear-gradient(90deg, #2563eb, #60a5fa); }
-.table-wrap { max-height: 740px; overflow: auto; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }
-.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.data-table th, .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
-.data-table th:first-child, .data-table td:first-child { text-align: left; }
-.data-table th:nth-child(4), .data-table td:nth-child(4) { text-align: left; }
-.data-table thead th { position: sticky; top: 0; background: #f9f2e6; z-index: 1; }
-.note-list { margin: 0; padding-left: 20px; }
-.footer-note { margin-top: 12px; color: var(--muted); font-size: 13px; }
-.mono-block { margin-top: 12px; padding: 14px 16px; border-radius: 16px; background: #1f2937; color: #f8fafc; font: 12px/1.5 ui-monospace, monospace; overflow: auto; white-space: pre-wrap; }
-code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; }
+
+* { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── layout ─── */
+.container { max-width: 1340px; margin: 0 auto; padding: 0 28px; }
+
+/* ─── nav ─── */
+.topnav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(12,14,18,.82);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 28px;
+}
+.topnav-inner {
+  max-width: 1340px; margin: 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  height: 52px; overflow-x: auto;
+}
+.topnav a {
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: color .15s, background .15s;
+}
+.topnav a:hover { color: var(--text); background: var(--surface-2); }
+.topnav .nav-label {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 6px 10px 6px 0;
+  border-right: 1px solid var(--border);
+  margin-right: 4px;
+}
+
+/* ─── hero ─── */
+.hero {
+  padding: 72px 0 48px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.hero-kicker {
+  font: 600 12px/1 var(--font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font: 400 52px/1.08 var(--font-display);
+  color: var(--text);
+  max-width: 820px;
+  margin-bottom: 16px;
+}
+.hero-subtitle {
+  font: 300 20px/1.55 var(--font-body);
+  color: var(--text-secondary);
+  max-width: 680px;
+}
+.hero-meta {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 28px;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 500 11.5px/1 var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+}
+.pill .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  display: inline-block;
+}
+.pill .dot.green { background: var(--green); }
+.pill .dot.amber { background: var(--amber); }
+.pill .dot.red { background: var(--red); }
+.pill .dot.blue { background: var(--accent); }
+
+/* ─── sections ─── */
+.section { padding: 56px 0; border-bottom: 1px solid var(--border-subtle); }
+.section:last-child { border-bottom: none; }
+.section-label {
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+.section-title {
+  font: 400 34px/1.15 var(--font-display);
+  margin-bottom: 8px;
+}
+.section-desc {
+  color: var(--text-secondary);
+  font-size: 16px;
+  max-width: 640px;
+  margin-bottom: 32px;
+}
+
+/* ─── scorecards ─── */
+.scorecards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.scorecard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.scorecard::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.scorecard.sc-green::before { background: var(--green); }
+.scorecard.sc-red::before { background: var(--red); }
+.scorecard.sc-amber::before { background: var(--amber); }
+.scorecard.sc-blue::before { background: var(--accent); }
+.scorecard.sc-purple::before { background: var(--purple); }
+.sc-label {
+  font: 600 11px/1.2 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+.sc-value {
+  font: 700 28px/1.15 var(--font-mono);
+  margin-bottom: 6px;
+}
+.sc-value.good { color: var(--green); }
+.sc-value.bad { color: var(--red); }
+.sc-value.warn { color: var(--amber); }
+.sc-value.neutral { color: var(--text); }
+.sc-note {
+  font: 400 13px/1.45 var(--font-body);
+  color: var(--text-secondary);
+}
+
+/* ─── cards ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 26px;
+}
+.card h3 {
+  font: 400 20px/1.25 var(--font-display);
+  margin-bottom: 10px;
+}
+.card p, .card li {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.card ul { padding-left: 18px; margin-top: 8px; }
+.card li { margin-bottom: 4px; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+/* ─── chart containers ─── */
+.chart-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 14px;
+}
+.chart-panel h3 {
+  font: 400 20px/1.25 var(--font-display);
+  margin-bottom: 4px;
+}
+.chart-panel .chart-desc {
+  font: 400 13px/1.45 var(--font-body);
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.chart-area { width: 100%; }
+.chart-area svg { width: 100%; display: block; }
+
+/* ─── legend ─── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  margin-bottom: 18px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-secondary);
+}
+.legend-swatch {
+  width: 12px; height: 12px; border-radius: 3px;
+}
+
+/* ─── tables ─── */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 13px/1.3 var(--font-mono);
+}
+.data-table th {
+  font-weight: 600;
+  text-align: right;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  position: sticky; top: 0;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.data-table th:first-child { text-align: left; }
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.data-table td:first-child {
+  text-align: left;
+  color: var(--text);
+  font-weight: 500;
+}
+.data-table tbody tr:hover { background: var(--surface-2); }
+.data-table .good { color: var(--green); }
+.data-table .bad { color: var(--red); }
+.data-table .warn { color: var(--amber); }
+
+/* ─── banner / callout ─── */
+.callout {
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  border: 1px solid;
+  margin: 14px 0;
+}
+.callout.callout-amber {
+  background: var(--amber-dim);
+  border-color: rgba(251,191,36,.2);
+}
+.callout.callout-green {
+  background: var(--green-dim);
+  border-color: rgba(52,211,153,.2);
+}
+.callout.callout-red {
+  background: var(--red-dim);
+  border-color: rgba(248,113,113,.2);
+}
+.callout strong {
+  display: block;
+  font: 600 13px/1.3 var(--font-mono);
+  margin-bottom: 6px;
+}
+.callout p {
+  font: 400 14px/1.55 var(--font-body);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ─── branch status bar ─── */
+.branch-status {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.branch-chip {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-decoration: none;
+  transition: border-color .15s;
+}
+.branch-chip:hover { border-color: var(--text-tertiary); }
+.branch-chip.active { border-color: var(--accent); background: var(--accent-dim); }
+.branch-chip.pending { opacity: .55; }
+.branch-chip .bc-name {
+  font: 600 12px/1 var(--font-mono);
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.branch-chip .bc-status {
+  font: 500 11px/1 var(--font-mono);
+  display: flex; align-items: center; gap: 5px;
+}
+.branch-chip .bc-status .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ─── heatmap ─── */
+.heatmap-grid {
+  display: grid;
+  gap: 3px;
+}
+.hm-cell {
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 11px/1 var(--font-mono);
+  padding: 10px 4px;
+  transition: transform .1s;
+  cursor: default;
+}
+.hm-cell:hover { transform: scale(1.06); z-index: 1; }
+.hm-header {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+}
+
+/* ─── tooltip ─── */
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  background: #1a1e26;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: 400 12px/1.5 var(--font-mono);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  opacity: 0;
+  transition: opacity .12s;
+  max-width: 280px;
+}
+.tooltip.visible { opacity: 1; }
+.tooltip .tt-label { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.tooltip .tt-value { font-weight: 600; }
+
+/* ─── responsive ─── */
 @media (max-width: 1100px) {
-  .hero, .columns-3, .columns-2 { grid-template-columns: 1fr; }
+  .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .branch-status { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 34px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .branch-status { grid-template-columns: 1fr; }
+  .scorecards { grid-template-columns: 1fr; }
+  .topnav-inner { gap: 2px; }
+}
+
+/* ─── print ─── */
+@media print {
+  .topnav { display: none; }
+  body { background: #fff; color: #111; }
+  .card, .chart-panel, .scorecard, .table-wrap { border-color: #ddd; background: #fff; }
+  .sc-label, .section-label { color: #666; }
 }
 </style>
 </head>
 <body>
-<main>
-  <section class="hero">
-    <div class="panel hero-copy">
-      <div class="kicker">Phase 2 Baseline Refresh</div>
-      <h1>Refreshed harness baseline on the physical device</h1>
-      <p class="subtitle">This report replaces the older Phase 2 baseline summary with the refreshed run from <code>20260312-231000-baseline-refresh</code> on the updated <code>perf/benchmark-harness</code> branch. It is the comparison source for the rebased Phase 3 branches and now includes the missing operational context, validation checks, and worst-case breakdowns.</p>
-      <div class="meta">
-        <div class="pill">Device: SM-F956B</div>
-        <div class="pill">Android 34</div>
-        <div class="pill">Rows: 26</div>
-        <div class="pill">Matrix: 24 / 24 PASS</div>
-        <div class="pill">Source: benchmark-results/20260312-231000-baseline-refresh/benchmark-results/20260312-231000-baseline-refresh/summary.csv</div>
-      </div>
-    </div>
-    <div class="panel scoreboard"><div class='stat'><div class='label'>Self-tests</div><div class='value'>2 / 2 PASS</div><div class='small'>Cache validation and sanity validation both passed on the physical device.</div></div><div class='stat'><div class='label'>Matrix</div><div class='value'>24 / 24 PASS</div><div class='small'>No failed scenario markers in the refreshed baseline matrix.</div></div><div class='stat'><div class='label'>Best Frame Avg</div><div class='value'>8.3347ms</div><div class='small'>s10_m50_none</div></div><div class='stat'><div class='label'>Worst Frame Avg</div><div class='value'>225.5450ms</div><div class='small'>s200_m50_continuous</div></div><div class='stat'><div class='label'>Worst Prepare Avg</div><div class='value'>106.0160ms</div><div class='small'>s200_m50_continuous</div></div><div class='stat'><div class='label'>Worst Hit-Test Avg</div><div class='value'>106.7288ms</div><div class='small'>s200_m50_continuous</div></div></div>
-  </section>
 
-  <section>
-    <div class="section-head"><h2>1. Executive Summary</h2><p>What matters in the refreshed baseline.</p></div>
-    <div class="panel card">
-      <ul class="note-list">
-        <li>The refreshed baseline completed on physical device <strong>SM-F956B</strong> (Android 34), not emulator.</li>
-        <li>All 26 rows passed: 2 self-tests and 24 baseline scenarios.</li>
-        <li><code>selftest_cache</code> still proves cache semantics are healthy on the harness: cache hit rate was <strong>0.9900</strong>.</li>
-        <li>All baseline scenarios stayed at <strong>0.0000</strong> cache hit rate, which is correct for the all-off baseline matrix.</li>
-        <li>The fastest matrix row was <strong>s10_m50_none</strong> at <strong>8.3347ms</strong> average frame time.</li>
-        <li>The heaviest row was <strong>s200_m50_continuous</strong> at <strong>225.5450ms</strong> average frame time, with <strong>106.0160ms</strong> prepare and <strong>106.7288ms</strong> hit-test cost.</li>
-        <li>Average non-interactive prepare cost is <strong>36.6401ms</strong>. Average continuous hit-test cost is <strong>38.3472ms</strong>. Average draw cost is only <strong>1.2253ms</strong>.</li>
-        <li>Allocation and GC pressure are also substantial at the high end: worst observed allocation was <strong>25.00MB</strong> and worst GC count was <strong>42338</strong>.</li>
+<div class="tooltip" id="tooltip"></div>
+
+<!-- ─── NAV ─── -->
+<nav class="topnav">
+  <div class="topnav-inner">
+    <span class="nav-label">Report</span>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#baseline">Baseline</a>
+    <a href="#prepared-scene-cache">Prepared Scene Cache</a>
+    <a href="#spatial-index">Spatial Index</a>
+    <a href="#broad-phase-sort">Broad-Phase Sort</a>
+    <a href="#path-caching">Path Caching</a>
+    <a href="#native-canvas">Native Canvas</a>
+    <a href="#methodology">Method</a>
+  </div>
+</nav>
+
+<main class="container">
+
+<!-- ═══════════════════════════════════════════════════════════
+     HERO
+     ═══════════════════════════════════════════════════════════ -->
+<section class="hero" id="top">
+  <div class="hero-kicker">Phase 3 — Performance Benchmark Report</div>
+  <h1>Isometric Renderer Branch Analysis</h1>
+  <p class="hero-subtitle">Systematic evaluation of five optimization branches against a common baseline. Each branch isolates a single flag so its contribution can be measured independently before combination.</p>
+  <div class="hero-meta">
+    <span class="pill"><span class="dot green"></span> 2 branches benchmarked</span>
+    <span class="pill"><span class="dot amber"></span> 3 branches pending</span>
+    <span class="pill">Device: SM-F956B</span>
+    <span class="pill">Android 34</span>
+    <span class="pill">Matrix: 24 scenarios</span>
+    <span class="pill">Baseline: 20260312-231000</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DASHBOARD
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="dashboard">
+  <div class="section-label">01</div>
+  <div class="section-title">Executive Dashboard</div>
+  <p class="section-desc">Branch status at a glance. Only branches with completed benchmark runs appear in the analysis below.</p>
+
+  <div class="branch-status">
+    <a href="#prepared-scene-cache" class="branch-chip active">
+      <div class="bc-name">Prepared Scene Cache</div>
+      <div class="bc-status" style="color:var(--green)"><span class="dot" style="background:var(--green)"></span> Net win</div>
+    </a>
+    <a href="#spatial-index" class="branch-chip active">
+      <div class="bc-name">Spatial Index</div>
+      <div class="bc-status" style="color:var(--amber)"><span class="dot" style="background:var(--amber)"></span> Mixed (partial)</div>
+    </a>
+    <a href="#broad-phase-sort" class="branch-chip pending">
+      <div class="bc-name">Broad-Phase Sort</div>
+      <div class="bc-status" style="color:var(--text-tertiary)"><span class="dot" style="background:var(--text-tertiary)"></span> Pending</div>
+    </a>
+    <a href="#path-caching" class="branch-chip pending">
+      <div class="bc-name">Path Caching</div>
+      <div class="bc-status" style="color:var(--text-tertiary)"><span class="dot" style="background:var(--text-tertiary)"></span> Pending</div>
+    </a>
+    <a href="#native-canvas" class="branch-chip pending">
+      <div class="bc-name">Native Canvas</div>
+      <div class="bc-status" style="color:var(--text-tertiary)"><span class="dot" style="background:var(--text-tertiary)"></span> Pending</div>
+    </a>
+  </div>
+
+  <div class="scorecards">
+    <div class="scorecard sc-green">
+      <div class="sc-label">Prepared Scene Cache</div>
+      <div class="sc-value good">−16.41ms</div>
+      <div class="sc-note">Average frame time improvement across 24 matrix rows. Strongest in large scenes under continuous interaction.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">−122.08ms</div>
+      <div class="sc-note">s200_m50_continuous — 54% reduction in frame time. Prepare, hit-test, and frame cost all improved.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Worst Regression</div>
+      <div class="sc-value bad">+2.26ms</div>
+      <div class="sc-note">s50_m10_none — small regression concentrated in the N=50 band where cache overhead exceeds benefit.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value neutral">15 / 24</div>
+      <div class="sc-note">62.5% of scenarios improved. All 9 regressions are under 3ms. 6 of 8 wins over 10ms are in N≥100.</div>
+    </div>
+    <div class="scorecard sc-purple">
+      <div class="sc-label">Decision</div>
+      <div class="sc-value neutral" style="font-size:20px">Keep in contention</div>
+      <div class="sc-note">Strong wins where baseline bottlenecks are worst. Stable-scene probe still needed for clean cache-reuse proof.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Spatial Index</div>
+      <div class="sc-value warn">−1.60ms</div>
+      <div class="sc-note">Partial run (23/24). Modest average improvement. Biggest win −13.67ms on s200_m50_occasional. Prepare savings, not hit-test.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BASELINE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="baseline">
+  <div class="section-label">02</div>
+  <div class="section-title">Baseline Profile</div>
+  <p class="section-desc">Where the renderer actually spends time before any optimization flag is enabled. Branch results only make sense against this cost structure.</p>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Self-Tests</div>
+      <div class="sc-value neutral">2 / 2 PASS</div>
+      <div class="sc-note">Harness validated on physical device.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Best Frame Time</div>
+      <div class="sc-value neutral">8.33ms</div>
+      <div class="sc-note">s10_m50_none — 120fps territory at N=10.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Worst Frame Time</div>
+      <div class="sc-value bad">225.55ms</div>
+      <div class="sc-note">s200_m50_continuous — 27× slower than the best row.</div>
+    </div>
+  </div>
+
+  <!-- Baseline cost breakdown chart -->
+  <div class="chart-panel">
+    <h3>Cost breakdown by scene size</h3>
+    <p class="chart-desc">Average time per frame split into prepare, draw, and hit-test. The system is prepare-bound, not draw-bound — draw time is negligible at every scale.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="chart-baseline-cost"></div>
+  </div>
+
+  <!-- Baseline scaling chart -->
+  <div class="chart-panel">
+    <h3>Frame time scaling by scene size and interaction</h3>
+    <p class="chart-desc">Frame time grows superlinearly with scene size. Continuous interaction adds substantial overhead at N≥50 because hit-testing iterates the full scene.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> None</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--amber)"></span> Occasional</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--red)"></span> Continuous</span>
+    </div>
+    <div class="chart-area" id="chart-baseline-scaling"></div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <h3>Dominant cost: Prepare</h3>
+      <p>Average prepare time across NONE rows: <strong style="color:var(--text)">36.64ms</strong>. At N=200, prepare alone exceeds 100ms. This is the biggest lever for any optimization.</p>
+    </div>
+    <div class="card">
+      <h3>Secondary cost: Hit-test</h3>
+      <p>Under continuous interaction, hit-test averages <strong style="color:var(--text)">38.35ms</strong>. At N=200, hit-test reaches 106ms — comparable to prepare cost.</p>
+    </div>
+    <div class="card">
+      <h3>Not the bottleneck: Draw</h3>
+      <p>Average draw time across all rows: <strong style="color:var(--text)">1.19ms</strong>. Draw is consistently cheap. Branches targeting draw-time (path caching, native canvas) face a narrower ceiling.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PREPARED SCENE CACHE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="prepared-scene-cache">
+  <div class="section-label">03</div>
+  <div class="section-title">Branch: Prepared Scene Cache</div>
+  <p class="section-desc">Skips <code style="color:var(--accent)">engine.prepare()</code> on frames where the node tree, viewport, render options, and lighting are unchanged. Only <code style="color:var(--accent)">enablePreparedSceneCache=true</code>; all other flags off.</p>
+
+  <div class="callout callout-amber" style="margin-bottom:24px">
+    <strong>Methodological caveat</strong>
+    <p>The current matrix uses non-zero mutation rates (0.10 and 0.50), which trigger cache invalidation. This proves the cache helps even under real invalidation pressure but does not replace the planned <code>mutationRate=0.0</code> stable-scene probe for clean cache-reuse proof.</p>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline). Green bars are improvements; red bars are regressions. Sorted by magnitude.</p>
+    <div class="chart-area" id="chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size × interaction pattern, averaged across mutation rates. Cell color intensity encodes magnitude of change.</p>
+    <div class="chart-area" id="chart-heatmap"></div>
+  </div>
+
+  <!-- By interaction pattern -->
+  <div class="chart-panel">
+    <h3>Analysis by interaction pattern</h3>
+    <p class="chart-desc">Continuous interaction shows the largest improvement because hit-test avoidance compounds with prepare savings.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="chart-by-interaction"></div>
+  </div>
+
+  <!-- By scene size -->
+  <div class="chart-panel">
+    <h3>Analysis by scene size</h3>
+    <p class="chart-desc">Gains scale with scene complexity. N=10 is noise-level. N=50 shows overhead. N=100 and N=200 show the real value.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="chart-by-size"></div>
+  </div>
+
+  <!-- Subsystem deltas -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Where the frame-time improvement actually comes from, broken down by prepare, draw, and hit-test deltas per interaction pattern.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. The x-axis shows frame time change; the y-axis shows allocation change. Points in the lower-left quadrant are pure wins (faster + less memory).</p>
+    <div class="chart-area" id="chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest regressions</h3>
+      <div class="table-wrap" id="table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-green" style="margin-top:24px">
+    <strong>Recommendation: Keep in contention</strong>
+    <p>The branch wins where the product needs help most — large scenes and continuous interaction. Average frame time improves by 16.4ms. The regressions are small (max +2.26ms), concentrated in mid-sized static scenes, and likely acceptable. Run the stable-scene probe next; if it confirms clean cache reuse, this is a strong merge candidate.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PENDING BRANCHES
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="spatial-index">
+  <div class="section-label">04</div>
+  <div class="section-title">Branch: Spatial Index</div>
+  <p class="section-desc">Replaces linear hit-test iteration with a spatial index for O(log N) lookups. Only <code style="color:var(--accent)">enableSpatialIndex=true</code>; all other flags off.</p>
+
+  <div class="callout callout-amber" style="margin-bottom:24px">
+    <strong>Partial run — 23 of 24 scenarios</strong>
+    <p>The <code>s200_m50_continuous</code> scenario is missing from this run. All analysis below covers the 23 matched scenarios only. The missing row is the heaviest baseline scenario (225ms frame time), so the full-matrix picture may change when the run completes.</p>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Avg Frame Delta</div>
+      <div class="sc-value warn">−1.60ms</div>
+      <div class="sc-note">Modest improvement across 23 matched rows. Much smaller than prepared-scene-cache (−16.4ms).</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">−13.67ms</div>
+      <div class="sc-note">s200_m50_occasional — driven by prepare savings, not hit-test reduction.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Worst Regression</div>
+      <div class="sc-value bad">+1.87ms</div>
+      <div class="sc-note">s50_m10_continuous — small regression in mid-size continuous interaction.</div>
+    </div>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline) for the 23 matched scenarios. Sorted by magnitude.</p>
+    <div class="chart-area" id="si-chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size × interaction pattern, averaged across mutation rates. The N=200 continuous cell is based on only one mutation rate (m10) due to the missing row.</p>
+    <div class="chart-area" id="si-chart-heatmap"></div>
+  </div>
+
+  <!-- By interaction pattern -->
+  <div class="chart-panel">
+    <h3>Analysis by interaction pattern</h3>
+    <p class="chart-desc">Unlike prepared-scene-cache, spatial index does not dramatically improve continuous interaction. The hit-test improvements are smaller than expected.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="si-chart-by-interaction"></div>
+  </div>
+
+  <!-- By scene size -->
+  <div class="chart-panel">
+    <h3>Analysis by scene size</h3>
+    <p class="chart-desc">Gains are concentrated at N=200 where prepare savings accumulate. N=10 and N=50 are near-neutral.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="si-chart-by-size"></div>
+  </div>
+
+  <!-- Subsystem deltas -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Prepare savings dominate. Hit-test improvement is surprisingly small — the spatial index may not be triggering the expected fast-path under this benchmark's interaction model.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="si-chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. Points in the lower-left quadrant are pure wins (faster + less memory).</p>
+    <div class="chart-area" id="si-chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="si-table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest regressions</h3>
+      <div class="table-wrap" id="si-table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison (23 matched rows)</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="si-table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-amber" style="margin-top:24px">
+    <strong>Recommendation: Mixed result, needs full run + investigation</strong>
+    <p>The spatial index shows modest frame-time improvement (−1.60ms avg) but the gains come from prepare savings, not hit-test reduction. This contradicts the hypothesis that spatial indexing would dominate continuous interaction cost. Complete the missing s200_m50_continuous row and investigate whether the spatial index fast-path is actually being used during hit-testing before making a final decision.</p>
+  </div>
+</section>
+
+<section class="section" id="broad-phase-sort">
+  <div class="section-label">05</div>
+  <div class="section-title">Branch: Broad-Phase Sort</div>
+  <p class="section-desc">Optimizes depth sorting during scene preparation. Expected to show prepare-time savings that scale with scene size.</p>
+  <div class="card" style="text-align:center;padding:48px">
+    <p style="color:var(--text-tertiary);font-family:var(--font-mono);font-size:13px">Benchmark run not yet completed</p>
+    <p style="color:var(--text-tertiary);font-size:14px;margin-top:8px">This section will be populated when the branch is benchmarked against the baseline.</p>
+    <p style="color:var(--text-tertiary);font-size:13px;margin-top:12px;font-family:var(--font-mono)">Expected signal: prepare-time savings during sort-heavy rows</p>
+  </div>
+</section>
+
+<section class="section" id="path-caching">
+  <div class="section-label">06</div>
+  <div class="section-title">Branch: Path Caching</div>
+  <p class="section-desc">Pre-converts <code style="color:var(--accent)">RenderCommand</code> polygons into Compose Path objects. Trades prepare-time increase for draw-time reduction. Rebuilds every frame without scene caching.</p>
+  <div class="card" style="text-align:center;padding:48px">
+    <p style="color:var(--text-tertiary);font-family:var(--font-mono);font-size:13px">Benchmark run not yet completed</p>
+    <p style="color:var(--text-tertiary);font-size:14px;margin-top:8px">This section will be populated when the branch is benchmarked against the baseline.</p>
+    <p style="color:var(--text-tertiary);font-size:13px;margin-top:12px;font-family:var(--font-mono)">Expected signal: avgDrawMs improves more than avgFrameMs</p>
+  </div>
+</section>
+
+<section class="section" id="native-canvas">
+  <div class="section-label">07</div>
+  <div class="section-title">Branch: Native Canvas</div>
+  <p class="section-desc">Renders through <code style="color:var(--accent)">android.graphics.Canvas</code> instead of Compose DrawScope. Android-only path that bypasses Compose draw overhead.</p>
+  <div class="card" style="text-align:center;padding:48px">
+    <p style="color:var(--text-tertiary);font-family:var(--font-mono);font-size:13px">Benchmark run not yet completed</p>
+    <p style="color:var(--text-tertiary);font-size:14px;margin-top:8px">This section will be populated when the branch is benchmarked against the baseline.</p>
+    <p style="color:var(--text-tertiary);font-size:13px;margin-top:12px;font-family:var(--font-mono)">Expected signal: draw-time movement, frame-time may lag</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     METHODOLOGY
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="methodology">
+  <div class="section-label">08</div>
+  <div class="section-title">Methodology and Artifacts</div>
+  <p class="section-desc">How results were produced and where the raw data lives.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Comparison design</h3>
+      <ul>
+        <li>Baseline: all optimization flags <code>false</code></li>
+        <li>Branch: only the single target flag set <code>true</code></li>
+        <li>Same physical device (SM-F956B), same Android 34, same harness, same 24-scenario matrix</li>
+        <li>Self-tests validated in both runs</li>
+        <li>Matrix: 4 scene sizes × 2 mutation rates × 3 interaction patterns</li>
       </ul>
     </div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>2. Run Context</h2><p>Exactly how this baseline was produced.</p></div>
-    <div class="columns-2">
-      <div class="panel card">
-        <h3>Execution Context</h3>
-        <ul><li>Branch: perf/benchmark-harness</li><li>Run ID: 20260312-231000-baseline-refresh</li><li>Device: SM-F956B (Android 34)</li><li>Target transport: physical device over ADB TCP, not emulator</li><li>Benchmark app rebuilt and installed before the run</li><li>Global animation scales set to 0 before launch</li><li>Device-side benchmark-results cleared before launch</li><li>Runner executed via Git Bash on Windows because WSL bash could not execute adb.exe on this host</li><li>Keep-screen-on flag was active in BenchmarkActivity during the run</li></ul>
-      </div>
-      <div class="panel card">
-        <h3>Invocation</h3>
-        <p>This is the exact setup pattern used for the successful baseline refresh. The important operational detail is the final Git Bash invocation; WSL bash was not usable for <code>adb.exe</code> on this host.</p>
-        <div class="mono-block">./gradlew :isometric-benchmark:assembleDebug
-adb -s 100.73.175.9:43771 install -r isometric-benchmark/build/outputs/apk/debug/isometric-benchmark-debug.apk
-adb -s 100.73.175.9:43771 shell settings put global window_animation_scale 0
-adb -s 100.73.175.9:43771 shell settings put global transition_animation_scale 0
-adb -s 100.73.175.9:43771 shell settings put global animator_duration_scale 0
-adb -s 100.73.175.9:43771 shell rm -rf /sdcard/Android/data/io.fabianterhorst.isometric.benchmark/files/benchmark-results/*
-&quot;C:\Program Files\Git\bin\bash.exe&quot; -lc &#x27;cd /c/Users/jayte/Documents/dev/Isometric &amp;&amp; ./isometric-benchmark/benchmark-runner.sh --label baseline-refresh&#x27; </div>
-      </div>
+    <div class="card">
+      <h3>Reading guide</h3>
+      <ul>
+        <li><strong style="color:var(--text)">avgFrameMs</strong> — primary decision metric (product-visible)</li>
+        <li><strong style="color:var(--text)">avgPrepareMs</strong> — subsystem diagnosis for scene prep</li>
+        <li><strong style="color:var(--text)">avgHitTestMs</strong> — subsystem diagnosis for interaction</li>
+        <li><strong style="color:var(--text)">allocatedMB / gcInvocations</strong> — cost-shifting indicators</li>
+        <li><strong style="color:var(--text)">p95 / p99</strong> — tail latency when jank matters</li>
+      </ul>
     </div>
-  </section>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Artifact references</h3>
+    <ul>
+      <li>Baseline CSV: <code style="color:var(--accent)">benchmark-results/20260312-231000-baseline-refresh/.../summary.csv</code></li>
+      <li>Prepared-scene-cache CSV: <code style="color:var(--accent)">benchmark-results/20260313-095306-prepared-scene-cache/.../summary.csv</code></li>
+      <li>Report design guide: <code style="color:var(--accent)">docs/plans/2026-03-13-benchmark-report-design.md</code></li>
+    </ul>
+  </div>
+</section>
 
-  <section>
-    <div class="section-head"><h2>3. Integrity And Artifact Checks</h2><p>Why this run is trustworthy enough to use as the new baseline.</p></div>
-    <div class="panel card">
-      <ul class="note-list"><li>summary.csv line count: 27 (1 header + 26 rows)</li><li>26 JSON payload files pulled locally</li><li>selftest_cache.result = PASS</li><li>selftest_sanity.result = PASS</li><li>s200_m50_continuous.result = PASS</li><li>All non-self-test rows use the all-off flag baseline</li><li>Local pull layout is nested because adb pull preserved benchmark-results/&lt;run-id&gt; under the requested directory</li></ul>
-      <div class="footer-note">Primary local artifact: <code>benchmark-results/20260312-231000-baseline-refresh/benchmark-results/20260312-231000-baseline-refresh/summary.csv</code></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>4. Visual Overview</h2><p>Scaling trends by size and subsystem.</p></div>
-    <div class="columns-3">
-      <div class="panel bar-group"><h3>Frame Mean By Size</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar frame' style='width:5.7%'></div></div><div class='bar-value'>8.3376ms</div></div><div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar frame' style='width:10.8%'></div></div><div class='bar-value'>15.8042ms</div></div><div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar frame' style='width:37.0%'></div></div><div class='bar-value'>54.2002ms</div></div><div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar frame' style='width:100.0%'></div></div><div class='bar-value'>146.5713ms</div></div></div>
-      <div class="panel bar-group"><h3>Prepare Mean In NONE Rows</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar prepare' style='width:2.0%'></div></div><div class='bar-value'>1.9558ms</div></div><div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar prepare' style='width:8.4%'></div></div><div class='bar-value'>8.3640ms</div></div><div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar prepare' style='width:36.3%'></div></div><div class='bar-value'>36.2600ms</div></div><div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar prepare' style='width:100.0%'></div></div><div class='bar-value'>99.9806ms</div></div></div>
-      <div class="panel bar-group"><h3>Hit-Test Mean In CONTINUOUS Rows</h3><div class='bar-row'><div class='bar-label'>N=10</div><div class='bar-track'><div class='bar hit' style='width:1.5%'></div></div><div class='bar-value'>1.5757ms</div></div><div class='bar-row'><div class='bar-label'>N=50</div><div class='bar-track'><div class='bar hit' style='width:10.3%'></div></div><div class='bar-value'>10.7664ms</div></div><div class='bar-row'><div class='bar-label'>N=100</div><div class='bar-track'><div class='bar hit' style='width:35.1%'></div></div><div class='bar-value'>36.6517ms</div></div><div class='bar-row'><div class='bar-label'>N=200</div><div class='bar-track'><div class='bar hit' style='width:100.0%'></div></div><div class='bar-value'>104.3949ms</div></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>5. Optimization Priority Ranking</h2><p>Ordered by end-to-end impact, not implementation convenience.</p></div>
-    <div class="columns-3"><article class='panel card'><h3>1. Hit-test cost is still the first thing to attack</h3><p>Continuous interaction averages 38.3472ms hit-test time across the matrix. That is already larger than the entire frame budget by N=100 and becomes dominant at N=200.</p><ul><li>s200_m50_continuous: hit-test 106.7288ms, frame 225.5450ms</li><li>s200_m10_continuous: hit-test 102.0609ms, frame 212.4941ms</li><li>s100_m50_continuous: hit-test 37.5431ms, frame 81.9583ms</li><li>s100_m10_continuous: hit-test 35.7603ms, frame 77.5381ms</li></ul><p><strong>Primary branches to validate first: spatial-index and broad-phase-sort.</strong></p></article><article class='panel card'><h3>2. Prepare cost is the next hard ceiling</h3><p>Non-interactive rows still average 36.6401ms prepare time. That means scene preparation remains expensive even before interaction is introduced.</p><ul><li>s200_m50_none: prepare 102.8262ms, frame 113.6884ms</li><li>s200_m10_none: prepare 97.1350ms, frame 105.1487ms</li><li>s100_m50_none: prepare 37.1022ms, frame 42.5213ms</li><li>s100_m10_none: prepare 35.4177ms, frame 39.8387ms</li></ul><p><strong>Prepared-scene-cache remains the most likely branch to improve steady-state rendering.</strong></p></article><article class='panel card'><h3>3. Draw is smaller, but allocations and GC are not</h3><p>Average draw time is only 1.2253ms, but average allocation is 13.19MB and average GC count is 11364 across the matrix. That makes memory churn part of the story even when draw time is not the top-line bottleneck.</p><ul><li>s200_m50_continuous: draw 2.5526ms, frame 225.5450ms</li><li>s200_m10_continuous: allocated 25.00MB</li><li>s200_m50_continuous: 42338 GC invocations</li><li>Occasional interaction average hit-test cost is only 0.6724ms</li></ul><p><strong>Path-caching and native-canvas need to show either frame-time wins or lower allocation churn to justify priority.</strong></p></article></div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>6. Worst-Case Breakdown</h2><p>Top rows by frame, prepare, hit-test, allocation, and GC.</p></div>
-    <div class="columns-2">
-      <div class="panel card"><h3>Top 5 By Frame Time</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Scenario</th><th>Size</th><th>Interaction</th><th>Avg Prepare</th><th>Avg Frame</th><th>Avg Hit</th><th>Alloc MB</th><th>GC</th></tr></thead><tbody><tr><td>s200_m50_continuous</td><td>200</td><td>CONTINUOUS</td><td>106.0160</td><td>225.5450</td><td>106.7288</td><td>18.37</td><td>42338</td></tr>
-<tr><td>s200_m10_continuous</td><td>200</td><td>CONTINUOUS</td><td>101.1354</td><td>212.4941</td><td>102.0609</td><td>25.00</td><td>29810</td></tr>
-<tr><td>s200_m50_occasional</td><td>200</td><td>OCCASIONAL</td><td>104.7177</td><td>117.8795</td><td>1.8933</td><td>14.16</td><td>36192</td></tr>
-<tr><td>s200_m50_none</td><td>200</td><td>NONE</td><td>102.8262</td><td>113.6884</td><td>0.0000</td><td>17.88</td><td>32969</td></tr>
-<tr><td>s200_m10_none</td><td>200</td><td>NONE</td><td>97.1350</td><td>105.1487</td><td>0.0000</td><td>24.37</td><td>20430</td></tr></tbody></table></div></div>
-      <div class="panel card"><h3>Top 5 By Prepare Time</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Scenario</th><th>Size</th><th>Interaction</th><th>Avg Prepare</th><th>Avg Frame</th><th>Avg Hit</th><th>Alloc MB</th><th>GC</th></tr></thead><tbody><tr><td>s200_m50_continuous</td><td>200</td><td>CONTINUOUS</td><td>106.0160</td><td>225.5450</td><td>106.7288</td><td>18.37</td><td>42338</td></tr>
-<tr><td>s200_m50_occasional</td><td>200</td><td>OCCASIONAL</td><td>104.7177</td><td>117.8795</td><td>1.8933</td><td>14.16</td><td>36192</td></tr>
-<tr><td>s200_m50_none</td><td>200</td><td>NONE</td><td>102.8262</td><td>113.6884</td><td>0.0000</td><td>17.88</td><td>32969</td></tr>
-<tr><td>s200_m10_continuous</td><td>200</td><td>CONTINUOUS</td><td>101.1354</td><td>212.4941</td><td>102.0609</td><td>25.00</td><td>29810</td></tr>
-<tr><td>s200_m10_none</td><td>200</td><td>NONE</td><td>97.1350</td><td>105.1487</td><td>0.0000</td><td>24.37</td><td>20430</td></tr></tbody></table></div></div>
-      <div class="panel card"><h3>Top 5 By Hit-Test Time</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Scenario</th><th>Size</th><th>Interaction</th><th>Avg Prepare</th><th>Avg Frame</th><th>Avg Hit</th><th>Alloc MB</th><th>GC</th></tr></thead><tbody><tr><td>s200_m50_continuous</td><td>200</td><td>CONTINUOUS</td><td>106.0160</td><td>225.5450</td><td>106.7288</td><td>18.37</td><td>42338</td></tr>
-<tr><td>s200_m10_continuous</td><td>200</td><td>CONTINUOUS</td><td>101.1354</td><td>212.4941</td><td>102.0609</td><td>25.00</td><td>29810</td></tr>
-<tr><td>s100_m50_continuous</td><td>100</td><td>CONTINUOUS</td><td>37.7312</td><td>81.9583</td><td>37.5431</td><td>6.13</td><td>17181</td></tr>
-<tr><td>s100_m10_continuous</td><td>100</td><td>CONTINUOUS</td><td>36.0763</td><td>77.5381</td><td>35.7603</td><td>20.63</td><td>10889</td></tr>
-<tr><td>s50_m50_continuous</td><td>50</td><td>CONTINUOUS</td><td>10.3528</td><td>25.4735</td><td>11.1374</td><td>16.10</td><td>4714</td></tr></tbody></table></div></div>
-      <div class="panel card"><h3>Top 5 By Allocation</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Scenario</th><th>Size</th><th>Interaction</th><th>Avg Prepare</th><th>Avg Frame</th><th>Avg Hit</th><th>Alloc MB</th><th>GC</th></tr></thead><tbody><tr><td>s200_m10_continuous</td><td>200</td><td>CONTINUOUS</td><td>101.1354</td><td>212.4941</td><td>102.0609</td><td>25.00</td><td>29810</td></tr>
-<tr><td>s200_m10_none</td><td>200</td><td>NONE</td><td>97.1350</td><td>105.1487</td><td>0.0000</td><td>24.37</td><td>20430</td></tr>
-<tr><td>s100_m10_continuous</td><td>100</td><td>CONTINUOUS</td><td>36.0763</td><td>77.5381</td><td>35.7603</td><td>20.63</td><td>10889</td></tr>
-<tr><td>s200_m50_continuous</td><td>200</td><td>CONTINUOUS</td><td>106.0160</td><td>225.5450</td><td>106.7288</td><td>18.37</td><td>42338</td></tr>
-<tr><td>s200_m50_none</td><td>200</td><td>NONE</td><td>102.8262</td><td>113.6884</td><td>0.0000</td><td>17.88</td><td>32969</td></tr></tbody></table></div></div>
-    </div>
-    <div class="panel card" style="margin-top:16px"><h3>Top 5 By GC Count</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Scenario</th><th>Size</th><th>Interaction</th><th>Avg Prepare</th><th>Avg Frame</th><th>Avg Hit</th><th>Alloc MB</th><th>GC</th></tr></thead><tbody><tr><td>s200_m50_continuous</td><td>200</td><td>CONTINUOUS</td><td>106.0160</td><td>225.5450</td><td>106.7288</td><td>18.37</td><td>42338</td></tr>
-<tr><td>s200_m50_occasional</td><td>200</td><td>OCCASIONAL</td><td>104.7177</td><td>117.8795</td><td>1.8933</td><td>14.16</td><td>36192</td></tr>
-<tr><td>s200_m50_none</td><td>200</td><td>NONE</td><td>102.8262</td><td>113.6884</td><td>0.0000</td><td>17.88</td><td>32969</td></tr>
-<tr><td>s200_m10_continuous</td><td>200</td><td>CONTINUOUS</td><td>101.1354</td><td>212.4941</td><td>102.0609</td><td>25.00</td><td>29810</td></tr>
-<tr><td>s200_m10_occasional</td><td>200</td><td>OCCASIONAL</td><td>94.9409</td><td>104.6724</td><td>1.7163</td><td>17.04</td><td>23739</td></tr></tbody></table></div></div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>7. Size-Level Summary</h2><p>How the refreshed baseline scales with scene size.</p></div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr><th>Size</th><th>Frame Avg</th><th>Frame Range</th><th>Prepare Avg</th><th>Prepare Range</th><th>Interactive Hit Avg</th><th>Avg Allocated</th><th>Avg GC Count</th></tr>
-        </thead>
-        <tbody><tr><td>N=10</td><td>8.3376</td><td>8.3347 to 8.3401</td><td>1.7726</td><td>1.4864 to 2.0654</td><td>0.8067</td><td>9.24</td><td>305</td></tr>
-<tr><td>N=50</td><td>15.8042</td><td>8.9585 to 25.4735</td><td>9.3094</td><td>7.1002 to 10.3528</td><td>5.4730</td><td>13.22</td><td>2775</td></tr>
-<tr><td>N=100</td><td>54.2002</td><td>39.8387 to 81.9583</td><td>36.3416</td><td>35.4177 to 37.7312</td><td>18.6596</td><td>10.82</td><td>11463</td></tr>
-<tr><td>N=200</td><td>146.5713</td><td>104.6724 to 225.5450</td><td>101.1285</td><td>94.9409 to 106.0160</td><td>53.0998</td><td>19.47</td><td>30913</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>8. Self-Test Results</h2><p>Harness integrity checks on the refreshed baseline.</p></div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr><th>Scenario</th><th>Avg Prepare</th><th>Avg Draw</th><th>Avg Frame</th><th>Cache Hit Rate</th><th>Allocated MB</th><th>GC Count</th></tr>
-        </thead>
-        <tbody><tr><td>selftest_cache</td><td>0.0723</td><td>0.2821</td><td>8.3142</td><td>0.9900</td><td>11.26</td><td>0</td></tr>
-<tr><td>selftest_sanity</td><td>1.0603</td><td>0.4174</td><td>8.3028</td><td>0.0000</td><td>48.27</td><td>0</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>9. Cleaned Matrix Metrics</h2><p>Primary comparison table for Phase 3 branches.</p></div>
-    <div class="banner panel">
-      <strong>Interpretation note</strong>
-      Use this table as the refreshed baseline reference for rebased Phase 3 branches. The matrix is still all-off: <code>enablePathCaching=false</code>, <code>enableSpatialIndex=false</code>, <code>enablePreparedSceneCache=false</code>, <code>enableNativeCanvas=false</code>, and <code>enableBroadPhaseSort=false</code> for every non-self-test row. When a later branch run improves draw but not frame, or improves frame but worsens allocation/GC, compare against these exact columns rather than headline averages alone.
-    </div>
-    <div class="table-wrap" style="margin-top:16px">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Scenario</th><th>Size</th><th>Mut %</th><th>Interaction</th>
-            <th>Avg Prepare</th><th>P50 Prepare</th><th>P95 Prepare</th><th>P99 Prepare</th>
-            <th>Avg Draw</th>
-            <th>Avg Frame</th><th>P50 Frame</th><th>P95 Frame</th><th>P99 Frame</th>
-            <th>Avg Hit</th><th>P95 Hit</th>
-            <th>Alloc MB</th><th>GC</th><th>Observed Mutation</th>
-          </tr>
-        </thead>
-        <tbody><tr><td>s10_m10_none</td><td>10</td><td>10</td><td>NONE</td><td>1.8462</td><td>1.8139</td><td>2.7634</td><td>3.0544</td><td>0.3699</td><td>8.3401</td><td>8.3436</td><td>8.3457</td><td>8.3461</td><td>0.0000</td><td>0.0000</td><td>9.17</td><td>72</td><td>0.1064</td></tr>
-<tr><td>s10_m10_occasional</td><td>10</td><td>10</td><td>OCCASIONAL</td><td>1.9267</td><td>1.9709</td><td>2.7514</td><td>3.1059</td><td>0.3317</td><td>8.3363</td><td>8.3430</td><td>8.3450</td><td>8.3455</td><td>0.0394</td><td>0.0000</td><td>9.21</td><td>145</td><td>0.1064</td></tr>
-<tr><td>s10_m10_continuous</td><td>10</td><td>10</td><td>CONTINUOUS</td><td>1.5327</td><td>1.5754</td><td>2.1685</td><td>2.7451</td><td>0.2735</td><td>8.3381</td><td>8.3429</td><td>8.3444</td><td>8.3451</td><td>1.6093</td><td>2.3157</td><td>9.68</td><td>279</td><td>0.1064</td></tr>
-<tr><td>s10_m50_none</td><td>10</td><td>50</td><td>NONE</td><td>2.0654</td><td>2.2009</td><td>2.9829</td><td>3.2811</td><td>0.3655</td><td>8.3347</td><td>8.3426</td><td>8.3455</td><td>8.3564</td><td>0.0000</td><td>0.0000</td><td>10.32</td><td>351</td><td>0.5062</td></tr>
-<tr><td>s10_m50_occasional</td><td>10</td><td>50</td><td>OCCASIONAL</td><td>1.7779</td><td>1.5312</td><td>2.6352</td><td>2.8672</td><td>0.3175</td><td>8.3388</td><td>8.3431</td><td>8.3447</td><td>8.3467</td><td>0.0360</td><td>0.0000</td><td>7.92</td><td>425</td><td>0.5062</td></tr>
-<tr><td>s10_m50_continuous</td><td>10</td><td>50</td><td>CONTINUOUS</td><td>1.4864</td><td>1.4623</td><td>2.1710</td><td>2.6087</td><td>0.2698</td><td>8.3374</td><td>8.3431</td><td>8.3445</td><td>8.3453</td><td>1.5422</td><td>2.2599</td><td>9.12</td><td>560</td><td>0.5062</td></tr>
-<tr><td>s50_m10_none</td><td>50</td><td>10</td><td>NONE</td><td>7.1002</td><td>6.6032</td><td>9.9209</td><td>10.8798</td><td>0.4519</td><td>8.9585</td><td>8.3427</td><td>13.9044</td><td>16.6871</td><td>0.0000</td><td>0.0000</td><td>17.25</td><td>1018</td><td>0.1016</td></tr>
-<tr><td>s50_m10_occasional</td><td>50</td><td>10</td><td>OCCASIONAL</td><td>9.2697</td><td>8.6697</td><td>12.5750</td><td>13.7404</td><td>0.6222</td><td>11.8170</td><td>13.9031</td><td>16.6890</td><td>22.2487</td><td>0.1764</td><td>0.0000</td><td>15.09</td><td>1535</td><td>0.1016</td></tr>
-<tr><td>s50_m10_continuous</td><td>50</td><td>10</td><td>CONTINUOUS</td><td>9.8492</td><td>9.4434</td><td>13.1509</td><td>14.1021</td><td>0.6729</td><td>23.6103</td><td>25.0291</td><td>30.5945</td><td>33.3769</td><td>10.3954</td><td>13.9791</td><td>12.73</td><td>2590</td><td>0.1016</td></tr>
-<tr><td>s50_m50_none</td><td>50</td><td>50</td><td>NONE</td><td>9.6277</td><td>9.0445</td><td>12.9982</td><td>14.2436</td><td>0.6438</td><td>12.3932</td><td>13.9047</td><td>16.6885</td><td>22.2494</td><td>0.0000</td><td>0.0000</td><td>8.45</td><td>3136</td><td>0.4989</td></tr>
-<tr><td>s50_m50_occasional</td><td>50</td><td>50</td><td>OCCASIONAL</td><td>9.6567</td><td>8.9345</td><td>13.3404</td><td>14.4297</td><td>0.6595</td><td>12.5727</td><td>13.9051</td><td>16.6908</td><td>22.2550</td><td>0.1828</td><td>0.0000</td><td>9.67</td><td>3659</td><td>0.4989</td></tr>
-<tr><td>s50_m50_continuous</td><td>50</td><td>50</td><td>CONTINUOUS</td><td>10.3528</td><td>10.0002</td><td>13.7965</td><td>15.1473</td><td>0.7046</td><td>25.4735</td><td>25.0281</td><td>33.3727</td><td>36.1535</td><td>11.1374</td><td>15.2492</td><td>16.10</td><td>4714</td><td>0.4989</td></tr>
-<tr><td>s100_m10_none</td><td>100</td><td>10</td><td>NONE</td><td>35.4177</td><td>36.3033</td><td>39.0058</td><td>40.0851</td><td>1.4267</td><td>39.8387</td><td>41.7133</td><td>44.5000</td><td>50.0593</td><td>0.0000</td><td>0.0000</td><td>9.05</td><td>6242</td><td>0.1004</td></tr>
-<tr><td>s100_m10_occasional</td><td>100</td><td>10</td><td>OCCASIONAL</td><td>35.7028</td><td>36.7377</td><td>39.7260</td><td>41.6786</td><td>1.4716</td><td>41.0627</td><td>41.7138</td><td>47.2821</td><td>77.8686</td><td>0.6660</td><td>0.0000</td><td>9.77</td><td>7802</td><td>0.1004</td></tr>
-<tr><td>s100_m10_continuous</td><td>100</td><td>10</td><td>CONTINUOUS</td><td>36.0763</td><td>36.2345</td><td>39.8149</td><td>41.6377</td><td>1.4293</td><td>77.5381</td><td>77.8645</td><td>86.2132</td><td>88.9935</td><td>35.7603</td><td>39.5146</td><td>20.63</td><td>10889</td><td>0.1004</td></tr>
-<tr><td>s100_m50_none</td><td>100</td><td>50</td><td>NONE</td><td>37.1022</td><td>37.3672</td><td>40.6787</td><td>42.3792</td><td>1.4553</td><td>42.5213</td><td>41.7141</td><td>47.2826</td><td>50.0605</td><td>0.0000</td><td>0.0000</td><td>9.48</td><td>12552</td><td>0.4988</td></tr>
-<tr><td>s100_m50_occasional</td><td>100</td><td>50</td><td>OCCASIONAL</td><td>36.0194</td><td>36.5379</td><td>40.4237</td><td>42.0501</td><td>1.4471</td><td>42.2821</td><td>41.7152</td><td>50.0590</td><td>77.8676</td><td>0.6689</td><td>0.0000</td><td>9.85</td><td>14111</td><td>0.4988</td></tr>
-<tr><td>s100_m50_continuous</td><td>100</td><td>50</td><td>CONTINUOUS</td><td>37.7312</td><td>38.0185</td><td>41.8141</td><td>43.4494</td><td>1.5800</td><td>81.9583</td><td>83.4190</td><td>91.7639</td><td>94.5516</td><td>37.5431</td><td>41.2441</td><td>6.13</td><td>17181</td><td>0.4988</td></tr>
-<tr><td>s200_m10_none</td><td>200</td><td>10</td><td>NONE</td><td>97.1350</td><td>96.9444</td><td>106.7584</td><td>111.2202</td><td>2.4155</td><td>105.1487</td><td>116.7876</td><td>125.1517</td><td>125.1608</td><td>0.0000</td><td>0.0000</td><td>24.37</td><td>20430</td><td>0.1006</td></tr>
-<tr><td>s200_m10_occasional</td><td>200</td><td>10</td><td>OCCASIONAL</td><td>94.9409</td><td>94.8564</td><td>104.2327</td><td>108.2076</td><td>2.3847</td><td>104.6724</td><td>108.4542</td><td>125.1514</td><td>200.2471</td><td>1.7163</td><td>0.0000</td><td>17.04</td><td>23739</td><td>0.1006</td></tr>
-<tr><td>s200_m10_continuous</td><td>200</td><td>10</td><td>CONTINUOUS</td><td>101.1354</td><td>100.6380</td><td>110.6189</td><td>116.8518</td><td>2.5240</td><td>212.4941</td><td>208.5871</td><td>250.3063</td><td>250.3400</td><td>102.0609</td><td>112.0060</td><td>25.00</td><td>29810</td><td>0.1006</td></tr>
-<tr><td>s200_m50_none</td><td>200</td><td>50</td><td>NONE</td><td>102.8262</td><td>102.0931</td><td>112.3271</td><td>119.3319</td><td>2.4895</td><td>113.6884</td><td>125.1305</td><td>125.1555</td><td>138.9949</td><td>0.0000</td><td>0.0000</td><td>17.88</td><td>32969</td><td>0.4985</td></tr>
-<tr><td>s200_m50_occasional</td><td>200</td><td>50</td><td>OCCASIONAL</td><td>104.7177</td><td>104.5235</td><td>115.2114</td><td>125.0239</td><td>2.5474</td><td>117.8795</td><td>125.1427</td><td>125.1702</td><td>222.4660</td><td>1.8933</td><td>0.0000</td><td>14.16</td><td>36192</td><td>0.4985</td></tr>
-<tr><td>s200_m50_continuous</td><td>200</td><td>50</td><td>CONTINUOUS</td><td>106.0160</td><td>105.5395</td><td>114.9276</td><td>121.1683</td><td>2.5526</td><td>225.5450</td><td>208.5914</td><td>250.3106</td><td>250.3315</td><td>106.7288</td><td>115.3485</td><td>18.37</td><td>42338</td><td>0.4985</td></tr></tbody>
-      </table>
-    </div>
-    <div class="footer-note">Local pull layout is still nested because <code>adb pull</code> preserves the device-side <code>benchmark-results/&lt;run-id&gt;</code> path under the requested output directory.</div>
-  </section>
-
-  <section>
-    <div class="section-head"><h2>10. Reading Guidance</h2><p>How to interpret noisy rows and decide what matters.</p></div>
-    <div class="columns-2">
-      <div class="panel card">
-        <h3>What To Trust Most</h3>
-        <ul>
-          <li>Use <strong>avgFrameMs</strong> for branch-level user-visible impact.</li>
-          <li>Use <strong>avgPrepareMs</strong> and <strong>avgHitTestMs</strong> to identify the subsystem creating that frame cost.</li>
-          <li>Use <strong>p95</strong> and <strong>p99</strong> to judge tail behavior; several heavy rows have much worse tails than their averages suggest.</li>
-          <li>Use <strong>allocatedMB</strong> and <strong>gcInvocations</strong> to spot branches that simply move work into allocation churn.</li>
-        </ul>
-      </div>
-      <div class="panel card">
-        <h3>What This Baseline Is For</h3>
-        <ul>
-          <li>This is the new comparison source for rebased Phase 3 branches.</li>
-          <li>It reflects the updated harness, including spatial-index correctness fixes, test-lane fixes, generalized runner flags, and keep-screen-on.</li>
-          <li>It should replace the older Phase 2 report when judging whether a branch is a real win.</li>
-          <li>For future branch runs on this machine, use Git Bash for the runner rather than WSL bash.</li>
-        </ul>
-      </div>
-    </div>
-  </section>
 </main>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+const baseline = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.8462,draw:0.3699,frame:8.3401,hit:0,alloc:9.17,gc:72,cache:0},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:1.9267,draw:0.3317,frame:8.3363,hit:0.0394,alloc:9.21,gc:145,cache:0},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.5327,draw:0.2735,frame:8.3381,hit:1.6093,alloc:9.68,gc:279,cache:0},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.0654,draw:0.3655,frame:8.3347,hit:0,alloc:10.32,gc:351,cache:0},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:1.7779,draw:0.3175,frame:8.3388,hit:0.036,alloc:7.92,gc:425,cache:0},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.4864,draw:0.2698,frame:8.3374,hit:1.5422,alloc:9.12,gc:560,cache:0},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:7.1002,draw:0.4519,frame:8.9585,hit:0,alloc:17.25,gc:1018,cache:0},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:9.2697,draw:0.6222,frame:11.817,hit:0.1764,alloc:15.09,gc:1535,cache:0},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:9.8492,draw:0.6729,frame:23.6103,hit:10.3954,alloc:12.73,gc:2590,cache:0},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:9.6277,draw:0.6438,frame:12.3932,hit:0,alloc:8.45,gc:3136,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:9.6567,draw:0.6595,frame:12.5727,hit:0.1828,alloc:9.67,gc:3659,cache:0},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.3528,draw:0.7046,frame:25.4735,hit:11.1374,alloc:16.1,gc:4714,cache:0},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:35.4177,draw:1.4267,frame:39.8387,hit:0,alloc:9.05,gc:6242,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:35.7028,draw:1.4716,frame:41.0627,hit:0.666,alloc:9.77,gc:7802,cache:0},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:36.0763,draw:1.4293,frame:77.5381,hit:35.7603,alloc:20.63,gc:10889,cache:0},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:37.1022,draw:1.4553,frame:42.5213,hit:0,alloc:9.48,gc:12552,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:36.0194,draw:1.4471,frame:42.2821,hit:0.6689,alloc:9.85,gc:14111,cache:0},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:37.7312,draw:1.58,frame:81.9583,hit:37.5431,alloc:6.13,gc:17181,cache:0},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:97.135,draw:2.4155,frame:105.1487,hit:0,alloc:24.37,gc:20430,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:94.9409,draw:2.3847,frame:104.6724,hit:1.7163,alloc:17.04,gc:23739,cache:0},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:101.1354,draw:2.524,frame:212.4941,hit:102.0609,alloc:25,gc:29810,cache:0},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:102.8262,draw:2.4895,frame:113.6884,hit:0,alloc:17.88,gc:32969,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:104.7177,draw:2.5474,frame:117.8795,hit:1.8933,alloc:14.16,gc:36192,cache:0},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:106.016,draw:2.5526,frame:225.545,hit:106.7288,alloc:18.37,gc:42338,cache:0}
+];
+
+const branch = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.0634,draw:0.3033,frame:8.3621,hit:0,alloc:9.61,gc:50,cache:0.324},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:1.4715,draw:0.3723,frame:8.332,hit:0.0378,alloc:8.74,gc:101,cache:0.336},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.4584,draw:0.3746,frame:8.335,hit:1.6387,alloc:9.35,gc:154,cache:0.662},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:1.8908,draw:0.3294,frame:8.3373,hit:0,alloc:9.71,gc:226,cache:0.004},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.0267,draw:0.355,frame:8.3398,hit:0.0332,alloc:8.57,gc:298,cache:0.0216},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.7314,draw:0.3133,frame:8.3412,hit:1.8509,alloc:9.67,gc:373,cache:0.502},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:8.8649,draw:0.5773,frame:11.2204,hit:0,alloc:16.67,gc:1010,cache:0.002},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:10.7036,draw:0.7067,frame:13.4327,hit:0.1386,alloc:16.29,gc:1673,cache:0.0196},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:10.6817,draw:0.7283,frame:13.837,hit:5.9003,alloc:13.99,gc:2367,cache:0.501},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.6334,draw:0.7434,frame:13.7841,hit:0,alloc:7.65,gc:3054,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:10.735,draw:0.7553,frame:14.0305,hit:0.0894,alloc:15.99,gc:3745,cache:0.0177},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.5005,draw:0.739,frame:14.1438,hit:5.931,alloc:16.04,gc:4509,cache:0.5},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:35.4142,draw:1.5153,frame:40.4382,hit:0,alloc:9,gc:6050,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:34.5595,draw:1.5015,frame:39.8104,hit:0.45,alloc:23.56,gc:7572,cache:0.0177},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:32.5881,draw:1.4153,frame:38.5931,hit:18.9479,alloc:24.31,gc:9102,cache:0.5},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:33.0028,draw:1.4814,frame:38.8253,hit:0,alloc:9.9,gc:10631,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:33.798,draw:1.5665,frame:40.1182,hit:0.4886,alloc:8.02,gc:12295,cache:0.0177},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:34.6508,draw:1.3233,frame:41.1077,hit:35.2544,alloc:6.22,gc:13879,cache:0.5},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:85.121,draw:2.1178,frame:92.2273,hit:0,alloc:12.81,gc:17039,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:87.3795,draw:2.1936,frame:94.8177,hit:0.9731,alloc:20.18,gc:20210,cache:0.0177},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:91.8192,draw:2.2621,frame:100.7301,hit:28.3586,alloc:16.19,gc:23405,cache:0.5},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:88.956,draw:2.2417,frame:98.4954,hit:0,alloc:13.3,gc:26515,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:87.2209,draw:2.2345,frame:96.4757,hit:1.5881,alloc:11.72,gc:29591,cache:0.0177},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:92.4338,draw:2.2096,frame:103.461,hit:64.5118,alloc:29.16,gc:32674,cache:0.5}
+];
+
+// ═══════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════
+const COL = {
+  prepare: '#6c9bff',
+  draw: '#a78bfa',
+  hit: '#22d3ee',
+  green: '#34d399',
+  red: '#f87171',
+  amber: '#fbbf24',
+  muted: '#5c6370',
+  text: '#e8eaf0',
+  textSec: '#8b92a0',
+  bg: '#14171d',
+  border: '#2a3040',
+  greenDim: 'rgba(52,211,153,.12)',
+  redDim: 'rgba(248,113,113,.12)',
+};
+
+function fmt(v, decimals=2) {
+  if (Math.abs(v) < 0.01) return '0.00';
+  return v.toFixed(decimals);
+}
+function fmtDelta(v) {
+  const s = v >= 0 ? '+' : '';
+  return s + fmt(v);
+}
+function deltaColor(v) { return v <= -0.5 ? COL.green : v >= 0.5 ? COL.red : COL.muted; }
+function deltaCellClass(v) { return v <= -0.5 ? 'good' : v >= 0.5 ? 'bad' : ''; }
+
+function svgEl(tag, attrs={}, text='') {
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = document.createElementNS(ns, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text) el.textContent = text;
+  return el;
+}
+
+function makeSVG(w, h) {
+  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'xMidYMid meet' });
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+  return svg;
+}
+
+// tooltip
+const ttEl = document.getElementById('tooltip');
+function showTooltip(e, html) {
+  ttEl.innerHTML = html;
+  ttEl.classList.add('visible');
+  const r = ttEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + r.width > window.innerWidth - 10) x = e.clientX - r.width - 14;
+  if (y + r.height > window.innerHeight - 10) y = e.clientY - r.height - 10;
+  ttEl.style.left = x + 'px';
+  ttEl.style.top = y + 'px';
+}
+function hideTooltip() { ttEl.classList.remove('visible'); }
+
+// groupBy helper
+function groupBy(arr, fn) {
+  const m = {};
+  arr.forEach(d => { const k = fn(d); (m[k] = m[k] || []).push(d); });
+  return m;
+}
+function avg(arr, fn) { return arr.reduce((s,d) => s + fn(d), 0) / arr.length; }
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Baseline cost breakdown
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const rows = [];
+
+  sizes.forEach(sz => {
+    ips.forEach(ip => {
+      const group = baseline.filter(d => d.size === sz && d.ip === ip);
+      rows.push({
+        label: `N=${sz} ${ip.toLowerCase()}`,
+        prepare: avg(group, d => d.prepare),
+        draw: avg(group, d => d.draw),
+        hit: avg(group, d => d.hit),
+      });
+    });
+  });
+
+  const W = 900, barH = 22, gap = 5, labelW = 180, padR = 80, padT = 10;
+  const H = padT + rows.length * (barH + gap) + 10;
+  const maxVal = Math.max(...rows.map(r => r.prepare + r.draw + r.hit));
+  const barW = W - labelW - padR;
+  const scale = v => (v / maxVal) * barW;
+
+  const svg = makeSVG(W, H);
+
+  rows.forEach((r, i) => {
+    const y = padT + i * (barH + gap);
+    const total = r.prepare + r.draw + r.hit;
+
+    // label
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, r.label));
+
+    // stacked bars
+    let x = labelW;
+    [{v: r.prepare, c: COL.prepare, l:'Prepare'}, {v: r.draw, c: COL.draw, l:'Draw'}, {v: r.hit, c: COL.hit, l:'Hit-test'}].forEach(seg => {
+      if (seg.v > 0.01) {
+        const w = scale(seg.v);
+        const rect = svgEl('rect', { x, y, width: Math.max(w, 1), height: barH, fill: seg.c, rx: 3, opacity: 0.85 });
+        rect.addEventListener('mousemove', e => showTooltip(e,
+          `<span class="tt-label">${r.label}</span><br><span class="tt-value">${seg.l}: ${fmt(seg.v)}ms</span><br>Total: ${fmt(total)}ms`));
+        rect.addEventListener('mouseleave', hideTooltip);
+        svg.appendChild(rect);
+        x += w;
+      }
+    });
+
+    // total label
+    svg.appendChild(svgEl('text', { x: x + 8, y: y + barH/2 + 4, fill: COL.textSec,
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, fmt(total) + 'ms'));
+  });
+
+  document.getElementById('chart-baseline-cost').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Baseline scaling
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const ipColors = { NONE: COL.muted, OCCASIONAL: COL.amber, CONTINUOUS: COL.red };
+
+  const W = 900, H = 300, padL = 60, padR = 30, padT = 20, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+
+  const grouped = {};
+  ips.forEach(ip => {
+    grouped[ip] = sizes.map(sz => {
+      const rows = baseline.filter(d => d.size === sz && d.ip === ip);
+      return { size: sz, frame: avg(rows, d => d.frame) };
+    });
+  });
+
+  const maxFrame = Math.max(...Object.values(grouped).flat().map(d => d.frame));
+  const scaleX = i => padL + (i / (sizes.length - 1)) * chartW;
+  const scaleY = v => padT + chartH - (v / maxFrame) * chartH;
+
+  const svg = makeSVG(W, H);
+
+  // grid
+  [0, 50, 100, 150, 200].forEach(v => {
+    if (v > maxFrame) return;
+    const y = scaleY(v);
+    svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: COL.border, 'stroke-width': 1 }));
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + 4, 'text-anchor': 'end',
+      fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, v + 'ms'));
+  });
+
+  // x labels
+  sizes.forEach((sz, i) => {
+    svg.appendChild(svgEl('text', { x: scaleX(i), y: H - 10, 'text-anchor': 'middle',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, 'N=' + sz));
+  });
+
+  // lines
+  ips.forEach(ip => {
+    const pts = grouped[ip];
+    const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(p.frame)}`).join(' ');
+    svg.appendChild(svgEl('path', { d: path, fill: 'none', stroke: ipColors[ip], 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+
+    pts.forEach((p, i) => {
+      const circle = svgEl('circle', { cx: scaleX(i), cy: scaleY(p.frame), r: 5, fill: ipColors[ip], cursor: 'pointer' });
+      circle.addEventListener('mousemove', e => showTooltip(e,
+        `<span class="tt-label">N=${p.size} · ${ip}</span><br><span class="tt-value">${fmt(p.frame)}ms avg frame</span>`));
+      circle.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(circle);
+    });
+  });
+
+  document.getElementById('chart-baseline-scaling').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Delta waterfall
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const deltas = baseline.map((b, i) => ({
+    name: b.name,
+    delta: branch[i].frame - b.frame,
+    size: b.size,
+    ip: b.ip,
+  })).sort((a, b) => a.delta - b.delta);
+
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)));
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+
+  // zero line
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H,
+    stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+
+    // value label
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    const anchor = d.delta <= 0 ? 'end' : 'start';
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': anchor,
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmtDelta(d.delta)));
+  });
+
+  document.getElementById('chart-delta-waterfall').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Heatmap
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('chart-heatmap');
+
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+
+  // header row
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => {
+    const hdr = document.createElement('div');
+    hdr.className = 'hm-header';
+    hdr.textContent = ip;
+    grid.appendChild(hdr);
+  });
+
+  const allDeltas = [];
+  sizes.forEach(sz => {
+    ips.forEach(ip => {
+      const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+      const brRows = branch.filter(d => d.size === sz && d.ip === ip);
+      const delta = avg(brRows, d => d.frame) - avg(bRows, d => d.frame);
+      allDeltas.push({ sz, ip, delta });
+    });
+  });
+  const absMax = Math.max(...allDeltas.map(d => Math.abs(d.delta)), 1);
+
+  sizes.forEach(sz => {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'hm-header';
+    rowLabel.textContent = 'N=' + sz;
+    grid.appendChild(rowLabel);
+
+    ips.forEach(ip => {
+      const d = allDeltas.find(x => x.sz === sz && x.ip === ip);
+      const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+      const color = d.delta <= 0
+        ? `rgba(52,211,153,${0.1 + intensity * 0.6})`
+        : `rgba(248,113,113,${0.1 + intensity * 0.6})`;
+      const textColor = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell';
+      cell.style.background = color;
+      cell.style.color = textColor;
+      cell.textContent = fmtDelta(d.delta) + 'ms';
+      cell.title = `N=${sz} ${ip}: ${fmtDelta(d.delta)}ms`;
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: By interaction pattern
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(baseline.filter(d => d.ip === ip), d => d.frame),
+    branch: avg(branch.filter(d => d.ip === ip), d => d.frame),
+  }));
+
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+
+  const svg = makeSVG(W, H);
+
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+
+    // baseline bar
+    const bRect = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+
+    // branch bar
+    const y2 = y + barH + gapInner;
+    const brRect = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: COL.green, rx: 4, opacity: 0.8 });
+    brRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(d.branch - d.baseline)}ms`));
+    brRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4,
+      fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmt(d.branch) + 'ms (' + fmtDelta(d.branch - d.baseline) + ')'));
+  });
+
+  document.getElementById('chart-by-interaction').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: By scene size
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(baseline.filter(d => d.size === sz), d => d.frame),
+    branch: avg(branch.filter(d => d.size === sz), d => d.frame),
+  }));
+
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+
+  const svg = makeSVG(W, H);
+
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+
+    const bRect = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brRect = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4,
+      fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+
+  document.getElementById('chart-by-size').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Subsystem impact
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+
+  const data = ips.map(ip => {
+    const bRows = baseline.filter(d => d.ip === ip);
+    const brRows = branch.filter(d => d.ip === ip);
+    return {
+      ip,
+      prepare: avg(brRows, d => d.prepare) - avg(bRows, d => d.prepare),
+      draw: avg(brRows, d => d.draw) - avg(bRows, d => d.draw),
+      hit: avg(brRows, d => d.hit) - avg(bRows, d => d.hit),
+    };
+  });
+
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+
+  // zero line
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB,
+    stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  // axis labels
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle',
+    fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start',
+    fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end',
+    fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2,
+      'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m];
+      const barLen = Math.abs(scale(v));
+      const x = v <= 0 ? center - barLen : center;
+      const color = metricColors[m];
+
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e,
+        `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start',
+        fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+
+  document.getElementById('chart-subsystem').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Memory tradeoff scatter
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const points = baseline.map((b, i) => ({
+    name: b.name,
+    frameDelta: branch[i].frame - b.frame,
+    allocDelta: branch[i].alloc - b.alloc,
+    size: b.size,
+  }));
+
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2;
+  const centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+
+  const svg = makeSVG(W, H);
+
+  // quadrant backgrounds
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+
+  // axes
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+
+  // axis labels
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle',
+    fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle',
+    fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11',
+    transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+
+  // quadrant labels
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16,
+    fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end',
+    fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6;
+    const c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+
+  // size legend
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+
+  document.getElementById('chart-tradeoff').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// TABLES
+// ═══════════════════════════════════════════════════════════
+function buildDeltaTable(container, rows) {
+  const html = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit-test Δ</th><th>Cache Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const b = baseline.find(d => d.name === r.name);
+      const br = branch.find(d => d.name === r.name);
+      const fd = br.frame - b.frame, pd = br.prepare - b.prepare, hd = br.hit - b.hit;
+      const cd = br.cache - b.cache, ad = br.alloc - b.alloc, gd = br.gc - b.gc;
+      return `<tr>
+        <td>${r.name}</td>
+        <td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td>
+        <td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td>
+        <td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td>
+        <td>${fmtDelta(cd)}</td>
+        <td>${fmtDelta(ad)}MB</td>
+        <td>${gd > 0 ? '+' : ''}${gd}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  container.innerHTML = html;
+}
+
+// Wins / regressions — prepared-scene-cache
+const allDeltas = baseline.map((b, i) => ({ name: b.name, delta: branch[i].frame - b.frame }));
+const sorted = [...allDeltas].sort((a, b) => a.delta - b.delta);
+buildDeltaTable(document.getElementById('table-wins'), sorted.filter(d => d.delta < 0).slice(0, 8));
+buildDeltaTable(document.getElementById('table-regressions'), sorted.filter(d => d.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 8));
+
+// Full table — prepared-scene-cache
+(function() {
+  const rows = baseline.map((b, i) => {
+    const br = branch[i];
+    return { name: b.name, size: b.size, ip: b.ip,
+      bFrame: b.frame, brFrame: br.frame, fd: br.frame - b.frame,
+      bPrep: b.prepare, brPrep: br.prepare, pd: br.prepare - b.prepare,
+      bHit: b.hit, brHit: br.hit, hd: br.hit - b.hit,
+      bDraw: b.draw, brDraw: br.draw, dd: br.draw - b.draw,
+      brCache: br.cache, ad: br.alloc - b.alloc, gd: br.gc - b.gc,
+    };
+  });
+
+  document.getElementById('table-full').innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th>
+      <th>Prepare Δ</th><th>Hit Δ</th><th>Draw Δ</th><th>Cache Hit</th><th>Alloc Δ</th><th>GC Δ</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${r.name}</td>
+      <td>${fmt(r.bFrame)}ms</td>
+      <td>${fmt(r.brFrame)}ms</td>
+      <td class="${deltaCellClass(r.fd)}">${fmtDelta(r.fd)}ms</td>
+      <td class="${deltaCellClass(r.pd)}">${fmtDelta(r.pd)}ms</td>
+      <td class="${deltaCellClass(r.hd)}">${fmtDelta(r.hd)}ms</td>
+      <td class="${deltaCellClass(r.dd)}">${fmtDelta(r.dd)}ms</td>
+      <td>${fmt(r.brCache, 4)}</td>
+      <td>${fmtDelta(r.ad)}MB</td>
+      <td>${r.gd > 0 ? '+' : ''}${r.gd}</td>
+    </tr>`).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// SPATIAL INDEX DATA (partial: 23/24, missing s200_m50_continuous)
+// ═══════════════════════════════════════════════════════════
+const spatialIndex = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.7228,draw:0.3187,frame:8.3349,hit:0,alloc:6.51,gc:74,cache:0},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:2.1481,draw:0.352,frame:8.3369,hit:0.0442,alloc:10.26,gc:149,cache:0},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.5749,draw:0.2669,frame:8.3317,hit:1.6829,alloc:8.72,gc:286,cache:0},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.1591,draw:0.3481,frame:8.3327,hit:0,alloc:8.95,gc:361,cache:0},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.1465,draw:0.35,frame:8.3358,hit:0.0459,alloc:9.52,gc:437,cache:0},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.5372,draw:0.2618,frame:8.3412,hit:1.6027,alloc:7.08,gc:575,cache:0},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:7.2766,draw:0.4564,frame:9.2607,hit:0,alloc:11.69,gc:1072,cache:0},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:8.7232,draw:0.5646,frame:11.0644,hit:0.163,alloc:15.5,gc:1748,cache:0},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:10.6803,draw:0.7244,frame:25.4783,hit:11.0509,alloc:13.87,gc:3069,cache:0},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.6956,draw:0.7012,frame:13.5908,hit:0,alloc:14.04,gc:3773,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:10.8061,draw:0.6988,frame:14.0819,hit:0.2189,alloc:11.6,gc:4507,cache:0},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.7462,draw:0.7344,frame:25.8733,hit:11.071,alloc:16.28,gc:5672,cache:0},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:36.8509,draw:1.4606,frame:41.3615,hit:0,alloc:18.76,gc:7330,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:36.9091,draw:1.4677,frame:42.3086,hit:0.6735,alloc:6.43,gc:9022,cache:0},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:36.866,draw:1.579,frame:79.0532,hit:36.1872,alloc:13.39,gc:12079,cache:0},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:36.3906,draw:1.4815,frame:41.9919,hit:0,alloc:10.43,gc:13740,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:36.4916,draw:1.4912,frame:42.5988,hit:0.6689,alloc:7.8,gc:15422,cache:0},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:36.3591,draw:1.5572,frame:80.1457,hit:36.1986,alloc:6.88,gc:18499,cache:0},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:91.282,draw:2.2364,frame:98.7745,hit:0,alloc:19.02,gc:21970,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:92.6458,draw:2.2758,frame:102.0137,hit:1.6631,alloc:14.85,gc:25287,cache:0},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:97.5375,draw:2.3124,frame:202.9345,hit:96.5173,alloc:15.17,gc:30975,cache:0},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:92.523,draw:2.2801,frame:102.3422,hit:0,alloc:9.29,gc:34190,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:92.6905,draw:2.2314,frame:104.2068,hit:1.6736,alloc:22.47,gc:37412,cache:0}
+];
+
+// ═══════════════════════════════════════════════════════════
+// SPATIAL INDEX CHARTS
+// ═══════════════════════════════════════════════════════════
+
+// Helper: match baseline rows to spatial index rows by name
+const siMatched = spatialIndex.map(si => {
+  const b = baseline.find(d => d.name === si.name);
+  return { name: si.name, size: si.size, ip: si.ip, mr: si.mr, b, si };
+}).filter(d => d.b);
+
+// SI: Delta waterfall
+(function() {
+  const deltas = siMatched.map(d => ({
+    name: d.name, delta: d.si.frame - d.b.frame, size: d.size, ip: d.ip,
+  })).sort((a, b) => a.delta - b.delta);
+
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 0.1);
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': d.delta <= 0 ? 'end' : 'start',
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmtDelta(d.delta)));
+  });
+  document.getElementById('si-chart-delta-waterfall').appendChild(svg);
+})();
+
+// SI: Heatmap
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('si-chart-heatmap');
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => { const h = document.createElement('div'); h.className = 'hm-header'; h.textContent = ip; grid.appendChild(h); });
+
+  const allD = [];
+  sizes.forEach(sz => { ips.forEach(ip => {
+    const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+    const sRows = siMatched.filter(d => d.size === sz && d.ip === ip);
+    if (sRows.length === 0 || bRows.length === 0) { allD.push({ sz, ip, delta: null }); return; }
+    allD.push({ sz, ip, delta: avg(sRows, d => d.si.frame) - avg(bRows, d => d.frame) });
+  }); });
+  const absMax = Math.max(...allD.filter(d => d.delta !== null).map(d => Math.abs(d.delta)), 1);
+
+  sizes.forEach(sz => {
+    const rl = document.createElement('div'); rl.className = 'hm-header'; rl.textContent = 'N=' + sz; grid.appendChild(rl);
+    ips.forEach(ip => {
+      const d = allD.find(x => x.sz === sz && x.ip === ip);
+      const cell = document.createElement('div'); cell.className = 'hm-cell';
+      if (d.delta === null) { cell.style.background = 'var(--surface-2)'; cell.style.color = 'var(--text-tertiary)'; cell.textContent = 'N/A'; }
+      else {
+        const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+        cell.style.background = d.delta <= 0 ? `rgba(52,211,153,${0.1+intensity*0.6})` : `rgba(248,113,113,${0.1+intensity*0.6})`;
+        cell.style.color = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+        cell.textContent = fmtDelta(d.delta) + 'ms';
+      }
+      grid.appendChild(cell);
+    });
+  });
+  container.appendChild(grid);
+})();
+
+// SI: By interaction pattern
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(siMatched.filter(d => d.ip === ip), d => d.b.frame),
+    branch: avg(siMatched.filter(d => d.ip === ip), d => d.si.frame),
+  }));
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('si-chart-by-interaction').appendChild(svg);
+})();
+
+// SI: By scene size
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(siMatched.filter(d => d.size === sz), d => d.b.frame),
+    branch: avg(siMatched.filter(d => d.size === sz), d => d.si.frame),
+  }));
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('si-chart-by-size').appendChild(svg);
+})();
+
+// SI: Subsystem impact
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+  const data = ips.map(ip => {
+    const rows = siMatched.filter(d => d.ip === ip);
+    return { ip, prepare: avg(rows, d => d.si.prepare) - avg(rows, d => d.b.prepare), draw: avg(rows, d => d.si.draw) - avg(rows, d => d.b.draw), hit: avg(rows, d => d.si.hit) - avg(rows, d => d.b.hit) };
+  });
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m]; const barLen = Math.abs(scale(v)); const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: metricColors[m], rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: metricColors[m], 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+  document.getElementById('si-chart-subsystem').appendChild(svg);
+})();
+
+// SI: Memory tradeoff scatter
+(function() {
+  const points = siMatched.map(d => ({ name: d.name, frameDelta: d.si.frame - d.b.frame, allocDelta: d.si.alloc - d.b.alloc, size: d.size }));
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6, c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+  document.getElementById('si-chart-tradeoff').appendChild(svg);
+})();
+
+// SI: Tables
+(function() {
+  function buildSiDeltaTable(container, rows) {
+    container.innerHTML = `<table class="data-table">
+      <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit-test Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const fd = r.si.frame - r.b.frame, pd = r.si.prepare - r.b.prepare, hd = r.si.hit - r.b.hit;
+        const ad = r.si.alloc - r.b.alloc, gd = r.si.gc - r.b.gc;
+        return `<tr><td>${r.name}</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(ad)}MB</td><td>${gd>0?'+':''}${gd}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const siSorted = [...siMatched].sort((a, b) => (a.si.frame - a.b.frame) - (b.si.frame - b.b.frame));
+  buildSiDeltaTable(document.getElementById('si-table-wins'), siSorted.filter(d => d.si.frame - d.b.frame < 0).slice(0, 8));
+  buildSiDeltaTable(document.getElementById('si-table-regressions'), siSorted.filter(d => d.si.frame - d.b.frame > 0).sort((a,b) => (b.si.frame-b.b.frame) - (a.si.frame-a.b.frame)).slice(0, 8));
+
+  // Full table
+  document.getElementById('si-table-full').innerHTML = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit Δ</th><th>Draw Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${siMatched.map(d => {
+      const fd = d.si.frame-d.b.frame, pd = d.si.prepare-d.b.prepare, hd = d.si.hit-d.b.hit, dd = d.si.draw-d.b.draw;
+      return `<tr><td>${d.name}</td><td>${fmt(d.b.frame)}ms</td><td>${fmt(d.si.frame)}ms</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td>${fmtDelta(d.si.alloc-d.b.alloc)}MB</td><td>${(d.si.gc-d.b.gc)>0?'+':''}${d.si.gc-d.b.gc}</td></tr>`;
+    }).join('')}</tbody></table>`;
+})();
+</script>
 </body>
 </html>
