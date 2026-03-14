@@ -54,7 +54,7 @@ interface RenderBenchmarkHooks {
  */
 class IsometricRenderer(
     private val engine: IsometricEngine,
-    private val enablePathCaching: Boolean = true,
+    private val enablePathCaching: Boolean = false,
     private val enableSpatialIndex: Boolean = true,
     private val spatialIndexCellSize: Double = DEFAULT_SPATIAL_INDEX_CELL_SIZE
 ) {

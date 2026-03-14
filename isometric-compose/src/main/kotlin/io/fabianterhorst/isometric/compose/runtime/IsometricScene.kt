@@ -53,7 +53,7 @@ data class RuntimeFlagSnapshot(
  * @param defaultColor Default color for shapes
  * @param colorPalette Color palette for theming
  * @param enableGestures Whether to enable gesture handling
- * @param enablePathCaching Enable path object caching (default: true) - reduces GC pressure by 30-40%
+ * @param enablePathCaching Enable path object caching (default: false) - reduces GC pressure by 30-40%
  * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
  * @param spatialIndexCellSize Spatial-index grid cell size in pixels (default: 100.0).
  *   Smaller cells reduce candidate counts but increase grid fan-out and rebuild work.
@@ -81,7 +81,7 @@ fun IsometricScene(
     defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
     colorPalette: ColorPalette = ColorPalette(),
     enableGestures: Boolean = true,
-    enablePathCaching: Boolean = true,
+    enablePathCaching: Boolean = false,
     enableSpatialIndex: Boolean = true,
     spatialIndexCellSize: Double = IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE,
     useNativeCanvas: Boolean = false,
