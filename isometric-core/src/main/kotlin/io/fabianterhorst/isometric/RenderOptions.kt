@@ -11,7 +11,7 @@ data class RenderOptions(
     val enableDepthSorting: Boolean = true,
     val enableBackfaceCulling: Boolean = true,
     val enableBoundsChecking: Boolean = true,
-    val enableBroadPhaseSort: Boolean = false,
+    val enableBroadPhaseSort: Boolean = true,
     val broadPhaseCellSize: Double = DEFAULT_BROAD_PHASE_CELL_SIZE
 ) {
     init {
@@ -44,7 +44,7 @@ data class RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
             enableBoundsChecking = false,    // Render everything
-            enableBroadPhaseSort = false
+            enableBroadPhaseSort = true
         )
     }
 }
