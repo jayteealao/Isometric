@@ -59,7 +59,7 @@ class IsometricRenderer(
     private val enablePathCaching: Boolean = false,
     private val enableSpatialIndex: Boolean = true,
     private val spatialIndexCellSize: Double = DEFAULT_SPATIAL_INDEX_CELL_SIZE
-) {
+) : java.io.Closeable {
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {
             "spatialIndexCellSize must be positive and finite, got $spatialIndexCellSize"
@@ -70,6 +70,13 @@ class IsometricRenderer(
         const val DEFAULT_SPATIAL_INDEX_CELL_SIZE: Double = 100.0
         private const val HIT_TEST_RADIUS_PX: Double = 8.0
     }
+    /**
+     * Optional callback invoked when a render command fails to draw.
+     * Receives the command ID and the exception. The command is skipped.
+     * Null in production (errors are silently skipped).
+     */
+    var onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null
+
     /**
      * Optional benchmark hooks for instrumentation. Set via [IsometricScene]'s SideEffect
      * from [LocalBenchmarkHooks]. Null in production (zero overhead).
@@ -97,6 +104,9 @@ class IsometricRenderer(
         val commandId: String
     )
 
+    // Closed flag — once true, the renderer must not be used
+    private var closed = false
+
     // Triple-layer cache for maximum performance
     private var cachedPreparedScene: PreparedScene? = null
     private var cachedPaths: List<CachedPath>? = null
@@ -117,6 +127,7 @@ class IsometricRenderer(
         width: Int,
         height: Int
     ): PreparedScene? {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return null
         if (forceRebuild) clearCache()
         if (needsUpdate(rootNode, context, width, height)) {
@@ -201,25 +212,29 @@ class IsometricRenderer(
         // FAST PATH: Render from cached paths (minimal allocations!)
         for (i in paths.indices) {
             val cached = paths[i]
-            when (strokeStyle) {
-                is StrokeStyle.FillOnly -> {
-                    drawPath(cached.path, cached.fillColor, style = Fill)
+            try {
+                when (strokeStyle) {
+                    is StrokeStyle.FillOnly -> {
+                        drawPath(cached.path, cached.fillColor, style = Fill)
+                    }
+                    is StrokeStyle.Stroke -> {
+                        drawPath(
+                            cached.path,
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
+                        )
+                    }
+                    is StrokeStyle.FillAndStroke -> {
+                        drawPath(cached.path, cached.fillColor, style = Fill)
+                        drawPath(
+                            cached.path,
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
+                        )
+                    }
                 }
-                is StrokeStyle.Stroke -> {
-                    drawPath(
-                        cached.path,
-                        strokeComposeColor!!,
-                        style = strokeDrawStyle!!
-                    )
-                }
-                is StrokeStyle.FillAndStroke -> {
-                    drawPath(cached.path, cached.fillColor, style = Fill)
-                    drawPath(
-                        cached.path,
-                        strokeComposeColor!!,
-                        style = strokeDrawStyle!!
-                    )
-                }
+            } catch (e: Exception) {
+                onRenderError?.invoke(cached.commandId, e)
             }
         }
 
@@ -237,7 +252,10 @@ class IsometricRenderer(
      * native `android.graphics.Path` during draw. In that mode the benchmark measures native
      * draw-path overhead, not cross-frame native-path reuse.
      *
-     * @throws NoClassDefFoundError on non-Android platforms
+     * @throws IllegalStateException if called on a non-Android platform
+     *   (should be caught at the IsometricScene level before reaching this method)
+     * @throws NoClassDefFoundError if android.graphics.Canvas is unavailable
+     *   (fallback — should not occur if IsometricScene validates first)
      */
     fun DrawScope.renderNative(
         rootNode: GroupNode,
@@ -266,25 +284,29 @@ class IsometricRenderer(
 
             // Render using native canvas (faster than Compose on Android)
             cachedPreparedScene?.commands?.forEach { command ->
-                val nativePath = command.toNativePath()
+                try {
+                    val nativePath = command.toNativePath()
 
-                when (strokeStyle) {
-                    is StrokeStyle.FillOnly -> {
-                        fillPaint.color = command.color.toAndroidColor()
-                        canvas.nativeCanvas.drawPath(nativePath, fillPaint)
+                    when (strokeStyle) {
+                        is StrokeStyle.FillOnly -> {
+                            fillPaint.color = command.color.toAndroidColor()
+                            canvas.nativeCanvas.drawPath(nativePath, fillPaint)
+                        }
+                        is StrokeStyle.Stroke -> {
+                            strokePaint.strokeWidth = strokeWidth!!
+                            strokePaint.color = strokeAndroidColor!!
+                            canvas.nativeCanvas.drawPath(nativePath, strokePaint)
+                        }
+                        is StrokeStyle.FillAndStroke -> {
+                            fillPaint.color = command.color.toAndroidColor()
+                            canvas.nativeCanvas.drawPath(nativePath, fillPaint)
+                            strokePaint.strokeWidth = strokeWidth!!
+                            strokePaint.color = strokeAndroidColor!!
+                            canvas.nativeCanvas.drawPath(nativePath, strokePaint)
+                        }
                     }
-                    is StrokeStyle.Stroke -> {
-                        strokePaint.strokeWidth = strokeWidth!!
-                        strokePaint.color = strokeAndroidColor!!
-                        canvas.nativeCanvas.drawPath(nativePath, strokePaint)
-                    }
-                    is StrokeStyle.FillAndStroke -> {
-                        fillPaint.color = command.color.toAndroidColor()
-                        canvas.nativeCanvas.drawPath(nativePath, fillPaint)
-                        strokePaint.strokeWidth = strokeWidth!!
-                        strokePaint.color = strokeAndroidColor!!
-                        canvas.nativeCanvas.drawPath(nativePath, strokePaint)
-                    }
+                } catch (e: Exception) {
+                    onRenderError?.invoke(command.commandId, e)
                 }
             }
 
@@ -375,7 +397,22 @@ class IsometricRenderer(
     }
 
     /**
-     * Rebuild cache when scene changes
+     * Release all cached resources. Idempotent — safe to call multiple times.
+     * After close(), the renderer must not be used for rendering; any attempt
+     * will throw [IllegalStateException].
+     */
+    override fun close() {
+        closed = true
+        clearCache()
+        benchmarkHooks = null
+        onRenderError = null
+    }
+
+    /**
+     * Rebuild cache when scene changes.
+     *
+     * If any step fails (e.g. a custom node's [IsometricNode.render] throws),
+     * the previous valid cache is preserved and [onRenderError] is notified.
      */
     internal fun rebuildCache(
         rootNode: GroupNode,
@@ -383,54 +420,63 @@ class IsometricRenderer(
         width: Int,
         height: Int
     ) {
-        // Clear engine
-        engine.clear()
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+        try {
+            // Collect all render commands from the tree FIRST (may throw).
+            // engine.clear() is deferred until after render succeeds to avoid
+            // a split-brain state where the engine is empty but the cache
+            // still references old data.
+            val commands = rootNode.render(context)
 
-        // Collect all render commands from the tree
-        val commands = rootNode.render(context)
+            // --- Point of no return: commit changes ---
+            engine.clear()
 
-        // Add commands to engine, preserving node-level IDs for hit testing
-        commands.forEach { command ->
-            engine.add(
-                path = command.originalPath,
-                color = command.color,
-                originalShape = command.originalShape,
-                id = command.commandId,
-                ownerNodeId = command.ownerNodeId
+            // Add commands to engine, preserving node-level IDs for hit testing
+            commands.forEach { command ->
+                engine.add(
+                    path = command.originalPath,
+                    color = command.color,
+                    originalShape = command.originalShape,
+                    id = command.commandId,
+                    ownerNodeId = command.ownerNodeId
+                )
+            }
+
+            // Build node ID lookup map for hit testing
+            nodeIdMap = buildNodeIdMap(rootNode)
+
+            // Prepare scene (projects 3D -> 2D, sorts by depth)
+            cachedPreparedScene = engine.projectScene(
+                width = width,
+                height = height,
+                renderOptions = context.renderOptions,
+                lightDirection = context.lightDirection
             )
+
+            cachedWidth = width
+            cachedHeight = height
+            cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+
+            // Build command maps used by both slow and fast hit-test paths.
+            buildCommandMaps(cachedPreparedScene!!)
+
+            // Build path cache (rendering optimization)
+            if (enablePathCaching) {
+                buildPathCache(cachedPreparedScene!!)
+            }
+
+            // Build spatial index (hit-testing optimization) — independent of path caching
+            if (enableSpatialIndex) {
+                buildSpatialIndex(cachedPreparedScene!!)
+            }
+
+            // Clear dirty flags
+            rootNode.markClean()
+            cacheValid = true
+        } catch (e: Exception) {
+            // Preserve previous valid cache — render last good frame
+            onRenderError?.invoke("rebuild", e)
         }
-
-        // Build node ID lookup map for hit testing
-        nodeIdMap = buildNodeIdMap(rootNode)
-
-        // Prepare scene (projects 3D -> 2D, sorts by depth)
-        cachedPreparedScene = engine.projectScene(
-            width = width,
-            height = height,
-            renderOptions = context.renderOptions,
-            lightDirection = context.lightDirection
-        )
-
-        cachedWidth = width
-        cachedHeight = height
-        cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
-
-        // Build command maps used by both slow and fast hit-test paths.
-        buildCommandMaps(cachedPreparedScene!!)
-
-        // Build path cache (rendering optimization)
-        if (enablePathCaching) {
-            buildPathCache(cachedPreparedScene!!)
-        }
-
-        // Build spatial index (hit-testing optimization) — independent of path caching
-        if (enableSpatialIndex) {
-            buildSpatialIndex(cachedPreparedScene!!)
-        }
-
-        // Clear dirty flags
-        rootNode.markClean()
-        cacheValid = true
     }
 
     /**
@@ -499,28 +545,32 @@ class IsometricRenderer(
         strokeDrawStyle: Stroke?
     ) {
         scene.commands.forEach { command ->
-            val path = command.toComposePath()
-            val color = command.color.toComposeColor()
+            try {
+                val path = command.toComposePath()
+                val color = command.color.toComposeColor()
 
-            when (strokeStyle) {
-                is StrokeStyle.FillOnly -> {
-                    drawPath(path, color, style = Fill)
+                when (strokeStyle) {
+                    is StrokeStyle.FillOnly -> {
+                        drawPath(path, color, style = Fill)
+                    }
+                    is StrokeStyle.Stroke -> {
+                        drawPath(
+                            path,
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
+                        )
+                    }
+                    is StrokeStyle.FillAndStroke -> {
+                        drawPath(path, color, style = Fill)
+                        drawPath(
+                            path,
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
+                        )
+                    }
                 }
-                is StrokeStyle.Stroke -> {
-                    drawPath(
-                        path,
-                        strokeComposeColor!!,
-                        style = strokeDrawStyle!!
-                    )
-                }
-                is StrokeStyle.FillAndStroke -> {
-                    drawPath(path, color, style = Fill)
-                    drawPath(
-                        path,
-                        strokeComposeColor!!,
-                        style = strokeDrawStyle!!
-                    )
-                }
+            } catch (e: Exception) {
+                onRenderError?.invoke(command.commandId, e)
             }
         }
     }

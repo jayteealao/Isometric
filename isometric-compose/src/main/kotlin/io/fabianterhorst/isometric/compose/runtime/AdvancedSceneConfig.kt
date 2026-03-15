@@ -23,6 +23,7 @@ class AdvancedSceneConfig(
     val frameVersion: Long = 0L,
     val onHitTestReady: ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? = null,
     val onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
+    val onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null,
     val onEngineReady: ((IsometricEngine) -> Unit)? = null,
     val onRendererReady: ((IsometricRenderer) -> Unit)? = null
 ) : SceneConfig(

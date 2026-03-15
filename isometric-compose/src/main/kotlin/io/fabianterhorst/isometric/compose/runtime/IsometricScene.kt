@@ -66,6 +66,11 @@ fun IsometricScene(
     config: AdvancedSceneConfig,
     content: @Composable IsometricScope.() -> Unit
 ) {
+    // Validate useNativeCanvas is only used on Android (fail-fast at composition time)
+    if (config.useNativeCanvas) {
+        remember { validateNativeCanvasPlatform(); true }
+    }
+
     // Create root node and applier
     val rootNode = remember { GroupNode() }
     val engine = remember(config.engine) { config.engine }
@@ -106,6 +111,7 @@ fun IsometricScene(
     SideEffect {
         renderer.benchmarkHooks = currentBenchmarkHooks
         renderer.forceRebuild = config.forceRebuild
+        renderer.onRenderError = config.onRenderError
     }
 
     // Track canvas size
@@ -161,6 +167,15 @@ fun IsometricScene(
 
     val composition = remember(compositionContext) {
         Composition(IsometricApplier(rootNode), compositionContext)
+    }
+
+    // Close renderer when it changes or the scene leaves the tree.
+    // Separated from the composition lifecycle to avoid disposing the composition
+    // when only the renderer config changes (which would crash on re-setContent).
+    DisposableEffect(renderer) {
+        onDispose {
+            renderer.close()
+        }
     }
 
     // Create the sub-composition once when this composable enters the tree.
@@ -301,5 +316,23 @@ fun IsometricScene(
                 }
             }
         }
+    }
+}
+
+/**
+ * Validates that the native Android canvas is available on the current platform.
+ * Throws [IllegalStateException] with an actionable message on non-Android JVM.
+ *
+ * Extracted from the composable for testability.
+ */
+internal fun validateNativeCanvasPlatform() {
+    try {
+        Class.forName("android.graphics.Canvas")
+    } catch (_: ClassNotFoundException) {
+        throw IllegalStateException(
+            "useNativeCanvas=true requires Android. " +
+            "The android.graphics.Canvas class is not available on this platform. " +
+            "Use the default Compose rendering path instead."
+        )
     }
 }
