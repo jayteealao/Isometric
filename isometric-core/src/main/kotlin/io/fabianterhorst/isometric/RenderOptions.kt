@@ -6,6 +6,8 @@ package io.fabianterhorst.isometric
  * @property enableDepthSorting Enable complex intersection-based depth sorting (slower but correct)
  * @property enableBackfaceCulling Remove back-facing polygons (improves performance)
  * @property enableBoundsChecking Remove polygons outside viewport bounds (improves performance)
+ * @property enableBroadPhaseSort Enable broad-phase spatial bucketing to prune depth-sort candidate pairs (faster for large scenes)
+ * @property broadPhaseCellSize Cell size in pixels for the broad-phase grid. Smaller values increase precision but use more memory.
  */
 class RenderOptions(
     val enableDepthSorting: Boolean = true,
