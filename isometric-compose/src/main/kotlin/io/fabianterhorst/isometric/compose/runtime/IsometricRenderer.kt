@@ -78,11 +78,11 @@ class IsometricRenderer(
 
     /**
      * When true, forces a cache rebuild every frame (disables PreparedScene caching).
-     * Used by benchmarks to measure prepare() cost independently of caching.
+ * Used by benchmarks to measure projectScene() cost independently of caching.
      */
     var forceRebuild: Boolean = false
 
-    /** Bundles inputs to engine.prepare() for cache invalidation. */
+    /** Bundles inputs to engine.projectScene() for cache invalidation. */
     private data class PrepareInputs(
         val renderOptions: RenderOptions,
         val lightDirection: Vector
@@ -118,7 +118,7 @@ class IsometricRenderer(
         height: Int
     ): PreparedScene? {
         if (width <= 0 || height <= 0) return null
-        if (forceRebuild) invalidate()
+        if (forceRebuild) clearCache()
         if (needsUpdate(rootNode, context, width, height)) {
             benchmarkHooks?.onCacheMiss()
             benchmarkHooks?.onPrepareStart()
@@ -189,37 +189,37 @@ class IsometricRenderer(
             is StrokeStyle.FillAndStroke -> Stroke(width = strokeStyle.width)
         }
 
-        // FAST PATH: Render from cached paths (minimal allocations!)
-        if (enablePathCaching && cachedPaths != null) {
-            val paths = cachedPaths!!
-            // Use indexed loop to avoid iterator allocation
-            for (i in paths.indices) {
-                val cached = paths[i]
-                when (strokeStyle) {
-                    is StrokeStyle.FillOnly -> {
-                        drawPath(cached.path, cached.fillColor, style = Fill)
-                    }
-                    is StrokeStyle.Stroke -> {
-                        drawPath(
-                            cached.path,
-                            strokeComposeColor!!,
-                            style = strokeDrawStyle!!
-                        )
-                    }
-                    is StrokeStyle.FillAndStroke -> {
-                        drawPath(cached.path, cached.fillColor, style = Fill)
-                        drawPath(
-                            cached.path,
-                            strokeComposeColor!!,
-                            style = strokeDrawStyle!!
-                        )
-                    }
-                }
-            }
-        } else {
-            // Fallback: Render without path caching
+        val paths = if (enablePathCaching) cachedPaths else null
+        if (paths == null) {
             cachedPreparedScene?.let { scene ->
                 renderPreparedScene(scene, strokeStyle, strokeComposeColor, strokeDrawStyle)
+            }
+            benchmarkHooks?.onDrawEnd()
+            return
+        }
+
+        // FAST PATH: Render from cached paths (minimal allocations!)
+        for (i in paths.indices) {
+            val cached = paths[i]
+            when (strokeStyle) {
+                is StrokeStyle.FillOnly -> {
+                    drawPath(cached.path, cached.fillColor, style = Fill)
+                }
+                is StrokeStyle.Stroke -> {
+                    drawPath(
+                        cached.path,
+                        strokeComposeColor!!,
+                        style = strokeDrawStyle!!
+                    )
+                }
+                is StrokeStyle.FillAndStroke -> {
+                    drawPath(cached.path, cached.fillColor, style = Fill)
+                    drawPath(
+                        cached.path,
+                        strokeComposeColor!!,
+                        style = strokeDrawStyle!!
+                    )
+                }
             }
         }
 
@@ -318,53 +318,19 @@ class IsometricRenderer(
         ensurePreparedScene(rootNode, context, width, height)
             ?: return null
 
-        if (enableSpatialIndex && spatialIndex != null) {
-            // Fast path: Use spatial index for O(k) hit testing
-            val candidateIds = spatialIndex!!.query(x, y, HIT_TEST_RADIUS_PX)
-
-            if (candidateIds.isNotEmpty()) {
-                // Resolve candidate IDs to commands, preserving the original scene order so
-                // engine.findItemAt(order = FRONT_TO_BACK) still returns the frontmost command.
-                val candidateCommands = candidateIds
-                    .mapNotNull { id -> commandIdMap[id] }
-                    .sortedBy { command -> commandOrderMap[command.id] ?: Int.MAX_VALUE }
-
-                if (candidateCommands.isNotEmpty()) {
-                    val filteredScene = PreparedScene(
-                        commands = candidateCommands,
-                        viewportWidth = cachedPreparedScene!!.viewportWidth,
-                        viewportHeight = cachedPreparedScene!!.viewportHeight
-                    )
-
-                    val hit = engine.findItemAt(
-                        preparedScene = filteredScene,
-                        x = x,
-                        y = y,
-                        order = HitOrder.FRONT_TO_BACK,
-                        touchRadius = HIT_TEST_RADIUS_PX
-                    )
-
-                    if (hit != null) {
-                        return findNodeByCommandId(hit.id)
-                    }
-                }
-            }
-        } else {
-            // Slow path: Linear search O(n)
-            val hit = engine.findItemAt(
-                preparedScene = cachedPreparedScene!!,
-                x = x,
-                y = y,
-                order = HitOrder.FRONT_TO_BACK,
-                touchRadius = HIT_TEST_RADIUS_PX
-            )
-
-            if (hit != null) {
-                return findNodeByCommandId(hit.id)
-            }
+        if (enableSpatialIndex) {
+            hitTestSpatial(x, y)?.let { return it }
         }
 
-        return null
+        val hit = engine.findItemAt(
+            preparedScene = cachedPreparedScene!!,
+            x = x,
+            y = y,
+            order = HitOrder.FRONT_TO_BACK,
+            touchRadius = HIT_TEST_RADIUS_PX
+        ) ?: return null
+
+        return findNodeByCommandId(hit.commandId)
     }
 
     /**
@@ -396,7 +362,7 @@ class IsometricRenderer(
     /**
      * Invalidate cache (call when render options change)
      */
-    fun invalidate() {
+    fun clearCache() {
         cacheValid = false
         cachedPreparedScene = null
         cachedPaths = null
@@ -429,7 +395,7 @@ class IsometricRenderer(
                 path = command.originalPath,
                 color = command.color,
                 originalShape = command.originalShape,
-                id = command.id,
+                id = command.commandId,
                 ownerNodeId = command.ownerNodeId
             )
         }
@@ -438,10 +404,10 @@ class IsometricRenderer(
         nodeIdMap = buildNodeIdMap(rootNode)
 
         // Prepare scene (projects 3D -> 2D, sorts by depth)
-        cachedPreparedScene = engine.prepare(
+        cachedPreparedScene = engine.projectScene(
             width = width,
             height = height,
-            options = context.renderOptions,
+            renderOptions = context.renderOptions,
             lightDirection = context.lightDirection
         )
 
@@ -463,7 +429,7 @@ class IsometricRenderer(
         }
 
         // Clear dirty flags
-        rootNode.clearDirty()
+        rootNode.markClean()
         cacheValid = true
     }
 
@@ -479,7 +445,7 @@ class IsometricRenderer(
             CachedPath(
                 path = command.toComposePath(),
                 fillColor = command.color.toComposeColor(),
-                commandId = command.id
+                commandId = command.commandId
             )
         }
     }
@@ -493,11 +459,11 @@ class IsometricRenderer(
         val cmdToNode = HashMap<String, IsometricNode>(scene.commands.size)
 
         for ((index, command) in scene.commands.withIndex()) {
-            cmdMap[command.id] = command
-            orderMap[command.id] = index
+            cmdMap[command.commandId] = command
+            orderMap[command.commandId] = index
             command.ownerNodeId
                 ?.let { nodeIdMap[it] }
-                ?.let { node -> cmdToNode[command.id] = node }
+                ?.let { node -> cmdToNode[command.commandId] = node }
         }
         commandIdMap = cmdMap
         commandOrderMap = orderMap
@@ -518,7 +484,7 @@ class IsometricRenderer(
         for (command in scene.commands) {
             val bounds = command.getBounds()
             if (bounds != null) {
-                spatialIndex!!.insert(command.id, bounds)
+                spatialIndex!!.insert(command.commandId, bounds)
             }
         }
     }
@@ -557,6 +523,34 @@ class IsometricRenderer(
                 }
             }
         }
+    }
+
+    private fun hitTestSpatial(x: Double, y: Double): IsometricNode? {
+        val index = spatialIndex ?: return null
+        val candidateIds = index.query(x, y, HIT_TEST_RADIUS_PX)
+        if (candidateIds.isEmpty()) return null
+
+        val candidateCommands = candidateIds
+            .mapNotNull { commandIdMap[it] }
+            .sortedBy { command -> commandOrderMap[command.commandId] ?: Int.MAX_VALUE }
+        if (candidateCommands.isEmpty()) return null
+
+        val preparedScene = cachedPreparedScene ?: return null
+        val filteredScene = PreparedScene(
+            commands = candidateCommands,
+            width = preparedScene.width,
+            height = preparedScene.height
+        )
+
+        val hit = engine.findItemAt(
+            preparedScene = filteredScene,
+            x = x,
+            y = y,
+            order = HitOrder.FRONT_TO_BACK,
+            touchRadius = HIT_TEST_RADIUS_PX
+        ) ?: return null
+
+        return findNodeByCommandId(hit.commandId)
     }
 
     /**

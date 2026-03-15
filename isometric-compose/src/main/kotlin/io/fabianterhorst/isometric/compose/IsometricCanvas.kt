@@ -61,10 +61,10 @@ fun IsometricCanvas(
         canvasHeight = size.height.toInt()
 
         // Prepare scene using current canvas size
-        val preparedScene = state.engine.prepare(
+        val preparedScene = state.engine.projectScene(
             width = canvasWidth,
             height = canvasHeight,
-            options = renderOptions
+            renderOptions = renderOptions
         )
 
         with(ComposeRenderer) {
@@ -85,7 +85,7 @@ private fun handleTap(
     onItemClick: (RenderCommand) -> Unit
 ) {
     // Prepare scene with actual canvas dimensions for accurate hit testing
-    val tempScene = state.engine.prepare(canvasWidth, canvasHeight, renderOptions)
+    val tempScene = state.engine.projectScene(canvasWidth, canvasHeight, renderOptions)
     val hit = state.engine.findItemAt(
         preparedScene = tempScene,
         x = offset.x.toDouble(),

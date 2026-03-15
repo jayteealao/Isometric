@@ -19,7 +19,7 @@ annotation class IsometricComposable
 /**
  * Add a 3D shape to the isometric scene
  *
- * @param shape The 3D shape to render
+ * @param geometry The 3D shape to render
  * @param color The color of the shape (defaults to LocalDefaultColor)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
@@ -31,7 +31,7 @@ annotation class IsometricComposable
 @IsometricComposable
 @Composable
 fun IsometricScope.Shape(
-    shape: Shape,
+    geometry: Shape,
     color: IsoColor = LocalDefaultColor.current,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
@@ -41,9 +41,9 @@ fun IsometricScope.Shape(
     visible: Boolean = true
 ) {
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(shape, color) },
+        factory = { ShapeNode(geometry, color) },
         update = {
-            set(shape) { this.shape = it; markDirty() }
+            set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {

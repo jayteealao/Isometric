@@ -83,7 +83,7 @@ class IsometricRendererTest {
 
         val contextA = RenderContext(
             width = 800, height = 600,
-            renderOptions = RenderOptions.Quality,
+            renderOptions = RenderOptions.NoCulling,
             lightDirection = dirA
         )
         renderer.rebuildCache(root, contextA, 800, 600)
@@ -93,7 +93,7 @@ class IsometricRendererTest {
 
         val contextB = RenderContext(
             width = 800, height = 600,
-            renderOptions = RenderOptions.Quality,
+            renderOptions = RenderOptions.NoCulling,
             lightDirection = dirB
         )
         renderer.rebuildCache(root, contextB, 800, 600)
@@ -115,7 +115,7 @@ class IsometricRendererTest {
 
         val contextA = RenderContext(
             width = 800, height = 600,
-            renderOptions = RenderOptions.Quality,
+            renderOptions = RenderOptions.NoCulling,
             lightDirection = dirA
         )
 
@@ -158,7 +158,7 @@ class IsometricRendererTest {
 
         assertFalse(renderer.needsUpdate(root, context, 800, 600))
 
-        val changed = context.copy(renderOptions = RenderOptions.Quality)
+        val changed = context.copy(renderOptions = RenderOptions.NoCulling)
         assertTrue(
             "Different renderOptions should trigger update",
             renderer.needsUpdate(root, changed, 800, 600)
@@ -169,7 +169,7 @@ class IsometricRendererTest {
 
     private val defaultContext = RenderContext(
         width = 800, height = 600,
-        renderOptions = RenderOptions.Quality,
+        renderOptions = RenderOptions.NoCulling,
         lightDirection = dirA
     )
 
@@ -539,7 +539,7 @@ class IsometricRendererTest {
         val avgX = cmd.points.map { it.x }.average()
         val avgY = cmd.points.map { it.y }.average()
 
-        renderer.invalidate()
+        renderer.clearCache()
         assertNull("invalidate should clear prepared scene", renderer.currentPreparedScene)
 
         // hitTest with valid dimensions should auto-rebuild and find the shape
@@ -598,7 +598,7 @@ class IsometricRendererTest {
 
         val contextA = RenderContext(
             width = 800, height = 600,
-            renderOptions = RenderOptions.Quality,
+            renderOptions = RenderOptions.NoCulling,
             lightDirection = dirA
         )
         renderer.rebuildCache(root, contextA, 800, 600)
@@ -644,8 +644,8 @@ class IsometricRendererTest {
 
         // Build at 800x600
         renderer.rebuildCache(root, defaultContext, 800, 600)
-        assertEquals(800, renderer.currentPreparedScene!!.viewportWidth)
-        assertEquals(600, renderer.currentPreparedScene!!.viewportHeight)
+        assertEquals(800, renderer.currentPreparedScene!!.width)
+        assertEquals(600, renderer.currentPreparedScene!!.height)
 
         // Call hitTest at a different viewport size — coordinates don't matter,
         // we just need hitTest to trigger a rebuild at the new size.
@@ -654,10 +654,10 @@ class IsometricRendererTest {
         renderer.hitTest(root, 0.0, 0.0, defaultContext, newWidth, newHeight)
 
         // Verify the scene was rebuilt at the new viewport size
-        assertEquals("viewportWidth should be updated after hitTest with new size",
-            newWidth, renderer.currentPreparedScene!!.viewportWidth)
-        assertEquals("viewportHeight should be updated after hitTest with new size",
-            newHeight, renderer.currentPreparedScene!!.viewportHeight)
+        assertEquals("width should be updated after hitTest with new size",
+            newWidth, renderer.currentPreparedScene!!.width)
+        assertEquals("height should be updated after hitTest with new size",
+            newHeight, renderer.currentPreparedScene!!.height)
 
         // Verify hit testing actually works at the new size by computing a fresh centroid
         val scene = renderer.currentPreparedScene!!
@@ -681,7 +681,7 @@ class IsometricRendererTest {
             scale = 2.0
         )
 
-        val copied = base.copy(renderOptions = RenderOptions.Performance)
+        val copied = base.copy(renderOptions = RenderOptions.NoDepthSorting)
         val testPoint = Point(1.0, 2.0, 3.0)
 
         assertEquals(
@@ -718,9 +718,9 @@ class IsometricRendererTest {
         stableRenderer.benchmarkHooks = stableHooks
         stableRenderer.forceRebuild = false
 
-        root.clearDirty()
+        root.markClean()
         stableRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
-        root.clearDirty()
+        root.markClean()
         stableRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
 
         assertEquals("Stable scene should miss cache only on first access", 1, stableHooks.cacheMisses)
@@ -737,9 +737,9 @@ class IsometricRendererTest {
         forceRenderer.benchmarkHooks = forceHooks
         forceRenderer.forceRebuild = true
 
-        root.clearDirty()
+        root.markClean()
         forceRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
-        root.clearDirty()
+        root.markClean()
         forceRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
 
         assertEquals("forceRebuild should miss cache on every stable access", 2, forceHooks.cacheMisses)

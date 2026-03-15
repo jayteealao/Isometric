@@ -5,27 +5,27 @@ package io.fabianterhorst.isometric
  * Contains platform-agnostic render commands sorted by depth.
  *
  * @property commands List of render commands, sorted back-to-front for correct depth ordering
- * @property viewportWidth The viewport width used for this preparation
- * @property viewportHeight The viewport height used for this preparation
+ * @property width The viewport width used for this preparation
+ * @property height The viewport height used for this preparation
  */
 class PreparedScene(
     val commands: List<RenderCommand>,
-    val viewportWidth: Int,
-    val viewportHeight: Int
+    val width: Int,
+    val height: Int
 ) {
     override fun equals(other: Any?): Boolean =
         other is PreparedScene &&
             commands == other.commands &&
-            viewportWidth == other.viewportWidth &&
-            viewportHeight == other.viewportHeight
+            width == other.width &&
+            height == other.height
 
     override fun hashCode(): Int {
         var result = commands.hashCode()
-        result = 31 * result + viewportWidth
-        result = 31 * result + viewportHeight
+        result = 31 * result + width
+        result = 31 * result + height
         return result
     }
 
     override fun toString(): String =
-        "PreparedScene(commands=$commands, viewportWidth=$viewportWidth, viewportHeight=$viewportHeight)"
+        "PreparedScene(commands=$commands, width=$width, height=$height)"
 }

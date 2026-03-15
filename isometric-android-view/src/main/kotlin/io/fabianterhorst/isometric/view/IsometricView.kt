@@ -123,8 +123,8 @@ class IsometricView @JvmOverloads constructor(
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
 
-        if (cachedScene == null || cachedScene?.viewportWidth != width || cachedScene?.viewportHeight != height) {
-            cachedScene = engine.prepare(width, height, renderOptions)
+        if (cachedScene == null || cachedScene?.width != width || cachedScene?.height != height) {
+            cachedScene = engine.projectScene(width, height, renderOptions)
         }
     }
 

@@ -63,10 +63,10 @@ class RenderOptions(
         val Default = RenderOptions()
 
         /**
-         * Performance mode: disable depth sorting for speed
-         * Use when shapes don't overlap or depth order doesn't matter
+         * Disable depth sorting while keeping culling and bounds checking enabled.
+         * Use when shapes don't overlap or depth order doesn't matter.
          */
-        val Performance = RenderOptions(
+        val NoDepthSorting = RenderOptions(
             enableDepthSorting = false,
             enableBackfaceCulling = true,
             enableBoundsChecking = true,
@@ -74,9 +74,9 @@ class RenderOptions(
         )
 
         /**
-         * Quality mode: all features enabled, prioritize correctness over speed
+         * Disable backface culling and viewport bounds checking while keeping depth sorting on.
          */
-        val Quality = RenderOptions(
+        val NoCulling = RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
             enableBoundsChecking = false,    // Render everything

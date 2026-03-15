@@ -114,7 +114,7 @@ fun BenchmarkScreen(
             )
         ) {
             ForEach(items, key = { it.id }) { item ->
-                Shape(shape = item.shape, color = item.color, position = item.position)
+                Shape(geometry = item.shape, color = item.color, position = item.position)
             }
         }
     }

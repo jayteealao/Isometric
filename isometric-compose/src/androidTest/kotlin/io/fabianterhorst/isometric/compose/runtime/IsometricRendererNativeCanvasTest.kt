@@ -32,7 +32,7 @@ class IsometricRendererNativeCanvasTest {
     private val context = RenderContext(
         width = 800,
         height = 600,
-        renderOptions = RenderOptions.Quality,
+        renderOptions = RenderOptions.NoCulling,
         lightDirection = Vector(2.0, -1.0, 3.0).normalize()
     )
 
@@ -90,7 +90,7 @@ class IsometricRendererNativeCanvasTest {
                 )
             ) {
                 Shape(
-                    shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+                    geometry = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
                     color = IsoColor.BLUE,
                     position = Point.ORIGIN
                 )

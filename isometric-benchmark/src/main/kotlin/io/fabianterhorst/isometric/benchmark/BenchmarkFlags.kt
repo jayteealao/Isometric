@@ -7,13 +7,9 @@ package io.fabianterhorst.isometric.benchmark
  *
  * @property enablePathCaching Path object caching in IsometricRenderer (reduces GC pressure)
  * @property enableSpatialIndex Spatial grid for O(k) hit testing
- * @property enablePreparedSceneCache PreparedScene caching across frames (skips engine.prepare() when scene is unchanged)
+ * @property enablePreparedSceneCache PreparedScene caching across frames (skips engine.projectScene() when scene is unchanged)
  * @property enableNativeCanvas Android-native canvas rendering (2x faster, Android-only)
-
  * @property enableBroadPhaseSort Broad-phase depth sorting optimization in IsometricEngine.sortPaths()
-
- * @property enableBroadPhaseSort Broad-phase depth sorting optimization in IsometricEngine.sortPaths()
-
  */
 data class BenchmarkFlags(
     val enablePathCaching: Boolean = false,

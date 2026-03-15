@@ -28,8 +28,8 @@ class IsometricNodeRenderTest {
         assertTrue("Prism should produce render commands", commands.isNotEmpty())
         commands.forEach { cmd ->
             assertTrue(
-                "Command ID '${cmd.id}' should start with node ID '${node.nodeId}'",
-                cmd.id.startsWith(node.nodeId)
+                "Command ID '${cmd.commandId}' should start with node ID '${node.nodeId}'",
+                cmd.commandId.startsWith(node.nodeId)
             )
         }
     }

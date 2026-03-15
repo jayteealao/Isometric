@@ -19,23 +19,23 @@ class IsometricEngineTest {
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
         engine.add(Prism(Point(1.0, 0.0, 0.0)), IsoColor.RED)
 
-        // Use Quality mode (no culling) to get all faces
-        val scene = engine.prepare(800, 600, RenderOptions.Quality)
+        // Use NoCulling mode to get all faces
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
         assertEquals(12, scene.commands.size) // 2 prisms × 6 faces each
 
         engine.clear()
-        val emptyScene = engine.prepare(800, 600, RenderOptions.Quality)
+        val emptyScene = engine.projectScene(800, 600, RenderOptions.NoCulling)
         assertEquals(0, emptyScene.commands.size)
     }
 
     @Test
-    fun `prepare generates correct viewport dimensions`() {
+    fun `projectScene generates correct viewport dimensions`() {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
 
-        val scene = engine.prepare(1000, 800, RenderOptions.Default)
-        assertEquals(1000, scene.viewportWidth)
-        assertEquals(800, scene.viewportHeight)
+        val scene = engine.projectScene(1000, 800, RenderOptions.Default)
+        assertEquals(1000, scene.width)
+        assertEquals(800, scene.height)
     }
 
     @Test
@@ -44,8 +44,8 @@ class IsometricEngineTest {
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
         engine.add(Prism(Point(1.0, 1.0, 1.0)), IsoColor.RED)
 
-        val sortedScene = engine.prepare(800, 600, RenderOptions.Default)
-        val unsortedScene = engine.prepare(800, 600, RenderOptions.Performance)
+        val sortedScene = engine.projectScene(800, 600, RenderOptions.Default)
+        val unsortedScene = engine.projectScene(800, 600, RenderOptions.NoDepthSorting)
 
         // Both should have same number of commands
         assertEquals(sortedScene.commands.size, unsortedScene.commands.size)
@@ -56,7 +56,7 @@ class IsometricEngineTest {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN, 2.0, 2.0, 2.0), IsoColor.BLUE)
 
-        val scene = engine.prepare(800, 600, RenderOptions.Default)
+        val scene = engine.projectScene(800, 600, RenderOptions.Default)
         assertTrue(scene.commands.isNotEmpty())
 
         // Use the center of a rendered face's projected points as hit coordinate
@@ -83,13 +83,13 @@ class IsometricEngineTest {
                 RenderCommand("back", overlappingPoints, IsoColor.BLUE, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null),
                 RenderCommand("front", overlappingPoints, IsoColor.RED, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null)
             ),
-            viewportWidth = 800,
-            viewportHeight = 600
+            width = 800,
+            height = 600
         )
 
         val engine = IsometricEngine()
-        assertEquals("front", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.FRONT_TO_BACK)?.id)
-        assertEquals("back", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.BACK_TO_FRONT)?.id)
+        assertEquals("front", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.FRONT_TO_BACK)?.commandId)
+        assertEquals("back", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.BACK_TO_FRONT)?.commandId)
     }
 
     @Test
@@ -104,13 +104,13 @@ class IsometricEngineTest {
                     null
                 )
             ),
-            viewportWidth = 800,
-            viewportHeight = 600
+            width = 800,
+            height = 600
         )
 
         val engine = IsometricEngine()
         assertNull(engine.findItemAt(scene, 120.0, 96.0, touchRadius = 0.0))
-        assertEquals("triangle", engine.findItemAt(scene, 120.0, 96.0, touchRadius = 8.0)?.id)
+        assertEquals("triangle", engine.findItemAt(scene, 120.0, 96.0, touchRadius = 8.0)?.commandId)
     }
 
     @Test
@@ -118,27 +118,27 @@ class IsometricEngineTest {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
 
-        val scene1 = engine.prepare(800, 600, RenderOptions.Default)
+        val scene1 = engine.projectScene(800, 600, RenderOptions.Default)
         engine.clear()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-        val scene2 = engine.prepare(800, 600, RenderOptions.Default)
+        val scene2 = engine.projectScene(800, 600, RenderOptions.Default)
 
         // IDs should be different between runs (cleared state)
-        val ids1 = scene1.commands.map { it.id }.toSet()
-        val ids2 = scene2.commands.map { it.id }.toSet()
+        val ids1 = scene1.commands.map { it.commandId }.toSet()
+        val ids2 = scene2.commands.map { it.commandId }.toSet()
         assertTrue(ids1.isNotEmpty())
         assertTrue(ids2.isNotEmpty())
     }
 
     @Test
-    fun `prepare without lightDirection uses engine default`() {
+    fun `projectScene without lightDirection uses engine default`() {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-        val defaultScene = engine.prepare(800, 600, RenderOptions.Quality)
+        val defaultScene = engine.projectScene(800, 600, RenderOptions.NoCulling)
 
         engine.clear()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-        val explicitScene = engine.prepare(800, 600, RenderOptions.Quality,
+        val explicitScene = engine.projectScene(800, 600, RenderOptions.NoCulling,
             lightDirection = Vector(2.0, -1.0, 3.0))
 
         assertEquals(defaultScene.commands.size, explicitScene.commands.size)
@@ -152,12 +152,12 @@ class IsometricEngineTest {
     fun `lightDirection changes shading colors`() {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-        val sceneA = engine.prepare(800, 600, RenderOptions.Quality,
+        val sceneA = engine.projectScene(800, 600, RenderOptions.NoCulling,
             lightDirection = Vector(2.0, -1.0, 3.0))
 
         engine.clear()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-        val sceneB = engine.prepare(800, 600, RenderOptions.Quality,
+        val sceneB = engine.projectScene(800, 600, RenderOptions.NoCulling,
             lightDirection = Vector(-1.0, 2.0, 0.5))
 
         assertEquals(sceneA.commands.size, sceneB.commands.size)
@@ -172,8 +172,8 @@ class IsometricEngineTest {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
 
-        val withCulling = engine.prepare(800, 600, RenderOptions.Default)
-        val withoutCulling = engine.prepare(800, 600, RenderOptions.Quality)
+        val withCulling = engine.projectScene(800, 600, RenderOptions.Default)
+        val withoutCulling = engine.projectScene(800, 600, RenderOptions.NoCulling)
 
         // With culling should have fewer or equal commands
         assertTrue(withCulling.commands.size <= withoutCulling.commands.size)
@@ -191,16 +191,16 @@ class IsometricEngineTest {
         broadPhaseEngine.add(Prism(Point(5.0, 0.0, 0.0)), IsoColor.RED)
         broadPhaseEngine.add(Prism(Point(0.0, 5.0, 0.0)), IsoColor.GREEN)
 
-        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Default)
-        val optimized = broadPhaseEngine.prepare(
+        val baseline = baselineEngine.projectScene(800, 600, RenderOptions.Default)
+        val optimized = broadPhaseEngine.projectScene(
             800,
             600,
             RenderOptions.Default.copy(enableBroadPhaseSort = true)
         )
 
         assertEquals(
-            baseline.commands.map { it.id },
-            optimized.commands.map { it.id }
+            baseline.commands.map { it.commandId },
+            optimized.commands.map { it.commandId }
         )
     }
 
@@ -216,16 +216,16 @@ class IsometricEngineTest {
         broadPhaseEngine.add(Prism(Point(0.5, 0.5, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
         broadPhaseEngine.add(Prism(Point(1.0, 1.0, 0.0), 1.5, 1.5, 1.0), IsoColor.GREEN)
 
-        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Quality)
-        val optimized = broadPhaseEngine.prepare(
+        val baseline = baselineEngine.projectScene(800, 600, RenderOptions.NoCulling)
+        val optimized = broadPhaseEngine.projectScene(
             800,
             600,
-            RenderOptions.Quality.copy(enableBroadPhaseSort = true)
+            RenderOptions.NoCulling.copy(enableBroadPhaseSort = true)
         )
 
         assertEquals(
-            baseline.commands.map { it.id },
-            optimized.commands.map { it.id }
+            baseline.commands.map { it.commandId },
+            optimized.commands.map { it.commandId }
         )
     }
 
@@ -241,19 +241,19 @@ class IsometricEngineTest {
         broadPhaseEngine.add(Prism(Point(0.75, 0.0, 0.0), 1.2, 1.2, 1.0), IsoColor.RED)
         broadPhaseEngine.add(Prism(Point(2.5, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.GREEN)
 
-        val baseline = baselineEngine.prepare(800, 600, RenderOptions.Quality)
-        val optimized = broadPhaseEngine.prepare(
+        val baseline = baselineEngine.projectScene(800, 600, RenderOptions.NoCulling)
+        val optimized = broadPhaseEngine.projectScene(
             800,
             600,
-            RenderOptions.Quality.copy(
+            RenderOptions.NoCulling.copy(
                 enableBroadPhaseSort = true,
                 broadPhaseCellSize = 50.0
             )
         )
 
         assertEquals(
-            baseline.commands.map { it.id },
-            optimized.commands.map { it.id }
+            baseline.commands.map { it.commandId },
+            optimized.commands.map { it.commandId }
         )
     }
 

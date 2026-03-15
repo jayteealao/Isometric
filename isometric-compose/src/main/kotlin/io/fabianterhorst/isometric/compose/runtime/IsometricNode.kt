@@ -90,9 +90,9 @@ abstract class IsometricNode {
     /**
      * Clear dirty flag (called after rendering)
      */
-    fun clearDirty() {
+    fun markClean() {
         isDirty = false
-        childrenSnapshot.forEach { it.clearDirty() }
+        childrenSnapshot.forEach { it.markClean() }
     }
 
     /**
@@ -100,6 +100,27 @@ abstract class IsometricNode {
      */
     abstract fun render(context: RenderContext): List<RenderCommand>
 
+    protected fun applyLocalTransforms(shape: Shape): Shape {
+        var result = shape.translate(position.x, position.y, position.z)
+        if (rotation != 0.0) {
+            result = result.rotateZ(rotationOrigin ?: position, rotation)
+        }
+        if (scale != 1.0) {
+            result = result.scale(scaleOrigin ?: position, scale)
+        }
+        return result
+    }
+
+    protected fun applyLocalTransforms(path: Path): Path {
+        var result = path.translate(position.x, position.y, position.z)
+        if (rotation != 0.0) {
+            result = result.rotateZ(rotationOrigin ?: position, rotation)
+        }
+        if (scale != 1.0) {
+            result = result.scale(scaleOrigin ?: position, scale)
+        }
+        return result
+    }
 }
 
 /**
@@ -140,26 +161,12 @@ class ShapeNode(
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
 
-        // Apply accumulated transforms from context
-        var transformedShape = context.applyTransformsToShape(shape)
-
-        // Apply local transforms
-        transformedShape = transformedShape.translate(position.x, position.y, position.z)
-
-        if (rotation != 0.0) {
-            val origin = rotationOrigin ?: position
-            transformedShape = transformedShape.rotateZ(origin, rotation)
-        }
-
-        if (scale != 1.0) {
-            val origin = scaleOrigin ?: position
-            transformedShape = transformedShape.scale(origin, scale)
-        }
+        val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
 
         // Convert shape to render commands
         return transformedShape.paths.map { path ->
             RenderCommand(
-                id = "${nodeId}_${path.hashCode()}",
+                commandId = "${nodeId}_${path.hashCode()}",
                 points = emptyList(), // Will be filled by engine
                 color = color,
                 originalPath = path,
@@ -183,30 +190,11 @@ class PathNode(
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
 
-        // Apply transforms to path points
-        var transformedPath = path
-
-        // Apply context transforms
-        transformedPath = context.applyTransformsToPath(transformedPath)
-
-        // Apply local transforms
-        if (position.x != 0.0 || position.y != 0.0 || position.z != 0.0) {
-            transformedPath = transformedPath.translate(position.x, position.y, position.z)
-        }
-
-        if (rotation != 0.0) {
-            val origin = rotationOrigin ?: position
-            transformedPath = transformedPath.rotateZ(origin, rotation)
-        }
-
-        if (scale != 1.0) {
-            val origin = scaleOrigin ?: position
-            transformedPath = transformedPath.scale(origin, scale)
-        }
+        val transformedPath = applyLocalTransforms(context.applyTransformsToPath(path))
 
         return listOf(
             RenderCommand(
-                id = nodeId,
+                commandId = nodeId,
                 points = emptyList(), // Will be filled by engine
                 color = color,
                 originalPath = transformedPath,
@@ -232,22 +220,11 @@ class BatchNode(
         if (!isVisible) return emptyList()
 
         return shapes.flatMapIndexed { index, shape ->
-            var transformedShape = context.applyTransformsToShape(shape)
-            transformedShape = transformedShape.translate(position.x, position.y, position.z)
-
-            if (rotation != 0.0) {
-                val origin = rotationOrigin ?: position
-                transformedShape = transformedShape.rotateZ(origin, rotation)
-            }
-
-            if (scale != 1.0) {
-                val origin = scaleOrigin ?: position
-                transformedShape = transformedShape.scale(origin, scale)
-            }
+            val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
 
             transformedShape.paths.map { path ->
                 RenderCommand(
-                    id = "${nodeId}_${index}_${path.hashCode()}",
+                    commandId = "${nodeId}_${index}_${path.hashCode()}",
                     points = emptyList(),
                     color = color,
                     originalPath = path,

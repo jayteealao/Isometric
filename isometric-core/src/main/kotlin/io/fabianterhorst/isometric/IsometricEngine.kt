@@ -89,13 +89,13 @@ class IsometricEngine(
     }
 
     /**
-     * Prepare the scene for rendering at the given viewport size
-     * Returns a platform-agnostic PreparedScene with sorted render commands
+     * Project the 3D scene to 2D screen space for the given viewport size.
+     * Returns a platform-agnostic PreparedScene with sorted render commands.
      */
-    fun prepare(
+    fun projectScene(
         width: Int,
         height: Int,
-        options: RenderOptions = RenderOptions.Default,
+        renderOptions: RenderOptions = RenderOptions.Default,
         lightDirection: Vector = this.defaultLightDirection
     ): PreparedScene {
         val normalizedLight = lightDirection.normalize()
@@ -106,29 +106,12 @@ class IsometricEngine(
 
         // Transform all items to 2D screen space
         val transformedItems = items.mapNotNull { item ->
-            val transformedPoints = item.path.points.map { point ->
-                translatePoint(point, originX, originY)
-            }
-
-            // Apply culling if enabled
-            if (options.enableBackfaceCulling && cullPath(transformedPoints)) {
-                return@mapNotNull null
-            }
-
-            // Apply bounds checking if enabled
-            if (options.enableBoundsChecking && !itemInDrawingBounds(transformedPoints, width, height)) {
-                return@mapNotNull null
-            }
-
-            // Calculate lighting-adjusted color
-            val litColor = transformColor(item.path, item.baseColor, normalizedLight)
-
-            TransformedItem(item, transformedPoints, litColor)
+            projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
         }
 
         // Sort by depth if enabled
-        val sortedItems = if (options.enableDepthSorting) {
-            sortPaths(transformedItems, options)
+        val sortedItems = if (renderOptions.enableDepthSorting) {
+            sortPaths(transformedItems, renderOptions)
         } else {
             transformedItems
         }
@@ -137,7 +120,7 @@ class IsometricEngine(
         for (transformedItem in sortedItems) {
             commands.add(
                 RenderCommand(
-                    id = transformedItem.item.id,
+                    commandId = transformedItem.item.id,
                     points = transformedItem.transformedPoints,
                     color = transformedItem.litColor,
                     originalPath = transformedItem.item.path,
@@ -148,6 +131,31 @@ class IsometricEngine(
         }
 
         return PreparedScene(commands, width, height)
+    }
+
+    private fun projectAndCull(
+        item: SceneItem,
+        originX: Double,
+        originY: Double,
+        renderOptions: RenderOptions,
+        normalizedLight: Vector,
+        width: Int,
+        height: Int
+    ): TransformedItem? {
+        val screenPoints = item.path.points.map { point ->
+            translatePoint(point, originX, originY)
+        }
+
+        if (renderOptions.enableBackfaceCulling && cullPath(screenPoints)) {
+            return null
+        }
+
+        if (renderOptions.enableBoundsChecking && !itemInDrawingBounds(screenPoints, width, height)) {
+            return null
+        }
+
+        val litColor = transformColor(item.path, item.baseColor, normalizedLight)
+        return TransformedItem(item, screenPoints, litColor)
     }
 
     /**
@@ -293,7 +301,7 @@ class IsometricEngine(
      * we only prune candidate-pair generation; polygon intersection, depth comparison, and
      * topological-sort behavior stay unchanged.
      */
-    private fun sortPaths(items: List<TransformedItem>, options: RenderOptions): List<TransformedItem> {
+    private fun sortPaths(items: List<TransformedItem>, renderOptions: RenderOptions): List<TransformedItem> {
         val sortedItems = mutableListOf<TransformedItem>()
         val observer = Point(-10.0, -10.0, 20.0)
         val length = items.size
@@ -301,8 +309,8 @@ class IsometricEngine(
         // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
         val drawBefore = List(length) { mutableListOf<Int>() }
 
-        if (options.enableBroadPhaseSort) {
-            val candidatePairs = buildBroadPhaseCandidatePairs(items, options.broadPhaseCellSize)
+        if (renderOptions.enableBroadPhaseSort) {
+            val candidatePairs = buildBroadPhaseCandidatePairs(items, renderOptions.broadPhaseCellSize)
             for (pair in candidatePairs) {
                 val i = pair.first
                 val j = pair.second

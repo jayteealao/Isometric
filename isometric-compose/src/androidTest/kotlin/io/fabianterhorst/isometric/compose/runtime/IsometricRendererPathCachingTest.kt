@@ -19,7 +19,7 @@ class IsometricRendererPathCachingTest {
     private val context = RenderContext(
         width = 800,
         height = 600,
-        renderOptions = RenderOptions.Quality,
+        renderOptions = RenderOptions.NoCulling,
         lightDirection = Vector(2.0, -1.0, 3.0).normalize()
     )
 
@@ -73,8 +73,8 @@ class IsometricRendererPathCachingTest {
         renderer.rebuildCache(root, context, 800, 600)
         assertTrue("Path cache should be populated after rebuild", cachedPathCount(renderer) > 0)
 
-        renderer.invalidate()
-        assertEquals("invalidate should clear cached paths", 0, cachedPathCount(renderer))
+        renderer.clearCache()
+        assertEquals("clearCache should clear cached paths", 0, cachedPathCount(renderer))
     }
 
     @Test
