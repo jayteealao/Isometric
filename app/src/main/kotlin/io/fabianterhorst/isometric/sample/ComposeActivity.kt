@@ -86,7 +86,7 @@ fun SimpleCubeSample() {
     val sceneState = rememberIsometricSceneState()
 
     IsometricCanvas(state = sceneState) {
-        add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
     }
 }
 
@@ -95,9 +95,9 @@ fun MultipleShapesSample() {
     val sceneState = rememberIsometricSceneState()
 
     IsometricCanvas(state = sceneState) {
-        add(Prism(Point(0.0, 0.0, 0.0), 4.0, 4.0, 2.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(Point(-1.0, 1.0, 0.0), 1.0, 2.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(Point(1.0, -1.0, 0.0), 2.0, 1.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
     }
 }
 
@@ -106,27 +106,27 @@ fun ComplexSceneSample() {
     val sceneState = rememberIsometricSceneState()
 
     IsometricCanvas(state = sceneState) {
-        add(Prism(Point(1.0, -1.0, 0.0), 4.0, 5.0, 2.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(Point(0.0, 0.0, 0.0), 1.0, 4.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(Point(-1.0, 1.0, 0.0), 1.0, 3.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Stairs(Point(-1.0, 0.0, 0.0), 10), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), IsoColor(33.0, 150.0, 243.0))
         add(
-            Stairs(Point(0.0, 3.0, 1.0), 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
+            Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
             IsoColor(33.0, 150.0, 243.0)
         )
-        add(Prism(Point(3.0, 0.0, 2.0), 2.0, 4.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(Point(2.0, 1.0, 2.0), 1.0, 3.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        add(Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
         add(
-            Stairs(Point(2.0, 0.0, 2.0), 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
+            Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
             IsoColor(33.0, 150.0, 243.0)
         )
-        add(Pyramid(Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
-        add(Pyramid(Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
-        add(Pyramid(Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
-        add(Pyramid(Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
-        add(Prism(Point(3.0, 2.0, 3.0), 1.0, 1.0, 0.2), IsoColor(50.0, 50.0, 50.0))
+        add(Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
+        add(Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
+        add(Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
+        add(Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
+        add(Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), IsoColor(50.0, 50.0, 50.0))
         add(
-            Octahedron(Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), 0.0),
+            Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), 0.0),
             IsoColor(0.0, 180.0, 180.0)
         )
     }
@@ -146,27 +146,27 @@ fun AnimatedSample() {
 
     LaunchedEffect(angle) {
         sceneState.clear()
-        sceneState.add(Prism(Point(1.0, -1.0, 0.0), 4.0, 5.0, 2.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(Point(0.0, 0.0, 0.0), 1.0, 4.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(Point(-1.0, 1.0, 0.0), 1.0, 3.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Stairs(Point(-1.0, 0.0, 0.0), 10), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), IsoColor(33.0, 150.0, 243.0))
         sceneState.add(
-            Stairs(Point(0.0, 3.0, 1.0), 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
+            Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
             IsoColor(33.0, 150.0, 243.0)
         )
-        sceneState.add(Prism(Point(3.0, 0.0, 2.0), 2.0, 4.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(Point(2.0, 1.0, 2.0), 1.0, 3.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+        sceneState.add(Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
         sceneState.add(
-            Stairs(Point(2.0, 0.0, 2.0), 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
+            Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
             IsoColor(33.0, 150.0, 243.0)
         )
-        sceneState.add(Pyramid(Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
-        sceneState.add(Pyramid(Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
-        sceneState.add(Pyramid(Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
-        sceneState.add(Pyramid(Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
-        sceneState.add(Prism(Point(3.0, 2.0, 3.0), 1.0, 1.0, 0.2), IsoColor(50.0, 50.0, 50.0))
+        sceneState.add(Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
+        sceneState.add(Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
+        sceneState.add(Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
+        sceneState.add(Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
+        sceneState.add(Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), IsoColor(50.0, 50.0, 50.0))
         sceneState.add(
-            Octahedron(Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), angle),
+            Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), angle),
             IsoColor(0.0, 180.0, 180.0)
         )
     }
@@ -199,12 +199,13 @@ fun InteractiveSample() {
             state = sceneState,
             modifier = Modifier.weight(1f),
             onItemClick = { item ->
-                clickedItem = item.id
+                clickedItem = item.commandId
             }
         ) {
-            add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-            add(Pyramid(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
-            add(Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 2.0, 20), IsoColor(0.0, 200.0, 100.0))
+            add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+            add(Pyramid(position = Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
+            add(Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), IsoColor(0.0, 200.0, 100.0))
         }
     }
 }
+

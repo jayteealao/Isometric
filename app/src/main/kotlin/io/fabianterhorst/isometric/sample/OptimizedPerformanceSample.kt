@@ -149,15 +149,15 @@ fun OptimizedPerformanceSample() {
                     }
 
                     Shape(
-                        shape = Prism(
-                            Point(
+                        geometry = Prism(
+                            position = Point(
                                 (x - gridSize / 2).toDouble() * 1.2,
                                 (y - gridSize / 2).toDouble() * 1.2,
                                 0.0
                             ),
-                            1.0,
-                            1.0,
-                            height
+                            width = 1.0,
+                            depth = 1.0,
+                            height = height
                         ),
                         color = IsoColor(
                             (x.toDouble() / gridSize) * 255,
@@ -298,15 +298,15 @@ private fun IsometricScope.LargeAnimatedGrid(wave: Double) {
             val height = 1.0 + sin(wave + x * 0.3 + y * 0.3) * 0.5
 
             Shape(
-                shape = Prism(
-                    Point(
+                geometry = Prism(
+                    position = Point(
                         (x - 7.5) * 1.2,
                         (y - 7.5) * 1.2,
                         0.0
                     ),
-                    1.0,
-                    1.0,
-                    height
+                    width = 1.0,
+                    depth = 1.0,
+                    height = height
                 ),
                 color = IsoColor(
                     (x / 15.0) * 255,
@@ -317,3 +317,4 @@ private fun IsometricScope.LargeAnimatedGrid(wave: Double) {
         }
     }
 }
+

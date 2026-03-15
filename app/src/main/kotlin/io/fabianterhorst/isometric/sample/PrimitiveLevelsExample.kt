@@ -36,7 +36,7 @@ import kotlin.math.sin
 @Composable
 fun IsometricScope.SimpleShapeHighLevel() {
     Shape(
-        shape = Prism(Point(0.0, 0.0, 0.0)),
+        geometry = Prism(position = Point(0.0, 0.0, 0.0)),
         color = IsoColor(255.0, 0.0, 0.0)
     )
 }
@@ -49,7 +49,7 @@ fun SimpleShapeLowLevel() {
     ComposeNode<ShapeNode, IsometricApplier>(
         factory = {
             ShapeNode(
-                shape = Prism(Point(0.0, 0.0, 0.0)),
+                shape = Prism(position = Point(0.0, 0.0, 0.0)),
                 color = IsoColor(255.0, 0.0, 0.0)
             )
         },
@@ -78,7 +78,7 @@ fun IsometricScope.AnimatedShapeHighLevel() {
     }
 
     Shape(
-        shape = Prism(Point(0.0, 0.0, 0.0)),
+        geometry = Prism(position = Point(0.0, 0.0, 0.0)),
         color = IsoColor(255.0, 0.0, 0.0),
         rotation = rotation  // Automatically triggers update
     )
@@ -101,7 +101,7 @@ fun AnimatedShapeLowLevel() {
     ComposeNode<ShapeNode, IsometricApplier>(
         factory = {
             ShapeNode(
-                shape = Prism(Point(0.0, 0.0, 0.0)),
+                shape = Prism(position = Point(0.0, 0.0, 0.0)),
                 color = IsoColor(255.0, 0.0, 0.0)
             )
         },
@@ -129,7 +129,7 @@ fun SmartUpdatingShape(rotation: Double) {
     ComposeNode<ShapeNode, IsometricApplier>(
         factory = {
             ShapeNode(
-                shape = Prism(Point(0.0, 0.0, 0.0)),
+                shape = Prism(position = Point(0.0, 0.0, 0.0)),
                 color = IsoColor(255.0, 0.0, 0.0)
             )
         },
@@ -177,7 +177,7 @@ class MultiShapeNode(
 
             transformedShape.paths.map { path ->
                 io.fabianterhorst.isometric.RenderCommand(
-                    id = "${nodeId}_${shape.hashCode()}_${path.hashCode()}",
+                    commandId = "${nodeId}_${shape.hashCode()}_${path.hashCode()}",
                     points = emptyList(),
                     color = color,
                     originalPath = path,
@@ -268,14 +268,14 @@ fun MixedLevelExample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         // HIGH-LEVEL: Easy to use for standard shapes
         Shape(
-            shape = Prism(Point(-2.0, 0.0, 0.0)),
+            geometry = Prism(position = Point(-2.0, 0.0, 0.0)),
             color = IsoColor(255.0, 0.0, 0.0)
         )
 
         // HIGH-LEVEL: Groups work great for hierarchies
         Group(rotation = angle) {
             Shape(
-                shape = Pyramid(Point(0.0, 0.0, 0.0)),
+                geometry = Pyramid(position = Point(0.0, 0.0, 0.0)),
                 color = IsoColor(0.0, 255.0, 0.0)
             )
         }
@@ -286,8 +286,8 @@ fun MixedLevelExample() {
         // CUSTOM NODE: Completely new node type
         MultiShape(
             shapes = listOf(
-                Prism(Point(2.0, 0.0, 0.0)),
-                Prism(Point(2.5, 0.0, 0.0))
+                Prism(position = Point(2.0, 0.0, 0.0)),
+                Prism(position = Point(2.5, 0.0, 0.0))
             ),
             colors = listOf(
                 IsoColor(0.0, 0.0, 255.0),
@@ -312,9 +312,9 @@ fun MixedLevelExample() {
 @Composable
 fun StandardUseCase() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
-        Shape(Prism(Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0))
+        Shape(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0))
         Group(rotation = PI / 4) {
-            Shape(Pyramid(Point(1.0, 0.0, 0.0)), IsoColor(0.0, 255.0, 0.0))
+            Shape(Pyramid(position = Point(1.0, 0.0, 0.0)), IsoColor(0.0, 255.0, 0.0))
         }
     }
 }
@@ -331,7 +331,7 @@ fun AdvancedUseCase() {
     var rotation by remember { mutableStateOf(0.0) }
 
     ComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(Prism(Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0)) },
+        factory = { ShapeNode(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0)) },
         update = {
             set(rotation) {
                 // Custom logic: only update every 0.5 radians
@@ -376,3 +376,4 @@ MIXING BOTH:
     ✅ This is totally fine and encouraged!
 
 */
+

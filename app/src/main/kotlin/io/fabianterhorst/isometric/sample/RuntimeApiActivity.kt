@@ -97,17 +97,17 @@ fun RuntimeApiSamplesScreen() {
 fun SimpleSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         Shape(
-            shape = Prism(Point(0.0, 0.0, 0.0), 2.0, 2.0, 2.0),
+            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 2.0, depth = 2.0, height = 2.0),
             color = IsoColor(33.0, 150.0, 243.0)
         )
 
         Shape(
-            shape = Pyramid(Point(3.0, 0.0, 0.0)),
+            geometry = Pyramid(position = Point(3.0, 0.0, 0.0)),
             color = IsoColor(255.0, 100.0, 0.0)
         )
 
         Shape(
-            shape = Cylinder(Point(-3.0, 0.0, 0.0), 0.5, 2.0, 20),
+            geometry = Cylinder(position = Point(-3.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
             color = IsoColor(0.0, 200.0, 100.0)
         )
     }
@@ -130,7 +130,7 @@ fun HierarchySample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         // Static base
         Shape(
-            shape = Prism(Point(0.0, 0.0, 0.0), 4.0, 4.0, 0.5),
+            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 0.5),
             color = IsoColor(100.0, 100.0, 100.0)
         )
 
@@ -142,22 +142,22 @@ fun HierarchySample() {
         ) {
             // These all rotate together (local coords relative to group center)
             Shape(
-                shape = Prism(Point(-1.5, 0.0, 0.0), 1.0, 1.0, 2.0),
+                geometry = Prism(position = Point(-1.5, 0.0, 0.0), width = 1.0, depth = 1.0, height = 2.0),
                 color = IsoColor(255.0, 0.0, 0.0)
             )
 
             Shape(
-                shape = Prism(Point(1.5, 0.0, 0.0), 1.0, 1.0, 2.0),
+                geometry = Prism(position = Point(1.5, 0.0, 0.0), width = 1.0, depth = 1.0, height = 2.0),
                 color = IsoColor(0.0, 255.0, 0.0)
             )
 
             Shape(
-                shape = Prism(Point(0.0, -1.5, 0.0), 1.0, 1.0, 2.0),
+                geometry = Prism(position = Point(0.0, -1.5, 0.0), width = 1.0, depth = 1.0, height = 2.0),
                 color = IsoColor(0.0, 0.0, 255.0)
             )
 
             Shape(
-                shape = Prism(Point(0.0, 1.5, 0.0), 1.0, 1.0, 2.0),
+                geometry = Prism(position = Point(0.0, 1.5, 0.0), width = 1.0, depth = 1.0, height = 2.0),
                 color = IsoColor(255.0, 255.0, 0.0)
             )
 
@@ -167,7 +167,7 @@ fun HierarchySample() {
                 rotation = -groupRotation * 2
             ) {
                 Shape(
-                    shape = Octahedron(Point(0.0, 0.0, 0.0)),
+                    geometry = Octahedron(position = Point(0.0, 0.0, 0.0)),
                     color = IsoColor(255.0, 0.0, 255.0)
                 )
             }
@@ -194,17 +194,17 @@ fun AnimationSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         // Static scene (never recomposes)
         Shape(
-            shape = Prism(Point(1.0, -1.0, 0.0), 4.0, 5.0, 2.0),
+            geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0),
             color = IsoColor(33.0, 150.0, 243.0)
         )
 
         Shape(
-            shape = Prism(Point(0.0, 0.0, 0.0), 1.0, 4.0, 1.0),
+            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0),
             color = IsoColor(33.0, 150.0, 243.0)
         )
 
         Shape(
-            shape = Stairs(Point(-1.0, 0.0, 0.0), 10),
+            geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10),
             color = IsoColor(33.0, 150.0, 243.0)
         )
 
@@ -215,7 +215,7 @@ fun AnimationSample() {
             rotationOrigin = Point(3.5, 2.5, 3.0)
         ) {
             Shape(
-                shape = Octahedron(Point(0.0, 0.0, 0.0)),
+                geometry = Octahedron(position = Point(0.0, 0.0, 0.0)),
                 color = IsoColor(0.0, 180.0, 180.0)
             )
         }
@@ -224,11 +224,11 @@ fun AnimationSample() {
         Group(position = Point(-3.0, 0.0, 0.0)) {
             ForEach((0..5).toList()) { i ->
                 Shape(
-                    shape = Prism(
-                        Point(0.0, 0.0, i.toDouble()),
-                        1.0,
-                        1.0,
-                        1.0
+                    geometry = Prism(
+                        position = Point(0.0, 0.0, i.toDouble()),
+                        width = 1.0,
+                        depth = 1.0,
+                        height = 1.0
                     ),
                     color = IsoColor(
                         ((sin(wave + i * PI / 3) + 1.0) * 0.5) * 255.0,
@@ -284,17 +284,17 @@ fun RuntimeInteractiveSample() {
         ) {
             Group(position = dragOffset) {
                 Shape(
-                    shape = Prism(Point(0.0, 0.0, 0.0)),
+                    geometry = Prism(position = Point(0.0, 0.0, 0.0)),
                     color = IsoColor(33.0, 150.0, 243.0)
                 )
 
                 Shape(
-                    shape = Pyramid(Point(2.0, 0.0, 0.0)),
+                    geometry = Pyramid(position = Point(2.0, 0.0, 0.0)),
                     color = IsoColor(255.0, 100.0, 0.0)
                 )
 
                 Shape(
-                    shape = Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 2.0, 20),
+                    geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
                     color = IsoColor(0.0, 200.0, 100.0)
                 )
             }
@@ -350,7 +350,7 @@ fun ConditionalSample() {
         IsometricScene(modifier = Modifier.weight(1f)) {
             // Base always visible
             Shape(
-                shape = Prism(Point(0.0, 0.0, 0.0), 8.0, 8.0, 0.2),
+                geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 8.0, depth = 8.0, height = 0.2),
                 color = IsoColor(150.0, 150.0, 150.0)
             )
 
@@ -358,7 +358,7 @@ fun ConditionalSample() {
             If(showPyramids) {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
-                        shape = Pyramid(Point(1.0 + i * 1.5, 2.0, 0.2)),
+                        geometry = Pyramid(position = Point(1.0 + i * 1.5, 2.0, 0.2)),
                         color = IsoColor(255.0, 100.0 + i * 15.0, 0.0)
                     )
                 }
@@ -368,7 +368,7 @@ fun ConditionalSample() {
             If(showCylinders) {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
-                        shape = Cylinder(Point(1.0 + i * 1.5, 5.0, 0.2), 0.4, 1.5, 20),
+                        geometry = Cylinder(position = Point(1.0 + i * 1.5, 5.0, 0.2), radius = 0.4, height = 1.5, vertices = 20),
                         color = IsoColor(0.0, 150.0 + i * 10.0, 255.0)
                     )
                 }
@@ -434,15 +434,15 @@ fun PerformanceSample() {
                     }
 
                     Shape(
-                        shape = Prism(
-                            Point(
+                        geometry = Prism(
+                            position = Point(
                                 (x - gridSize / 2).toDouble() * 1.2,
                                 (y - gridSize / 2).toDouble() * 1.2,
                                 0.0
                             ),
-                            1.0,
-                            1.0,
-                            height
+                            width = 1.0,
+                            depth = 1.0,
+                            height = height
                         ),
                         color = IsoColor(
                             (x.toDouble() / gridSize) * 255,
@@ -455,3 +455,4 @@ fun PerformanceSample() {
         }
     }
 }
+
