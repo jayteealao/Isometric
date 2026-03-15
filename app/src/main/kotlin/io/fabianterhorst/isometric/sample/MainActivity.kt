@@ -42,8 +42,8 @@ class MainActivity : ComponentActivity() {
                     onClick = { onSelect(Intent(this@MainActivity, ViewSampleActivity::class.java)) }
                 )
                 SampleCard(
-                    title = "Compose Canvas API",
-                    description = "State-driven IsometricCanvas samples: shapes, animation, interaction",
+                    title = "Compose Scene API",
+                    description = "IsometricScene samples: shapes, animation, and interaction",
                     onClick = { onSelect(Intent(this@MainActivity, ComposeActivity::class.java)) }
                 )
                 SampleCard(

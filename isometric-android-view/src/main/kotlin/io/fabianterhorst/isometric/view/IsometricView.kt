@@ -103,19 +103,6 @@ class IsometricView @JvmOverloads constructor(
         invalidate()
     }
 
-    // Compatibility methods for old Color class
-    fun add(path: Path, color: io.fabianterhorst.isometric.Color) {
-        add(path, convertColor(color))
-    }
-
-    fun add(shape: Shape, color: io.fabianterhorst.isometric.Color) {
-        add(shape, convertColor(color))
-    }
-
-    private fun convertColor(oldColor: io.fabianterhorst.isometric.Color): IsoColor {
-        return IsoColor(oldColor.r, oldColor.g, oldColor.b, oldColor.a)
-    }
-
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 

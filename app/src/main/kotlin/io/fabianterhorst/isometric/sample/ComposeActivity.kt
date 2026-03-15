@@ -9,8 +9,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.fabianterhorst.isometric.*
-import io.fabianterhorst.isometric.compose.IsometricCanvas
-import io.fabianterhorst.isometric.compose.rememberIsometricSceneState
+import io.fabianterhorst.isometric.compose.runtime.GestureConfig
+import io.fabianterhorst.isometric.compose.runtime.IsometricScene
+import io.fabianterhorst.isometric.compose.runtime.SceneConfig
+import io.fabianterhorst.isometric.compose.runtime.Shape
+import io.fabianterhorst.isometric.compose.runtime.TapEvent
 import io.fabianterhorst.isometric.shapes.*
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -83,60 +86,54 @@ fun IsometricSamplesScreen() {
 
 @Composable
 fun SimpleCubeSample() {
-    val sceneState = rememberIsometricSceneState()
-
-    IsometricCanvas(state = sceneState) {
-        add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
     }
 }
 
 @Composable
 fun MultipleShapesSample() {
-    val sceneState = rememberIsometricSceneState()
-
-    IsometricCanvas(state = sceneState) {
-        add(Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
     }
 }
 
 @Composable
 fun ComplexSceneSample() {
-    val sceneState = rememberIsometricSceneState()
-
-    IsometricCanvas(state = sceneState) {
-        add(Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), IsoColor(33.0, 150.0, 243.0))
-        add(
-            Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
-            IsoColor(33.0, 150.0, 243.0)
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(
+            geometry = Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
+            color = IsoColor(33.0, 150.0, 243.0)
         )
-        add(Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        add(
-            Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
-            IsoColor(33.0, 150.0, 243.0)
+        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(
+            geometry = Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
+            color = IsoColor(33.0, 150.0, 243.0)
         )
-        add(Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
-        add(Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
-        add(Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
-        add(Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
-        add(Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), IsoColor(50.0, 50.0, 50.0))
-        add(
-            Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), 0.0),
-            IsoColor(0.0, 180.0, 180.0)
+        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 180.0, 0.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 0.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), color = IsoColor(0.0, 180.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), color = IsoColor(40.0, 180.0, 40.0))
+        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), color = IsoColor(50.0, 50.0, 50.0))
+        Shape(
+            geometry = Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), 0.0),
+            color = IsoColor(0.0, 180.0, 180.0)
         )
     }
 }
 
 @Composable
 fun AnimatedSample() {
-    val sceneState = rememberIsometricSceneState()
     var angle by remember { mutableStateOf(0.0) }
 
+    // TODO(WS8): Replace delay(16) with withFrameNanos for proper frame pacing
     LaunchedEffect(Unit) {
         while (true) {
             delay(16) // ~60fps
@@ -144,39 +141,35 @@ fun AnimatedSample() {
         }
     }
 
-    LaunchedEffect(angle) {
-        sceneState.clear()
-        sceneState.add(Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(
-            Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
-            IsoColor(33.0, 150.0, 243.0)
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(
+            geometry = Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
+            color = IsoColor(33.0, 150.0, 243.0)
         )
-        sceneState.add(Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
-        sceneState.add(
-            Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
-            IsoColor(33.0, 150.0, 243.0)
+        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(
+            geometry = Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
+            color = IsoColor(33.0, 150.0, 243.0)
         )
-        sceneState.add(Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), IsoColor(180.0, 180.0, 0.0))
-        sceneState.add(Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), IsoColor(180.0, 0.0, 180.0))
-        sceneState.add(Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), IsoColor(0.0, 180.0, 180.0))
-        sceneState.add(Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
-        sceneState.add(Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), IsoColor(50.0, 50.0, 50.0))
-        sceneState.add(
-            Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), angle),
-            IsoColor(0.0, 180.0, 180.0)
+        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 180.0, 0.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 0.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), color = IsoColor(0.0, 180.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), color = IsoColor(40.0, 180.0, 40.0))
+        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), color = IsoColor(50.0, 50.0, 50.0))
+        Shape(
+            geometry = Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), angle),
+            color = IsoColor(0.0, 180.0, 180.0)
         )
     }
-
-    IsometricCanvas(state = sceneState) {}
 }
 
 @Composable
 fun InteractiveSample() {
-    val sceneState = rememberIsometricSceneState()
     var clickedItem by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -195,17 +188,19 @@ fun InteractiveSample() {
             }
         }
 
-        IsometricCanvas(
-            state = sceneState,
+        IsometricScene(
             modifier = Modifier.weight(1f),
-            onItemClick = { item ->
-                clickedItem = item.commandId
-            }
+            config = SceneConfig(
+                gestures = GestureConfig(
+                    onTap = { event: TapEvent ->
+                        clickedItem = event.node?.nodeId
+                    }
+                )
+            )
         ) {
-            add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-            add(Pyramid(position = Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
-            add(Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), IsoColor(0.0, 200.0, 100.0))
+            Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
+            Shape(geometry = Pyramid(position = Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
+            Shape(geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), color = IsoColor(0.0, 200.0, 100.0))
         }
     }
 }
-
