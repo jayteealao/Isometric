@@ -1,13 +1,18 @@
 package io.fabianterhorst.isometric.shapes
 
+import io.fabianterhorst.isometric.ExperimentalIsometricApi
 import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.Shape
 
 /**
- * A knot shape
- * Note: needs depth sorting fix as per original TODO
+ * A knot shape composed of interlocking prisms and custom faces.
+ *
+ * **Experimental**: This shape has a known depth-sorting issue where
+ * overlapping internal faces may render in incorrect order. Use with
+ * caution in scenes that require precise depth accuracy.
  */
+@ExperimentalIsometricApi
 class Knot(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
 
     override fun translate(dx: Double, dy: Double, dz: Double): Knot =
