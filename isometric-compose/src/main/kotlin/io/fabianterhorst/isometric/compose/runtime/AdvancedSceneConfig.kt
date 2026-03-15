@@ -1,12 +1,12 @@
 package io.fabianterhorst.isometric.compose.runtime
 
-import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 
-@Immutable
+@Stable
 class AdvancedSceneConfig(
     renderOptions: RenderOptions = RenderOptions.Default,
     lightDirection: Vector = IsometricEngine.DEFAULT_LIGHT_DIRECTION.normalize(),

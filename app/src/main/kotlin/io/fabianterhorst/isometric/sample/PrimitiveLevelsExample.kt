@@ -1,5 +1,6 @@
 package io.fabianterhorst.isometric.sample
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ComposeNode
 import androidx.compose.runtime.LaunchedEffect
@@ -7,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.compose.runtime.*
@@ -263,7 +265,7 @@ fun MixedLevelExample() {
         }
     }
 
-    IsometricScene {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         // HIGH-LEVEL: Easy to use for standard shapes
         Shape(
             shape = Prism(Point(-2.0, 0.0, 0.0)),
@@ -309,7 +311,7 @@ fun MixedLevelExample() {
  */
 @Composable
 fun StandardUseCase() {
-    IsometricScene {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         Shape(Prism(Point(0.0, 0.0, 0.0)), IsoColor(255.0, 0.0, 0.0))
         Group(rotation = PI / 4) {
             Shape(Pyramid(Point(1.0, 0.0, 0.0)), IsoColor(0.0, 255.0, 0.0))

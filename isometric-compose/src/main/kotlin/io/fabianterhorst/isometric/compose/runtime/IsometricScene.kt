@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +68,7 @@ fun IsometricScene(
 ) {
     // Create root node and applier
     val rootNode = remember { GroupNode() }
-    val engine = remember { config.engine }
+    val engine = remember(config.engine) { config.engine }
     val renderer = remember(engine, config.enablePathCaching, config.enableSpatialIndex, config.spatialIndexCellSize) {
         IsometricRenderer(
             engine = engine,
@@ -76,11 +77,15 @@ fun IsometricScene(
             spatialIndexCellSize = config.spatialIndexCellSize
         )
     }
+    val currentOnEngineReady by rememberUpdatedState(config.onEngineReady)
+    val currentOnRendererReady by rememberUpdatedState(config.onRendererReady)
 
-    DisposableEffect(engine, renderer) {
-        config.onEngineReady?.invoke(engine)
-        config.onRendererReady?.invoke(renderer)
-        onDispose { }
+    LaunchedEffect(engine) {
+        currentOnEngineReady?.invoke(engine)
+    }
+
+    LaunchedEffect(renderer) {
+        currentOnRendererReady?.invoke(renderer)
     }
 
     // Scene version counter — incremented when the node tree becomes dirty.
@@ -148,6 +153,11 @@ fun IsometricScene(
     // Setup composition with custom applier
     val compositionContext = rememberCompositionContext()
     val currentContent by rememberUpdatedState(content)
+    val currentDefaultColor by rememberUpdatedState(config.defaultColor)
+    val currentLightDirection by rememberUpdatedState(config.lightDirection)
+    val currentRenderOptions by rememberUpdatedState(config.renderOptions)
+    val currentStrokeStyle by rememberUpdatedState(config.strokeStyle)
+    val currentColorPalette by rememberUpdatedState(config.colorPalette)
 
     val composition = remember(compositionContext) {
         Composition(IsometricApplier(rootNode), compositionContext)
@@ -159,11 +169,11 @@ fun IsometricScene(
     DisposableEffect(composition) {
         composition.setContent {
             CompositionLocalProvider(
-                LocalDefaultColor provides config.defaultColor,
-                LocalLightDirection provides config.lightDirection,
-                LocalRenderOptions provides config.renderOptions,
-                LocalStrokeStyle provides config.strokeStyle,
-                LocalColorPalette provides config.colorPalette
+                LocalDefaultColor provides currentDefaultColor,
+                LocalLightDirection provides currentLightDirection,
+                LocalRenderOptions provides currentRenderOptions,
+                LocalStrokeStyle provides currentStrokeStyle,
+                LocalColorPalette provides currentColorPalette
             ) {
                 IsometricScopeImpl.currentContent()
             }

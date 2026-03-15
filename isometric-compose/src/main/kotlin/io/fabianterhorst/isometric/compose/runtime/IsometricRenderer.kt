@@ -178,6 +178,17 @@ class IsometricRenderer(
 
         benchmarkHooks?.onDrawStart()
 
+        val strokeComposeColor = when (strokeStyle) {
+            is StrokeStyle.FillOnly -> null
+            is StrokeStyle.Stroke -> strokeStyle.color.toComposeColor()
+            is StrokeStyle.FillAndStroke -> strokeStyle.color.toComposeColor()
+        }
+        val strokeDrawStyle = when (strokeStyle) {
+            is StrokeStyle.FillOnly -> null
+            is StrokeStyle.Stroke -> Stroke(width = strokeStyle.width)
+            is StrokeStyle.FillAndStroke -> Stroke(width = strokeStyle.width)
+        }
+
         // FAST PATH: Render from cached paths (minimal allocations!)
         if (enablePathCaching && cachedPaths != null) {
             val paths = cachedPaths!!
@@ -191,16 +202,16 @@ class IsometricRenderer(
                     is StrokeStyle.Stroke -> {
                         drawPath(
                             cached.path,
-                            strokeStyle.color.toComposeColor(),
-                            style = Stroke(width = strokeStyle.width)
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
                         )
                     }
                     is StrokeStyle.FillAndStroke -> {
                         drawPath(cached.path, cached.fillColor, style = Fill)
                         drawPath(
                             cached.path,
-                            strokeStyle.color.toComposeColor(),
-                            style = Stroke(width = strokeStyle.width)
+                            strokeComposeColor!!,
+                            style = strokeDrawStyle!!
                         )
                     }
                 }
@@ -208,7 +219,7 @@ class IsometricRenderer(
         } else {
             // Fallback: Render without path caching
             cachedPreparedScene?.let { scene ->
-                renderPreparedScene(scene, strokeStyle)
+                renderPreparedScene(scene, strokeStyle, strokeComposeColor, strokeDrawStyle)
             }
         }
 
@@ -242,6 +253,17 @@ class IsometricRenderer(
 
             benchmarkHooks?.onDrawStart()
 
+            val strokeAndroidColor = when (strokeStyle) {
+                is StrokeStyle.FillOnly -> null
+                is StrokeStyle.Stroke -> strokeStyle.color.toAndroidColor()
+                is StrokeStyle.FillAndStroke -> strokeStyle.color.toAndroidColor()
+            }
+            val strokeWidth = when (strokeStyle) {
+                is StrokeStyle.FillOnly -> null
+                is StrokeStyle.Stroke -> strokeStyle.width
+                is StrokeStyle.FillAndStroke -> strokeStyle.width
+            }
+
             // Render using native canvas (faster than Compose on Android)
             cachedPreparedScene?.commands?.forEach { command ->
                 val nativePath = command.toNativePath()
@@ -252,15 +274,15 @@ class IsometricRenderer(
                         canvas.nativeCanvas.drawPath(nativePath, fillPaint)
                     }
                     is StrokeStyle.Stroke -> {
-                        strokePaint.strokeWidth = strokeStyle.width
-                        strokePaint.color = strokeStyle.color.toAndroidColor()
+                        strokePaint.strokeWidth = strokeWidth!!
+                        strokePaint.color = strokeAndroidColor!!
                         canvas.nativeCanvas.drawPath(nativePath, strokePaint)
                     }
                     is StrokeStyle.FillAndStroke -> {
                         fillPaint.color = command.color.toAndroidColor()
                         canvas.nativeCanvas.drawPath(nativePath, fillPaint)
-                        strokePaint.strokeWidth = strokeStyle.width
-                        strokePaint.color = strokeStyle.color.toAndroidColor()
+                        strokePaint.strokeWidth = strokeWidth!!
+                        strokePaint.color = strokeAndroidColor!!
                         canvas.nativeCanvas.drawPath(nativePath, strokePaint)
                     }
                 }
@@ -506,7 +528,9 @@ class IsometricRenderer(
      */
     private fun DrawScope.renderPreparedScene(
         scene: PreparedScene,
-        strokeStyle: StrokeStyle
+        strokeStyle: StrokeStyle,
+        strokeComposeColor: Color?,
+        strokeDrawStyle: Stroke?
     ) {
         scene.commands.forEach { command ->
             val path = command.toComposePath()
@@ -519,16 +543,16 @@ class IsometricRenderer(
                 is StrokeStyle.Stroke -> {
                     drawPath(
                         path,
-                        strokeStyle.color.toComposeColor(),
-                        style = Stroke(width = strokeStyle.width)
+                        strokeComposeColor!!,
+                        style = strokeDrawStyle!!
                     )
                 }
                 is StrokeStyle.FillAndStroke -> {
                     drawPath(path, color, style = Fill)
                     drawPath(
                         path,
-                        strokeStyle.color.toComposeColor(),
-                        style = Stroke(width = strokeStyle.width)
+                        strokeComposeColor!!,
+                        style = strokeDrawStyle!!
                     )
                 }
             }
