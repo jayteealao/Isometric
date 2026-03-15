@@ -28,18 +28,8 @@ val LocalRenderOptions = compositionLocalOf {
     RenderOptions.Default
 }
 
-/**
- * CompositionLocal for providing default stroke width
- */
-val LocalStrokeWidth = compositionLocalOf {
-    1f
-}
-
-/**
- * CompositionLocal for enabling/disabling stroke drawing
- */
-val LocalDrawStroke = compositionLocalOf {
-    true
+val LocalStrokeStyle = compositionLocalOf<StrokeStyle> {
+    StrokeStyle.FillAndStroke()
 }
 
 /**

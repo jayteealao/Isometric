@@ -1,7 +1,6 @@
 package io.fabianterhorst.isometric.compose.runtime
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
@@ -17,11 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
-import io.fabianterhorst.isometric.IsometricEngine.Companion.DEFAULT_LIGHT_DIRECTION
-import io.fabianterhorst.isometric.RenderOptions
-import io.fabianterhorst.isometric.Vector
 
 /**
  * Snapshot of the actual runtime flag configuration applied to the renderer.
@@ -38,73 +33,54 @@ data class RuntimeFlagSnapshot(
 )
 
 /**
- * Main composable for creating isometric scenes using the runtime-level API.
+ * High-level entry point for standard scene usage.
  *
- * This uses a custom Applier to build a node tree that is efficiently rendered
- * with dirty tracking and incremental updates.
- *
- * @param modifier Modifier to apply to the canvas
- * @param renderOptions Rendering configuration options
- * @param strokeWidth Width of outline strokes
- * @param drawStroke Whether to draw outlines around shapes
- * @param lightDirection Direction of the light source (unit vector).
- *   Affects per-face shading via dot-product lighting. The default matches
- *   the engine's built-in light direction to preserve existing visuals.
- * @param defaultColor Default color for shapes
- * @param colorPalette Color palette for theming
- * @param enableGestures Whether to enable gesture handling
- * @param enablePathCaching Enable path object caching (default: false) - reduces GC pressure by 30-40%
- * @param enableSpatialIndex Enable spatial indexing for fast hit testing (default: true) - 7-25x faster
- * @param spatialIndexCellSize Spatial-index grid cell size in pixels (default: 100.0).
- *   Smaller cells reduce candidate counts but increase grid fan-out and rebuild work.
- * @param useNativeCanvas Use Android native canvas for rendering (default: false) - 2x faster, Android-only
- * @param forceRebuild Force cache rebuild every frame (benchmark use only, default: false)
- * @param frameVersion External redraw signal. When this value changes, the Canvas is
- *   invalidated even if the node tree itself is unchanged. Used by benchmarks to ensure
- *   static scenes still render every measured frame so cache hits are observable.
- * @param onHitTestReady Callback providing a hit-test function when the renderer is ready.
- *   The provided function accepts (x, y) screen coordinates and returns the hit node or null.
- *   Used by benchmarks to invoke hit tests directly without Compose pointer input overhead.
- * @param onTap Callback when the scene is tapped (x, y, node)
- * @param onDragStart Callback when drag starts
- * @param onDrag Callback when dragging (delta x, delta y)
- * @param onDragEnd Callback when drag ends
- * @param content Scene construction lambda
+ * Uses [SceneConfig] for stable, user-facing options and delegates to the advanced
+ * overload with the lower-level renderer and benchmark hooks left at their defaults.
  */
 @Composable
 fun IsometricScene(
     modifier: Modifier = Modifier,
-    renderOptions: RenderOptions = RenderOptions.Default,
-    strokeWidth: Float = 1f,
-    drawStroke: Boolean = true,
-    lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
-    defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
-    colorPalette: ColorPalette = ColorPalette(),
-    enableGestures: Boolean = true,
-    enablePathCaching: Boolean = false,
-    enableSpatialIndex: Boolean = true,
-    spatialIndexCellSize: Double = IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE,
-    useNativeCanvas: Boolean = false,
-    forceRebuild: Boolean = false,
-    frameVersion: Long = 0L,
-    onHitTestReady: ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? = null,
-    onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
-    onTap: (x: Double, y: Double, node: IsometricNode?) -> Unit = { _, _, _ -> },
-    onDragStart: (x: Double, y: Double) -> Unit = { _, _ -> },
-    onDrag: (deltaX: Double, deltaY: Double) -> Unit = { _, _ -> },
-    onDragEnd: () -> Unit = {},
+    config: SceneConfig = SceneConfig(),
+    content: @Composable IsometricScope.() -> Unit
+) {
+    IsometricScene(
+        modifier = modifier,
+        config = AdvancedSceneConfig(
+            renderOptions = config.renderOptions,
+            lightDirection = config.lightDirection,
+            defaultColor = config.defaultColor,
+            colorPalette = config.colorPalette,
+            strokeStyle = config.strokeStyle,
+            gestures = config.gestures,
+            useNativeCanvas = config.useNativeCanvas
+        ),
+        content = content
+    )
+}
+
+@Composable
+fun IsometricScene(
+    modifier: Modifier = Modifier,
+    config: AdvancedSceneConfig,
     content: @Composable IsometricScope.() -> Unit
 ) {
     // Create root node and applier
     val rootNode = remember { GroupNode() }
-    val engine = remember { IsometricEngine() }
-    val renderer = remember(engine, enablePathCaching, enableSpatialIndex, spatialIndexCellSize) {
+    val engine = remember { config.engine }
+    val renderer = remember(engine, config.enablePathCaching, config.enableSpatialIndex, config.spatialIndexCellSize) {
         IsometricRenderer(
             engine = engine,
-            enablePathCaching = enablePathCaching,
-            enableSpatialIndex = enableSpatialIndex,
-            spatialIndexCellSize = spatialIndexCellSize
+            enablePathCaching = config.enablePathCaching,
+            enableSpatialIndex = config.enableSpatialIndex,
+            spatialIndexCellSize = config.spatialIndexCellSize
         )
+    }
+
+    DisposableEffect(engine, renderer) {
+        config.onEngineReady?.invoke(engine)
+        config.onRendererReady?.invoke(renderer)
+        onDispose { }
     }
 
     // Scene version counter — incremented when the node tree becomes dirty.
@@ -124,26 +100,26 @@ fun IsometricScene(
     val currentBenchmarkHooks = LocalBenchmarkHooks.current
     SideEffect {
         renderer.benchmarkHooks = currentBenchmarkHooks
-        renderer.forceRebuild = forceRebuild
+        renderer.forceRebuild = config.forceRebuild
     }
 
     // Track canvas size
-    var canvasWidth by remember { mutableStateOf(800) }
-    var canvasHeight by remember { mutableStateOf(600) }
+    var canvasWidth by remember { mutableStateOf(0) }
+    var canvasHeight by remember { mutableStateOf(0) }
 
     // Create render context
-    val renderContext = remember(canvasWidth, canvasHeight, renderOptions, lightDirection) {
+    val renderContext = remember(canvasWidth, canvasHeight, config.renderOptions, config.lightDirection) {
         RenderContext(
             width = canvasWidth,
             height = canvasHeight,
-            renderOptions = renderOptions,
-            lightDirection = lightDirection
+            renderOptions = config.renderOptions,
+            lightDirection = config.lightDirection
         )
     }
 
     // Provide hit-test function to benchmarks (bypasses Compose pointer input overhead)
     SideEffect {
-        onHitTestReady?.invoke { x, y ->
+        config.onHitTestReady?.invoke { x, y ->
             renderer.hitTest(
                 rootNode = rootNode,
                 x = x, y = y,
@@ -156,13 +132,13 @@ fun IsometricScene(
 
     // Report actual runtime flag state to benchmarks for validation
     SideEffect {
-        onFlagsReady?.invoke(
+        config.onFlagsReady?.invoke(
             RuntimeFlagSnapshot(
-                enablePathCaching = enablePathCaching,
-                enableSpatialIndex = enableSpatialIndex,
-                enableBroadPhaseSort = renderOptions.enableBroadPhaseSort,
+                enablePathCaching = config.enablePathCaching,
+                enableSpatialIndex = config.enableSpatialIndex,
+                enableBroadPhaseSort = config.renderOptions.enableBroadPhaseSort,
                 forceRebuild = renderer.forceRebuild,
-                useNativeCanvas = useNativeCanvas,
+                useNativeCanvas = config.useNativeCanvas,
                 canvasWidth = canvasWidth,
                 canvasHeight = canvasHeight
             )
@@ -183,12 +159,11 @@ fun IsometricScene(
     DisposableEffect(composition) {
         composition.setContent {
             CompositionLocalProvider(
-                LocalDefaultColor provides defaultColor,
-                LocalLightDirection provides lightDirection,
-                LocalRenderOptions provides renderOptions,
-                LocalStrokeWidth provides strokeWidth,
-                LocalDrawStroke provides drawStroke,
-                LocalColorPalette provides colorPalette
+                LocalDefaultColor provides config.defaultColor,
+                LocalLightDirection provides config.lightDirection,
+                LocalRenderOptions provides config.renderOptions,
+                LocalStrokeStyle provides config.strokeStyle,
+                LocalColorPalette provides config.colorPalette
             ) {
                 IsometricScopeImpl.currentContent()
             }
@@ -203,17 +178,13 @@ fun IsometricScene(
     val currentRenderContext by rememberUpdatedState(renderContext)
     val currentCanvasWidth by rememberUpdatedState(canvasWidth)
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)
-    val currentOnTap by rememberUpdatedState(onTap)
-    val currentOnDragStart by rememberUpdatedState(onDragStart)
-    val currentOnDrag by rememberUpdatedState(onDrag)
-    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentGestures by rememberUpdatedState(config.gestures)
 
     // Render to canvas with gesture handling
     Canvas(
         modifier = modifier
-            .fillMaxSize()
             .then(
-                if (enableGestures) {
+                if (config.gestures.enabled) {
                     Modifier.pointerInput(Unit) {
                         awaitPointerEventScope {
                             var isDragging = false
@@ -237,13 +208,17 @@ fun IsometricScene(
                                             val delta = position - start
 
                                             // If moved more than threshold, it's a drag
-                                            if (!isDragging && delta.getDistance() > 8f) {
+                                            if (!isDragging && delta.getDistance() > currentGestures.dragThreshold) {
                                                 isDragging = true
-                                                currentOnDragStart(start.x.toDouble(), start.y.toDouble())
+                                                currentGestures.onDragStart?.invoke(
+                                                    DragEvent(start.x.toDouble(), start.y.toDouble())
+                                                )
                                             }
 
                                             if (isDragging) {
-                                                currentOnDrag(delta.x.toDouble(), delta.y.toDouble())
+                                                currentGestures.onDrag?.invoke(
+                                                    DragEvent(delta.x.toDouble(), delta.y.toDouble())
+                                                )
                                                 dragStartPos = position
                                                 event.changes.forEach { it.consume() }
                                             }
@@ -254,9 +229,8 @@ fun IsometricScene(
                                         val position = event.changes.first().position
 
                                         if (isDragging) {
-                                            currentOnDragEnd()
+                                            currentGestures.onDragEnd?.invoke()
                                         } else {
-                                            // It's a tap
                                             val hitNode = renderer.hitTest(
                                                 rootNode = rootNode,
                                                 x = position.x.toDouble(),
@@ -265,7 +239,13 @@ fun IsometricScene(
                                                 width = currentCanvasWidth,
                                                 height = currentCanvasHeight
                                             )
-                                            currentOnTap(position.x.toDouble(), position.y.toDouble(), hitNode)
+                                            currentGestures.onTap?.invoke(
+                                                TapEvent(
+                                                    x = position.x.toDouble(),
+                                                    y = position.y.toDouble(),
+                                                    node = hitNode
+                                                )
+                                            )
                                         }
 
                                         isDragging = false
@@ -288,52 +268,28 @@ fun IsometricScene(
         // Read frameVersion to subscribe to external redraw requests.
         // Benchmarks use this to render static scenes every frame without mutating the tree.
         @Suppress("UNUSED_EXPRESSION")
-        frameVersion
+        config.frameVersion
 
         // Update canvas size
         canvasWidth = size.width.toInt()
         canvasHeight = size.height.toInt()
 
-        // Render the scene (choose rendering method)
-        with(renderer) {
-            if (useNativeCanvas) {
-                // Native canvas rendering (Android-only, 2x faster)
-                renderNative(
-                    rootNode = rootNode,
-                    context = renderContext,
-                    strokeWidth = strokeWidth,
-                    drawStroke = drawStroke
-                )
-            } else {
-                // Standard Compose rendering (multiplatform)
-                render(
-                    rootNode = rootNode,
-                    context = renderContext,
-                    strokeWidth = strokeWidth,
-                    drawStroke = drawStroke
-                )
+        if (canvasWidth > 0 && canvasHeight > 0) {
+            with(renderer) {
+                if (config.useNativeCanvas) {
+                    renderNative(
+                        rootNode = rootNode,
+                        context = renderContext,
+                        strokeStyle = config.strokeStyle
+                    )
+                } else {
+                    render(
+                        rootNode = rootNode,
+                        context = renderContext,
+                        strokeStyle = config.strokeStyle
+                    )
+                }
             }
         }
     }
-}
-
-/**
- * Simpler version of IsometricScene without gesture handling
- */
-@Composable
-fun IsometricScene(
-    modifier: Modifier = Modifier,
-    renderOptions: RenderOptions = RenderOptions.Default,
-    strokeWidth: Float = 1f,
-    drawStroke: Boolean = true,
-    content: @Composable IsometricScope.() -> Unit
-) {
-    IsometricScene(
-        modifier = modifier,
-        renderOptions = renderOptions,
-        strokeWidth = strokeWidth,
-        drawStroke = drawStroke,
-        enableGestures = false,
-        content = content
-    )
 }

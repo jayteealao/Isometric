@@ -114,28 +114,25 @@ fun OptimizedPerformanceSample() {
         // Optimized Scene with unified API
         IsometricScene(
             modifier = Modifier.weight(1f),
-            enablePathCaching = true,  // Always enabled (huge win)
-            enableSpatialIndex = enableSpatialIndex,
-            useNativeCanvas = useNativeCanvas,
-            enableGestures = true,
-            onTap = { _, _, node ->
-                // Measure click time
-                val startTime = System.nanoTime()
-
-                clickCount++
-
-                val endTime = System.nanoTime()
-                val clickTime = (endTime - startTime) / 1_000_000.0 // ms
-
-                // Running average
-                avgClickTime = if (clickCount == 1) {
-                    clickTime
-                } else {
-                    (avgClickTime * (clickCount - 1) + clickTime) / clickCount
-                }
-
-                lastClickTime = System.currentTimeMillis()
-            }
+            config = AdvancedSceneConfig(
+                gestures = GestureConfig(
+                    onTap = {
+                        val startTime = System.nanoTime()
+                        clickCount++
+                        val endTime = System.nanoTime()
+                        val clickTime = (endTime - startTime) / 1_000_000.0
+                        avgClickTime = if (clickCount == 1) {
+                            clickTime
+                        } else {
+                            (avgClickTime * (clickCount - 1) + clickTime) / clickCount
+                        }
+                        lastClickTime = System.currentTimeMillis()
+                    }
+                ),
+                useNativeCanvas = useNativeCanvas,
+                enablePathCaching = true,
+                enableSpatialIndex = enableSpatialIndex
+            )
         ) {
             ForEach(
                 items = (0 until gridSize).toList(),
@@ -246,9 +243,11 @@ fun PerformanceComparisonDemo() {
             // Optimized version with all optimizations enabled
             IsometricScene(
                 modifier = Modifier.weight(1f),
-                enablePathCaching = true,
-                enableSpatialIndex = true,
-                useNativeCanvas = true
+                config = AdvancedSceneConfig(
+                    useNativeCanvas = true,
+                    enablePathCaching = true,
+                    enableSpatialIndex = true
+                )
             ) {
                 LargeAnimatedGrid(wave)
             }
@@ -256,9 +255,11 @@ fun PerformanceComparisonDemo() {
             // Standard version with optimizations disabled
             IsometricScene(
                 modifier = Modifier.weight(1f),
-                enablePathCaching = false,
-                enableSpatialIndex = false,
-                useNativeCanvas = false
+                config = AdvancedSceneConfig(
+                    useNativeCanvas = false,
+                    enablePathCaching = false,
+                    enableSpatialIndex = false
+                )
             ) {
                 LargeAnimatedGrid(wave)
             }

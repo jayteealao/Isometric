@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.fabianterhorst.isometric.RenderOptions
+import io.fabianterhorst.isometric.compose.runtime.AdvancedSceneConfig
 import io.fabianterhorst.isometric.compose.runtime.ForEach
 import io.fabianterhorst.isometric.compose.runtime.IsometricScene
 import io.fabianterhorst.isometric.compose.runtime.LocalBenchmarkHooks
@@ -94,23 +95,23 @@ fun BenchmarkScreen(
     CompositionLocalProvider(LocalBenchmarkHooks provides benchmarkHooks) {
         IsometricScene(
             modifier = Modifier.fillMaxSize(),
-            enablePathCaching = flags.enablePathCaching,
-            enableSpatialIndex = flags.enableSpatialIndex,
-            useNativeCanvas = flags.enableNativeCanvas,
-            forceRebuild = !flags.enablePreparedSceneCache,
-            frameVersion = frameVersion,
-            renderOptions = RenderOptions.Default.copy(
-                enableBroadPhaseSort = flags.enableBroadPhaseSort
-            ),
-            enableGestures = false,
-            onHitTestReady = { hitTest -> orchestrator.hitTestFn = hitTest },
-            onFlagsReady = { snapshot ->
-                runtimeFlagSnapshot = snapshot
-                // Also provide viewport dimensions to orchestrator
-                orchestrator.viewportWidth = snapshot.canvasWidth
-                orchestrator.viewportHeight = snapshot.canvasHeight
-            },
-            onTap = { _, _, _ -> /* interaction responses handled by orchestrator */ }
+            config = AdvancedSceneConfig(
+                renderOptions = RenderOptions.Default.copy(
+                    enableBroadPhaseSort = flags.enableBroadPhaseSort
+                ),
+                gestures = io.fabianterhorst.isometric.compose.runtime.GestureConfig.Disabled,
+                useNativeCanvas = flags.enableNativeCanvas,
+                enablePathCaching = flags.enablePathCaching,
+                enableSpatialIndex = flags.enableSpatialIndex,
+                forceRebuild = !flags.enablePreparedSceneCache,
+                frameVersion = frameVersion,
+                onHitTestReady = { hitTest -> orchestrator.hitTestFn = hitTest },
+                onFlagsReady = { snapshot ->
+                    runtimeFlagSnapshot = snapshot
+                    orchestrator.viewportWidth = snapshot.canvasWidth
+                    orchestrator.viewportHeight = snapshot.canvasHeight
+                }
+            )
         ) {
             ForEach(items, key = { it.id }) { item ->
                 Shape(shape = item.shape, color = item.color, position = item.position)

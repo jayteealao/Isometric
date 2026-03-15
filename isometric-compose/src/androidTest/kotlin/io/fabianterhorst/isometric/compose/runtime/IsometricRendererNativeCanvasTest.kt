@@ -1,6 +1,7 @@
 package io.fabianterhorst.isometric.compose.runtime
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
@@ -79,11 +80,14 @@ class IsometricRendererNativeCanvasTest {
 
         composeRule.setContent {
             IsometricScene(
-                enableGestures = false,
-                enablePathCaching = false,
-                enableSpatialIndex = false,
-                useNativeCanvas = true,
-                onFlagsReady = { snapshot = it }
+                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                config = AdvancedSceneConfig(
+                    gestures = GestureConfig.Disabled,
+                    enablePathCaching = false,
+                    enableSpatialIndex = false,
+                    useNativeCanvas = true,
+                    onFlagsReady = { snapshot = it }
+                )
             ) {
                 Shape(
                     shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),

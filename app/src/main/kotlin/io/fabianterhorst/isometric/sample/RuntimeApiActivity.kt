@@ -95,7 +95,7 @@ fun RuntimeApiSamplesScreen() {
  */
 @Composable
 fun SimpleSample() {
-    IsometricScene {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         Shape(
             shape = Prism(Point(0.0, 0.0, 0.0), 2.0, 2.0, 2.0),
             color = IsoColor(33.0, 150.0, 243.0)
@@ -127,7 +127,7 @@ fun HierarchySample() {
         }
     }
 
-    IsometricScene {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         // Static base
         Shape(
             shape = Prism(Point(0.0, 0.0, 0.0), 4.0, 4.0, 0.5),
@@ -191,7 +191,7 @@ fun AnimationSample() {
         }
     }
 
-    IsometricScene {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         // Static scene (never recomposes)
         Shape(
             shape = Prism(Point(1.0, -1.0, 0.0), 4.0, 5.0, 2.0),
@@ -267,17 +267,20 @@ fun RuntimeInteractiveSample() {
 
         IsometricScene(
             modifier = Modifier.weight(1f),
-            enableGestures = true,
-            onTap = { x, y, node ->
-                tappedNode = node?.let { "Node ${it.nodeId}" } ?: "Background"
-            },
-            onDrag = { deltaX, deltaY ->
-                dragOffset = Point(
-                    dragOffset.x + deltaX / 50.0,
-                    dragOffset.y - deltaY / 50.0,
-                    dragOffset.z
+            config = SceneConfig(
+                gestures = GestureConfig(
+                    onTap = { event ->
+                        tappedNode = event.node?.let { "Node ${it.nodeId}" } ?: "Background"
+                    },
+                    onDrag = { event ->
+                        dragOffset = Point(
+                            dragOffset.x + event.x / 50.0,
+                            dragOffset.y - event.y / 50.0,
+                            dragOffset.z
+                        )
+                    }
                 )
-            }
+            )
         ) {
             Group(position = dragOffset) {
                 Shape(
