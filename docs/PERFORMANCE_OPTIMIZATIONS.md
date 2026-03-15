@@ -23,10 +23,10 @@ The **IsometricScene** composable includes **8 major optimizations** built-in, w
 |----------|-----------------|---------------------|
 | **Simple scenes (<20 shapes)** | ✅ Defaults work great | Keep defaults |
 | **Medium scenes (20-100 shapes)** | ✅ Defaults work great | Keep defaults |
-| **Large scenes (100+ shapes)** | ✅ Defaults work well | Consider `useNativeCanvas` on Android |
-| **Animated scenes** | ✅ Good performance | Enable `enableOffThreadComputation` |
+| **Large scenes (100+ shapes)** | ✅ Defaults work well | Consider `AdvancedSceneConfig(useNativeCanvas = true)` on Android |
+| **Animated scenes** | ✅ Good performance | Keep defaults and profile before enabling Android-only options |
 | **Interactive (frequent clicks)** | ✅ Fast hit testing | Spatial index enabled by default |
-| **Android-only app** | Cross-platform defaults | Set `useNativeCanvas = true` for 2x speedup |
+| **Android-only app** | Cross-platform defaults | Set `AdvancedSceneConfig(useNativeCanvas = true)` for 2x speedup |
 
 ---
 
@@ -95,20 +95,20 @@ fun MyScene() {
 
 ### 3. PreparedScene Caching
 
-**Problem:** `engine.prepare()` does expensive 3D→2D projection, lighting, and depth sorting every frame.
+**Problem:** `engine.projectScene()` does expensive 3D→2D projection, lighting, and depth sorting every frame.
 
 **Solution:** Cache `PreparedScene` and only regenerate when scene is dirty.
 
 **Before:**
 ```kotlin
 // Every frame
-val scene = engine.prepare(width, height, options) // ❌ Expensive!
+val scene = engine.projectScene(width, height, renderOptions) // ❌ Expensive!
 ```
 
 **After:**
 ```kotlin
 if (rootNode.isDirty || width != cachedWidth) {
-    cachedScene = engine.prepare(width, height, options) // ✅ Only when needed
+    cachedScene = engine.projectScene(width, height, renderOptions) // ✅ Only when needed
 }
 
 // Render from cache
@@ -135,7 +135,7 @@ renderPreparedScene(cachedScene)
 **Usage:**
 ```kotlin
 IsometricScene(
-    useNativeCanvas = true // ✅ 2x faster on Android
+    config = AdvancedSceneConfig(useNativeCanvas = true)
 ) {
     // ...
 }
@@ -225,7 +225,7 @@ batches.forEach { (color, shapesWithColor) ->
 ┌──────────────────────────────────────┐
 │ Background Thread (Dispatchers.Default)
 │ - Collect render commands
-│ - Run engine.prepare()
+│ - Run engine.projectScene()
 │ - Build spatial index
 │ - Convert to Paths
 └───────────────┬──────────────────────┘
@@ -238,13 +238,12 @@ batches.forEach { (color, shapesWithColor) ->
 └──────────────────────────────────────┘
 ```
 
-**Usage:**
+**Status:** This is a design direction, not a public `IsometricScene` option in the current API.
+
+**Concept sketch:**
 ```kotlin
-IsometricScene(
-    enableOffThreadComputation = true
-) {
-    // Scene updates compute off main thread
-}
+// Not available as a public IsometricScene parameter yet.
+// If you need this, compute scene inputs off the UI thread and feed stable state into IsometricScene.
 ```
 
 **Performance Impact:**
@@ -293,8 +292,8 @@ fun BasicScene() {
     IsometricScene {  // Path caching + spatial index enabled by default!
         ForEach((0..100).toList()) { i ->
             Shape(
-                Prism(Point(i.toDouble(), 0.0, 0.0)),
-                IsoColor(255, 150, 100)
+                geometry = Prism(position = Point(i.toDouble(), 0.0, 0.0)),
+                color = IsoColor(255, 150, 100)
             )
         }
     }
@@ -307,7 +306,7 @@ fun BasicScene() {
 @Composable
 fun AndroidOptimizedScene() {
     IsometricScene(
-        useNativeCanvas = true  // ✅ 2x faster on Android
+        config = AdvancedSceneConfig(useNativeCanvas = true)
     ) {
         // Scene content
     }
@@ -320,26 +319,28 @@ fun AndroidOptimizedScene() {
 @Composable
 fun MaxPerformanceScene() {
     IsometricScene(
-        enablePathCaching = true,         // ✅ Default: ON
-        enableSpatialIndex = true,        // ✅ Default: ON
-        useNativeCanvas = true,           // ✅ Android-only
-        enableOffThreadComputation = true, // ✅ Async computation
-        onTap = { x, y, node ->
-            // Hit testing is O(1) + O(k)
-            println("Tapped: $node")
-        }
+        config = AdvancedSceneConfig(
+            enablePathCaching = true,
+            enableSpatialIndex = true,
+            useNativeCanvas = true,
+            gestures = GestureConfig(
+                onTap = { event ->
+                    println("Tapped: ${event.node}")
+                }
+            )
+        )
     ) {
         // Large scene with 500+ shapes
         ForEach((0..500).toList()) { i ->
             Shape(
-                Prism(
-                    Point(
+                geometry = Prism(
+                    position = Point(
                         (i % 25).toDouble(),
                         (i / 25).toDouble(),
                         0.0
                     )
                 ),
-                IsoColor(i * 0.5, 150, 200)
+                color = IsoColor(i * 0.5, 150, 200)
             )
         }
     }
@@ -421,14 +422,11 @@ IsometricScene { ... }
 
 // For Android apps, enable native canvas
 IsometricScene(
-    useNativeCanvas = true  // 2x faster on Android
+    config = AdvancedSceneConfig(useNativeCanvas = true)
 ) { ... }
 
-// For heavy animated scenes, enable off-thread computation
-IsometricScene(
-    useNativeCanvas = true,
-    enableOffThreadComputation = true  // Non-blocking updates
-) { ... }
+// For heavy animated scenes, start with defaults and measure first.
+IsometricScene { ... }
 ```
 
 ### 2. Profile Before Optimizing
@@ -452,7 +450,7 @@ IsometricScene {
 **Android-Only Project:**
 ```kotlin
 IsometricScene(
-    useNativeCanvas = true  // ✅ Enable for 2x speedup
+    config = AdvancedSceneConfig(useNativeCanvas = true)
 ) {
     // ...
 }
@@ -471,7 +469,7 @@ IsometricScene(
 
 ### Issue: Native canvas crashes
 
-**Solution:** Only use `useNativeCanvas = true` on Android:
+**Solution:** Only set `useNativeCanvas = true` through `AdvancedSceneConfig` on Android:
 
 ```kotlin
 val useNative = remember {
@@ -484,7 +482,9 @@ val useNative = remember {
     }
 }
 
-IsometricScene(useNativeCanvas = useNative) { ... }
+IsometricScene(
+    config = AdvancedSceneConfig(useNativeCanvas = useNative)
+) { ... }
 ```
 
 ### Issue: Spatial index uses too much memory
@@ -522,5 +522,5 @@ These are estimates — always profile your specific use case.
 
 **Recommendation:**
 - **Default settings work great for most apps!** Path caching, scene caching, and spatial indexing are already enabled.
-- **Android-only apps:** Enable `useNativeCanvas = true` for ~2x draw speedup
-- **Heavy animations:** Enable `enableOffThreadComputation = true` to keep UI responsive
+- **Android-only apps:** Enable `AdvancedSceneConfig(useNativeCanvas = true)` for ~2x draw speedup
+- **Heavy animations:** Keep the scene graph stable and profile before introducing more complexity

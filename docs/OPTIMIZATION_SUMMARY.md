@@ -87,7 +87,7 @@ cachedPaths?.forEach { cached ->
 **Implementation:**
 - `renderNative()` method uses `android.graphics.Canvas` directly
 - Reusable `Paint` objects for fill and stroke
-- Opt-in via `useNativeCanvas = true` parameter
+- Opt-in via `AdvancedSceneConfig(useNativeCanvas = true)`
 
 **Code Location:** `OptimizedIsometricRenderer.kt:107-136`
 
@@ -96,8 +96,7 @@ fun renderNative(
     canvas: android.graphics.Canvas,
     rootNode: GroupNode,
     context: RenderContext,
-    strokeWidth: Float = 1f,
-    drawStroke: Boolean = true
+    strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke()
 ) {
     // Render using native canvas (faster than Compose on Android)
     cachedPreparedScene?.commands?.forEach { command ->
@@ -228,16 +227,16 @@ fun hitTest(
 - `prepareSceneAsync()` runs on `Dispatchers.Default`
 - Expensive operations (projection, sorting, path conversion) off main thread
 - Only drawing happens on UI thread
-- Opt-in via `enableOffThreadComputation = true`
+- Not currently exposed as a public `IsometricScene` parameter
 
 **Code Location:** `OptimizedIsometricScene.kt:84-98`
 
 ```kotlin
 LaunchedEffect(rootNode.isDirty, canvasWidth, canvasHeight) {
-    if (rootNode.isDirty && enableOffThreadComputation) {
+    if (rootNode.isDirty) {
         scope.launch {
             withContext(Dispatchers.Default) {
-                // Prepare scene off main thread
+                // Example architecture only; not a public IsometricScene flag today.
                 renderer.prepareSceneAsync(rootNode, renderContext)
             }
             sceneVersion++
@@ -259,10 +258,11 @@ LaunchedEffect(rootNode.isDirty, canvasWidth, canvasHeight) {
 
 ```kotlin
 IsometricScene(
-    enablePathCaching = true,         // ✅ Path caching (default: true)
-    enableSpatialIndex = true,        // ✅ Fast hit testing (default: true)
-    useNativeCanvas = true,           // ✅ Native rendering (Android-only)
-    enableOffThreadComputation = true // ✅ Async computation (opt-in)
+    config = AdvancedSceneConfig(
+        enablePathCaching = true,
+        enableSpatialIndex = true,
+        useNativeCanvas = true
+    )
 ) {
     // Your scene
 }

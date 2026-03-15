@@ -18,7 +18,7 @@ Both are valid! The choice depends on your needs.
 ```kotlin
 IsometricScene {
     Shape(
-        shape = Prism(Point(0, 0, 0)),
+        geometry = Prism(Point(0, 0, 0)),
         color = IsoColor(255, 0, 0),
         rotation = PI / 4
     )
@@ -32,15 +32,15 @@ The `Shape` composable is actually this:
 ```kotlin
 @Composable
 fun IsometricScope.Shape(
-    shape: Shape,
+    geometry: Shape,
     color: IsoColor = LocalDefaultColor.current,
     // ... other params
 ) {
     // THIS is the low-level primitive!
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(shape, color) },
+        factory = { ShapeNode(geometry, color) },
         update = {
-            set(shape) { this.shape = it; markDirty() }
+            set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             // ... etc
@@ -132,7 +132,7 @@ fun PulsingShape() {
     }
 
     Shape(
-        shape = Prism(Point(0, 0, 0)),
+        geometry = Prism(Point(0, 0, 0)),
         color = IsoColor(255, 0, 0),
         scale = scale  // ✅ Works, but creates extra state
     )

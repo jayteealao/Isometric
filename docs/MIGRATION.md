@@ -400,10 +400,10 @@ IsometricCanvas(
 
 ## Performance Tips
 
-1. **Use RenderOptions.Performance** for large scenes:
+1. **Use RenderOptions.NoDepthSorting** for large scenes where draw order does not matter:
    ```kotlin
    IsometricCanvas(
-       renderOptions = RenderOptions.Performance
+       renderOptions = RenderOptions.NoDepthSorting
    )
    ```
 

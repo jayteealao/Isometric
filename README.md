@@ -56,7 +56,7 @@ implementation 'io.fabianterhorst:isometric-android-view:0.1.0'
 fun MyIsometricScene() {
     IsometricScene {
         Shape(
-            shape = Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0),
+            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 1.0, height = 1.0),
             color = IsoColor(33.0, 150.0, 243.0)
         )
     }
@@ -69,7 +69,7 @@ fun MyIsometricScene() {
 - 🎯 Advanced gesture handling (tap, drag, custom)
 - ⚡ Dirty tracking for efficient updates
 - 🎨 CompositionLocal theming support
-- 💾 Path caching enabled by default (30-40% less GC)
+- 💾 Prepared-scene caching enabled by default
 - 🔍 Spatial indexing for 7-25x faster hit testing
 
 📖 **[See Runtime API Documentation](docs/RUNTIME_API.md)** | ⚡ **[Performance Guide](docs/PERFORMANCE_OPTIMIZATIONS.md)**
@@ -83,7 +83,7 @@ fun MyIsometricScene() {
 fun MyIsometricScene() {
     IsometricCanvas {
         add(
-            Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0),
+            Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 1.0, height = 1.0),
             IsoColor(33.0, 150.0, 243.0)
         )
     }
@@ -160,7 +160,7 @@ You can use **both levels** in the same project:
 
 **1. High-Level Composables** (Easy):
 ```kotlin
-Shape(Prism(...), color)
+Shape(geometry = Prism(...), color = color)
 Group(rotation = angle) { ... }
 ```
 
@@ -183,7 +183,7 @@ ComposeNode<ShapeNode, IsometricApplier>(...) {
 ```kotlin
 IsometricCanvas {
     add(
-        Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0),
+        Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 1.0, height = 1.0),
         IsoColor(33.0, 150.0, 243.0)
     )
 }
@@ -205,9 +205,9 @@ isometricView.add(
 **Compose:**
 ```kotlin
 IsometricCanvas {
-    add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-    add(Prism(Point(-1.0, 1.0, 0.0), 1.0, 2.0, 1.0), IsoColor(33.0, 150.0, 243.0))
-    add(Prism(Point(1.0, -1.0, 0.0), 2.0, 1.0, 1.0), IsoColor(33.0, 150.0, 243.0))
+    add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+    add(Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
+    add(Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), IsoColor(33.0, 150.0, 243.0))
 }
 ```
 
@@ -264,11 +264,11 @@ fun AnimatedScene() {
 
     IsometricScene {
         // Static shapes (never recompose)
-        Shape(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
 
         // Animated group (only this recomposes!)
         Group(rotation = angle) {
-            Shape(Octahedron(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
+            Shape(geometry = Octahedron(position = Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
         }
     }
 }
@@ -281,11 +281,11 @@ fun AnimatedScene() {
 ```kotlin
 IsometricScene {
     Group(position = Point(5.0, 0.0, 0.0), rotation = angle) {
-        Shape(Prism(...), color1)
+        Shape(geometry = Prism(...), color = color1)
 
         // Nested group - transforms accumulate!
         Group(position = Point(0.0, 0.0, 2.0), rotation = -angle * 2) {
-            Shape(Octahedron(...), color2)
+            Shape(geometry = Octahedron(...), color = color2)
         }
     }
 }
@@ -297,16 +297,20 @@ IsometricScene {
 
 ```kotlin
 IsometricScene(
-    enableGestures = true,
-    onTap = { x, y, node ->
-        println("Tapped node: ${node?.nodeId}")
-    },
-    onDrag = { deltaX, deltaY ->
-        // Handle drag gestures
-    }
+    config = SceneConfig(
+        gestures = GestureConfig(
+            onTap = { event ->
+                println("Tapped node: ${event.node?.nodeId} at (${event.x}, ${event.y})")
+            },
+            onDrag = { event ->
+                // Handle drag gestures
+                println("Drag delta: ${event.x}, ${event.y}")
+            }
+        )
+    )
 ) {
-    Shape(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-    Shape(Pyramid(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
+    Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
+    Shape(geometry = Pyramid(position = Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
 }
 ```
 
@@ -316,11 +320,11 @@ IsometricScene(
 
 ```kotlin
 IsometricScene {
-    Shape(baseShape, baseColor)
+    Shape(geometry = baseShape, color = baseColor)
 
     If(showExtras) {
         ForEach((0..count).toList()) { i ->
-            Shape(Pyramid(Point(i.toDouble(), 0.0, 0.0)), colors[i])
+            Shape(geometry = Pyramid(position = Point(i.toDouble(), 0.0, 0.0)), color = colors[i])
         }
     }
 }
@@ -346,7 +350,7 @@ fun AnimatedScene() {
     LaunchedEffect(angle) {
         sceneState.clear()
         sceneState.add(
-            Octahedron(Point(0.0, 0.0, 0.0)).rotateZ(Point.ORIGIN, angle),
+            Octahedron(position = Point(0.0, 0.0, 0.0)).rotateZ(Point.ORIGIN, angle),
             IsoColor(33.0, 150.0, 243.0)
         )
     }
@@ -360,11 +364,11 @@ fun AnimatedScene() {
 ```kotlin
 IsometricCanvas(
     onItemClick = { item ->
-        println("Clicked item: ${item.id}")
+        println("Clicked item: ${item.commandId}")
     }
 ) {
-    add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-    add(Pyramid(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
+    add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
+    add(Pyramid(position = Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
 }
 ```
 
