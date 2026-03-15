@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalIsometricApi::class)
+
 package io.fabianterhorst.isometric
 
 import io.fabianterhorst.isometric.shapes.Prism

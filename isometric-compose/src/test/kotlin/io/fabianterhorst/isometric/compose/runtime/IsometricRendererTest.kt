@@ -763,4 +763,215 @@ class IsometricRendererTest {
         }
         throw AssertionError("Expected IllegalArgumentException for non-positive cell size")
     }
+
+    // --- WS4 Error Handling Tests ---
+
+    @Test
+    fun `onRenderError is invoked when rebuildCache throws`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = false)
+
+        val errors = mutableListOf<Pair<String, Throwable>>()
+        renderer.onRenderError = { id, error -> errors.add(id to error) }
+
+        // Create a node that throws during render
+        val root = GroupNode()
+        val badNode = object : IsometricNode() {
+            override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
+                throw RuntimeException("Simulated render error")
+            }
+        }
+        root.children.add(badNode)
+        badNode.parent = root
+        root.updateChildrenSnapshot()
+
+        // rebuildCache should not throw — the error is caught and reported
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        assertEquals(1, errors.size)
+        assertEquals("rebuild", errors[0].first)
+        assertTrue(errors[0].second.message!!.contains("Simulated render error"))
+    }
+
+    @Test
+    fun `rebuildCache preserves previous cache on failure`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = false)
+        renderer.onRenderError = { _, _ -> /* suppress */ }
+
+        // Build a valid scene first
+        val root = buildSceneRoot()
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        val validScene = renderer.currentPreparedScene
+        assertNotNull(validScene)
+        assertTrue(validScene!!.commands.isNotEmpty())
+
+        // Now replace with a node that throws
+        root.children.clear()
+        val badNode = object : IsometricNode() {
+            override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
+                throw RuntimeException("fail")
+            }
+        }
+        root.children.add(badNode)
+        badNode.parent = root
+        root.updateChildrenSnapshot()
+        root.markDirty()
+
+        // Rebuild fails — previous cache should be preserved
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+        assertEquals(validScene, renderer.currentPreparedScene)
+    }
+
+    // --- WS4 Lifecycle Tests ---
+
+    @Test
+    fun `close is idempotent`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false, enableSpatialIndex = false)
+        val root = buildSceneRoot()
+        renderer.rebuildCache(root, defaultContext, 800, 600)
+
+        // Call close twice — should not throw
+        renderer.close()
+        renderer.close()
+
+        // Verify all cache fields are null
+        assertNull(renderer.currentPreparedScene)
+    }
+
+    @Test
+    fun `close clears callbacks and prevents reuse`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        renderer.benchmarkHooks = CountingHooks()
+        renderer.onRenderError = { _, _ -> }
+
+        renderer.close()
+
+        // After close, all cache is cleared
+        assertNull(renderer.currentPreparedScene)
+
+        // Any attempt to use the renderer after close should throw
+        val root = buildSceneRoot()
+        try {
+            renderer.hitTest(root, 0.0, 0.0, defaultContext, 800, 600)
+            throw AssertionError("Expected IllegalStateException after close")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.contains("closed"))
+        }
+    }
+
+    // --- WS4 Atomic ID Tests ---
+
+    @Test
+    fun `node IDs are unique across many nodes`() {
+        val ids = mutableSetOf<String>()
+        repeat(10000) {
+            val node = ShapeNode(
+                shape = io.fabianterhorst.isometric.shapes.Prism(io.fabianterhorst.isometric.Point.ORIGIN),
+                color = IsoColor.BLUE
+            )
+            assertTrue("Node ID should be unique: ${node.nodeId}", ids.add(node.nodeId))
+        }
+        assertEquals(10000, ids.size)
+    }
+
+    @Test
+    fun `node IDs are unique across concurrent creation`() {
+        val ids = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        val latch = java.util.concurrent.CountDownLatch(2)
+        val nodesPerThread = 5000
+
+        val t1 = Thread {
+            repeat(nodesPerThread) {
+                val node = ShapeNode(
+                    shape = io.fabianterhorst.isometric.shapes.Prism(io.fabianterhorst.isometric.Point.ORIGIN),
+                    color = IsoColor.BLUE
+                )
+                ids.add(node.nodeId)
+            }
+            latch.countDown()
+        }
+        val t2 = Thread {
+            repeat(nodesPerThread) {
+                val node = PathNode(
+                    path = io.fabianterhorst.isometric.Path(
+                        io.fabianterhorst.isometric.Point.ORIGIN,
+                        io.fabianterhorst.isometric.Point(1.0, 0.0, 0.0),
+                        io.fabianterhorst.isometric.Point(0.0, 1.0, 0.0)
+                    ),
+                    color = IsoColor.RED
+                )
+                ids.add(node.nodeId)
+            }
+            latch.countDown()
+        }
+
+        t1.start()
+        t2.start()
+        latch.await()
+
+        assertEquals(
+            "All ${nodesPerThread * 2} IDs should be unique",
+            nodesPerThread * 2,
+            ids.size
+        )
+    }
+
+    // --- WS4 fix 5: Platform safety ---
+
+    @Test
+    fun `validateNativeCanvasPlatform succeeds on Android classpath`() {
+        // Paparazzi / Robolectric puts android.graphics.Canvas on the classpath,
+        // so this should not throw. On a pure JVM it would throw IllegalStateException.
+        validateNativeCanvasPlatform()
+    }
+
+    // --- WS4 fix 4: Leaf node children ---
+
+    @Test
+    fun `leaf nodes share immutable children singleton`() {
+        val shape1 = ShapeNode(
+            shape = Prism(Point.ORIGIN),
+            color = IsoColor.BLUE
+        )
+        val shape2 = ShapeNode(
+            shape = Prism(Point.ORIGIN),
+            color = IsoColor.RED
+        )
+        val path = PathNode(
+            path = Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)),
+            color = IsoColor.GREEN
+        )
+
+        // All leaf nodes should share the same children list instance (zero-allocation singleton)
+        assertTrue(
+            "Leaf nodes should share the same children instance",
+            shape1.children === shape2.children && shape2.children === path.children
+        )
+        assertTrue("Leaf children should be empty", shape1.children.isEmpty())
+    }
+
+    // --- WS4 fix 3: rebuildCache closed guard ---
+
+    @Test
+    fun `rebuildCache throws after close`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine = engine)
+        renderer.close()
+
+        val root = GroupNode()
+        val error = try {
+            renderer.rebuildCache(root, defaultContext, 800, 600)
+            null
+        } catch (e: IllegalStateException) {
+            e
+        }
+
+        assertNotNull("rebuildCache after close should throw IllegalStateException", error)
+        assertTrue(
+            error!!.message!!.contains("closed")
+        )
+    }
 }
