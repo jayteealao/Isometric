@@ -107,7 +107,7 @@ fun SimpleSample() {
         )
 
         Shape(
-            shape = Cylinder(Point(-3.0, 0.0, 0.0), 0.5, 20, 2.0),
+            shape = Cylinder(Point(-3.0, 0.0, 0.0), 0.5, 2.0, 20),
             color = IsoColor(0.0, 200.0, 100.0)
         )
     }
@@ -231,9 +231,9 @@ fun AnimationSample() {
                         1.0
                     ),
                     color = IsoColor(
-                        255.0 * sin(wave + i * PI / 3),
+                        ((sin(wave + i * PI / 3) + 1.0) * 0.5) * 255.0,
                         150.0,
-                        255.0 * cos(wave + i * PI / 3)
+                        ((cos(wave + i * PI / 3) + 1.0) * 0.5) * 255.0
                     )
                 )
             }
@@ -291,7 +291,7 @@ fun RuntimeInteractiveSample() {
                 )
 
                 Shape(
-                    shape = Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 20, 2.0),
+                    shape = Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 2.0, 20),
                     color = IsoColor(0.0, 200.0, 100.0)
                 )
             }
@@ -365,7 +365,7 @@ fun ConditionalSample() {
             If(showCylinders) {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
-                        shape = Cylinder(Point(1.0 + i * 1.5, 5.0, 0.2), 0.4, 20, 1.5),
+                        shape = Cylinder(Point(1.0 + i * 1.5, 5.0, 0.2), 0.4, 1.5, 20),
                         color = IsoColor(0.0, 150.0 + i * 10.0, 255.0)
                     )
                 }

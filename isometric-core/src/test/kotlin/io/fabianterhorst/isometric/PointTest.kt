@@ -44,4 +44,18 @@ class PointTest {
         val p2 = Point(3.0, 4.0, 0.0)
         assertEquals(5.0, Point.distance(p1, p2), 0.0001)
     }
+
+    @Test
+    fun `point operators work as expected`() {
+        val point = Point(1.0, 2.0, 3.0)
+        val otherPoint = Point(4.0, 5.0, 6.0)
+        val vector = Vector(0.5, 1.5, -1.0)
+
+        assertEquals(Point(5.0, 7.0, 9.0), point + otherPoint)
+        assertEquals(Point(1.5, 3.5, 2.0), point + vector)
+        assertEquals(Vector(-3.0, -3.0, -3.0), point - otherPoint)
+        assertEquals(Point(0.5, 0.5, 4.0), point - vector)
+        assertEquals(Point(2.0, 4.0, 6.0), point * 2.0)
+        assertEquals(Point(-1.0, -2.0, -3.0), -point)
+    }
 }

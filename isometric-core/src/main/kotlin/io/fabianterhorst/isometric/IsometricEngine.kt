@@ -37,6 +37,13 @@ class IsometricEngine(
     private var nextId = 0
 
     init {
+        require(angle.isFinite()) { "angle must be finite, got $angle" }
+        require(scale.isFinite() && scale > 0.0) { "scale must be positive and finite, got $scale" }
+        require(colorDifference.isFinite() && colorDifference >= 0.0) {
+            "colorDifference must be non-negative and finite, got $colorDifference"
+        }
+        require(lightDirection.magnitude() > 0.0) { "lightDirection must be non-zero" }
+
         transformation = arrayOf(
             doubleArrayOf(
                 scale * cos(angle),
@@ -148,44 +155,42 @@ class IsometricEngine(
      *
      * @param x Screen x coordinate
      * @param y Screen y coordinate
-     * @param reverseSort If true, search front-to-back (for click handling)
-     * @param useRadius If true, consider points within radius of edges
-     * @param radius Touch radius in pixels
+     * @param order Search order for hit testing
+     * @param touchRadius Touch radius in pixels. 0.0 means exact point hit testing.
      * @return The RenderCommand at this position, or null
      */
     fun findItemAt(
         preparedScene: PreparedScene,
         x: Double,
         y: Double,
-        reverseSort: Boolean = true,
-        useRadius: Boolean = false,
-        radius: Double = 8.0
+        order: HitOrder = HitOrder.FRONT_TO_BACK,
+        touchRadius: Double = 0.0
     ): RenderCommand? {
-        val commandsList = if (reverseSort) {
-            preparedScene.commands.reversed()
-        } else {
-            preparedScene.commands
+        val commandsList = when (order) {
+            HitOrder.FRONT_TO_BACK -> preparedScene.commands.reversed()
+            HitOrder.BACK_TO_FRONT -> preparedScene.commands
         }
 
         for (command in commandsList) {
             // Build convex hull of command points
             val hull = buildConvexHull(command.points)
+            val hullPoints = hull.map { Point(it.x, it.y, 0.0) }
 
             // Test if point is inside or close to polygon
-            val isInside = if (useRadius) {
+            val isInside = if (touchRadius > 0.0) {
                 IntersectionUtils.isPointCloseToPoly(
-                    hull.map { Point(it.x, it.y, 0.0) },
+                    hullPoints,
                     x,
                     y,
-                    radius
+                    touchRadius
                 ) || IntersectionUtils.isPointInPoly(
-                    hull.map { Point(it.x, it.y, 0.0) },
+                    hullPoints,
                     x,
                     y
                 )
             } else {
                 IntersectionUtils.isPointInPoly(
-                    hull.map { Point(it.x, it.y, 0.0) },
+                    hullPoints,
                     x,
                     y
                 )
@@ -241,7 +246,7 @@ class IsometricEngine(
         val normalK = if (magnitude == 0.0) 0.0 else k3 / magnitude
 
         // Dot product with light angle
-        val brightness = normalI * lightDirection.i + normalJ * lightDirection.j + normalK * lightDirection.k
+        val brightness = normalI * lightDirection.x + normalJ * lightDirection.y + normalK * lightDirection.z
 
         return color.lighten(brightness * colorDifference, lightColor)
     }

@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 /**
  * Represents a point in 3D space with transformation operations.
  */
-data class Point(
+class Point(
     val x: Double = 0.0,
     val y: Double = 0.0,
     val z: Double = 0.0
@@ -61,6 +61,18 @@ data class Point(
     fun translate(dx: Double, dy: Double, dz: Double): Point {
         return Point(x + dx, y + dy, z + dz)
     }
+
+    operator fun plus(other: Point): Point = Point(x + other.x, y + other.y, z + other.z)
+
+    operator fun plus(vector: Vector): Point = Point(x + vector.x, y + vector.y, z + vector.z)
+
+    operator fun minus(other: Point): Vector = Vector(x - other.x, y - other.y, z - other.z)
+
+    operator fun minus(vector: Vector): Point = Point(x - vector.x, y - vector.y, z - vector.z)
+
+    operator fun times(scalar: Double): Point = Point(x * scalar, y * scalar, z * scalar)
+
+    operator fun unaryMinus(): Point = Point(-x, -y, -z)
 
     /**
      * Scale a point about a given origin
@@ -127,4 +139,16 @@ data class Point(
     fun depth(): Double {
         return x + y - 2 * z
     }
+
+    override fun equals(other: Any?): Boolean =
+        other is Point && x == other.x && y == other.y && z == other.z
+
+    override fun hashCode(): Int {
+        var result = x.hashCode()
+        result = 31 * result + y.hashCode()
+        result = 31 * result + z.hashCode()
+        return result
+    }
+
+    override fun toString(): String = "Point(x=$x, y=$y, z=$z)"
 }

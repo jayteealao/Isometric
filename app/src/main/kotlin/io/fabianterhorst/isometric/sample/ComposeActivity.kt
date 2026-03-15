@@ -204,7 +204,7 @@ fun InteractiveSample() {
         ) {
             add(Prism(Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
             add(Pyramid(Point(2.0, 0.0, 0.0)), IsoColor(255.0, 100.0, 0.0))
-            add(Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 20, 2.0), IsoColor(0.0, 200.0, 100.0))
+            add(Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 2.0, 20), IsoColor(0.0, 200.0, 100.0))
         }
     }
 }

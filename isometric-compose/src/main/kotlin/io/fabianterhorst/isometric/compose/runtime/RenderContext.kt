@@ -14,7 +14,7 @@ import io.fabianterhorst.isometric.Vector
  * Marked as @Immutable to prevent unnecessary recomposition when instances don't change
  */
 @Immutable
-data class RenderContext(
+class RenderContext(
     val width: Int,
     val height: Int,
     val renderOptions: RenderOptions,
@@ -27,6 +27,22 @@ data class RenderContext(
     private val rotationOrigin: Point? = null,
     private val scaleOrigin: Point? = null
 ) {
+    fun copy(
+        width: Int = this.width,
+        height: Int = this.height,
+        renderOptions: RenderOptions = this.renderOptions,
+        lightDirection: Vector = this.lightDirection
+    ): RenderContext = RenderContext(
+        width = width,
+        height = height,
+        renderOptions = renderOptions,
+        lightDirection = lightDirection,
+        accumulatedPosition = accumulatedPosition,
+        accumulatedRotation = accumulatedRotation,
+        accumulatedScale = accumulatedScale,
+        rotationOrigin = rotationOrigin,
+        scaleOrigin = scaleOrigin
+    )
 
     /**
      * Create a new context with additional transforms
@@ -69,7 +85,11 @@ data class RenderContext(
         // Accumulate scale
         val newScale = accumulatedScale * scale
 
-        return copy(
+        return RenderContext(
+            width = width,
+            height = height,
+            renderOptions = renderOptions,
+            lightDirection = lightDirection,
             accumulatedPosition = newPosition,
             accumulatedRotation = newRotation,
             accumulatedScale = newScale,
@@ -169,4 +189,32 @@ data class RenderContext(
 
         return result
     }
+
+    override fun equals(other: Any?): Boolean =
+        other is RenderContext &&
+            width == other.width &&
+            height == other.height &&
+            renderOptions == other.renderOptions &&
+            lightDirection == other.lightDirection &&
+            accumulatedPosition == other.accumulatedPosition &&
+            accumulatedRotation == other.accumulatedRotation &&
+            accumulatedScale == other.accumulatedScale &&
+            rotationOrigin == other.rotationOrigin &&
+            scaleOrigin == other.scaleOrigin
+
+    override fun hashCode(): Int {
+        var result = width
+        result = 31 * result + height
+        result = 31 * result + renderOptions.hashCode()
+        result = 31 * result + lightDirection.hashCode()
+        result = 31 * result + accumulatedPosition.hashCode()
+        result = 31 * result + accumulatedRotation.hashCode()
+        result = 31 * result + accumulatedScale.hashCode()
+        result = 31 * result + (rotationOrigin?.hashCode() ?: 0)
+        result = 31 * result + (scaleOrigin?.hashCode() ?: 0)
+        return result
+    }
+
+    override fun toString(): String =
+        "RenderContext(width=$width, height=$height, renderOptions=$renderOptions, lightDirection=$lightDirection)"
 }

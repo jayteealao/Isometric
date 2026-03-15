@@ -8,8 +8,24 @@ package io.fabianterhorst.isometric
  * @property viewportWidth The viewport width used for this preparation
  * @property viewportHeight The viewport height used for this preparation
  */
-data class PreparedScene(
+class PreparedScene(
     val commands: List<RenderCommand>,
     val viewportWidth: Int,
     val viewportHeight: Int
-)
+) {
+    override fun equals(other: Any?): Boolean =
+        other is PreparedScene &&
+            commands == other.commands &&
+            viewportWidth == other.viewportWidth &&
+            viewportHeight == other.viewportHeight
+
+    override fun hashCode(): Int {
+        var result = commands.hashCode()
+        result = 31 * result + viewportWidth
+        result = 31 * result + viewportHeight
+        return result
+    }
+
+    override fun toString(): String =
+        "PreparedScene(commands=$commands, viewportWidth=$viewportWidth, viewportHeight=$viewportHeight)"
+}

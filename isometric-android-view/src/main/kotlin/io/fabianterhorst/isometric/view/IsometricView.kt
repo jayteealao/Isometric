@@ -25,9 +25,8 @@ class IsometricView @JvmOverloads constructor(
     private var listener: OnItemClickListener? = null
 
     private var renderOptions = RenderOptions.Default
-    private var reverseSortForLookup = false
-    private var touchRadiusLookup = false
-    private var touchRadius = 8.0
+    private var hitOrder = HitOrder.BACK_TO_FRONT
+    private var touchRadius = 0.0
 
     private var cachedScene: PreparedScene? = null
 
@@ -57,17 +56,10 @@ class IsometricView @JvmOverloads constructor(
     }
 
     /**
-     * Reverse the sort order when looking up which item was touched
+     * Configure hit-test ordering.
      */
-    fun setReverseSortForLookup(reverseSortForLookup: Boolean) {
-        this.reverseSortForLookup = reverseSortForLookup
-    }
-
-    /**
-     * Allow click lookup to consider a touch region defined by a circle
-     */
-    fun setTouchRadiusLookup(touchRadiusLookup: Boolean) {
-        this.touchRadiusLookup = touchRadiusLookup
+    fun setHitOrder(hitOrder: HitOrder) {
+        this.hitOrder = hitOrder
     }
 
     /**
@@ -158,9 +150,8 @@ class IsometricView @JvmOverloads constructor(
                             preparedScene = scene,
                             x = event.x.toDouble(),
                             y = event.y.toDouble(),
-                            reverseSort = reverseSortForLookup,
-                            useRadius = touchRadiusLookup,
-                            radius = touchRadius
+                            order = hitOrder,
+                            touchRadius = touchRadius
                         )
 
                         item?.let {

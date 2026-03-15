@@ -1,8 +1,12 @@
 package io.fabianterhorst.isometric
 
 import io.fabianterhorst.isometric.shapes.Prism
+import io.fabianterhorst.isometric.shapes.Stairs
+import io.fabianterhorst.isometric.shapes.Knot
+import io.fabianterhorst.isometric.shapes.Octahedron
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -59,12 +63,54 @@ class IsometricEngineTest {
         val cmd = scene.commands.first()
         val avgX = cmd.points.map { it.x }.average()
         val avgY = cmd.points.map { it.y }.average()
-        val hit = engine.findItemAt(scene, avgX, avgY, reverseSort = true)
+        val hit = engine.findItemAt(scene, avgX, avgY, order = HitOrder.FRONT_TO_BACK)
         assertNotNull(hit)
 
         // Click far outside (should miss)
-        val miss = engine.findItemAt(scene, 10.0, 10.0, reverseSort = true)
+        val miss = engine.findItemAt(scene, 10.0, 10.0, order = HitOrder.FRONT_TO_BACK)
         assertNull(miss)
+    }
+
+    @Test
+    fun `findItemAt honors hit order`() {
+        val overlappingPoints = listOf(
+            Point2D(100.0, 100.0),
+            Point2D(140.0, 100.0),
+            Point2D(120.0, 140.0)
+        )
+        val scene = PreparedScene(
+            commands = listOf(
+                RenderCommand("back", overlappingPoints, IsoColor.BLUE, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null),
+                RenderCommand("front", overlappingPoints, IsoColor.RED, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null)
+            ),
+            viewportWidth = 800,
+            viewportHeight = 600
+        )
+
+        val engine = IsometricEngine()
+        assertEquals("front", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.FRONT_TO_BACK)?.id)
+        assertEquals("back", engine.findItemAt(scene, 120.0, 115.0, order = HitOrder.BACK_TO_FRONT)?.id)
+    }
+
+    @Test
+    fun `findItemAt honors touch radius`() {
+        val scene = PreparedScene(
+            commands = listOf(
+                RenderCommand(
+                    "triangle",
+                    listOf(Point2D(100.0, 100.0), Point2D(140.0, 100.0), Point2D(120.0, 140.0)),
+                    IsoColor.BLUE,
+                    Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)),
+                    null
+                )
+            ),
+            viewportWidth = 800,
+            viewportHeight = 600
+        )
+
+        val engine = IsometricEngine()
+        assertNull(engine.findItemAt(scene, 120.0, 96.0, touchRadius = 0.0))
+        assertEquals("triangle", engine.findItemAt(scene, 120.0, 96.0, touchRadius = 8.0)?.id)
     }
 
     @Test
@@ -213,12 +259,42 @@ class IsometricEngineTest {
 
     @Test
     fun `render options reject non-positive broad phase cell size`() {
-        try {
+        val error = assertFailsWith<IllegalArgumentException> {
             RenderOptions(broadPhaseCellSize = 0.0)
-        } catch (e: IllegalArgumentException) {
-            assertTrue(e.message!!.contains("broadPhaseCellSize"))
-            return
         }
-        throw AssertionError("Expected IllegalArgumentException for non-positive broadPhaseCellSize")
+        assertTrue(error.message!!.contains("broadPhaseCellSize"))
+    }
+
+    @Test
+    fun `render options reject non-finite broad phase cell size`() {
+        assertFailsWith<IllegalArgumentException> {
+            RenderOptions(broadPhaseCellSize = Double.NaN)
+        }
+    }
+
+    @Test
+    fun `engine rejects invalid constructor parameters`() {
+        assertFailsWith<IllegalArgumentException> { IsometricEngine(scale = 0.0) }
+        assertFailsWith<IllegalArgumentException> { IsometricEngine(angle = Double.NaN) }
+        assertFailsWith<IllegalArgumentException> { IsometricEngine(colorDifference = -0.1) }
+        assertFailsWith<IllegalArgumentException> { IsometricEngine(lightDirection = Vector(0.0, 0.0, 0.0)) }
+    }
+
+    @Test
+    fun `shapes reject invalid dimensions`() {
+        assertFailsWith<IllegalArgumentException> { Prism(Point.ORIGIN, width = 0.0) }
+        assertFailsWith<IllegalArgumentException> { io.fabianterhorst.isometric.shapes.Pyramid(Point.ORIGIN, height = -1.0) }
+        assertFailsWith<IllegalArgumentException> { io.fabianterhorst.isometric.shapes.Cylinder(Point.ORIGIN, radius = 0.0) }
+        assertFailsWith<IllegalArgumentException> { io.fabianterhorst.isometric.paths.Circle(Point.ORIGIN, vertices = 2) }
+        assertFailsWith<IllegalArgumentException> { Stairs(Point.ORIGIN, 0) }
+    }
+
+    @Test
+    fun `shapes support zero arg defaults where intended`() {
+        assertEquals(6, Prism().paths.size)
+        assertEquals(4, io.fabianterhorst.isometric.shapes.Pyramid().paths.size)
+        assertTrue(io.fabianterhorst.isometric.shapes.Cylinder().paths.isNotEmpty())
+        assertEquals(8, Octahedron().paths.size)
+        assertTrue(Knot().paths.isNotEmpty())
     }
 }

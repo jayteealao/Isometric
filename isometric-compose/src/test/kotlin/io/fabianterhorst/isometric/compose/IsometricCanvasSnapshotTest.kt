@@ -245,7 +245,7 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(680.dp, 440.dp)) {
                 val state = rememberIsometricSceneState()
                 IsometricCanvas(state = state) {
-                    add(Cylinder(Point(1.0, 1.0, 1.0), 0.5, 30, 2.0), BLUE)
+                    add(Cylinder(Point(1.0, 1.0, 1.0), 0.5, 2.0, 30), BLUE)
                 }
             }
         }

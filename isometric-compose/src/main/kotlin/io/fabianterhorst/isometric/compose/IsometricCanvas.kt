@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import io.fabianterhorst.isometric.IsoColor
+import io.fabianterhorst.isometric.HitOrder
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
@@ -89,9 +90,8 @@ private fun handleTap(
         preparedScene = tempScene,
         x = offset.x.toDouble(),
         y = offset.y.toDouble(),
-        reverseSort = true,
-        useRadius = true,
-        radius = 8.0
+        order = HitOrder.FRONT_TO_BACK,
+        touchRadius = 8.0
     )
     hit?.let { onItemClick(it) }
 }

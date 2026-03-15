@@ -46,8 +46,16 @@ fun IsometricScope.Shape(
             set(shape) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(position) { this.position = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
-            set(scale) { this.scale = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
@@ -81,8 +89,16 @@ fun IsometricScope.Group(
         factory = { GroupNode() },
         update = {
             set(position) { this.position = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
-            set(scale) { this.scale = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
@@ -123,8 +139,16 @@ fun IsometricScope.Path(
             set(path) { this.path = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(position) { this.position = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
-            set(scale) { this.scale = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
@@ -162,8 +186,16 @@ fun IsometricScope.Batch(
             set(shapes) { this.shapes = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(position) { this.position = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
-            set(scale) { this.scale = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }

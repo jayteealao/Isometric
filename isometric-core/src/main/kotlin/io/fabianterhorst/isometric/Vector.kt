@@ -5,10 +5,10 @@ import kotlin.math.sqrt
 /**
  * Represents a 3D vector with common vector operations
  */
-data class Vector(
-    val i: Double,
-    val j: Double,
-    val k: Double
+class Vector(
+    val x: Double,
+    val y: Double,
+    val z: Double
 ) {
     companion object {
         /**
@@ -22,17 +22,17 @@ data class Vector(
          * Cross product of two vectors
          */
         fun crossProduct(v1: Vector, v2: Vector): Vector {
-            val i = v1.j * v2.k - v2.j * v1.k
-            val j = -1 * (v1.i * v2.k - v2.i * v1.k)
-            val k = v1.i * v2.j - v2.i * v1.j
-            return Vector(i, j, k)
+            val cx = v1.y * v2.z - v2.y * v1.z
+            val cy = -1 * (v1.x * v2.z - v2.x * v1.z)
+            val cz = v1.x * v2.y - v2.x * v1.y
+            return Vector(cx, cy, cz)
         }
 
         /**
          * Dot product of two vectors
          */
         fun dotProduct(v1: Vector, v2: Vector): Double {
-            return v1.i * v2.i + v1.j * v2.j + v1.k * v2.k
+            return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
         }
     }
 
@@ -40,7 +40,7 @@ data class Vector(
      * Calculate the magnitude (length) of this vector
      */
     fun magnitude(): Double {
-        return sqrt(i * i + j * j + k * k)
+        return sqrt(x * x + y * y + z * z)
     }
 
     /**
@@ -52,6 +52,34 @@ data class Vector(
         if (mag == 0.0) {
             return Vector(0.0, 0.0, 0.0)
         }
-        return Vector(i / mag, j / mag, k / mag)
+        return Vector(x / mag, y / mag, z / mag)
     }
+
+    operator fun plus(other: Vector): Vector = Vector(x + other.x, y + other.y, z + other.z)
+
+    operator fun minus(other: Vector): Vector = Vector(x - other.x, y - other.y, z - other.z)
+
+    operator fun times(scalar: Double): Vector = Vector(x * scalar, y * scalar, z * scalar)
+
+    operator fun unaryMinus(): Vector = Vector(-x, -y, -z)
+
+    infix fun cross(other: Vector): Vector = Vector(
+        y * other.z - z * other.y,
+        z * other.x - x * other.z,
+        x * other.y - y * other.x
+    )
+
+    infix fun dot(other: Vector): Double = x * other.x + y * other.y + z * other.z
+
+    override fun equals(other: Any?): Boolean =
+        other is Vector && x == other.x && y == other.y && z == other.z
+
+    override fun hashCode(): Int {
+        var result = x.hashCode()
+        result = 31 * result + y.hashCode()
+        result = 31 * result + z.hashCode()
+        return result
+    }
+
+    override fun toString(): String = "Vector(x=$x, y=$y, z=$z)"
 }

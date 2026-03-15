@@ -669,6 +669,29 @@ class IsometricRendererTest {
         assertNotNull("hitTest should find shape at centroid after viewport resize", hit)
     }
 
+    @Test
+    fun `render context copy preserves accumulated transforms`() {
+        val base = RenderContext(
+            width = 800,
+            height = 600,
+            renderOptions = RenderOptions.Default
+        ).withTransform(
+            position = Point(3.0, 4.0, 5.0),
+            rotation = 0.4,
+            scale = 2.0
+        )
+
+        val copied = base.copy(renderOptions = RenderOptions.Performance)
+        val testPoint = Point(1.0, 2.0, 3.0)
+
+        assertEquals(
+            "copy() should preserve accumulated transforms when only public fields change",
+            base.applyTransformsToPoint(testPoint),
+            copied.applyTransformsToPoint(testPoint)
+        )
+    }
+
+    @Test
     fun `stable hitTest reuses prepared scene unless forceRebuild is enabled`() {
         val root = buildSceneRoot()
 

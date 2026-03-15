@@ -9,10 +9,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import io.fabianterhorst.isometric.IsometricEngine
+import io.fabianterhorst.isometric.HitOrder
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
+import io.fabianterhorst.isometric.compose.toComposeColor
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -59,7 +61,9 @@ class IsometricRenderer(
     private val spatialIndexCellSize: Double = DEFAULT_SPATIAL_INDEX_CELL_SIZE
 ) {
     init {
-        require(spatialIndexCellSize > 0.0) { "spatialIndexCellSize must be > 0" }
+        require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {
+            "spatialIndexCellSize must be positive and finite, got $spatialIndexCellSize"
+        }
     }
 
     companion object {
@@ -278,7 +282,7 @@ class IsometricRenderer(
 
             if (candidateIds.isNotEmpty()) {
                 // Resolve candidate IDs to commands, preserving the original scene order so
-                // engine.findItemAt(reverseSort = true) still returns the frontmost command.
+                // engine.findItemAt(order = FRONT_TO_BACK) still returns the frontmost command.
                 val candidateCommands = candidateIds
                     .mapNotNull { id -> commandIdMap[id] }
                     .sortedBy { command -> commandOrderMap[command.id] ?: Int.MAX_VALUE }
@@ -294,9 +298,8 @@ class IsometricRenderer(
                         preparedScene = filteredScene,
                         x = x,
                         y = y,
-                        reverseSort = true,
-                        useRadius = true,
-                        radius = HIT_TEST_RADIUS_PX
+                        order = HitOrder.FRONT_TO_BACK,
+                        touchRadius = HIT_TEST_RADIUS_PX
                     )
 
                     if (hit != null) {
@@ -310,9 +313,8 @@ class IsometricRenderer(
                 preparedScene = cachedPreparedScene!!,
                 x = x,
                 y = y,
-                reverseSort = true,
-                useRadius = true,
-                radius = HIT_TEST_RADIUS_PX
+                order = HitOrder.FRONT_TO_BACK,
+                touchRadius = HIT_TEST_RADIUS_PX
             )
 
             if (hit != null) {
@@ -641,18 +643,6 @@ private fun RenderCommand.getBounds(): ShapeBounds? {
     }
 
     return ShapeBounds(minX, minY, maxX, maxY)
-}
-
-/**
- * Extension: Convert IsoColor to Compose Color
- */
-private fun io.fabianterhorst.isometric.IsoColor.toComposeColor(): Color {
-    return Color(
-        red = (r.toFloat() / 255f).coerceIn(0f, 1f),
-        green = (g.toFloat() / 255f).coerceIn(0f, 1f),
-        blue = (b.toFloat() / 255f).coerceIn(0f, 1f),
-        alpha = (a.toFloat() / 255f).coerceIn(0f, 1f)
-    )
 }
 
 /**
