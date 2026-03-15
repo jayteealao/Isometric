@@ -1,14 +1,16 @@
 package io.fabianterhorst.isometric
 
 import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.floor
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Core isometric rendering engine.
- * Platform-agnostic - outputs PreparedScene that can be rendered by any platform.
+ * Platform-agnostic — outputs [PreparedScene] that can be rendered by any platform.
+ *
+ * This class is a thin facade that delegates to focused collaborators:
+ * - [SceneGraph] — mutable scene state accumulation
+ * - [IsometricProjection] — 3D-to-2D projection, lighting, culling
+ * - [DepthSorter] — intersection-based depth sorting with broad-phase acceleration
+ * - [HitTester] — hit testing with convex hull and touch radius
  */
 class IsometricEngine(
     private val angle: Double = PI / 6,  // 30 degrees
@@ -16,25 +18,11 @@ class IsometricEngine(
     private val lightDirection: Vector = DEFAULT_LIGHT_DIRECTION,
     private val colorDifference: Double = 0.20,
     private val lightColor: IsoColor = IsoColor.WHITE
-) {
+) : SceneProjector {
     companion object {
         /** Default light direction used when none is specified. */
-        val DEFAULT_LIGHT_DIRECTION = Vector(2.0, -1.0, 3.0)
+        val DEFAULT_LIGHT_DIRECTION: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION
     }
-
-    private val transformation: Array<DoubleArray>
-    private val defaultLightDirection: Vector
-
-    private data class SceneItem(
-        val path: Path,
-        val baseColor: IsoColor,
-        val originalShape: Shape?,
-        val id: String,  // Stable ID for hit testing
-        val ownerNodeId: String? = null
-    )
-
-    private val items = mutableListOf<SceneItem>()
-    private var nextId = 0
 
     init {
         require(angle.isFinite()) { "angle must be finite, got $angle" }
@@ -43,462 +31,95 @@ class IsometricEngine(
             "colorDifference must be non-negative and finite, got $colorDifference"
         }
         require(lightDirection.magnitude() > 0.0) { "lightDirection must be non-zero" }
-
-        transformation = arrayOf(
-            doubleArrayOf(
-                scale * cos(angle),
-                scale * sin(angle)
-            ),
-            doubleArrayOf(
-                scale * cos(PI - angle),
-                scale * sin(PI - angle)
-            )
-        )
-        defaultLightDirection = lightDirection.normalize()
     }
 
-    /**
-     * Add a shape to the scene
-     */
-    fun add(shape: Shape, color: IsoColor) {
-        val paths = shape.orderedPaths()
-        for (path in paths) {
-            add(path, color, shape)
-        }
-    }
+    private val sceneGraph = SceneGraph()
+    private val projection = IsometricProjection(angle, scale, colorDifference, lightColor)
+    private val defaultLightDirection: Vector = lightDirection.normalize()
 
-    /**
-     * Add a path to the scene
-     */
-    fun add(
+    override fun add(shape: Shape, color: IsoColor) = sceneGraph.add(shape, color)
+
+    override fun add(
         path: Path,
         color: IsoColor,
-        originalShape: Shape? = null,
-        id: String? = null,
-        ownerNodeId: String? = null
-    ) {
-        items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId))
-    }
+        originalShape: Shape?,
+        id: String?,
+        ownerNodeId: String?
+    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId)
 
-    /**
-     * Clear all items from the scene
-     */
-    fun clear() {
-        items.clear()
-        nextId = 0
-    }
+    override fun clear() = sceneGraph.clear()
 
     /**
      * Project the 3D scene to 2D screen space for the given viewport size.
-     * Returns a platform-agnostic PreparedScene with sorted render commands.
+     * Returns a platform-agnostic [PreparedScene] with sorted render commands.
      */
-    fun projectScene(
+    override fun projectScene(
         width: Int,
         height: Int,
-        renderOptions: RenderOptions = RenderOptions.Default,
-        lightDirection: Vector = this.defaultLightDirection
+        renderOptions: RenderOptions,
+        lightDirection: Vector
     ): PreparedScene {
         val normalizedLight = lightDirection.normalize()
         val originX = width / 2.0
         val originY = height * 0.9
 
-        val commands = mutableListOf<RenderCommand>()
-
-        // Transform all items to 2D screen space
-        val transformedItems = items.mapNotNull { item ->
+        // Transform all items to 2D screen space, applying culling and lighting
+        val transformedItems = sceneGraph.items.mapNotNull { item ->
             projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
         }
 
         // Sort by depth if enabled
         val sortedItems = if (renderOptions.enableDepthSorting) {
-            sortPaths(transformedItems, renderOptions)
+            DepthSorter.sort(transformedItems, renderOptions)
         } else {
             transformedItems
         }
 
         // Convert to render commands
-        for (transformedItem in sortedItems) {
-            commands.add(
-                RenderCommand(
-                    commandId = transformedItem.item.id,
-                    points = transformedItem.transformedPoints,
-                    color = transformedItem.litColor,
-                    originalPath = transformedItem.item.path,
-                    originalShape = transformedItem.item.originalShape,
-                    ownerNodeId = transformedItem.item.ownerNodeId
-                )
+        val commands = sortedItems.map { transformedItem ->
+            RenderCommand(
+                commandId = transformedItem.item.id,
+                points = transformedItem.transformedPoints,
+                color = transformedItem.litColor,
+                originalPath = transformedItem.item.path,
+                originalShape = transformedItem.item.originalShape,
+                ownerNodeId = transformedItem.item.ownerNodeId
             )
         }
 
         return PreparedScene(commands, width, height)
     }
 
+    override fun findItemAt(
+        preparedScene: PreparedScene,
+        x: Double,
+        y: Double,
+        order: HitOrder,
+        touchRadius: Double
+    ): RenderCommand? = HitTester.findItemAt(preparedScene, x, y, order, touchRadius)
+
     private fun projectAndCull(
-        item: SceneItem,
+        item: SceneGraph.SceneItem,
         originX: Double,
         originY: Double,
         renderOptions: RenderOptions,
         normalizedLight: Vector,
         width: Int,
         height: Int
-    ): TransformedItem? {
+    ): DepthSorter.TransformedItem? {
         val screenPoints = item.path.points.map { point ->
-            translatePoint(point, originX, originY)
+            projection.translatePoint(point, originX, originY)
         }
 
-        if (renderOptions.enableBackfaceCulling && cullPath(screenPoints)) {
+        if (renderOptions.enableBackfaceCulling && projection.cullPath(screenPoints)) {
             return null
         }
 
-        if (renderOptions.enableBoundsChecking && !itemInDrawingBounds(screenPoints, width, height)) {
+        if (renderOptions.enableBoundsChecking && !projection.itemInDrawingBounds(screenPoints, width, height)) {
             return null
         }
 
-        val litColor = transformColor(item.path, item.baseColor, normalizedLight)
-        return TransformedItem(item, screenPoints, litColor)
+        val litColor = projection.transformColor(item.path, item.baseColor, normalizedLight)
+        return DepthSorter.TransformedItem(item, screenPoints, litColor)
     }
-
-    /**
-     * Find the item at a given screen position (for hit testing)
-     *
-     * @param x Screen x coordinate
-     * @param y Screen y coordinate
-     * @param order Search order for hit testing
-     * @param touchRadius Touch radius in pixels. 0.0 means exact point hit testing.
-     * @return The RenderCommand at this position, or null
-     */
-    fun findItemAt(
-        preparedScene: PreparedScene,
-        x: Double,
-        y: Double,
-        order: HitOrder = HitOrder.FRONT_TO_BACK,
-        touchRadius: Double = 0.0
-    ): RenderCommand? {
-        val commandsList = when (order) {
-            HitOrder.FRONT_TO_BACK -> preparedScene.commands.reversed()
-            HitOrder.BACK_TO_FRONT -> preparedScene.commands
-        }
-
-        for (command in commandsList) {
-            // Build convex hull of command points
-            val hull = buildConvexHull(command.points)
-            val hullPoints = hull.map { Point(it.x, it.y, 0.0) }
-
-            // Test if point is inside or close to polygon
-            val isInside = if (touchRadius > 0.0) {
-                IntersectionUtils.isPointCloseToPoly(
-                    hullPoints,
-                    x,
-                    y,
-                    touchRadius
-                ) || IntersectionUtils.isPointInPoly(
-                    hullPoints,
-                    x,
-                    y
-                )
-            } else {
-                IntersectionUtils.isPointInPoly(
-                    hullPoints,
-                    x,
-                    y
-                )
-            }
-
-            if (isInside) {
-                return command
-            }
-        }
-
-        return null
-    }
-
-    /**
-     * X rides along the angle extended from the origin
-     * Y rides perpendicular to this angle (in isometric view: PI - angle)
-     * Z affects the y coordinate of the drawn point
-     */
-    private fun translatePoint(point: Point, originX: Double, originY: Double): Point2D {
-        return Point2D(
-            originX + point.x * transformation[0][0] + point.y * transformation[1][0],
-            originY - point.x * transformation[0][1] - point.y * transformation[1][1] - (point.z * scale)
-        )
-    }
-
-    /**
-     * Apply lighting to a color based on the path's surface normal
-     */
-    private fun transformColor(path: Path, color: IsoColor, lightDirection: Vector): IsoColor {
-        if (path.points.size < 3) return color
-
-        val p1 = path.points[1]
-        val p2 = path.points[0]
-        val i = p2.x - p1.x
-        val j = p2.y - p1.y
-        val k = p2.z - p1.z
-
-        val p3 = path.points[2]
-        val p4 = path.points[1]
-        val i2 = p4.x - p3.x
-        val j2 = p4.y - p3.y
-        val k2 = p4.z - p3.z
-
-        // Cross product to get normal
-        val i3 = j * k2 - j2 * k
-        val j3 = -1 * (i * k2 - i2 * k)
-        val k3 = i * j2 - i2 * j
-
-        // Normalize
-        val magnitude = sqrt(i3 * i3 + j3 * j3 + k3 * k3)
-        val normalI = if (magnitude == 0.0) 0.0 else i3 / magnitude
-        val normalJ = if (magnitude == 0.0) 0.0 else j3 / magnitude
-        val normalK = if (magnitude == 0.0) 0.0 else k3 / magnitude
-
-        // Dot product with light angle
-        val brightness = normalI * lightDirection.x + normalJ * lightDirection.y + normalK * lightDirection.z
-
-        return color.lighten(brightness * colorDifference, lightColor)
-    }
-
-    /**
-     * Back-face culling test
-     * Returns true if the path should be culled (is facing away)
-     */
-    private fun cullPath(transformedPoints: List<Point2D>): Boolean {
-        if (transformedPoints.size < 3) return false
-
-        val a = transformedPoints[0].x * transformedPoints[1].y
-        val b = transformedPoints[1].x * transformedPoints[2].y
-        val c = transformedPoints[2].x * transformedPoints[0].y
-
-        val d = transformedPoints[1].x * transformedPoints[0].y
-        val e = transformedPoints[2].x * transformedPoints[1].y
-        val f = transformedPoints[0].x * transformedPoints[2].y
-
-        val z = a + b + c - d - e - f
-        return z > 0
-    }
-
-    /**
-     * Check if any point of the item is within the drawing bounds
-     */
-    private fun itemInDrawingBounds(
-        transformedPoints: List<Point2D>,
-        width: Int,
-        height: Int
-    ): Boolean {
-        for (point in transformedPoints) {
-            if (point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height) {
-                return true
-            }
-        }
-        return false
-    }
-
-    /**
-     * Sort paths using intersection-based depth sorting algorithm
-     *
-     * The baseline path checks every prior item pair. When broad-phase sorting is enabled,
-     * we only prune candidate-pair generation; polygon intersection, depth comparison, and
-     * topological-sort behavior stay unchanged.
-     */
-    private fun sortPaths(items: List<TransformedItem>, renderOptions: RenderOptions): List<TransformedItem> {
-        val sortedItems = mutableListOf<TransformedItem>()
-        val observer = Point(-10.0, -10.0, 20.0)
-        val length = items.size
-
-        // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
-        val drawBefore = List(length) { mutableListOf<Int>() }
-
-        if (renderOptions.enableBroadPhaseSort) {
-            val candidatePairs = buildBroadPhaseCandidatePairs(items, renderOptions.broadPhaseCellSize)
-            for (pair in candidatePairs) {
-                val i = pair.first
-                val j = pair.second
-                val itemA = items[i]
-                val itemB = items[j]
-
-                // Check if 2D projections intersect
-                if (IntersectionUtils.hasIntersection(
-                        itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
-                        itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
-                    )
-                ) {
-                    // Use 3D depth comparison
-                    val cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
-                    if (cmpPath < 0) {
-                        drawBefore[i].add(j)
-                    } else if (cmpPath > 0) {
-                        drawBefore[j].add(i)
-                    }
-                }
-            }
-        } else {
-            for (i in 0 until length) {
-                val itemA = items[i]
-                for (j in 0 until i) {
-                    val itemB = items[j]
-
-                    // Check if 2D projections intersect
-                    if (IntersectionUtils.hasIntersection(
-                            itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
-                            itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
-                        )
-                    ) {
-                        // Use 3D depth comparison
-                        val cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
-                        if (cmpPath < 0) {
-                            drawBefore[i].add(j)
-                        } else if (cmpPath > 0) {
-                            drawBefore[j].add(i)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Topological sort
-        val drawn = BooleanArray(length) { false }
-        var drawThisTurn = true
-
-        while (drawThisTurn) {
-            drawThisTurn = false
-            for (i in 0 until length) {
-                if (!drawn[i]) {
-                    // Check if all dependencies are drawn
-                    val canDraw = drawBefore[i].all { drawn[it] }
-                    if (canDraw) {
-                        sortedItems.add(items[i])
-                        drawn[i] = true
-                        drawThisTurn = true
-                    }
-                }
-            }
-        }
-
-        // Add any remaining items (circular dependencies)
-        for (i in 0 until length) {
-            if (!drawn[i]) {
-                sortedItems.add(items[i])
-            }
-        }
-
-        return sortedItems
-    }
-
-    private fun buildBroadPhaseCandidatePairs(
-        items: List<TransformedItem>,
-        cellSize: Double
-    ): List<Pair<Int, Int>> {
-        val grid = HashMap<Long, MutableList<Int>>()
-
-        items.forEachIndexed { index, item ->
-            val bounds = item.getBounds()
-            val minCol = floor(bounds.minX / cellSize).toInt()
-            val maxCol = floor(bounds.maxX / cellSize).toInt()
-            val minRow = floor(bounds.minY / cellSize).toInt()
-            val maxRow = floor(bounds.maxY / cellSize).toInt()
-
-            for (row in minRow..maxRow) {
-                for (col in minCol..maxCol) {
-                    grid.getOrPut(cellKey(col, row)) { mutableListOf() }.add(index)
-                }
-            }
-        }
-
-        val seen = HashSet<Long>()
-        val pairs = ArrayList<Pair<Int, Int>>()
-        for (bucket in grid.values) {
-            if (bucket.size < 2) continue
-            for (a in 0 until bucket.lastIndex) {
-                for (b in a + 1 until bucket.size) {
-                    val first = minOf(bucket[a], bucket[b])
-                    val second = maxOf(bucket[a], bucket[b])
-                    val key = pairKey(first, second)
-                    if (seen.add(key)) {
-                        pairs.add(second to first)
-                    }
-                }
-            }
-        }
-
-        return pairs
-    }
-
-    private fun cellKey(col: Int, row: Int): Long {
-        return (col.toLong() shl 32) xor (row.toLong() and 0xffffffffL)
-    }
-
-    private fun pairKey(first: Int, second: Int): Long {
-        return (first.toLong() shl 32) xor (second.toLong() and 0xffffffffL)
-    }
-
-    private fun TransformedItem.getBounds(): ItemBounds {
-        var minX = Double.POSITIVE_INFINITY
-        var minY = Double.POSITIVE_INFINITY
-        var maxX = Double.NEGATIVE_INFINITY
-        var maxY = Double.NEGATIVE_INFINITY
-
-        for (point in transformedPoints) {
-            minX = minOf(minX, point.x)
-            minY = minOf(minY, point.y)
-            maxX = maxOf(maxX, point.x)
-            maxY = maxOf(maxY, point.y)
-        }
-
-        return ItemBounds(minX, minY, maxX, maxY)
-    }
-
-    /**
-     * Build a convex hull for hit testing
-     * Returns the extreme points (top, bottom, left, right) plus any edge points
-     */
-    private fun buildConvexHull(points: List<Point2D>): List<Point2D> {
-        if (points.isEmpty()) return emptyList()
-
-        var top: Point2D? = null
-        var bottom: Point2D? = null
-        var left: Point2D? = null
-        var right: Point2D? = null
-
-        // Find extreme points
-        for (point in points) {
-            if (top == null || point.y > top.y) {
-                top = point
-            }
-            if (bottom == null || point.y < bottom.y) {
-                bottom = point
-            }
-            if (left == null || point.x < left.x) {
-                left = point
-            }
-            if (right == null || point.x > right.x) {
-                right = point
-            }
-        }
-
-        val hull = mutableListOf(left!!, top!!, right!!, bottom!!)
-
-        // Add points on the edges
-        for (point in points) {
-            if (point.x == left.x && point != left) hull.add(point)
-            if (point.x == right.x && point != right) hull.add(point)
-            if (point.y == top.y && point != top) hull.add(point)
-            if (point.y == bottom.y && point != bottom) hull.add(point)
-        }
-
-        return hull.distinct()
-    }
-
-    private data class TransformedItem(
-        val item: SceneItem,
-        val transformedPoints: List<Point2D>,
-        val litColor: IsoColor
-    )
-
-    private data class ItemBounds(
-        val minX: Double,
-        val minY: Double,
-        val maxX: Double,
-        val maxY: Double
-    )
 }

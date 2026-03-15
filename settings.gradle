@@ -15,7 +15,6 @@ dependencyResolutionManagement {
 }
 
 include ':app'
-include ':lib'
 include ':isometric-core'
 include ':isometric-compose'
 include ':isometric-android-view'

@@ -161,11 +161,11 @@ class MultiShapeNode(
     var colors: List<IsoColor>
 ) : IsometricNode() {
 
-    override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
-        if (!isVisible) return emptyList()
+    override fun renderTo(output: MutableList<io.fabianterhorst.isometric.RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
 
         // Render all shapes with their respective colors
-        return shapes.zip(colors).flatMap { (shape, color) ->
+        shapes.zip(colors).forEach { (shape, color) ->
             var transformedShape = context.applyTransformsToShape(shape)
             transformedShape = transformedShape.translate(position.x, position.y, position.z)
 
@@ -174,14 +174,16 @@ class MultiShapeNode(
                 transformedShape = transformedShape.rotateZ(origin, rotation)
             }
 
-            transformedShape.paths.map { path ->
-                io.fabianterhorst.isometric.RenderCommand(
-                    commandId = "${nodeId}_${shape.hashCode()}_${path.hashCode()}",
-                    points = emptyList(),
-                    color = color,
-                    originalPath = path,
-                    originalShape = transformedShape,
-                    ownerNodeId = nodeId
+            for (path in transformedShape.paths) {
+                output.add(
+                    io.fabianterhorst.isometric.RenderCommand(
+                        commandId = "${nodeId}_${shape.hashCode()}_${path.hashCode()}",
+                        points = emptyList(),
+                        color = color,
+                        originalPath = path,
+                        originalShape = transformedShape,
+                        ownerNodeId = nodeId
+                    )
                 )
             }
         }

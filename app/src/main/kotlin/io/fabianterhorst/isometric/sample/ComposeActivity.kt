@@ -189,7 +189,7 @@ fun InteractiveSample() {
         }
 
         IsometricScene(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             config = SceneConfig(
                 gestures = GestureConfig(
                     onTap = { event: TapEvent ->

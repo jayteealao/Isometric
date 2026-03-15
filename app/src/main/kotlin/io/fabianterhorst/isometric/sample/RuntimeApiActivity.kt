@@ -266,7 +266,7 @@ fun RuntimeInteractiveSample() {
         }
 
         IsometricScene(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             config = SceneConfig(
                 gestures = GestureConfig(
                     onTap = { event ->
@@ -347,7 +347,7 @@ fun ConditionalSample() {
             }
         }
 
-        IsometricScene(modifier = Modifier.weight(1f)) {
+        IsometricScene(modifier = Modifier.weight(1f).fillMaxWidth()) {
             // Base always visible
             Shape(
                 geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 8.0, depth = 8.0, height = 0.2),
@@ -418,7 +418,7 @@ fun PerformanceSample() {
             }
         }
 
-        IsometricScene(modifier = Modifier.weight(1f)) {
+        IsometricScene(modifier = Modifier.weight(1f).fillMaxWidth()) {
             ForEach(
                 items = (0 until gridSize).toList(),
                 key = { it }

@@ -2,6 +2,7 @@ package io.fabianterhorst.isometric.compose.runtime
 
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
+import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.shapes.Prism
 import org.junit.Assert.assertEquals
@@ -18,13 +19,20 @@ class IsometricNodeRenderTest {
         renderOptions = RenderOptions.Default
     )
 
+    /** Helper: collect render commands from a node using the accumulator pattern. */
+    private fun IsometricNode.collectCommands(context: RenderContext): List<RenderCommand> {
+        val output = mutableListOf<RenderCommand>()
+        renderTo(output, context)
+        return output
+    }
+
     @Test
     fun shapeNodeProducesCommandsWithCorrectIdPrefix() {
         val node = ShapeNode(
             shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
             color = IsoColor.BLUE
         )
-        val commands = node.render(baseContext())
+        val commands = node.collectCommands(baseContext())
         assertTrue("Prism should produce render commands", commands.isNotEmpty())
         commands.forEach { cmd ->
             assertTrue(
@@ -41,7 +49,7 @@ class IsometricNodeRenderTest {
             color = IsoColor.BLUE
         )
         node.isVisible = false
-        val commands = node.render(baseContext())
+        val commands = node.collectCommands(baseContext())
         assertTrue("Invisible node should produce no commands", commands.isEmpty())
     }
 
@@ -52,7 +60,7 @@ class IsometricNodeRenderTest {
             shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
             color = IsoColor.BLUE
         )
-        val aloneCommands = shapeAlone.render(baseContext())
+        val aloneCommands = shapeAlone.collectCommands(baseContext())
 
         // Render same shape inside a group offset by (5,0,0)
         val group = GroupNode()
@@ -65,7 +73,7 @@ class IsometricNodeRenderTest {
         childShape.parent = group
         group.updateChildrenSnapshot()
 
-        val groupCommands = group.render(baseContext())
+        val groupCommands = group.collectCommands(baseContext())
         assertTrue("Group should produce commands from child", groupCommands.isNotEmpty())
 
         // Each path point in the group version should be offset by (5,0,0)
@@ -93,7 +101,7 @@ class IsometricNodeRenderTest {
         childShape.parent = group
         group.updateChildrenSnapshot()
 
-        val commands = group.render(baseContext())
+        val commands = group.collectCommands(baseContext())
         assertTrue("Invisible group should produce no commands", commands.isEmpty())
     }
 
@@ -104,7 +112,7 @@ class IsometricNodeRenderTest {
             shape = Prism(Point(5.0, 0.0, 0.0), 1.0, 1.0, 1.0),
             color = IsoColor.BLUE
         )
-        val noRotCommands = shapeNoRotation.render(baseContext())
+        val noRotCommands = shapeNoRotation.collectCommands(baseContext())
 
         // Render same shape inside a group rotated PI/2
         val group = GroupNode()
@@ -117,7 +125,7 @@ class IsometricNodeRenderTest {
         childShape.parent = group
         group.updateChildrenSnapshot()
 
-        val rotatedCommands = group.render(baseContext())
+        val rotatedCommands = group.collectCommands(baseContext())
         assertTrue("Rotated group should produce commands", rotatedCommands.isNotEmpty())
 
         // The rotated shape should have different X/Y coordinates
@@ -133,7 +141,7 @@ class IsometricNodeRenderTest {
     fun emptyGroupNodeReturnsEmptyCommands() {
         val group = GroupNode()
         group.updateChildrenSnapshot()
-        val commands = group.render(baseContext())
+        val commands = group.collectCommands(baseContext())
         assertTrue("Empty group should produce no commands", commands.isEmpty())
     }
 }

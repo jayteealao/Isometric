@@ -777,7 +777,7 @@ class IsometricRendererTest {
         // Create a node that throws during render
         val root = GroupNode()
         val badNode = object : IsometricNode() {
-            override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
+            override fun renderTo(output: MutableList<io.fabianterhorst.isometric.RenderCommand>, context: RenderContext) {
                 throw RuntimeException("Simulated render error")
             }
         }
@@ -809,7 +809,7 @@ class IsometricRendererTest {
         // Now replace with a node that throws
         root.children.clear()
         val badNode = object : IsometricNode() {
-            override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
+            override fun renderTo(output: MutableList<io.fabianterhorst.isometric.RenderCommand>, context: RenderContext) {
                 throw RuntimeException("fail")
             }
         }

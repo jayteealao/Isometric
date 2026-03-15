@@ -116,9 +116,10 @@ abstract class IsometricNode {
     }
 
     /**
-     * Render this node and its children to a list of render commands
+     * Render this node and its children into the given accumulator list.
+     * Eliminates intermediate list allocations compared to a returning `render()` method.
      */
-    abstract fun render(context: RenderContext): List<RenderCommand>
+    abstract fun renderTo(output: MutableList<RenderCommand>, context: RenderContext)
 
     protected fun applyLocalTransforms(shape: Shape): Shape {
         var result = shape.translate(position.x, position.y, position.z)
@@ -149,8 +150,8 @@ abstract class IsometricNode {
 class GroupNode : IsometricNode() {
     internal override val children = mutableListOf<IsometricNode>()
 
-    override fun render(context: RenderContext): List<RenderCommand> {
-        if (!isVisible) return emptyList()
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
 
         // Create child context with accumulated transforms
         val childContext = context.withTransform(
@@ -161,9 +162,9 @@ class GroupNode : IsometricNode() {
             scaleOrigin = scaleOrigin
         )
 
-        // Render all children from the thread-safe snapshot
-        return childrenSnapshot.flatMap { child ->
-            child.render(childContext)
+        // Render all children from the thread-safe snapshot — zero intermediate allocations
+        for (child in childrenSnapshot) {
+            child.renderTo(output, childContext)
         }
     }
 
@@ -177,20 +178,22 @@ class ShapeNode(
     var color: IsoColor
 ) : IsometricNode() {
 
-    override fun render(context: RenderContext): List<RenderCommand> {
-        if (!isVisible) return emptyList()
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
 
         val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
 
-        // Convert shape to render commands
-        return transformedShape.paths.map { path ->
-            RenderCommand(
-                commandId = "${nodeId}_${path.hashCode()}",
-                points = emptyList(), // Will be filled by engine
-                color = color,
-                originalPath = path,
-                originalShape = transformedShape,
-                ownerNodeId = nodeId
+        // Convert shape to render commands — adds directly to accumulator
+        for (path in transformedShape.paths) {
+            output.add(
+                RenderCommand(
+                    commandId = "${nodeId}_${path.hashCode()}",
+                    points = emptyList(), // Will be filled by engine
+                    color = color,
+                    originalPath = path,
+                    originalShape = transformedShape,
+                    ownerNodeId = nodeId
+                )
             )
         }
     }
@@ -205,12 +208,12 @@ class PathNode(
     var color: IsoColor
 ) : IsometricNode() {
 
-    override fun render(context: RenderContext): List<RenderCommand> {
-        if (!isVisible) return emptyList()
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
 
         val transformedPath = applyLocalTransforms(context.applyTransformsToPath(path))
 
-        return listOf(
+        output.add(
             RenderCommand(
                 commandId = nodeId,
                 points = emptyList(), // Will be filled by engine
@@ -233,20 +236,22 @@ class BatchNode(
     var color: IsoColor
 ) : IsometricNode() {
 
-    override fun render(context: RenderContext): List<RenderCommand> {
-        if (!isVisible) return emptyList()
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
 
-        return shapes.flatMapIndexed { index, shape ->
+        shapes.forEachIndexed { index, shape ->
             val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
 
-            transformedShape.paths.map { path ->
-                RenderCommand(
-                    commandId = "${nodeId}_${index}_${path.hashCode()}",
-                    points = emptyList(),
-                    color = color,
-                    originalPath = path,
-                    originalShape = transformedShape,
-                    ownerNodeId = nodeId
+            for (path in transformedShape.paths) {
+                output.add(
+                    RenderCommand(
+                        commandId = "${nodeId}_${index}_${path.hashCode()}",
+                        points = emptyList(),
+                        color = color,
+                        originalPath = path,
+                        originalShape = transformedShape,
+                        ownerNodeId = nodeId
+                    )
                 )
             }
         }
