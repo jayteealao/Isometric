@@ -8,11 +8,17 @@ import io.fabianterhorst.isometric.paths.Circle
  * A cylindrical shape
  */
 class Cylinder(
-    origin: Point,
-    radius: Double = 1.0,
-    vertices: Int = 20,
-    height: Double = 1.0
-) : Shape(Shape.extrude(Circle(origin, radius, vertices), height).paths) {
+    val position: Point = Point.ORIGIN,
+    val radius: Double = 1.0,
+    val height: Double = 1.0,
+    val vertices: Int = 20
+) : Shape(Shape.extrude(Circle(position, radius, vertices), height).paths) {
+    init {
+        require(radius > 0.0) { "Cylinder radius must be positive, got $radius" }
+        require(vertices >= 3) { "Cylinder needs at least 3 vertices, got $vertices" }
+        require(height > 0.0) { "Cylinder height must be positive, got $height" }
+    }
 
-    constructor(origin: Point, vertices: Int, height: Double) : this(origin, 1.0, vertices, height)
+    override fun translate(dx: Double, dy: Double, dz: Double): Cylinder =
+        Cylinder(position.translate(dx, dy, dz), radius, height, vertices)
 }

@@ -6,12 +6,16 @@ package io.fabianterhorst.isometric
 open class Shape(
     val paths: List<Path>
 ) {
+    init {
+        require(paths.isNotEmpty()) { "Shape requires at least one path" }
+    }
+
     constructor(vararg paths: Path) : this(paths.toList())
 
     /**
      * Translate the shape by the given deltas
      */
-    fun translate(dx: Double, dy: Double, dz: Double): Shape {
+    open fun translate(dx: Double, dy: Double, dz: Double): Shape {
         return Shape(paths.map { it.translate(dx, dy, dz) })
     }
 
@@ -54,34 +58,7 @@ open class Shape(
     /**
      * Sort the list of faces by distance then return the ordered paths
      */
-    fun orderedPaths(): List<Path> {
-        // Bubble sort by depth (back to front)
-        val sortedPaths = paths.toMutableList()
-        val depths = sortedPaths.map { it.depth() }.toMutableList()
-
-        var swapped = true
-        var j = 0
-        while (swapped) {
-            swapped = false
-            j++
-            for (i in 0 until sortedPaths.size - j) {
-                if (depths[i] < depths[i + 1]) {
-                    // Swap paths
-                    val tmpPath = sortedPaths[i]
-                    sortedPaths[i] = sortedPaths[i + 1]
-                    sortedPaths[i + 1] = tmpPath
-
-                    // Swap depths
-                    val tmpDepth = depths[i]
-                    depths[i] = depths[i + 1]
-                    depths[i + 1] = tmpDepth
-
-                    swapped = true
-                }
-            }
-        }
-        return sortedPaths
-    }
+    fun orderedPaths(): List<Path> = paths.sortedByDescending { it.depth }
 
     companion object {
         /**

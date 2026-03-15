@@ -7,17 +7,26 @@ import io.fabianterhorst.isometric.Shape
 /**
  * A staircase shape
  */
-class Stairs(origin: Point, stepCount: Int) : Shape(createPaths(origin, stepCount)) {
+class Stairs(
+    val position: Point = Point.ORIGIN,
+    val stepCount: Int
+) : Shape(createPaths(position, stepCount)) {
+    init {
+        require(stepCount >= 1) { "Stairs needs at least 1 step, got $stepCount" }
+    }
+
+    override fun translate(dx: Double, dy: Double, dz: Double): Stairs =
+        Stairs(position.translate(dx, dy, dz), stepCount)
 
     companion object {
-        private fun createPaths(origin: Point, stepCount: Int): List<Path> {
+        private fun createPaths(position: Point, stepCount: Int): List<Path> {
             val paths = mutableListOf<Path>()
             val zigzagPoints = mutableListOf<Point>()
 
-            zigzagPoints.add(origin)
+            zigzagPoints.add(position)
 
             for (i in 0 until stepCount) {
-                val stepCorner = origin.translate(0.0, i / stepCount.toDouble(), (i + 1) / stepCount.toDouble())
+                val stepCorner = position.translate(0.0, i / stepCount.toDouble(), (i + 1) / stepCount.toDouble())
 
                 // Vertical face
                 paths.add(
@@ -42,7 +51,7 @@ class Stairs(origin: Point, stepCount: Int) : Shape(createPaths(origin, stepCoun
                 zigzagPoints.add(stepCorner.translate(0.0, 1.0 / stepCount, 0.0))
             }
 
-            zigzagPoints.add(origin.translate(0.0, 1.0, 0.0))
+            zigzagPoints.add(position.translate(0.0, 1.0, 0.0))
 
             // Zigzag side face
             paths.add(Path(zigzagPoints))

@@ -4,8 +4,19 @@ package io.fabianterhorst.isometric
  * Represents a 2D path (polygon face) in 3D space
  */
 open class Path(
-    val points: List<Point>
+    points: List<Point>
 ) {
+    val points: List<Point> = points.toList()
+
+    init {
+        require(this.points.size >= 3) { "Path requires at least 3 points, got ${this.points.size}" }
+    }
+
+    /**
+     * Average depth of all points in this path, precalculated at construction time.
+     */
+    val depth: Double = this.points.sumOf { it.depth() } / this.points.size
+
     constructor(vararg points: Point) : this(points.toList())
 
     /**
@@ -59,14 +70,6 @@ open class Path(
     }
 
     /**
-     * Calculate the average depth of all points in this path
-     */
-    fun depth(): Double {
-        if (points.isEmpty()) return 0.0
-        return points.sumOf { it.depth() } / points.size
-    }
-
-    /**
      * If pathB ("this") is closer from the observer than pathA, it must be drawn after.
      * It is closer if one of its vertices and the observer are on the same side of the plane defined by pathA.
      */
@@ -78,8 +81,6 @@ open class Path(
      * Count how many vertices of this path are on the same side of pathA's plane as the observer
      */
     private fun countCloserThan(pathA: Path, observer: Point): Int {
-        if (pathA.points.size < 3) return 0
-
         // The plane containing pathA is defined by the three points A, B, C
         val AB = Vector.fromTwoPoints(pathA.points[0], pathA.points[1])
         val AC = Vector.fromTwoPoints(pathA.points[0], pathA.points[2])

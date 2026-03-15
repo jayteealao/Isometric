@@ -106,6 +106,7 @@ fun AnimatedShapeLowLevel() {
         update = {
             // YOU control exactly how rotation updates work
             set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
                 this.rotation = it
                 markDirty()
             }
@@ -202,7 +203,11 @@ fun IsometricScope.MultiShape(
         update = {
             set(shapes) { this.shapes = it; markDirty() }
             set(colors) { this.colors = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
         }
     )
 }
@@ -226,8 +231,16 @@ fun OptimizedBatchUpdate(
         update = {
             set(shape) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
-            set(rotation) { this.rotation = it; markDirty() }
-            set(scale) { this.scale = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
         }
     )
 }
@@ -320,6 +333,7 @@ fun AdvancedUseCase() {
         update = {
             set(rotation) {
                 // Custom logic: only update every 0.5 radians
+                require(it.isFinite()) { "rotation must be finite, got $it" }
                 val snappedRotation = (it / 0.5).toInt() * 0.5
                 if (this.rotation != snappedRotation) {
                     this.rotation = snappedRotation

@@ -14,9 +14,11 @@ class Circle(
     radius: Double = 1.0,
     vertices: Int = 20
 ) : Path(createCirclePoints(origin, radius, vertices)) {
-
     companion object {
         private fun createCirclePoints(origin: Point, radius: Double, vertices: Int): List<Point> {
+            require(radius > 0.0) { "Circle radius must be positive, got $radius" }
+            require(vertices >= 3) { "Circle needs at least 3 vertices, got $vertices" }
+
             val points = mutableListOf<Point>()
             for (i in 0 until vertices) {
                 points.add(

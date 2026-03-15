@@ -9,24 +9,30 @@ import kotlin.math.PI
  * A pyramid shape
  */
 class Pyramid(
-    origin: Point,
-    dx: Double = 1.0,
-    dy: Double = 1.0,
-    dz: Double = 1.0
-) : Shape(createPaths(origin, dx, dy, dz)) {
+    val position: Point = Point.ORIGIN,
+    val width: Double = 1.0,
+    val depth: Double = 1.0,
+    val height: Double = 1.0
+) : Shape(createPaths(position, width, depth, height)) {
+    init {
+        require(width > 0.0) { "Pyramid width must be positive, got $width" }
+        require(depth > 0.0) { "Pyramid depth must be positive, got $depth" }
+        require(height > 0.0) { "Pyramid height must be positive, got $height" }
+    }
 
-    constructor(origin: Point) : this(origin, 1.0, 1.0, 1.0)
+    override fun translate(dx: Double, dy: Double, dz: Double): Pyramid =
+        Pyramid(position.translate(dx, dy, dz), width, depth, height)
 
     companion object {
-        private fun createPaths(origin: Point, dx: Double, dy: Double, dz: Double): List<Path> {
+        private fun createPaths(position: Point, width: Double, depth: Double, height: Double): List<Path> {
             val paths = mutableListOf<Path>()
-            val center = origin.translate(dx / 2.0, dy / 2.0, 0.0)
+            val center = position.translate(width / 2.0, depth / 2.0, 0.0)
 
             /* Path parallel to the x-axis */
             val face1 = Path(
-                origin,
-                Point(origin.x + dx, origin.y, origin.z),
-                Point(origin.x + dx / 2.0, origin.y + dy / 2.0, origin.z + dz)
+                position,
+                Point(position.x + width, position.y, position.z),
+                Point(position.x + width / 2.0, position.y + depth / 2.0, position.z + height)
             )
 
             /* Push the face, and its opposite face, by rotating around the Z-axis */
@@ -35,9 +41,9 @@ class Pyramid(
 
             /* Path parallel to the y-axis */
             val face2 = Path(
-                origin,
-                Point(origin.x + dx / 2.0, origin.y + dy / 2.0, origin.z + dz),
-                Point(origin.x, origin.y + dy, origin.z)
+                position,
+                Point(position.x + width / 2.0, position.y + depth / 2.0, position.z + height),
+                Point(position.x, position.y + depth, position.z)
             )
             paths.add(face2)
             paths.add(face2.rotateZ(center, PI))

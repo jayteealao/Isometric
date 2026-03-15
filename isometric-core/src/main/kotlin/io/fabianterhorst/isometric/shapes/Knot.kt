@@ -8,10 +8,13 @@ import io.fabianterhorst.isometric.Shape
  * A knot shape
  * Note: needs depth sorting fix as per original TODO
  */
-class Knot(origin: Point) : Shape(createPaths(origin)) {
+class Knot(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
+
+    override fun translate(dx: Double, dy: Double, dz: Double): Knot =
+        Knot(position.translate(dx, dy, dz))
 
     companion object {
-        private fun createPaths(origin: Point): List<Path> {
+        private fun createPaths(position: Point): List<Path> {
             val allPaths = mutableListOf<Path>()
 
             // Add prisms
@@ -40,7 +43,7 @@ class Knot(origin: Point) : Shape(createPaths(origin)) {
             // Scale and translate all paths
             val scaledPaths = allPaths.map { it.scale(Point.ORIGIN, 1.0 / 5.0) }
             val translatedPaths = scaledPaths.map { it.translate(-0.1, 0.15, 0.4) }
-            val finalPaths = translatedPaths.map { it.translate(origin.x, origin.y, origin.z) }
+            val finalPaths = translatedPaths.map { it.translate(position.x, position.y, position.z) }
 
             return finalPaths
         }

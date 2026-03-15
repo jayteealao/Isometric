@@ -9,20 +9,23 @@ import kotlin.math.sqrt
 /**
  * An octahedron shape (8-faced polyhedron)
  */
-class Octahedron(origin: Point) : Shape(createPaths(origin)) {
+class Octahedron(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
+
+    override fun translate(dx: Double, dy: Double, dz: Double): Octahedron =
+        Octahedron(position.translate(dx, dy, dz))
 
     companion object {
-        private fun createPaths(origin: Point): List<Path> {
-            val center = origin.translate(0.5, 0.5, 0.5)
+        private fun createPaths(position: Point): List<Path> {
+            val center = position.translate(0.5, 0.5, 0.5)
             val upperTriangle = Path(
-                origin.translate(0.0, 0.0, 0.5),
-                origin.translate(0.5, 0.5, 1.0),
-                origin.translate(0.0, 1.0, 0.5)
+                position.translate(0.0, 0.0, 0.5),
+                position.translate(0.5, 0.5, 1.0),
+                position.translate(0.0, 1.0, 0.5)
             )
             val lowerTriangle = Path(
-                origin.translate(0.0, 0.0, 0.5),
-                origin.translate(0.0, 1.0, 0.5),
-                origin.translate(0.5, 0.5, 0.0)
+                position.translate(0.0, 0.0, 0.5),
+                position.translate(0.0, 1.0, 0.5),
+                position.translate(0.5, 0.5, 0.0)
             )
 
             val paths = mutableListOf<Path>()
