@@ -160,7 +160,6 @@ class MultiShapeNode(
     var shapes: List<io.fabianterhorst.isometric.Shape>,
     var colors: List<IsoColor>
 ) : IsometricNode() {
-    override val children = mutableListOf<IsometricNode>()
 
     override fun render(context: RenderContext): List<io.fabianterhorst.isometric.RenderCommand> {
         if (!isVisible) return emptyList()

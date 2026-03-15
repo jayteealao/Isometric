@@ -5,6 +5,8 @@ import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.RenderCommand
 import io.fabianterhorst.isometric.Shape
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Base node for the isometric scene graph.
@@ -12,6 +14,19 @@ import io.fabianterhorst.isometric.Shape
  * Open for extension to support custom node types via low-level ComposeNode primitives.
  */
 abstract class IsometricNode {
+    companion object {
+        private val nextId = AtomicLong(0)
+
+        /**
+         * Shared immutable empty list for leaf nodes. Avoids per-node ArrayList allocation.
+         * Throws [UnsupportedOperationException] on mutation — correct behavior since
+         * leaf nodes should never have children added by the Applier.
+         */
+        @Suppress("UNCHECKED_CAST")
+        private val LEAF_CHILDREN: MutableList<IsometricNode> =
+            Collections.emptyList<IsometricNode>() as MutableList<IsometricNode>
+    }
+
     /**
      * Parent node in the tree
      */
@@ -19,8 +34,11 @@ abstract class IsometricNode {
 
     /**
      * Mutable children list — only accessed by the Applier for mutations.
+     * Internal to prevent external consumers from bypassing dirty tracking.
+     * Provides a default empty list for leaf nodes; container nodes (e.g. [GroupNode])
+     * override this with their own mutable list.
      */
-    abstract val children: MutableList<IsometricNode>
+    internal open val children: MutableList<IsometricNode> = LEAF_CHILDREN
 
     /**
      * Thread-safe snapshot of children for rendering and traversal.
@@ -61,9 +79,11 @@ abstract class IsometricNode {
         private set
 
     /**
-     * Unique identifier for this node
+     * Unique identifier for this node.
+     * Uses a monotonically increasing atomic counter to guarantee collision-free IDs
+     * across the lifetime of the process, even under concurrent creation.
      */
-    val nodeId: String = "node_${System.identityHashCode(this)}"
+    val nodeId: String = "node_${nextId.getAndIncrement()}"
 
     /**
      * Callback invoked when dirty propagation reaches a root node (parent == null).
@@ -127,7 +147,7 @@ abstract class IsometricNode {
  * Container node that groups other nodes and applies transforms
  */
 class GroupNode : IsometricNode() {
-    override val children = mutableListOf<IsometricNode>()
+    internal override val children = mutableListOf<IsometricNode>()
 
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
@@ -156,7 +176,6 @@ class ShapeNode(
     var shape: Shape,
     var color: IsoColor
 ) : IsometricNode() {
-    override val children = mutableListOf<IsometricNode>()
 
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
@@ -185,7 +204,6 @@ class PathNode(
     var path: Path,
     var color: IsoColor
 ) : IsometricNode() {
-    override val children = mutableListOf<IsometricNode>()
 
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
@@ -214,7 +232,6 @@ class BatchNode(
     var shapes: List<Shape>,
     var color: IsoColor
 ) : IsometricNode() {
-    override val children = mutableListOf<IsometricNode>()
 
     override fun render(context: RenderContext): List<RenderCommand> {
         if (!isVisible) return emptyList()
