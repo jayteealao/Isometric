@@ -5,8 +5,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import io.fabianterhorst.isometric.IsoColor
-import io.fabianterhorst.isometric.Point2D
 import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderCommand
 
@@ -46,29 +44,5 @@ object ComposeRenderer {
             }
             close()
         }
-    }
-
-    /**
-     * Convert IsoColor to Compose Color
-     */
-    fun IsoColor.toComposeColor(): Color {
-        return Color(
-            red = (r.toFloat() / 255f).coerceIn(0f, 1f),
-            green = (g.toFloat() / 255f).coerceIn(0f, 1f),
-            blue = (b.toFloat() / 255f).coerceIn(0f, 1f),
-            alpha = (a.toFloat() / 255f).coerceIn(0f, 1f)
-        )
-    }
-
-    /**
-     * Convert Compose Color to IsoColor
-     */
-    fun Color.toIsoColor(): IsoColor {
-        return IsoColor(
-            r = (red * 255).toDouble(),
-            g = (green * 255).toDouble(),
-            b = (blue * 255).toDouble(),
-            a = (alpha * 255).toDouble()
-        )
     }
 }
