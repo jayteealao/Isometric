@@ -21,7 +21,7 @@ object AwtRenderer {
         width: Int,
         height: Int,
         outputFile: File,
-        backgroundColor: Color = Color.WHITE,
+        backgroundColor: Color? = null,
         scale: Double = 70.0,
         centerContent: Boolean = true,
         block: IsometricEngine.() -> Unit
@@ -40,7 +40,7 @@ object AwtRenderer {
         scene: PreparedScene,
         width: Int,
         height: Int,
-        backgroundColor: Color = Color.WHITE,
+        backgroundColor: Color? = null,
         centerContent: Boolean = true
     ): BufferedImage {
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
@@ -49,9 +49,11 @@ object AwtRenderer {
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
 
-        // Background
-        g2d.color = backgroundColor
-        g2d.fillRect(0, 0, width, height)
+        // Background (null = transparent)
+        if (backgroundColor != null) {
+            g2d.color = backgroundColor
+            g2d.fillRect(0, 0, width, height)
+        }
 
         // Auto-center: compute bounding box of all projected content and translate to center
         if (centerContent && scene.commands.isNotEmpty()) {
