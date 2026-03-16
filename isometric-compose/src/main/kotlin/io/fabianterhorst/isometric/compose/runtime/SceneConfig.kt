@@ -14,7 +14,8 @@ open class SceneConfig(
     val colorPalette: ColorPalette = ColorPalette(),
     val strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
     val gestures: GestureConfig = GestureConfig.Disabled,
-    val useNativeCanvas: Boolean = false
+    val useNativeCanvas: Boolean = false,
+    val cameraState: CameraState? = null
 ) {
     override fun equals(other: Any?): Boolean =
         other != null &&
@@ -26,7 +27,8 @@ open class SceneConfig(
             colorPalette == other.colorPalette &&
             strokeStyle == other.strokeStyle &&
             gestures == other.gestures &&
-            useNativeCanvas == other.useNativeCanvas
+            useNativeCanvas == other.useNativeCanvas &&
+            cameraState === other.cameraState
 
     override fun hashCode(): Int {
         var result = renderOptions.hashCode()
@@ -36,9 +38,10 @@ open class SceneConfig(
         result = 31 * result + strokeStyle.hashCode()
         result = 31 * result + gestures.hashCode()
         result = 31 * result + useNativeCanvas.hashCode()
+        result = 31 * result + (cameraState?.let { System.identityHashCode(it) } ?: 0)
         return result
     }
 
     override fun toString(): String =
-        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas)"
+        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas, cameraState=$cameraState)"
 }
