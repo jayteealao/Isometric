@@ -103,16 +103,18 @@ fun IsometricScene(
     // Wire benchmark hooks from CompositionLocal — read during composition,
     // then bridged into the imperative renderer via DisposableEffect.
     val currentBenchmarkHooks = LocalBenchmarkHooks.current
+    val currentOnRenderError by rememberUpdatedState(config.onRenderError)
 
     // Effect 1: Wire dirty notification and renderer config.
-    // Keyed on rootNode, renderer, and the bridged values — re-wires when any change.
+    // Keyed on rootNode, renderer, and stable values — re-wires when any change.
+    // Callback keys use rememberUpdatedState to avoid churn from inline lambdas.
     // onDispose clears the callback and hooks to prevent stale references when
     // the composable leaves the tree or dependencies are recreated.
-    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, config.forceRebuild, config.onRenderError) {
+    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, config.forceRebuild) {
         rootNode.onDirty = { sceneVersion++ }
         renderer.benchmarkHooks = currentBenchmarkHooks
         renderer.forceRebuild = config.forceRebuild
-        renderer.onRenderError = config.onRenderError
+        renderer.onRenderError = { id, error -> currentOnRenderError?.invoke(id, error) }
 
         onDispose {
             rootNode.onDirty = null
@@ -122,7 +124,9 @@ fun IsometricScene(
     }
 
     // Hook: expose prepared scene for inspection/debugging outside the draw phase.
-    // Uses rememberUpdatedState so the DisposableEffect closure always calls the latest callback.
+    // Fires after every recomposition. The scene is the latest cached value and
+    // may lag by one frame (updated during Canvas draw, observed next composition).
+    // Uses rememberUpdatedState so the SideEffect always calls the latest callback.
     val currentOnPreparedSceneReady by rememberUpdatedState(config.onPreparedSceneReady)
     SideEffect {
         renderer.currentPreparedScene?.let { scene ->
@@ -145,10 +149,13 @@ fun IsometricScene(
     }
 
     // Effect 2: Publish hit-test function and runtime flags to callers.
-    // Keyed on the dependencies captured by the hit-test lambda — re-publishes when they change.
-    // onDispose nullifies the hit-test function so callers don't hold a stale reference.
-    DisposableEffect(config.onHitTestReady, config.onFlagsReady, renderContext, canvasWidth, canvasHeight) {
-        config.onHitTestReady?.invoke { x, y ->
+    // Keyed on all values captured by the hit-test lambda (including renderer/rootNode)
+    // so the effect re-publishes a fresh function when the renderer is recreated.
+    // Callback keys use rememberUpdatedState to avoid churn from inline lambdas.
+    val currentOnHitTestReady by rememberUpdatedState(config.onHitTestReady)
+    val currentOnFlagsReady by rememberUpdatedState(config.onFlagsReady)
+    DisposableEffect(renderer, rootNode, renderContext, canvasWidth, canvasHeight) {
+        currentOnHitTestReady?.invoke { x, y ->
             renderer.hitTest(
                 rootNode = rootNode,
                 x = x, y = y,
@@ -158,7 +165,7 @@ fun IsometricScene(
             )
         }
 
-        config.onFlagsReady?.invoke(
+        currentOnFlagsReady?.invoke(
             RuntimeFlagSnapshot(
                 enablePathCaching = config.enablePathCaching,
                 enableSpatialIndex = config.enableSpatialIndex,
@@ -171,8 +178,8 @@ fun IsometricScene(
         )
 
         onDispose {
-            // No explicit teardown needed — callers receive a fresh lambda on re-entry,
-            // and the old lambda simply becomes unreachable when dependencies change.
+            // Publish a no-op so callers don't invoke a stale reference to a closed renderer
+            currentOnHitTestReady?.invoke { _, _ -> null }
         }
     }
 
