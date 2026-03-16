@@ -45,6 +45,23 @@ class RenderContext(
     )
 
     /**
+     * Create a new context with overridden render options.
+     */
+    fun withRenderOptions(options: RenderOptions): RenderContext {
+        return RenderContext(
+            width = width,
+            height = height,
+            renderOptions = options,
+            lightDirection = lightDirection,
+            accumulatedPosition = accumulatedPosition,
+            accumulatedRotation = accumulatedRotation,
+            accumulatedScale = accumulatedScale,
+            rotationOrigin = rotationOrigin,
+            scaleOrigin = scaleOrigin
+        )
+    }
+
+    /**
      * Create a new context with additional transforms
      */
     fun withTransform(
