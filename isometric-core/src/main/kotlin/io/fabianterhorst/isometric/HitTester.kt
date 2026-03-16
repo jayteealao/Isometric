@@ -3,8 +3,8 @@ package io.fabianterhorst.isometric
 /**
  * Hit testing: find the frontmost render command at a screen coordinate.
  *
- * Builds a convex hull of each command's projected points and performs
- * point-in-polygon testing with optional touch radius expansion.
+ * Uses the projected polygon points directly for point-in-polygon testing
+ * with optional touch radius expansion.
  */
 internal object HitTester {
 
@@ -31,18 +31,18 @@ internal object HitTester {
         }
 
         for (command in commandsList) {
-            val hull = buildConvexHull(command.points)
-            val hullPoints = hull.map { Point(it.x, it.y, 0.0) }
+            // Use projected points directly — they are already in correct winding order
+            val points = command.points.map { Point(it.x, it.y, 0.0) }
 
             val isInside = if (touchRadius > 0.0) {
                 IntersectionUtils.isPointCloseToPoly(
-                    hullPoints, x, y, touchRadius
+                    points, x, y, touchRadius
                 ) || IntersectionUtils.isPointInPoly(
-                    hullPoints, x, y
+                    points, x, y
                 )
             } else {
                 IntersectionUtils.isPointInPoly(
-                    hullPoints, x, y
+                    points, x, y
                 )
             }
 
@@ -52,44 +52,5 @@ internal object HitTester {
         }
 
         return null
-    }
-
-    /**
-     * Build a convex hull for hit testing.
-     * Returns the extreme points (top, bottom, left, right) plus any edge points.
-     */
-    private fun buildConvexHull(points: List<Point2D>): List<Point2D> {
-        if (points.isEmpty()) return emptyList()
-
-        var top: Point2D? = null
-        var bottom: Point2D? = null
-        var left: Point2D? = null
-        var right: Point2D? = null
-
-        for (point in points) {
-            if (top == null || point.y > top.y) {
-                top = point
-            }
-            if (bottom == null || point.y < bottom.y) {
-                bottom = point
-            }
-            if (left == null || point.x < left.x) {
-                left = point
-            }
-            if (right == null || point.x > right.x) {
-                right = point
-            }
-        }
-
-        val hull = mutableListOf(left!!, top!!, right!!, bottom!!)
-
-        for (point in points) {
-            if (point.x == left.x && point != left) hull.add(point)
-            if (point.x == right.x && point != right) hull.add(point)
-            if (point.y == top.y && point != top) hull.add(point)
-            if (point.y == bottom.y && point != bottom) hull.add(point)
-        }
-
-        return hull.distinct()
     }
 }
