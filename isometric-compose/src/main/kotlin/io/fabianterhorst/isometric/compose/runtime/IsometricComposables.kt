@@ -7,6 +7,8 @@ import androidx.compose.runtime.ReusableComposeNode
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
+import io.fabianterhorst.isometric.RenderCommand
+import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Shape
 
 /**
@@ -72,6 +74,7 @@ fun IsometricScope.Shape(
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the group and its children are visible
+ * @param renderOptions Optional per-subtree render options override (null inherits from parent)
  * @param content The child nodes
  */
 @IsometricComposable
@@ -83,6 +86,7 @@ fun IsometricScope.Group(
     rotationOrigin: Point? = null,
     scaleOrigin: Point? = null,
     visible: Boolean = true,
+    renderOptions: RenderOptions? = null,
     content: @Composable IsometricScope.() -> Unit
 ) {
     ReusableComposeNode<GroupNode, IsometricApplier>(
@@ -102,6 +106,7 @@ fun IsometricScope.Group(
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
+            set(renderOptions) { this.renderOptions = it; markDirty() }
         },
         content = {
             IsometricScopeImpl.content()
@@ -237,4 +242,79 @@ fun <T> IsometricScope.ForEach(
             IsometricScopeImpl.content(item)
         }
     }
+}
+
+/**
+ * Add a custom-rendered node to the isometric scene.
+ *
+ * This is the escape hatch for geometry beyond built-in shapes. The [render]
+ * function is called during tree traversal with the accumulated [RenderContext]
+ * and the node's unique ID (for use in [RenderCommand.ownerNodeId] to enable
+ * hit testing), and should return [RenderCommand]s representing the custom geometry.
+ *
+ * Example — a custom ground plane:
+ * ```
+ * CustomNode(render = { context, nodeId ->
+ *     val groundPath = Path(
+ *         Point(-5.0, -5.0, 0.0),
+ *         Point(5.0, -5.0, 0.0),
+ *         Point(5.0, 5.0, 0.0),
+ *         Point(-5.0, 5.0, 0.0)
+ *     )
+ *     val transformedPath = context.applyTransformsToPath(groundPath)
+ *     listOf(
+ *         RenderCommand(
+ *             commandId = "ground",
+ *             points = emptyList(),
+ *             color = IsoColor(200.0, 200.0, 200.0),
+ *             originalPath = transformedPath,
+ *             originalShape = null,
+ *             ownerNodeId = nodeId
+ *         )
+ *     )
+ * })
+ * ```
+ *
+ * @param position Local position offset
+ * @param rotation Local rotation around Z axis
+ * @param scale Local scale factor
+ * @param rotationOrigin Origin point for rotation
+ * @param scaleOrigin Origin point for scaling
+ * @param visible Whether the node is visible
+ * @param renderOptions Optional per-node render options override
+ * @param render Function producing render commands from the accumulated context and node ID
+ */
+@IsometricComposable
+@Composable
+fun IsometricScope.CustomNode(
+    position: Point = Point(0.0, 0.0, 0.0),
+    rotation: Double = 0.0,
+    scale: Double = 1.0,
+    rotationOrigin: Point? = null,
+    scaleOrigin: Point? = null,
+    visible: Boolean = true,
+    renderOptions: RenderOptions? = null,
+    render: (context: RenderContext, nodeId: String) -> List<RenderCommand>
+) {
+    ReusableComposeNode<CustomRenderNode, IsometricApplier>(
+        factory = { CustomRenderNode(render) },
+        update = {
+            set(render) { this.renderFunction = it; markDirty() }
+            set(position) { this.position = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it
+                markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it
+                markDirty()
+            }
+            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
+            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
+            set(visible) { this.isVisible = it; markDirty() }
+            set(renderOptions) { this.renderOptions = it; markDirty() }
+        }
+    )
 }

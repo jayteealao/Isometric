@@ -4,6 +4,7 @@ import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.RenderCommand
+import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Shape
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
@@ -71,6 +72,13 @@ abstract class IsometricNode {
     var isVisible: Boolean = true
 
     /**
+     * Optional per-node render options override.
+     * When non-null, overrides the inherited render options for this node and its subtree.
+     * When null (default), inherits from the parent context.
+     */
+    var renderOptions: RenderOptions? = null
+
+    /**
      * Dirty tracking for efficient rendering.
      * Volatile to ensure visibility across threads (Applier vs Canvas draw).
      */
@@ -121,27 +129,6 @@ abstract class IsometricNode {
      */
     abstract fun renderTo(output: MutableList<RenderCommand>, context: RenderContext)
 
-    protected fun applyLocalTransforms(shape: Shape): Shape {
-        var result = shape.translate(position.x, position.y, position.z)
-        if (rotation != 0.0) {
-            result = result.rotateZ(rotationOrigin ?: position, rotation)
-        }
-        if (scale != 1.0) {
-            result = result.scale(scaleOrigin ?: position, scale)
-        }
-        return result
-    }
-
-    protected fun applyLocalTransforms(path: Path): Path {
-        var result = path.translate(position.x, position.y, position.z)
-        if (rotation != 0.0) {
-            result = result.rotateZ(rotationOrigin ?: position, rotation)
-        }
-        if (scale != 1.0) {
-            result = result.scale(scaleOrigin ?: position, scale)
-        }
-        return result
-    }
 }
 
 /**
@@ -153,8 +140,15 @@ class GroupNode : IsometricNode() {
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
         if (!isVisible) return
 
+        // Apply per-node render options override if set
+        val effectiveContext = if (renderOptions != null) {
+            context.withRenderOptions(renderOptions!!)
+        } else {
+            context
+        }
+
         // Create child context with accumulated transforms
-        val childContext = context.withTransform(
+        val childContext = effectiveContext.withTransform(
             position = position,
             rotation = rotation,
             scale = scale,
@@ -181,7 +175,19 @@ class ShapeNode(
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
         if (!isVisible) return
 
-        val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
+        val effectiveContext = if (renderOptions != null) {
+            context.withRenderOptions(renderOptions!!)
+        } else {
+            context
+        }
+        val localContext = effectiveContext.withTransform(
+            position = position,
+            rotation = rotation,
+            scale = scale,
+            rotationOrigin = rotationOrigin,
+            scaleOrigin = scaleOrigin
+        )
+        val transformedShape = localContext.applyTransformsToShape(shape)
 
         // Convert shape to render commands — adds directly to accumulator
         for (path in transformedShape.paths) {
@@ -211,7 +217,19 @@ class PathNode(
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
         if (!isVisible) return
 
-        val transformedPath = applyLocalTransforms(context.applyTransformsToPath(path))
+        val effectiveContext = if (renderOptions != null) {
+            context.withRenderOptions(renderOptions!!)
+        } else {
+            context
+        }
+        val localContext = effectiveContext.withTransform(
+            position = position,
+            rotation = rotation,
+            scale = scale,
+            rotationOrigin = rotationOrigin,
+            scaleOrigin = scaleOrigin
+        )
+        val transformedPath = localContext.applyTransformsToPath(path)
 
         output.add(
             RenderCommand(
@@ -239,8 +257,21 @@ class BatchNode(
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
         if (!isVisible) return
 
+        val effectiveContext = if (renderOptions != null) {
+            context.withRenderOptions(renderOptions!!)
+        } else {
+            context
+        }
+        val localContext = effectiveContext.withTransform(
+            position = position,
+            rotation = rotation,
+            scale = scale,
+            rotationOrigin = rotationOrigin,
+            scaleOrigin = scaleOrigin
+        )
+
         shapes.forEachIndexed { index, shape ->
-            val transformedShape = applyLocalTransforms(context.applyTransformsToShape(shape))
+            val transformedShape = localContext.applyTransformsToShape(shape)
 
             for (path in transformedShape.paths) {
                 output.add(
@@ -257,4 +288,38 @@ class BatchNode(
         }
     }
 
+}
+
+/**
+ * Node that delegates rendering to a user-provided function.
+ *
+ * This is the escape hatch for users who need geometry beyond the built-in shapes.
+ * The [renderFunction] receives the accumulated [RenderContext] and the node's
+ * [nodeId] (for use in [RenderCommand.ownerNodeId]), and returns render commands
+ * that will be included in the scene's depth sorting and drawing.
+ */
+class CustomRenderNode(
+    var renderFunction: (context: RenderContext, nodeId: String) -> List<RenderCommand>
+) : IsometricNode() {
+
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
+
+        // Apply per-node render options override if set
+        val effectiveContext = if (renderOptions != null) {
+            context.withRenderOptions(renderOptions!!)
+        } else {
+            context
+        }
+
+        val localContext = effectiveContext.withTransform(
+            position = position,
+            rotation = rotation,
+            scale = scale,
+            rotationOrigin = rotationOrigin,
+            scaleOrigin = scaleOrigin
+        )
+
+        output += renderFunction(localContext, nodeId)
+    }
 }
