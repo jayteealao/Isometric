@@ -45,7 +45,10 @@ android {
 }
 
 dependencies {
-    // Core module
+    // api (not implementation) because Shape, Point, IsoColor, Vector etc. appear in
+    // composable signatures — consumers need direct access to core types.
+    // Internal collaborators (SceneGraph, IsometricProjection, DepthSorter, HitTester)
+    // are marked internal and don't leak through api.
     api(project(":isometric-core"))
 
     // Compose
