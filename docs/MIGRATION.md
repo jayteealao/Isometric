@@ -1,6 +1,10 @@
 # Migration Guide: Android View → Jetpack Compose
 
-This guide helps you migrate from the View-based `IsometricView` API to the new Compose `IsometricCanvas` API.
+> **This document has been superseded by the [documentation site](https://jayteealao.github.io/Isometric/migration/view-to-compose/).** This file is retained for reference only.
+
+This guide helps you migrate from the View-based `IsometricView` API to the Compose `IsometricScene` API.
+
+> **Note:** An earlier Compose API called `IsometricCanvas` was removed and superseded by `IsometricScene`. All examples below use `IsometricScene`. If you are migrating from `IsometricCanvas`, see the [Runtime API documentation](RUNTIME_API.md) for the current API.
 
 ## Module Migration
 
@@ -48,17 +52,14 @@ isometricView.add(
 ```kotlin
 @Composable
 fun MyScreen() {
-    val sceneState = rememberIsometricSceneState()
-
-    IsometricCanvas(
-        state = sceneState,
+    IsometricScene(
         modifier = Modifier
             .fillMaxWidth()
             .height(300.dp)
     ) {
-        add(
-            Prism(Point(0.0, 0.0, 0.0)),
-            IsoColor(33.0, 150.0, 243.0)
+        Shape(
+            geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+            color = IsoColor(33, 150, 243)
         )
     }
 }
@@ -70,7 +71,7 @@ fun MyScreen() {
 
 | View API | Compose API |
 |----------|-------------|
-| `import io.fabianterhorst.isometric.IsometricView` | `import io.fabianterhorst.isometric.compose.IsometricCanvas` |
+| `import io.fabianterhorst.isometric.IsometricView` | `import io.fabianterhorst.isometric.compose.runtime.IsometricScene` |
 | `import io.fabianterhorst.isometric.Color` | `import io.fabianterhorst.isometric.IsoColor` |
 | `import io.fabianterhorst.isometric.shapes.*` | `import io.fabianterhorst.isometric.shapes.*` (unchanged) |
 
@@ -110,16 +111,9 @@ isometricView.clear();
 
 **Compose API (declarative):**
 ```kotlin
-val sceneState = rememberIsometricSceneState()
-
-// In composable content block:
-IsometricCanvas(state = sceneState) {
-    add(shape, color)
+IsometricScene {
+    Shape(geometry = shape, color = color)
 }
-
-// Or imperatively:
-sceneState.add(shape, color)
-sceneState.clear()
 ```
 
 ### 5. Click Handling
@@ -136,13 +130,16 @@ isometricView.setClickListener(new IsometricView.OnItemClickListener() {
 
 **Compose API:**
 ```kotlin
-IsometricCanvas(
-    state = sceneState,
-    onItemClick = { renderCommand ->
-        // Handle click
-    }
+IsometricScene(
+    config = SceneConfig(
+        gestures = GestureConfig(
+            onTap = { event ->
+                println("Tapped node: ${event.node?.nodeId}")
+            }
+        )
+    )
 ) {
-    // Scene content
+    Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33, 150, 243))
 }
 ```
 
@@ -159,12 +156,13 @@ isometricView.setTouchRadius(8.0);
 
 **Compose API:**
 ```kotlin
-IsometricCanvas(
-    state = sceneState,
-    renderOptions = RenderOptions(
-        enableDepthSorting = true,
-        enableBackfaceCulling = true,
-        enableBoundsChecking = true
+IsometricScene(
+    config = SceneConfig(
+        renderOptions = RenderOptions(
+            enableDepthSorting = true,
+            enableBackfaceCulling = true,
+            enableBoundsChecking = true
+        )
     )
 ) {
     // Scene content
@@ -202,10 +200,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MyStaticScene() {
-    val sceneState = rememberIsometricSceneState()
-
-    IsometricCanvas(state = sceneState) {
-        add(Prism(Point.ORIGIN), IsoColor(33.0, 150.0, 243.0))
+    IsometricScene {
+        Shape(
+            geometry = Prism(position = Point.ORIGIN),
+            color = IsoColor(33, 150, 243)
+        )
     }
 }
 ```
@@ -231,20 +230,16 @@ private void updateScene(int count) {
 ```kotlin
 @Composable
 fun DynamicScene() {
-    val sceneState = rememberIsometricSceneState()
     var count by remember { mutableIntStateOf(1) }
 
-    LaunchedEffect(count) {
-        sceneState.clear()
-        repeat(count) { i ->
-            sceneState.add(
-                Prism(Point(i.toDouble(), 0.0, 0.0)),
-                IsoColor(33.0, 150.0, 243.0)
+    IsometricScene {
+        ForEach((0 until count).toList()) { i ->
+            Shape(
+                geometry = Prism(position = Point(i.toDouble(), 0.0, 0.0)),
+                color = IsoColor(33, 150, 243)
             )
         }
     }
-
-    IsometricCanvas(state = sceneState)
 }
 ```
 
@@ -279,7 +274,6 @@ private void updateScene() {
 ```kotlin
 @Composable
 fun AnimatedScene() {
-    val sceneState = rememberIsometricSceneState()
     var rotation by remember { mutableStateOf(0.0) }
 
     LaunchedEffect(Unit) {
@@ -290,16 +284,17 @@ fun AnimatedScene() {
         }
     }
 
-    LaunchedEffect(rotation) {
-        sceneState.clear()
-        val cube = Prism(Point.ORIGIN, 3.0, 3.0, 1.0)
-        sceneState.add(
-            cube.rotateZ(Point(1.5, 1.5, 0.0), rotation),
-            IsoColor(50.0, 60.0, 160.0)
-        )
+    IsometricScene {
+        Group(
+            rotation = rotation,
+            rotationOrigin = Point(1.5, 1.5, 0.0)
+        ) {
+            Shape(
+                geometry = Prism(position = Point.ORIGIN, width = 3.0, depth = 3.0, height = 1.0),
+                color = IsoColor(50, 60, 160)
+            )
+        }
     }
-
-    IsometricCanvas(state = sceneState)
 }
 ```
 
@@ -386,14 +381,17 @@ LaunchedEffect(myState) {
 
 ### Issue: Click detection not working
 
-**Solution:** Ensure you're using `IsometricCanvas` with `onItemClick` parameter:
+**Solution:** Ensure you're using `IsometricScene` with `GestureConfig`:
 
 ```kotlin
-IsometricCanvas(
-    state = sceneState,
-    onItemClick = { renderCommand ->
-        // Handle click
-    }
+IsometricScene(
+    config = SceneConfig(
+        gestures = GestureConfig(
+            onTap = { event ->
+                println("Tapped: ${event.node?.nodeId}")
+            }
+        )
+    )
 ) {
     // Scene content
 }
@@ -403,22 +401,22 @@ IsometricCanvas(
 
 1. **Use RenderOptions.NoDepthSorting** for large scenes where draw order does not matter:
    ```kotlin
-   IsometricCanvas(
-       renderOptions = RenderOptions.NoDepthSorting
-   )
+   IsometricScene(
+       config = SceneConfig(renderOptions = RenderOptions.NoDepthSorting)
+   ) {
+       // Scene content
+   }
    ```
 
-2. **Avoid recreating scenes unnecessarily:**
+2. **Leverage per-node dirty tracking:**
    ```kotlin
-   // Good: Only recreates when count changes
-   LaunchedEffect(count) {
-       sceneState.clear()
-       // Build scene
+   // Good: Only the animated group recomposes
+   IsometricScene {
+       Shape(geometry = staticShape, color = color1)  // Never recomposes
+       Group(rotation = angle) {                       // Only this recomposes
+           Shape(geometry = animatedShape, color = color2)
+       }
    }
-
-   // Bad: Recreates every recomposition
-   sceneState.clear()
-   // Build scene
    ```
 
 3. **Use `remember` for expensive computations:**
@@ -431,17 +429,17 @@ IsometricCanvas(
 
 ## Questions?
 
-- Check the investigation report: `COMPOSE_PORT_INVESTIGATION.md`
-- Review the README: `README_COMPOSE.md`
+- See the [Runtime API documentation](RUNTIME_API.md) for the current API reference
+- See the [Performance Optimizations guide](PERFORMANCE_OPTIMIZATIONS.md) for tuning
 - Open an issue on GitHub
 
 ## Summary
 
 **Key Changes:**
 - ✅ `Color` → `IsoColor`
-- ✅ `IsometricView` (XML) → `IsometricCanvas` (Composable)
-- ✅ `setClickListener()` → `onItemClick` parameter
-- ✅ Imperative API → Declarative API (but imperative still available via `sceneState`)
+- ✅ `IsometricView` (XML) → `IsometricScene` (Composable)
+- ✅ `setClickListener()` → `GestureConfig(onTap = ...)`
+- ✅ Imperative API → Declarative API with scene graph
 - ✅ Int coordinates → Double coordinates
 - ✅ Java constructors → Kotlin constructors
 

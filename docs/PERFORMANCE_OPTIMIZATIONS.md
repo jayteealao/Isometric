@@ -1,5 +1,7 @@
 # Performance Optimizations Guide
 
+> **This document has been superseded by the [documentation site](https://jayteealao.github.io/Isometric/guides/performance/).** See also [Scene Config Reference](https://jayteealao.github.io/Isometric/reference/scene-config/) and [Rendering Pipeline](https://jayteealao.github.io/Isometric/concepts/rendering-pipeline/). This file is retained for reference only.
+
 This document covers the **advanced performance optimizations** available in the Isometric library's Runtime API.
 
 ## Overview

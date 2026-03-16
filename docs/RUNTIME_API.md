@@ -1,5 +1,7 @@
 # Isometric Runtime-Level API Documentation
 
+> **This document has been superseded by the [documentation site](https://jayteealao.github.io/Isometric/).** Content has been migrated to the Quick Start, Composables Reference, Animation, Gestures, Coordinate System, FAQ, Scene Graph, and Advanced Patterns pages. This file is retained for reference only.
+
 This document describes the new runtime-level API for the Isometric library, which uses Compose Runtime primitives (`ComposeNode`, `Applier`) to provide a more powerful and efficient way to build isometric scenes.
 
 ## Table of Contents
@@ -538,15 +540,15 @@ IsometricScene {
 }
 ```
 
-### Performance Comparison
+### Performance
 
-| Scenario | Old API | New API | Improvement |
-|----------|---------|---------|-------------|
-| Static scene (20 shapes) | 1ms | 1ms | Same |
-| Animated single shape | 15ms | 2ms | **7.5x faster** |
-| Conditional shapes (toggle 10) | 12ms | 1ms | **12x faster** |
-| Large grid (100 shapes animated) | 80ms | 5ms | **16x faster** |
-| Hit testing | 3ms | 1ms | **3x faster** |
+| Scenario | Frame time |
+|----------|-----------|
+| Static scene (20 shapes) | ~1ms |
+| Animated single shape | ~2ms |
+| Conditional shapes (toggle 10) | ~1ms |
+| Large grid (100 shapes animated) | ~5ms |
+| Hit testing | ~1ms |
 
 ### Memory Usage
 
@@ -560,13 +562,12 @@ IsometricScene {
 
 ### Simple Scene
 
-**Before:**
+**Before (legacy, removed):**
 ```kotlin
 val sceneState = rememberIsometricSceneState()
 
-IsometricCanvas(state = sceneState) {
-    add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
-}
+// IsometricCanvas was removed — use IsometricScene instead
+sceneState.add(Prism(position = Point(0.0, 0.0, 0.0)), IsoColor(33.0, 150.0, 243.0))
 ```
 
 **After:**
@@ -594,7 +595,7 @@ LaunchedEffect(angle) {
     sceneState.add(Octahedron(...).rotateZ(..., angle), color2)
 }
 
-IsometricCanvas(state = sceneState) {}
+// IsometricCanvas was removed — use IsometricScene instead
 ```
 
 **After:**
@@ -613,18 +614,11 @@ IsometricScene {
 
 ### Interactive Scene
 
-**Before:**
+**Before (legacy, removed):**
 ```kotlin
 val sceneState = rememberIsometricSceneState()
 
-IsometricCanvas(
-    state = sceneState,
-    onItemClick = { item ->
-        println("Clicked: ${item.commandId}")
-    }
-) {
-    add(Prism(...), color)
-}
+// IsometricCanvas was removed — use IsometricScene instead
 ```
 
 **After:**

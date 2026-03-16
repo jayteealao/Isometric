@@ -1,5 +1,7 @@
 # Performance Optimizations Summary
 
+> **This document has been superseded by the [documentation site](https://jayteealao.github.io/Isometric/guides/performance/).** This file is retained for reference only.
+
 ## ✅ All 8 Optimizations Implemented
 
 Based on the recommendations, we've implemented a complete set of performance optimizations:

@@ -1,5 +1,7 @@
 # Understanding the Two Levels of the Runtime API
 
+> **This document has been superseded by the [documentation site](https://jayteealao.github.io/Isometric/concepts/scene-graph/).** See also [Advanced Patterns](https://jayteealao.github.io/Isometric/examples/advanced-patterns/). This file is retained for reference only.
+
 ## Overview
 
 The runtime API provides **two levels of abstraction**:
