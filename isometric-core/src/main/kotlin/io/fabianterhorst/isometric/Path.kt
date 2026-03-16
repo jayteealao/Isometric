@@ -1,7 +1,20 @@
 package io.fabianterhorst.isometric
 
 /**
- * Represents a 2D path (polygon face) in 3D space
+ * Represents a polygon face in 3D space, defined by an ordered list of vertices.
+ *
+ * A Path requires at least 3 points and is used as the fundamental rendering primitive:
+ * each face of a [Shape] is a Path. Paths are immutable; all transform methods return
+ * new instances.
+ *
+ * A variadic constructor `Path(vararg points: Point)` is provided for convenient
+ * inline construction.
+ *
+ * The [depth] property is the average depth of all vertices, used for back-to-front
+ * sorting during rendering. Note that this is a sorting metric and is unrelated to the
+ * `depth` parameter on shape classes like [io.fabianterhorst.isometric.shapes.Prism].
+ *
+ * @param points The ordered vertices of this polygon (minimum 3)
  */
 open class Path(
     points: List<Point>

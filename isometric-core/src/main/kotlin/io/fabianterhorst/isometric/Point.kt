@@ -24,14 +24,22 @@ class Point @JvmOverloads constructor(
         val ORIGIN = Point(0.0, 0.0, 0.0)
 
         /**
-         * Distance between two points
+         * Distance between two points.
+         *
+         * @param p1 The first point.
+         * @param p2 The second point.
+         * @return The Euclidean distance between [p1] and [p2].
          */
         fun distance(p1: Point, p2: Point): Double {
             return sqrt(distance2(p1, p2))
         }
 
         /**
-         * Squared distance between two points (faster, avoids sqrt)
+         * Squared distance between two points (faster, avoids sqrt).
+         *
+         * @param p1 The first point.
+         * @param p2 The second point.
+         * @return The squared Euclidean distance between [p1] and [p2].
          */
         fun distance2(p1: Point, p2: Point): Double {
             val dx = p2.x - p1.x
@@ -41,7 +49,12 @@ class Point @JvmOverloads constructor(
         }
 
         /**
-         * Squared distance between a point p and a line segment vw
+         * Squared distance between a point and a line segment (faster, avoids sqrt).
+         *
+         * @param p The query point.
+         * @param v The start of the line segment.
+         * @param w The end of the line segment.
+         * @return The squared Euclidean distance from [p] to the closest point on segment [v]-[w].
          */
         fun distanceToSegmentSquared(p: Point, v: Point, w: Point): Double {
             val l2 = distance2(v, w)
@@ -55,7 +68,12 @@ class Point @JvmOverloads constructor(
         }
 
         /**
-         * Distance between a point p and a line segment vw
+         * Distance between a point and a line segment.
+         *
+         * @param p The query point.
+         * @param v The start of the line segment.
+         * @param w The end of the line segment.
+         * @return The Euclidean distance from [p] to the closest point on segment [v]-[w].
          */
         fun distanceToSegment(p: Point, v: Point, w: Point): Double {
             return sqrt(distanceToSegmentSquared(p, v, w))
@@ -63,26 +81,43 @@ class Point @JvmOverloads constructor(
     }
 
     /**
-     * Translate a point by the given deltas
+     * Translate a point by the given deltas.
+     *
+     * @param dx Delta to add to the x coordinate.
+     * @param dy Delta to add to the y coordinate.
+     * @param dz Delta to add to the z coordinate.
+     * @return A new point shifted by ([dx], [dy], [dz]).
      */
     fun translate(dx: Double, dy: Double, dz: Double): Point {
         return Point(x + dx, y + dy, z + dz)
     }
 
+    /** Returns a new point with each coordinate summed. */
     operator fun plus(other: Point): Point = Point(x + other.x, y + other.y, z + other.z)
 
+    /** Translates this point by [vector]. */
     operator fun plus(vector: Vector): Point = Point(x + vector.x, y + vector.y, z + vector.z)
 
+    /** Returns the [Vector] from [other] to this point. */
     operator fun minus(other: Point): Vector = Vector(x - other.x, y - other.y, z - other.z)
 
+    /** Translates this point by the negation of [vector]. */
     operator fun minus(vector: Vector): Point = Point(x - vector.x, y - vector.y, z - vector.z)
 
+    /** Scales all coordinates by [scalar]. */
     operator fun times(scalar: Double): Point = Point(x * scalar, y * scalar, z * scalar)
 
+    /** Negates all coordinates. */
     operator fun unaryMinus(): Point = Point(-x, -y, -z)
 
     /**
-     * Scale a point about a given origin
+     * Scale a point about a given origin.
+     *
+     * @param origin The center of the scale operation.
+     * @param dx Scale factor for the x axis.
+     * @param dy Scale factor for the y axis.
+     * @param dz Scale factor for the z axis.
+     * @return A new point scaled around [origin].
      */
     fun scale(origin: Point, dx: Double, dy: Double, dz: Double): Point {
         return Point(
@@ -92,16 +127,22 @@ class Point @JvmOverloads constructor(
         )
     }
 
+    /** Uniform scale by [dx] relative to [origin]. */
     fun scale(origin: Point, dx: Double): Point {
         return scale(origin, dx, dx, dx)
     }
 
+    /** Scales X by [dx] and Y by [dy] relative to [origin] (Z unchanged). */
     fun scale(origin: Point, dx: Double, dy: Double): Point {
         return scale(origin, dx, dy, 1.0)
     }
 
     /**
-     * Rotate about origin on the X axis
+     * Rotate about origin on the X axis.
+     *
+     * @param origin The center of rotation.
+     * @param angle The rotation angle in radians.
+     * @return A new point rotated around the X axis through [origin].
      */
     fun rotateX(origin: Point, angle: Double): Point {
         val pY = y - origin.y
@@ -114,7 +155,11 @@ class Point @JvmOverloads constructor(
     }
 
     /**
-     * Rotate about origin on the Y axis
+     * Rotate about origin on the Y axis.
+     *
+     * @param origin The center of rotation.
+     * @param angle The rotation angle in radians.
+     * @return A new point rotated around the Y axis through [origin].
      */
     fun rotateY(origin: Point, angle: Double): Point {
         val pX = x - origin.x
@@ -127,7 +172,11 @@ class Point @JvmOverloads constructor(
     }
 
     /**
-     * Rotate about origin on the Z axis
+     * Rotate about origin on the Z axis.
+     *
+     * @param origin The center of rotation.
+     * @param angle The rotation angle in radians.
+     * @return A new point rotated around the Z axis through [origin].
      */
     fun rotateZ(origin: Point, angle: Double): Point {
         val pX = x - origin.x

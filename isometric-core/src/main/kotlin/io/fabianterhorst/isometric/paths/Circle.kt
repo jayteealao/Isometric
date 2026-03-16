@@ -7,7 +7,15 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * A circular path (polygon approximation of a circle)
+ * A circular [Path] approximated by a regular polygon with [vertices] sides.
+ *
+ * Higher [vertices] values produce smoother circles at the cost of more geometry.
+ * A minimum of 3 vertices is required; 20 (the default) is visually smooth for
+ * most use cases.
+ *
+ * @param origin Center point of the circle in world space.
+ * @param radius Radius of the circle in world units. Must be positive.
+ * @param vertices Number of sides in the polygon approximation. Must be >= 3.
  */
 class Circle(
     origin: Point,

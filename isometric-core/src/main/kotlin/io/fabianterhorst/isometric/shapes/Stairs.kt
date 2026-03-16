@@ -5,7 +5,14 @@ import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.Shape
 
 /**
- * A staircase shape
+ * A staircase shape whose steps are distributed within a 1x1x1 bounding box.
+ *
+ * Each step occupies `1/stepCount` of the total depth (y-axis) and height (z-axis),
+ * while the full width (x-axis) is always 1 unit. Use [translate] and [Shape.scale]
+ * to reposition or resize the staircase.
+ *
+ * @param position The origin corner of the staircase bounding box (default [Point.ORIGIN])
+ * @param stepCount The number of steps (must be at least 1)
  */
 class Stairs @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,

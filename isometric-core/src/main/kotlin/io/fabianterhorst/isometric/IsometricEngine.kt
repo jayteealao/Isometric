@@ -142,8 +142,23 @@ class IsometricEngine @JvmOverloads constructor(
         return projection.screenToWorld(screenPoint, originX, originY, z)
     }
 
+    /**
+     * Adds all faces of a [Shape] to the scene with the given [color].
+     *
+     * Each face ([Path]) of the shape is added as a separate scene item so that
+     * individual faces can be depth-sorted and lit independently.
+     */
     override fun add(shape: Shape, color: IsoColor) = sceneGraph.add(shape, color)
 
+    /**
+     * Adds a single [Path] (polygon face) to the scene.
+     *
+     * @param path The polygon face to add
+     * @param color The base color for this face
+     * @param originalShape Optional reference to the parent [Shape] (used for hit-test grouping)
+     * @param id Optional unique identifier for this scene item
+     * @param ownerNodeId Optional identifier of the Compose node that owns this item
+     */
     override fun add(
         path: Path,
         color: IsoColor,
@@ -152,11 +167,22 @@ class IsometricEngine @JvmOverloads constructor(
         ownerNodeId: String?
     ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId)
 
+    /**
+     * Removes all items from the scene graph.
+     */
     override fun clear() = sceneGraph.clear()
 
     /**
-     * Project the 3D scene to 2D screen space for the given viewport size.
-     * Returns a platform-agnostic [PreparedScene] with sorted render commands.
+     * Projects the 3D scene to 2D screen space for the given viewport size.
+     *
+     * Applies back-face culling, bounds checking, lighting, and depth sorting
+     * according to [renderOptions], then returns a platform-agnostic [PreparedScene]
+     * containing sorted render commands ready for drawing.
+     *
+     * @param width The viewport width in pixels
+     * @param height The viewport height in pixels
+     * @param renderOptions Controls culling, sorting, and other rendering options
+     * @param lightDirection The direction of the light source (will be normalized internally)
      */
     override fun projectScene(
         width: Int,
@@ -195,6 +221,16 @@ class IsometricEngine @JvmOverloads constructor(
         return PreparedScene(commands, width, height)
     }
 
+    /**
+     * Finds the [RenderCommand] at the given screen coordinates in the prepared scene.
+     *
+     * @param preparedScene The previously projected scene to query
+     * @param x The screen x-coordinate to test
+     * @param y The screen y-coordinate to test
+     * @param order Whether to return the front-most or back-most hit
+     * @param touchRadius Pixel radius for fuzzy hit testing (0.0 for exact)
+     * @return The matching [RenderCommand], or `null` if nothing is hit
+     */
     override fun findItemAt(
         preparedScene: PreparedScene,
         x: Double,

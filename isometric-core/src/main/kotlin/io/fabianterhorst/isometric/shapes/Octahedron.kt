@@ -7,7 +7,12 @@ import kotlin.math.PI
 import kotlin.math.sqrt
 
 /**
- * An octahedron shape (8-faced polyhedron)
+ * An octahedron (8-faced polyhedron) inscribed in a unit cube.
+ *
+ * The octahedron has a fixed size of approximately 1 world unit across each axis.
+ * Use [translate] and [Shape.scale] to reposition or resize it.
+ *
+ * @param position The origin corner of the bounding cube (default [Point.ORIGIN])
  */
 class Octahedron(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
 

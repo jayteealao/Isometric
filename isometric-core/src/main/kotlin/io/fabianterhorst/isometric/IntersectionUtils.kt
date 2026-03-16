@@ -6,7 +6,16 @@ package io.fabianterhorst.isometric
 object IntersectionUtils {
 
     /**
-     * Check if a point is close to any edge of a polygon (within radius)
+     * Tests whether the point ([x], [y]) is within [radius] pixels of the polygon [poly].
+     *
+     * Combines a point-in-polygon test with an edge-proximity test so that points
+     * near the polygon boundary also return `true`.
+     *
+     * @param poly Polygon vertices (projected 2D points).
+     * @param x X coordinate to test.
+     * @param y Y coordinate to test.
+     * @param radius Maximum distance from the polygon edge to still be considered "close".
+     * @return `true` if the point is inside or within [radius] of the polygon.
      */
     fun isPointCloseToPoly(poly: List<Point>, x: Double, y: Double, radius: Double): Boolean {
         val p = Point(x, y, 0.0)
@@ -28,7 +37,13 @@ object IntersectionUtils {
     }
 
     /**
-     * Ray casting algorithm to check if a point is inside a polygon
+     * Tests whether the point ([x], [y]) is inside the polygon [poly] using the
+     * ray-casting algorithm.
+     *
+     * @param poly Polygon vertices (projected 2D points).
+     * @param x X coordinate to test.
+     * @param y Y coordinate to test.
+     * @return `true` if the point is strictly inside the polygon.
      */
     fun isPointInPoly(poly: List<Point>, x: Double, y: Double): Boolean {
         var c = false
@@ -45,7 +60,13 @@ object IntersectionUtils {
     }
 
     /**
-     * Check if two polygons have any intersection (edges cross or one contains the other)
+     * Tests whether two convex polygons overlap using the Separating Axis Theorem (SAT).
+     *
+     * Used during depth sorting to determine which face pairs need explicit ordering.
+     *
+     * @param pointsA Vertices of the first polygon (projected 2D points).
+     * @param pointsB Vertices of the second polygon (projected 2D points).
+     * @return `true` if the polygons overlap.
      */
     fun hasIntersection(pointsA: List<Point>, pointsB: List<Point>): Boolean {
         if (pointsA.isEmpty() || pointsB.isEmpty()) return false

@@ -6,7 +6,15 @@ import io.fabianterhorst.isometric.Shape
 import kotlin.math.PI
 
 /**
- * A pyramid shape
+ * A pyramid shape with a rectangular base tapering to an apex.
+ *
+ * The base is defined by [position], [width], and [depth], and the apex is centered
+ * above the base at the given [height].
+ *
+ * @param position The minimum-corner origin point of the base (default [Point.ORIGIN])
+ * @param width The extent of the base along the x-axis (must be positive, default 1.0)
+ * @param depth The extent of the base along the y-axis (must be positive, default 1.0)
+ * @param height The height of the apex above the base along the z-axis (must be positive, default 1.0)
  */
 class Pyramid @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,

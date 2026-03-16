@@ -5,7 +5,13 @@ import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.Shape
 
 /**
- * A rectangular prism (box) shape
+ * A rectangular prism (box) shape composed of six quad faces.
+ *
+ * @param position The minimum-corner origin point of the prism (default [Point.ORIGIN])
+ * @param width The extent along the x-axis (must be positive, default 1.0)
+ * @param depth The extent along the y-axis (must be positive, default 1.0). Note that this
+ *   is a geometric dimension and is unrelated to [Path.depth], which is a sorting metric.
+ * @param height The extent along the z-axis (must be positive, default 1.0)
  */
 class Prism @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,

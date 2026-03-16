@@ -1,7 +1,16 @@
 package io.fabianterhorst.isometric
 
 /**
- * Represents a 3D shape composed of multiple 2D paths (faces)
+ * Represents a 3D shape composed of multiple polygon faces ([Path] instances).
+ *
+ * Shapes are immutable value objects: every transform method (translate, rotate, scale)
+ * returns a new [Shape] rather than mutating in place. The constituent [paths] define the
+ * faces of the shape and are used for rendering, depth sorting, and hit testing.
+ *
+ * Use the [extrude] factory method to create a 3D shape from a 2D [Path], or construct
+ * directly from a list of paths.
+ *
+ * @param paths The polygon faces that make up this shape (must not be empty)
  */
 open class Shape(
     val paths: List<Path>
@@ -62,7 +71,13 @@ open class Shape(
 
     companion object {
         /**
-         * Extrude a 2D path along the z-axis to create a 3D shape
+         * Extrudes a 2D [Path] along the z-axis to create a 3D shape.
+         *
+         * The resulting shape contains a bottom face, a top face, and one side face
+         * per edge of the original path.
+         *
+         * @param path The 2D base polygon to extrude
+         * @param height The distance to extrude along the z-axis (default 1.0)
          */
         fun extrude(path: Path, height: Double = 1.0): Shape {
             val topPath = path.translate(0.0, 0.0, height)
