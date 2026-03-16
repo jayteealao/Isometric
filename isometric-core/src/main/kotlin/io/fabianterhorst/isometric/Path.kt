@@ -14,8 +14,18 @@ open class Path(
 
     /**
      * Average depth of all points in this path, precalculated at construction time.
+     * Uses the default 30° angle.
      */
     val depth: Double = this.points.sumOf { it.depth() } / this.points.size
+
+    /**
+     * Average depth for an arbitrary engine angle.
+     *
+     * @param angle The isometric projection angle in radians
+     */
+    fun depth(angle: Double): Double {
+        return points.sumOf { it.depth(angle) } / points.size
+    }
 
     constructor(vararg points: Point) : this(points.toList())
 

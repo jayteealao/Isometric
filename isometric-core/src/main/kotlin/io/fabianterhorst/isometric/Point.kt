@@ -133,11 +133,29 @@ class Point(
     }
 
     /**
-     * The depth of a point in the isometric plane
-     * z is weighted slightly to accommodate |_ arrangements
+     * Simplified depth formula using equal weighting for x and y.
+     * This is a heuristic that provides correct relative ordering for standard
+     * isometric scenes. For exact depth at arbitrary projection angles,
+     * use [depth] with an angle parameter.
+     *
+     * Note: This is NOT equivalent to `depth(PI/6)` — the parameterized
+     * version uses cos/sin weighting while this uses uniform weighting.
      */
     fun depth(): Double {
         return x + y - 2 * z
+    }
+
+    /**
+     * The depth of a point in the isometric plane for an arbitrary engine angle.
+     * The formula weights x/y by cos/sin of the projection angle and z by a
+     * factor that preserves correct depth ordering for the given viewing angle.
+     *
+     * @param angle The isometric projection angle in radians (e.g., PI / 6 for 30°)
+     */
+    fun depth(angle: Double): Double {
+        val cosA = cos(angle)
+        val sinA = sin(angle)
+        return x * cosA + y * sinA - 2 * z
     }
 
     override fun equals(other: Any?): Boolean =
