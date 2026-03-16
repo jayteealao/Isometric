@@ -17,12 +17,12 @@ import io.fabianterhorst.isometric.compose.toComposePath
  * measurement overhead.
  */
 interface RenderBenchmarkHooks {
-    fun onPrepareStart()
-    fun onPrepareEnd()
-    fun onDrawStart()
-    fun onDrawEnd()
-    fun onCacheHit()
-    fun onCacheMiss()
+    fun onPrepareStart() {}
+    fun onPrepareEnd() {}
+    fun onDrawStart() {}
+    fun onDrawEnd() {}
+    fun onCacheHit() {}
+    fun onCacheMiss() {}
 }
 
 /**
