@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import io.fabianterhorst.isometric.IsometricEngine
+import io.fabianterhorst.isometric.SceneProjector
 
 /**
  * Snapshot of the actual runtime flag configuration applied to the renderer.

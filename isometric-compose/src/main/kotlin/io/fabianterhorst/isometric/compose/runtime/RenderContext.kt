@@ -3,8 +3,8 @@ package io.fabianterhorst.isometric.compose.runtime
 import androidx.compose.runtime.Immutable
 import io.fabianterhorst.isometric.Path
 import io.fabianterhorst.isometric.Point
-import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
+import io.fabianterhorst.isometric.SceneProjector
 import io.fabianterhorst.isometric.Shape
 import io.fabianterhorst.isometric.Vector
 
@@ -18,7 +18,7 @@ class RenderContext(
     val width: Int,
     val height: Int,
     val renderOptions: RenderOptions,
-    val lightDirection: Vector = IsometricEngine.DEFAULT_LIGHT_DIRECTION.normalize(),
+    val lightDirection: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION.normalize(),
 
     // Accumulated transforms
     private val accumulatedPosition: Point = Point(0.0, 0.0, 0.0),

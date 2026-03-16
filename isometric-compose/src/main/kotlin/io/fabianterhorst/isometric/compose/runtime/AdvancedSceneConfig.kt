@@ -4,18 +4,19 @@ import androidx.compose.runtime.Stable
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
+import io.fabianterhorst.isometric.SceneProjector
 import io.fabianterhorst.isometric.Vector
 
 @Stable
 class AdvancedSceneConfig(
     renderOptions: RenderOptions = RenderOptions.Default,
-    lightDirection: Vector = IsometricEngine.DEFAULT_LIGHT_DIRECTION.normalize(),
+    lightDirection: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION.normalize(),
     defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
     colorPalette: ColorPalette = ColorPalette(),
     strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
     gestures: GestureConfig = GestureConfig.Disabled,
     useNativeCanvas: Boolean = false,
-    val engine: IsometricEngine = IsometricEngine(),
+    val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
     val spatialIndexCellSize: Double = IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE,
@@ -24,7 +25,7 @@ class AdvancedSceneConfig(
     val onHitTestReady: ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? = null,
     val onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
     val onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null,
-    val onEngineReady: ((IsometricEngine) -> Unit)? = null,
+    val onEngineReady: ((SceneProjector) -> Unit)? = null,
     val onRendererReady: ((IsometricRenderer) -> Unit)? = null
 ) : SceneConfig(
     renderOptions = renderOptions,

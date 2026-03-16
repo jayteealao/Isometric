@@ -2,7 +2,7 @@ package io.fabianterhorst.isometric.compose.runtime
 
 import androidx.compose.runtime.Immutable
 import io.fabianterhorst.isometric.IsoColor
-import io.fabianterhorst.isometric.IsometricEngine.Companion.DEFAULT_LIGHT_DIRECTION
+import io.fabianterhorst.isometric.SceneProjector.Companion.DEFAULT_LIGHT_DIRECTION
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 
