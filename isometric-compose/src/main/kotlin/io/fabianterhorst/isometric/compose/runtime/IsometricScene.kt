@@ -39,6 +39,10 @@ data class RuntimeFlagSnapshot(
  *
  * Uses [SceneConfig] for stable, user-facing options and delegates to the advanced
  * overload with the lower-level renderer and benchmark hooks left at their defaults.
+ *
+ * @param modifier Standard Compose modifier for sizing and layout.
+ * @param config Scene configuration controlling render options, lighting, colors, and gestures.
+ * @param content Composable content block scoped to [IsometricScope].
  */
 @Composable
 fun IsometricScene(
@@ -62,6 +66,16 @@ fun IsometricScene(
     )
 }
 
+/**
+ * Advanced entry point exposing the full renderer and benchmark configuration.
+ *
+ * Prefer the [SceneConfig] overload for typical usage. This overload is intended for
+ * benchmarking, custom engine injection, and fine-grained renderer control.
+ *
+ * @param modifier Standard Compose modifier for sizing and layout.
+ * @param config Advanced scene configuration with renderer hooks, engine injection, and benchmark flags.
+ * @param content Composable content block scoped to [IsometricScope].
+ */
 @Composable
 fun IsometricScene(
     modifier: Modifier = Modifier,

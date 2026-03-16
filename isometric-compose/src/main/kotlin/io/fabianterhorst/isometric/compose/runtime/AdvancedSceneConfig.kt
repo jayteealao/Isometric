@@ -9,6 +9,50 @@ import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.SceneProjector
 import io.fabianterhorst.isometric.Vector
 
+/**
+ * Extended scene configuration that adds engine-level tuning and lifecycle hook callbacks
+ * on top of [SceneConfig].
+ *
+ * Use this when you need fine-grained control over the rendering pipeline, such as
+ * enabling path caching, configuring the spatial index, or receiving callbacks at
+ * specific points in the render lifecycle.
+ *
+ * @param renderOptions Controls rendering behaviour such as sorting and face culling.
+ * @param lightDirection Normalized direction vector for the scene's light source.
+ * @param defaultColor Fallback [IsoColor] for shapes without an explicit color.
+ * @param colorPalette Named semantic colors for consistent theming.
+ * @param strokeStyle Determines how shape outlines are drawn.
+ * @param gestures Tap and drag interaction configuration.
+ * @param useNativeCanvas When `true`, renders to the platform's native canvas.
+ * @param cameraState Optional pan/zoom camera state.
+ * @param engine The [SceneProjector] implementation used for world-to-screen projection.
+ *   Defaults to [IsometricEngine].
+ * @param enablePathCaching When `true`, caches computed paths between frames to reduce
+ *   allocation pressure. Useful for static or slowly-changing scenes.
+ * @param enableSpatialIndex When `true`, builds a spatial index for efficient hit testing.
+ * @param spatialIndexCellSize Cell size (in world units) of the spatial-index grid.
+ *   Must be positive and finite.
+ * @param forceRebuild When `true`, forces a full scene rebuild on the next frame,
+ *   bypassing incremental diffing.
+ * @param frameVersion Monotonically increasing version counter used to detect changes
+ *   that require a re-render.
+ * @param onHitTestReady Called once the hit-test function is available. The provided
+ *   lambda maps screen coordinates to the [IsometricNode] at that position, or `null`
+ *   if nothing was hit.
+ * @param onFlagsReady Called with a [RuntimeFlagSnapshot] once runtime flags have been resolved.
+ * @param onRenderError Called when a render command fails. Receives the command ID and
+ *   the thrown [Throwable].
+ * @param onEngineReady Called with the [SceneProjector] instance after the engine has
+ *   been initialised for the current frame.
+ * @param onRendererReady Called with the [IsometricRenderer] instance after the renderer
+ *   has been initialised for the current frame.
+ * @param onBeforeDraw Invoked inside the [DrawScope] immediately before the scene is drawn.
+ *   Useful for drawing background layers or debug overlays.
+ * @param onAfterDraw Invoked inside the [DrawScope] immediately after the scene is drawn.
+ *   Useful for drawing foreground overlays or debug information.
+ * @param onPreparedSceneReady Called with the fully-built [PreparedScene] before it is
+ *   rendered, allowing inspection or serialisation of the scene graph.
+ */
 @Stable
 class AdvancedSceneConfig(
     renderOptions: RenderOptions = RenderOptions.Default,

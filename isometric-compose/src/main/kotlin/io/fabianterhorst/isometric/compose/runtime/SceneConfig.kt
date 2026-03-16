@@ -6,6 +6,27 @@ import io.fabianterhorst.isometric.SceneProjector.Companion.DEFAULT_LIGHT_DIRECT
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.Vector
 
+/**
+ * Core configuration for an isometric scene.
+ *
+ * Bundles rendering, lighting, color, stroke, gesture, and camera settings into a
+ * single immutable value that drives [IsometricScene] behaviour. Extend with
+ * [AdvancedSceneConfig] when hook callbacks or engine-level tuning are needed.
+ *
+ * @param renderOptions Controls rendering behaviour such as sorting and face culling.
+ * @param lightDirection Normalized direction vector for the scene's light source, used
+ *   to compute per-face shading.
+ * @param defaultColor Fallback [IsoColor] applied to shapes that do not specify their own color.
+ * @param colorPalette A [ColorPalette] providing named semantic colors (primary, secondary, etc.)
+ *   that shapes can reference for consistent theming.
+ * @param strokeStyle Determines how shape outlines are drawn. Defaults to [StrokeStyle.FillAndStroke].
+ * @param gestures A [GestureConfig] controlling tap and drag interaction with the scene.
+ *   Defaults to [GestureConfig.Disabled].
+ * @param useNativeCanvas When `true`, renders directly to the platform's native canvas
+ *   instead of the Compose draw scope. May improve performance on some devices.
+ * @param cameraState Optional [CameraState] for pan/zoom control. When `null`, the scene
+ *   uses a fixed viewport. Equality is checked by reference identity.
+ */
 @Immutable
 open class SceneConfig(
     val renderOptions: RenderOptions = RenderOptions.Default,

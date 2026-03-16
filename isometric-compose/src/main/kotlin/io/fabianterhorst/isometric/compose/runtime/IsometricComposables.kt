@@ -229,7 +229,15 @@ fun IsometricScope.Batch(
 }
 
 /**
- * Conditionally include content based on a predicate
+ * Conditionally renders [content] based on [condition].
+ *
+ * When [condition] is `false`, children are removed from the scene graph entirely —
+ * they do not consume rendering resources. When [condition] flips from `false` to
+ * `true`, children are re-inserted and marked dirty, triggering a re-render of the
+ * affected subtree only.
+ *
+ * @param condition When `false`, the [content] block is not rendered.
+ * @param content Composable content to conditionally include in the scene.
  */
 @IsometricComposable
 @Composable
@@ -243,7 +251,18 @@ fun IsometricScope.If(
 }
 
 /**
- * Iterate over a list and create content for each item
+ * Renders [content] once for each item in [items].
+ *
+ * Providing a stable [key] function is strongly recommended for lists that change
+ * over time. Without keys, Compose treats the list positionally — removing an item
+ * from the middle causes all subsequent items to recompose. With keys, only the
+ * removed item's node is deleted and the rest are reused.
+ *
+ * @param items The list of data items to iterate over.
+ * @param key Optional function that returns a stable, unique key for each item.
+ *   When provided, enables efficient add/remove/reorder without full re-render.
+ * @param content Composable content block invoked for each item, receiving the
+ *   item as a parameter within [IsometricScope].
  */
 @IsometricComposable
 @Composable

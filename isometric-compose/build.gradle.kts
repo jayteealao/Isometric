@@ -2,6 +2,7 @@ plugins {
     id("com.android.library")
     kotlin("android")
     id("app.cash.paparazzi") version "1.3.0"
+    id("org.jetbrains.dokka")
 }
 
 android {
