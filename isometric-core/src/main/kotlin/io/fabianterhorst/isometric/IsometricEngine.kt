@@ -13,8 +13,8 @@ import kotlin.math.PI
  * - [HitTester] — hit testing with point-in-polygon and touch radius
  */
 class IsometricEngine(
-    private val angle: Double = PI / 6,  // 30 degrees
-    private val scale: Double = 70.0,
+    angle: Double = PI / 6,  // 30 degrees
+    scale: Double = 70.0,
     private val colorDifference: Double = 0.20,
     private val lightColor: IsoColor = IsoColor.WHITE
 ) : SceneProjector {
@@ -22,6 +22,28 @@ class IsometricEngine(
         /** Default light direction used when none is specified. */
         val DEFAULT_LIGHT_DIRECTION: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION
     }
+
+    /**
+     * The isometric projection angle in radians.
+     * Changing this at runtime recomputes the internal projection matrix.
+     */
+    var angle: Double = angle
+        set(value) {
+            require(value.isFinite()) { "angle must be finite, got $value" }
+            field = value
+            rebuildProjection()
+        }
+
+    /**
+     * The isometric scale factor (pixels per world unit).
+     * Changing this at runtime recomputes the internal projection matrix.
+     */
+    var scale: Double = scale
+        set(value) {
+            require(value.isFinite() && value > 0.0) { "scale must be positive and finite, got $value" }
+            field = value
+            rebuildProjection()
+        }
 
     init {
         require(angle.isFinite()) { "angle must be finite, got $angle" }
@@ -31,8 +53,62 @@ class IsometricEngine(
         }
     }
 
+    /**
+     * Monotonically increasing version counter, incremented whenever
+     * mutable engine parameters (angle, scale) change.
+     * Signals caches that projected output may be stale.
+     * Volatile to ensure visibility when read by the renderer on
+     * a different thread (e.g. Canvas draw vs main-thread mutation).
+     */
+    @Volatile
+    override var projectionVersion: Long = 0L
+        private set
+
     private val sceneGraph = SceneGraph()
-    private val projection = IsometricProjection(angle, scale, colorDifference, lightColor)
+    private var projection = IsometricProjection(angle, scale, colorDifference, lightColor)
+
+    private fun rebuildProjection() {
+        projection = IsometricProjection(this.angle, this.scale, colorDifference, lightColor)
+        projectionVersion++
+    }
+
+    /**
+     * Project a 3D world point to 2D screen coordinates.
+     *
+     * @param point The 3D world point
+     * @param viewportWidth The viewport width in pixels
+     * @param viewportHeight The viewport height in pixels
+     * @return The 2D screen position
+     */
+    fun worldToScreen(point: Point, viewportWidth: Int, viewportHeight: Int): Point2D {
+        val originX = viewportWidth / 2.0
+        val originY = viewportHeight * 0.9
+        return projection.translatePoint(point, originX, originY)
+    }
+
+    /**
+     * Unproject a 2D screen point back to 3D world coordinates on a given plane.
+     *
+     * The inverse projection is not unique — a screen point corresponds to a line
+     * in 3D space. This method returns the intersection of that line with the
+     * horizontal plane at the specified Z height.
+     *
+     * @param screenPoint The 2D screen position
+     * @param viewportWidth The viewport width in pixels
+     * @param viewportHeight The viewport height in pixels
+     * @param z The Z plane to project onto (default: 0.0)
+     * @return The 3D world point on the specified Z plane
+     */
+    fun screenToWorld(
+        screenPoint: Point2D,
+        viewportWidth: Int,
+        viewportHeight: Int,
+        z: Double = 0.0
+    ): Point {
+        val originX = viewportWidth / 2.0
+        val originY = viewportHeight * 0.9
+        return projection.screenToWorld(screenPoint, originX, originY, z)
+    }
 
     override fun add(shape: Shape, color: IsoColor) = sceneGraph.add(shape, color)
 

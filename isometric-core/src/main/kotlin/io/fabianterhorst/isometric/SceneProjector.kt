@@ -14,6 +14,14 @@ interface SceneProjector {
     }
 
     /**
+     * Monotonically increasing version counter for internal state changes.
+     * Incremented when mutable parameters (e.g., angle, scale) change,
+     * signaling caches that projected output may be stale.
+     * Default implementation returns 0 (immutable projector).
+     */
+    val projectionVersion: Long get() = 0L
+
+    /**
      * Add a shape to the scene graph.
      */
     fun add(shape: Shape, color: IsoColor)

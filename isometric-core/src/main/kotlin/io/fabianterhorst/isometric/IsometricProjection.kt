@@ -37,6 +37,36 @@ internal class IsometricProjection(
     }
 
     /**
+     * Unproject a 2D screen point back to 3D world coordinates on a given Z plane.
+     *
+     * Inverts the [translatePoint] transformation by solving the 2x2 linear system
+     * formed by the projection matrix.
+     *
+     * @param screenPoint The 2D screen position
+     * @param originX The viewport origin X (typically width / 2.0)
+     * @param originY The viewport origin Y (typically height * 0.9)
+     * @param z The Z plane to project onto
+     * @return The 3D world point on the specified Z plane
+     */
+    fun screenToWorld(screenPoint: Point2D, originX: Double, originY: Double, z: Double): Point {
+        val a = transformation[0][0]
+        val b = transformation[1][0]
+        val c = transformation[0][1]
+        val d = transformation[1][1]
+
+        val rhs1 = screenPoint.x - originX
+        val rhs2 = originY - screenPoint.y - z * scale
+
+        val det = a * d - b * c
+        require(kotlin.math.abs(det) > 1e-10) { "Near-degenerate projection matrix (det=$det) — cannot reliably invert" }
+
+        val worldX = (rhs1 * d - rhs2 * b) / det
+        val worldY = (rhs2 * a - rhs1 * c) / det
+
+        return Point(worldX, worldY, z)
+    }
+
+    /**
      * Apply lighting to a color based on the path's surface normal.
      *
      * Computes the surface normal via cross product of two edges,
