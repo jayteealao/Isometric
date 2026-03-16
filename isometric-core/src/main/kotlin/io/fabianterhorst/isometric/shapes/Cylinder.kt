@@ -7,7 +7,7 @@ import io.fabianterhorst.isometric.paths.Circle
 /**
  * A cylindrical shape
  */
-class Cylinder(
+class Cylinder @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,
     val radius: Double = 1.0,
     val height: Double = 1.0,

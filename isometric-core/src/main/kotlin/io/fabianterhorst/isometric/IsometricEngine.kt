@@ -12,7 +12,7 @@ import kotlin.math.PI
  * - [DepthSorter] — intersection-based depth sorting with broad-phase acceleration
  * - [HitTester] — hit testing with point-in-polygon and touch radius
  */
-class IsometricEngine(
+class IsometricEngine @JvmOverloads constructor(
     angle: Double = PI / 6,  // 30 degrees
     scale: Double = 70.0,
     private val colorDifference: Double = 0.20,
@@ -20,7 +20,7 @@ class IsometricEngine(
 ) : SceneProjector {
     companion object {
         /** Default light direction used when none is specified. */
-        val DEFAULT_LIGHT_DIRECTION: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION
+        @JvmField val DEFAULT_LIGHT_DIRECTION: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION
     }
 
     /**

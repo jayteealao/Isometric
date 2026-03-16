@@ -7,7 +7,7 @@ import kotlin.math.sqrt
 /**
  * Represents a point in 3D space with transformation operations.
  */
-class Point(
+class Point @JvmOverloads constructor(
     val x: Double = 0.0,
     val y: Double = 0.0,
     val z: Double = 0.0

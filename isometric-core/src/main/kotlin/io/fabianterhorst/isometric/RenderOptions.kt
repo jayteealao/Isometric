@@ -9,7 +9,7 @@ package io.fabianterhorst.isometric
  * @property enableBroadPhaseSort Enable broad-phase spatial bucketing to prune depth-sort candidate pairs (faster for large scenes)
  * @property broadPhaseCellSize Cell size in pixels for the broad-phase grid. Smaller values increase precision but use more memory.
  */
-class RenderOptions(
+class RenderOptions @JvmOverloads constructor(
     val enableDepthSorting: Boolean = true,
     val enableBackfaceCulling: Boolean = true,
     val enableBoundsChecking: Boolean = true,
@@ -62,13 +62,13 @@ class RenderOptions(
         /**
          * Default options: all optimizations enabled
          */
-        val Default = RenderOptions()
+        @JvmField val Default = RenderOptions()
 
         /**
          * Disable depth sorting while keeping culling and bounds checking enabled.
          * Use when shapes don't overlap or depth order doesn't matter.
          */
-        val NoDepthSorting = RenderOptions(
+        @JvmField val NoDepthSorting = RenderOptions(
             enableDepthSorting = false,
             enableBackfaceCulling = true,
             enableBoundsChecking = true,
@@ -78,7 +78,7 @@ class RenderOptions(
         /**
          * Disable backface culling and viewport bounds checking while keeping depth sorting on.
          */
-        val NoCulling = RenderOptions(
+        @JvmField val NoCulling = RenderOptions(
             enableDepthSorting = true,
             enableBackfaceCulling = false,  // Show all faces
             enableBoundsChecking = false,    // Render everything

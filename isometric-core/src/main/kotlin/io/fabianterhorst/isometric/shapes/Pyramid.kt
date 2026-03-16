@@ -8,7 +8,7 @@ import kotlin.math.PI
 /**
  * A pyramid shape
  */
-class Pyramid(
+class Pyramid @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,
     val width: Double = 1.0,
     val depth: Double = 1.0,

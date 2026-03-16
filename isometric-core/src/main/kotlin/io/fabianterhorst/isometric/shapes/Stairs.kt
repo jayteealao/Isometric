@@ -7,7 +7,7 @@ import io.fabianterhorst.isometric.Shape
 /**
  * A staircase shape
  */
-class Stairs(
+class Stairs @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,
     val stepCount: Int
 ) : Shape(createPaths(position, stepCount)) {

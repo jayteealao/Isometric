@@ -7,7 +7,7 @@ import io.fabianterhorst.isometric.Shape
 /**
  * A rectangular prism (box) shape
  */
-class Prism(
+class Prism @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,
     val width: Double = 1.0,
     val depth: Double = 1.0,

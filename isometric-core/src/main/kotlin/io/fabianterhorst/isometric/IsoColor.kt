@@ -8,12 +8,13 @@ import kotlin.math.round
  * Represents a color with RGB and HSL representations
  * Renamed from Color to IsoColor to avoid conflicts with platform Color classes
  */
-data class IsoColor(
+data class IsoColor @JvmOverloads constructor(
     val r: Double,
     val g: Double,
     val b: Double,
     val a: Double = 255.0
 ) {
+    @JvmOverloads
     constructor(r: Int, g: Int, b: Int, a: Int = 255) : this(
         r.toDouble(),
         g.toDouble(),
@@ -136,19 +137,19 @@ data class IsoColor(
 
     companion object {
         // Common colors
-        val WHITE = IsoColor(255, 255, 255)
-        val BLACK = IsoColor(0, 0, 0)
-        val RED = IsoColor(255, 0, 0)
-        val GREEN = IsoColor(0, 255, 0)
-        val BLUE = IsoColor(0, 0, 255)
-        val GRAY = IsoColor(158, 158, 158)
-        val DARK_GRAY = IsoColor(97, 97, 97)
-        val LIGHT_GRAY = IsoColor(224, 224, 224)
-        val CYAN = IsoColor(0, 188, 212)
-        val ORANGE = IsoColor(255, 152, 0)
-        val PURPLE = IsoColor(156, 39, 176)
-        val YELLOW = IsoColor(255, 235, 59)
-        val BROWN = IsoColor(121, 85, 72)
+        @JvmField val WHITE = IsoColor(255, 255, 255)
+        @JvmField val BLACK = IsoColor(0, 0, 0)
+        @JvmField val RED = IsoColor(255, 0, 0)
+        @JvmField val GREEN = IsoColor(0, 255, 0)
+        @JvmField val BLUE = IsoColor(0, 0, 255)
+        @JvmField val GRAY = IsoColor(158, 158, 158)
+        @JvmField val DARK_GRAY = IsoColor(97, 97, 97)
+        @JvmField val LIGHT_GRAY = IsoColor(224, 224, 224)
+        @JvmField val CYAN = IsoColor(0, 188, 212)
+        @JvmField val ORANGE = IsoColor(255, 152, 0)
+        @JvmField val PURPLE = IsoColor(156, 39, 176)
+        @JvmField val YELLOW = IsoColor(255, 235, 59)
+        @JvmField val BROWN = IsoColor(121, 85, 72)
 
         fun fromHex(hex: Long): IsoColor = when {
             hex < 0 -> fromPackedArgbInt(hex.toInt())
