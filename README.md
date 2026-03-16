@@ -55,10 +55,7 @@ implementation 'io.fabianterhorst:isometric-android-view:0.1.0'
 @Composable
 fun MyIsometricScene() {
     IsometricScene {
-        Shape(
-            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 1.0, height = 1.0),
-            color = IsoColor(33.0, 150.0, 243.0)
-        )
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)))
     }
 }
 ```

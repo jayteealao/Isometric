@@ -86,7 +86,7 @@ fun IsometricSamplesScreen() {
 @Composable
 fun SimpleCubeSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
-        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)))
     }
 }
 

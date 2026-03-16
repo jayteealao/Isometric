@@ -96,8 +96,7 @@ fun RuntimeApiSamplesScreen() {
 fun SimpleSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         Shape(
-            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 2.0, depth = 2.0, height = 2.0),
-            color = IsoColor(33.0, 150.0, 243.0)
+            geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 2.0, depth = 2.0, height = 2.0)
         )
 
         Shape(
