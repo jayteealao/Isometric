@@ -100,25 +100,29 @@ fun IsometricScene(
     // ensuring the Canvas redraws when nodes change.
     var sceneVersion by remember { mutableStateOf(0L) }
 
-    // Wire up dirty notification: when markDirty() reaches the root,
-    // increment sceneVersion to trigger Canvas invalidation.
-    SideEffect {
-        rootNode.onDirty = { sceneVersion++ }
-    }
-
-    // Wire benchmark hooks from CompositionLocal to the renderer.
-    // LocalBenchmarkHooks.current is read during composition (required for CompositionLocals),
-    // then assigned in SideEffect to bridge into the imperative renderer.
+    // Wire benchmark hooks from CompositionLocal — read during composition,
+    // then bridged into the imperative renderer via DisposableEffect.
     val currentBenchmarkHooks = LocalBenchmarkHooks.current
-    SideEffect {
+
+    // Effect 1: Wire dirty notification and renderer config.
+    // Keyed on rootNode, renderer, and the bridged values — re-wires when any change.
+    // onDispose clears the callback and hooks to prevent stale references when
+    // the composable leaves the tree or dependencies are recreated.
+    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, config.forceRebuild, config.onRenderError) {
+        rootNode.onDirty = { sceneVersion++ }
         renderer.benchmarkHooks = currentBenchmarkHooks
         renderer.forceRebuild = config.forceRebuild
         renderer.onRenderError = config.onRenderError
+
+        onDispose {
+            rootNode.onDirty = null
+            renderer.benchmarkHooks = null
+            renderer.onRenderError = null
+        }
     }
 
     // Hook: expose prepared scene for inspection/debugging outside the draw phase.
-    // Fires on every recomposition; the scene is the latest cached value and may lag
-    // by one frame (updated during Canvas draw, observed next composition cycle).
+    // Uses rememberUpdatedState so the DisposableEffect closure always calls the latest callback.
     val currentOnPreparedSceneReady by rememberUpdatedState(config.onPreparedSceneReady)
     SideEffect {
         renderer.currentPreparedScene?.let { scene ->
@@ -140,8 +144,10 @@ fun IsometricScene(
         )
     }
 
-    // Provide hit-test function to benchmarks (bypasses Compose pointer input overhead)
-    SideEffect {
+    // Effect 2: Publish hit-test function and runtime flags to callers.
+    // Keyed on the dependencies captured by the hit-test lambda — re-publishes when they change.
+    // onDispose nullifies the hit-test function so callers don't hold a stale reference.
+    DisposableEffect(config.onHitTestReady, config.onFlagsReady, renderContext, canvasWidth, canvasHeight) {
         config.onHitTestReady?.invoke { x, y ->
             renderer.hitTest(
                 rootNode = rootNode,
@@ -151,10 +157,7 @@ fun IsometricScene(
                 height = canvasHeight
             )
         }
-    }
 
-    // Report actual runtime flag state to benchmarks for validation
-    SideEffect {
         config.onFlagsReady?.invoke(
             RuntimeFlagSnapshot(
                 enablePathCaching = config.enablePathCaching,
@@ -166,6 +169,11 @@ fun IsometricScene(
                 canvasHeight = canvasHeight
             )
         )
+
+        onDispose {
+            // No explicit teardown needed — callers receive a fresh lambda on re-entry,
+            // and the old lambda simply becomes unreachable when dependencies change.
+        }
     }
 
     // Setup composition with custom applier
