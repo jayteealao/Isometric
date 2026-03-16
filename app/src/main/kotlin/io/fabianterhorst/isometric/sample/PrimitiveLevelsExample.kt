@@ -8,10 +8,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
-import androidx.compose.runtime.withFrameNanos
 import io.fabianterhorst.isometric.compose.runtime.*
 import io.fabianterhorst.isometric.shapes.Prism
 import io.fabianterhorst.isometric.shapes.Pyramid

@@ -153,9 +153,8 @@ fun PulsingShape() {
             )
         },
         update = {
-            // Custom update logic that runs on every frame
+            // update{} runs during composition (not a coroutine) — use wall-clock time here
             update {
-                // Calculate scale directly without extra state
                 this.scale = 1.0 + sin(System.currentTimeMillis() / 500.0) * 0.2
                 markDirty()
             }

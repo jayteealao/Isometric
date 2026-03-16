@@ -22,7 +22,7 @@ annotation class IsometricComposable
  * Add a 3D shape to the isometric scene.
  *
  * **Name disambiguation:** This composable shares its name with [io.fabianterhorst.isometric.Shape],
- * the core geometry class that represents a 3D shape (collection of [Path]s). The [geometry]
+ * the core geometry class that represents a 3D shape (collection of [io.fabianterhorst.isometric.Path]s). The [geometry]
  * parameter accepts that class. If both are imported in the same file, use an import alias:
  *
  * ```kotlin
@@ -77,7 +77,7 @@ fun IsometricScope.Shape(
 }
 
 /**
- * Create a group that applies transforms to all its children
+ * Create a group that applies transforms to all its children.
  *
  * @param position Local position offset for all children
  * @param rotation Local rotation around Z axis for all children
@@ -87,6 +87,9 @@ fun IsometricScope.Shape(
  * @param visible Whether the group and its children are visible
  * @param renderOptions Optional per-subtree render options override (null inherits from parent)
  * @param content The child nodes
+ * @see Shape
+ * @see Path
+ * @see Batch
  */
 @IsometricComposable
 @Composable
@@ -126,7 +129,7 @@ fun IsometricScope.Group(
 }
 
 /**
- * Add a raw 2D path to the isometric scene
+ * Add a raw 2D path to the isometric scene.
  *
  * @param path The 2D path to render
  * @param color The color of the path (defaults to LocalDefaultColor)
@@ -136,6 +139,9 @@ fun IsometricScope.Group(
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the path is visible
+ * @see Shape
+ * @see Group
+ * @see Batch
  */
 @IsometricComposable
 @Composable
@@ -173,7 +179,7 @@ fun IsometricScope.Path(
 }
 
 /**
- * Batch multiple shapes with the same color for performance
+ * Batch multiple shapes with the same color for performance.
  *
  * @param shapes List of shapes to render
  * @param color The color for all shapes (defaults to LocalDefaultColor)
@@ -183,6 +189,9 @@ fun IsometricScope.Path(
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the batch is visible
+ * @see Shape
+ * @see Group
+ * @see Path
  */
 @IsometricComposable
 @Composable
