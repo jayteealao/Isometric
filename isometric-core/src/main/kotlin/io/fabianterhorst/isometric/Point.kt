@@ -5,7 +5,14 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * Represents a point in 3D space with transformation operations.
+ * A point in 3D isometric space.
+ *
+ * The coordinate system is:
+ * - [x]: right-and-down on screen (increases toward bottom-right)
+ * - [y]: left-and-down on screen (increases toward bottom-left)
+ * - [z]: straight up on screen (increases upward)
+ *
+ * @see depth for painter's algorithm sorting
  */
 class Point @JvmOverloads constructor(
     val x: Double = 0.0,
@@ -133,13 +140,22 @@ class Point @JvmOverloads constructor(
     }
 
     /**
-     * Simplified depth formula using equal weighting for x and y.
-     * This is a heuristic that provides correct relative ordering for standard
-     * isometric scenes. For exact depth at arbitrary projection angles,
-     * use [depth] with an angle parameter.
+     * The depth of a point in the isometric projection, used for painter's algorithm sorting.
+     *
+     * Formula: `x + y - 2 * z`
+     *
+     * - Points with higher depth are farther from the viewer and should be drawn first.
+     * - The z-axis is weighted by 2 because each unit of z moves a point "closer" to the viewer
+     *   more than one unit of x or y (z is perpendicular to the screen, while x and y are
+     *   projected at 30-degree angles).
+     *
+     * This simplified formula uses equal weighting for x and y. For exact depth at
+     * arbitrary projection angles, use [depth] with an angle parameter.
      *
      * Note: This is NOT equivalent to `depth(PI/6)` — the parameterized
      * version uses cos/sin weighting while this uses uniform weighting.
+     *
+     * @return the depth value for sorting; higher = farther from viewer
      */
     fun depth(): Double {
         return x + y - 2 * z

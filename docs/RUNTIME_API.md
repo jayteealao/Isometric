@@ -118,6 +118,47 @@ Shared state is provided through Composition Locals:
 
 ---
 
+## Coordinate System
+
+The isometric engine uses a standard isometric projection. Understanding the axes is
+essential for positioning shapes correctly.
+
+### Axis directions
+
+```
+         z (up)
+         |
+         |
+        / \
+       /   \
+      y     x
+ (left-down) (right-down)
+```
+
+| Axis | Screen direction | Example |
+|------|-----------------|---------|
+| **x** | Right-and-down (toward bottom-right) | `Point(1.0, 0.0, 0.0)` moves a shape to the bottom-right |
+| **y** | Left-and-down (toward bottom-left) | `Point(0.0, 1.0, 0.0)` moves a shape to the bottom-left |
+| **z** | Straight up | `Point(0.0, 0.0, 1.0)` moves a shape upward |
+
+### Projection math
+
+The 3D-to-2D projection uses a configurable angle (default 30 degrees) and scale
+(default 70 pixels per unit):
+
+```
+screenX = originX + x * scale * cos(angle) + y * scale * cos(PI - angle)
+screenY = originY - x * scale * sin(angle) - y * scale * sin(PI - angle) - z * scale
+```
+
+### Depth sorting
+
+Faces are drawn back-to-front using the depth formula `x + y - 2 * z`. Higher values
+are farther from the viewer. The z-axis is weighted by 2 because vertical movement
+has a stronger effect on perceived depth than diagonal x/y movement.
+
+---
+
 ## API Reference
 
 ### IsometricScene

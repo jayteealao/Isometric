@@ -11,6 +11,38 @@ import kotlin.math.PI
  * - [IsometricProjection] — 3D-to-2D projection, lighting, culling
  * - [DepthSorter] — intersection-based depth sorting with broad-phase acceleration
  * - [HitTester] — hit testing with point-in-polygon and touch radius
+ *
+ * ## Coordinate System
+ *
+ * The engine uses a standard isometric projection with configurable [angle] (default 30°)
+ * and [scale] (default 70 pixels per unit).
+ *
+ * ```
+ *          z (up)
+ *          |
+ *          |
+ *         / \
+ *        /   \
+ *       y     x
+ *  (left-down) (right-down)
+ * ```
+ *
+ * - **x-axis**: points right-and-down on screen
+ * - **y-axis**: points left-and-down on screen
+ * - **z-axis**: points straight up on screen
+ *
+ * ### Projection formulas
+ *
+ * The 3D-to-2D projection is:
+ * ```
+ * screenX = originX + x * scale * cos(angle) + y * scale * cos(PI - angle)
+ * screenY = originY - x * scale * sin(angle) - y * scale * sin(PI - angle) - z * scale
+ * ```
+ *
+ * ### Depth sorting
+ *
+ * Faces are sorted back-to-front using [Point.depth]: `x + y - 2 * z`.
+ * Higher depth values are farther from the viewer and drawn first.
  */
 class IsometricEngine @JvmOverloads constructor(
     angle: Double = PI / 6,  // 30 degrees
