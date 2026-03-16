@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.fabianterhorst.isometric.IsoColor
+import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.SceneProjector
 
@@ -90,3 +91,19 @@ val LocalColorPalette = compositionLocalOf {
  * Defaults to null (no instrumentation) in production.
  */
 val LocalBenchmarkHooks = staticCompositionLocalOf<RenderBenchmarkHooks?> { null }
+
+/**
+ * CompositionLocal for providing the [IsometricEngine] to child composables.
+ *
+ * Uses [staticCompositionLocalOf] because the engine instance is set once per
+ * scene and never changes — avoiding unnecessary recomposition tracking.
+ *
+ * Access within an IsometricScope:
+ * ```
+ * val engine = LocalIsometricEngine.current
+ * val screenPos = engine.worldToScreen(point, viewportWidth, viewportHeight)
+ * ```
+ */
+val LocalIsometricEngine = staticCompositionLocalOf<IsometricEngine> {
+    error("No IsometricEngine provided. LocalIsometricEngine must be used within an IsometricScene.")
+}
