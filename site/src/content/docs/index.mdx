@@ -1,0 +1,36 @@
+---
+title: Isometric
+description: Declarative isometric rendering for Jetpack Compose
+template: splash
+hero:
+  tagline: Build interactive 3D isometric scenes with a familiar Compose API.
+  image:
+    html: <img src="/screenshots/complex-scene.png" alt="Isometric scene" />
+  actions:
+    - text: Get Started
+      link: /getting-started/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/jayteealao/Isometric
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Declarative API" icon="pencil">
+    Build scenes with `Shape`, `Group`, and `Path` composables. Transforms accumulate automatically through the hierarchy.
+  </Card>
+  <Card title="High Performance" icon="rocket">
+    Per-node dirty tracking, prepared-scene caching, and spatial indexing. Only changed subtrees re-render.
+  </Card>
+  <Card title="Interactive" icon="approve-check-circle">
+    Built-in tap and drag gestures with spatial hit testing. Camera pan and zoom with `CameraState`.
+  </Card>
+  <Card title="6 Built-in Shapes" icon="puzzle">
+    Prism, Pyramid, Cylinder, Octahedron, Stairs, and Knot — plus custom shape support via `Shape.extrude` and `CustomNode`.
+  </Card>
+</CardGrid>
