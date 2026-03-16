@@ -155,7 +155,10 @@ fun IsometricScene(
     val currentOnHitTestReady by rememberUpdatedState(config.onHitTestReady)
     val currentOnFlagsReady by rememberUpdatedState(config.onFlagsReady)
     DisposableEffect(renderer, rootNode, renderContext, canvasWidth, canvasHeight, config.forceRebuild, config.useNativeCanvas) {
-        currentOnHitTestReady?.invoke { x, y ->
+        // Capture at entry so onDispose notifies the same callback that received
+        // the real function, not a potentially-different latest callback.
+        val capturedOnHitTestReady = currentOnHitTestReady
+        capturedOnHitTestReady?.invoke { x, y ->
             renderer.hitTest(
                 rootNode = rootNode,
                 x = x, y = y,
@@ -179,7 +182,7 @@ fun IsometricScene(
 
         onDispose {
             // Publish a no-op so callers don't invoke a stale reference to a closed renderer
-            currentOnHitTestReady?.invoke { _, _ -> null }
+            capturedOnHitTestReady?.invoke { _, _ -> null }
         }
     }
 
