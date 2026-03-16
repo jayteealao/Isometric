@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import io.fabianterhorst.isometric.IsometricEngine
 import io.fabianterhorst.isometric.SceneProjector
 
 /**
@@ -54,7 +55,8 @@ fun IsometricScene(
             colorPalette = config.colorPalette,
             strokeStyle = config.strokeStyle,
             gestures = config.gestures,
-            useNativeCanvas = config.useNativeCanvas
+            useNativeCanvas = config.useNativeCanvas,
+            cameraState = config.cameraState
         ),
         content = content
     )
@@ -112,6 +114,16 @@ fun IsometricScene(
         renderer.benchmarkHooks = currentBenchmarkHooks
         renderer.forceRebuild = config.forceRebuild
         renderer.onRenderError = config.onRenderError
+    }
+
+    // Hook: expose prepared scene for inspection/debugging outside the draw phase.
+    // Fires on every recomposition; the scene is the latest cached value and may lag
+    // by one frame (updated during Canvas draw, observed next composition cycle).
+    val currentOnPreparedSceneReady by rememberUpdatedState(config.onPreparedSceneReady)
+    SideEffect {
+        renderer.currentPreparedScene?.let { scene ->
+            currentOnPreparedSceneReady?.invoke(scene)
+        }
     }
 
     // Track canvas size
@@ -178,18 +190,27 @@ fun IsometricScene(
         }
     }
 
+    // Resolve the engine as IsometricEngine for the CompositionLocal.
+    // Uses rememberUpdatedState so the sub-composition's setContent closure
+    // never captures a stale reference.
+    val currentIsometricEngine by rememberUpdatedState(engine as? IsometricEngine)
+
     // Create the sub-composition once when this composable enters the tree.
     // The lambda reads rememberUpdatedState-backed values, so the child composition
     // still recomposes when those values change without re-calling setContent().
     DisposableEffect(composition) {
         composition.setContent {
-            CompositionLocalProvider(
-                LocalDefaultColor provides currentDefaultColor,
-                LocalLightDirection provides currentLightDirection,
-                LocalRenderOptions provides currentRenderOptions,
-                LocalStrokeStyle provides currentStrokeStyle,
-                LocalColorPalette provides currentColorPalette
-            ) {
+            val providers = buildList {
+                add(LocalDefaultColor provides currentDefaultColor)
+                add(LocalLightDirection provides currentLightDirection)
+                add(LocalRenderOptions provides currentRenderOptions)
+                add(LocalStrokeStyle provides currentStrokeStyle)
+                add(LocalColorPalette provides currentColorPalette)
+                if (currentIsometricEngine != null) {
+                    add(LocalIsometricEngine provides currentIsometricEngine!!)
+                }
+            }
+            CompositionLocalProvider(*providers.toTypedArray()) {
                 IsometricScopeImpl.currentContent()
             }
         }
@@ -204,12 +225,16 @@ fun IsometricScene(
     val currentCanvasWidth by rememberUpdatedState(canvasWidth)
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)
     val currentGestures by rememberUpdatedState(config.gestures)
+    val currentCameraState by rememberUpdatedState(config.cameraState)
 
-    // Render to canvas with gesture handling
+    // Render to canvas with gesture handling.
+    // Pointer input is installed when gestures are explicitly enabled OR when a
+    // CameraState is provided (for default drag-to-pan behavior).
+    val gesturesActive = config.gestures.enabled || config.cameraState != null
     Canvas(
         modifier = modifier
             .then(
-                if (config.gestures.enabled) {
+                if (gesturesActive) {
                     Modifier.pointerInput(Unit) {
                         awaitPointerEventScope {
                             var isDragging = false
@@ -241,9 +266,14 @@ fun IsometricScene(
                                             }
 
                                             if (isDragging) {
-                                                currentGestures.onDrag?.invoke(
-                                                    DragEvent(delta.x.toDouble(), delta.y.toDouble())
-                                                )
+                                                val dragEvent = DragEvent(delta.x.toDouble(), delta.y.toDouble())
+                                                val onDrag = currentGestures.onDrag
+                                                if (onDrag != null) {
+                                                    onDrag.invoke(dragEvent)
+                                                } else {
+                                                    // C2: Default drag→pan when cameraState is active
+                                                    currentCameraState?.pan(dragEvent.x, dragEvent.y)
+                                                }
                                                 dragStartPos = position
                                                 event.changes.forEach { it.consume() }
                                             }
@@ -256,10 +286,25 @@ fun IsometricScene(
                                         if (isDragging) {
                                             currentGestures.onDragEnd?.invoke()
                                         } else {
+                                            // S8: Inverse-transform pointer coordinates when camera
+                                            // is active, so hit testing uses engine-space coords.
+                                            val camera = currentCameraState
+                                            val hitX: Double
+                                            val hitY: Double
+                                            if (camera != null) {
+                                                val cx = currentCanvasWidth / 2.0
+                                                val cy = currentCanvasHeight / 2.0
+                                                hitX = (position.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+                                                hitY = (position.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+                                            } else {
+                                                hitX = position.x.toDouble()
+                                                hitY = position.y.toDouble()
+                                            }
+
                                             val hitNode = renderer.hitTest(
                                                 rootNode = rootNode,
-                                                x = position.x.toDouble(),
-                                                y = position.y.toDouble(),
+                                                x = hitX,
+                                                y = hitY,
                                                 context = currentRenderContext,
                                                 width = currentCanvasWidth,
                                                 height = currentCanvasHeight
@@ -300,6 +345,27 @@ fun IsometricScene(
         canvasHeight = size.height.toInt()
 
         if (canvasWidth > 0 && canvasHeight > 0) {
+            // Apply camera transforms if CameraState is provided.
+            // Zoom is applied around the canvas center so that zooming in
+            // keeps the center of the viewport fixed rather than the top-left corner.
+            // Transform order: translate to center+pan → scale → translate back.
+            val cameraState = config.cameraState
+            if (cameraState != null) {
+                // Read state properties to subscribe to changes
+                val panX = cameraState.panX
+                val panY = cameraState.panY
+                val zoom = cameraState.zoom
+                val cx = canvasWidth / 2f
+                val cy = canvasHeight / 2f
+
+                drawContext.transform.translate(cx + panX.toFloat(), cy + panY.toFloat())
+                drawContext.transform.scale(zoom.toFloat(), zoom.toFloat())
+                drawContext.transform.translate(-cx, -cy)
+            }
+
+            // Hook: before draw
+            config.onBeforeDraw?.invoke(this)
+
             with(renderer) {
                 if (config.useNativeCanvas) {
                     renderNative(
@@ -315,6 +381,9 @@ fun IsometricScene(
                     )
                 }
             }
+
+            // Hook: after draw
+            config.onAfterDraw?.invoke(this)
         }
     }
 }

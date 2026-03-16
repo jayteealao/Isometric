@@ -1,8 +1,10 @@
 package io.fabianterhorst.isometric.compose.runtime
 
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
+import io.fabianterhorst.isometric.PreparedScene
 import io.fabianterhorst.isometric.RenderOptions
 import io.fabianterhorst.isometric.SceneProjector
 import io.fabianterhorst.isometric.Vector
@@ -16,6 +18,7 @@ class AdvancedSceneConfig(
     strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
     gestures: GestureConfig = GestureConfig.Disabled,
     useNativeCanvas: Boolean = false,
+    cameraState: CameraState? = null,
     val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
@@ -26,7 +29,10 @@ class AdvancedSceneConfig(
     val onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
     val onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null,
     val onEngineReady: ((SceneProjector) -> Unit)? = null,
-    val onRendererReady: ((IsometricRenderer) -> Unit)? = null
+    val onRendererReady: ((IsometricRenderer) -> Unit)? = null,
+    val onBeforeDraw: (DrawScope.() -> Unit)? = null,
+    val onAfterDraw: (DrawScope.() -> Unit)? = null,
+    val onPreparedSceneReady: ((PreparedScene) -> Unit)? = null
 ) : SceneConfig(
     renderOptions = renderOptions,
     lightDirection = lightDirection,
@@ -34,7 +40,8 @@ class AdvancedSceneConfig(
     colorPalette = colorPalette,
     strokeStyle = strokeStyle,
     gestures = gestures,
-    useNativeCanvas = useNativeCanvas
+    useNativeCanvas = useNativeCanvas,
+    cameraState = cameraState
 ) {
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {
