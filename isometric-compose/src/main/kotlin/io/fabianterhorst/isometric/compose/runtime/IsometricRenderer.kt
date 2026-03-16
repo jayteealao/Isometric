@@ -64,7 +64,7 @@ class IsometricRenderer(
     var onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null
 
     /**
-     * Optional benchmark hooks for instrumentation. Set via [IsometricScene]'s SideEffect
+     * Optional benchmark hooks for instrumentation. Set via [IsometricScene]'s DisposableEffect
      * from [LocalBenchmarkHooks]. Null in production (zero overhead).
      */
     var benchmarkHooks: RenderBenchmarkHooks? = null

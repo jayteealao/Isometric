@@ -154,7 +154,7 @@ fun IsometricScene(
     // Callback keys use rememberUpdatedState to avoid churn from inline lambdas.
     val currentOnHitTestReady by rememberUpdatedState(config.onHitTestReady)
     val currentOnFlagsReady by rememberUpdatedState(config.onFlagsReady)
-    DisposableEffect(renderer, rootNode, renderContext, canvasWidth, canvasHeight) {
+    DisposableEffect(renderer, rootNode, renderContext, canvasWidth, canvasHeight, config.forceRebuild, config.useNativeCanvas) {
         currentOnHitTestReady?.invoke { x, y ->
             renderer.hitTest(
                 rootNode = rootNode,
