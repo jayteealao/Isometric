@@ -49,6 +49,7 @@ internal class SceneCache(
     private var cachedHeight: Int = 0
     private var cacheValid: Boolean = false
     private var cachedPrepareInputs: PrepareInputs? = null
+    private var cachedProjectionVersion: Long = -1L
 
     /**
      * Check whether the cache is stale and needs a rebuild.
@@ -64,7 +65,8 @@ internal class SceneCache(
                 !cacheValid ||
                 width != cachedWidth ||
                 height != cachedHeight ||
-                currentInputs != cachedPrepareInputs
+                currentInputs != cachedPrepareInputs ||
+                engine.projectionVersion != cachedProjectionVersion
     }
 
     /**
@@ -113,6 +115,7 @@ internal class SceneCache(
             cachedWidth = width
             cachedHeight = height
             cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+            cachedProjectionVersion = engine.projectionVersion
 
             if (enablePathCaching) {
                 buildPathCache(scene)
@@ -136,6 +139,7 @@ internal class SceneCache(
         currentPreparedScene = null
         cachedPaths = null
         cachedPrepareInputs = null
+        cachedProjectionVersion = -1L
     }
 
     private fun buildPathCache(scene: PreparedScene) {
