@@ -102,7 +102,7 @@ internal object DepthSorter {
         items: List<TransformedItem>,
         cellSize: Double
     ): List<Pair<Int, Int>> {
-        val grid = HashMap<Long, MutableList<Int>>()
+        val grid = hashMapOf<Long, MutableList<Int>>()
 
         items.forEachIndexed { index, item ->
             val bounds = item.getBounds()
@@ -118,8 +118,8 @@ internal object DepthSorter {
             }
         }
 
-        val seen = HashSet<Long>()
-        val pairs = ArrayList<Pair<Int, Int>>()
+        val seen = hashSetOf<Long>()
+        val pairs = mutableListOf<Pair<Int, Int>>()
         for (bucket in grid.values) {
             if (bucket.size < 2) continue
             for (a in 0 until bucket.lastIndex) {
