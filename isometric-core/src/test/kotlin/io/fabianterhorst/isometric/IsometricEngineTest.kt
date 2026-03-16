@@ -133,7 +133,7 @@ class IsometricEngineTest {
     }
 
     @Test
-    fun `projectScene without lightDirection uses engine default`() {
+    fun `projectScene without lightDirection uses interface default`() {
         val engine = IsometricEngine()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
         val defaultScene = engine.projectScene(800, 600, RenderOptions.NoCulling)
@@ -141,12 +141,12 @@ class IsometricEngineTest {
         engine.clear()
         engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
         val explicitScene = engine.projectScene(800, 600, RenderOptions.NoCulling,
-            lightDirection = Vector(2.0, -1.0, 3.0))
+            lightDirection = SceneProjector.DEFAULT_LIGHT_DIRECTION)
 
         assertEquals(defaultScene.commands.size, explicitScene.commands.size)
         for (i in defaultScene.commands.indices) {
             assertEquals(defaultScene.commands[i].color, explicitScene.commands[i].color,
-                "Command $i color should match engine default")
+                "Command $i color should match SceneProjector default")
         }
     }
 
@@ -279,7 +279,6 @@ class IsometricEngineTest {
         assertFailsWith<IllegalArgumentException> { IsometricEngine(scale = 0.0) }
         assertFailsWith<IllegalArgumentException> { IsometricEngine(angle = Double.NaN) }
         assertFailsWith<IllegalArgumentException> { IsometricEngine(colorDifference = -0.1) }
-        assertFailsWith<IllegalArgumentException> { IsometricEngine(lightDirection = Vector(0.0, 0.0, 0.0)) }
     }
 
     @Test

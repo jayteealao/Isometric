@@ -10,12 +10,11 @@ import kotlin.math.PI
  * - [SceneGraph] — mutable scene state accumulation
  * - [IsometricProjection] — 3D-to-2D projection, lighting, culling
  * - [DepthSorter] — intersection-based depth sorting with broad-phase acceleration
- * - [HitTester] — hit testing with convex hull and touch radius
+ * - [HitTester] — hit testing with point-in-polygon and touch radius
  */
 class IsometricEngine(
     private val angle: Double = PI / 6,  // 30 degrees
     private val scale: Double = 70.0,
-    private val lightDirection: Vector = DEFAULT_LIGHT_DIRECTION,
     private val colorDifference: Double = 0.20,
     private val lightColor: IsoColor = IsoColor.WHITE
 ) : SceneProjector {
@@ -30,12 +29,10 @@ class IsometricEngine(
         require(colorDifference.isFinite() && colorDifference >= 0.0) {
             "colorDifference must be non-negative and finite, got $colorDifference"
         }
-        require(lightDirection.magnitude() > 0.0) { "lightDirection must be non-zero" }
     }
 
     private val sceneGraph = SceneGraph()
     private val projection = IsometricProjection(angle, scale, colorDifference, lightColor)
-    private val defaultLightDirection: Vector = lightDirection.normalize()
 
     override fun add(shape: Shape, color: IsoColor) = sceneGraph.add(shape, color)
 
