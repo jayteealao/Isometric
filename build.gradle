@@ -36,13 +36,15 @@ plugins {
 
 // Dokka multi-module aggregation: root collects submodule docs
 // into build/dokka/html/ for the docs site CI pipeline.
+// Note: isometric-android-view (legacy View API) and isometric-benchmark
+// (app module) are intentionally excluded — they don't apply Dokka.
 dependencies {
     dokka project(':isometric-core')
     dokka project(':isometric-compose')
 }
 
-// Note: Dokka plugin provides a root 'clean' task.
-// Submodule clean tasks handle per-module build dirs.
+// Dokka applies LifecycleBasePlugin which registers the 'clean' task.
+// We configure it to also delete the root build directory.
 tasks.named('clean').configure {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }

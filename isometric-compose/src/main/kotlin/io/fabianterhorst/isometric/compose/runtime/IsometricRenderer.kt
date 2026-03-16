@@ -33,8 +33,7 @@ interface RenderBenchmarkHooks {
  * - [SceneCache] — prepared-scene caching and invalidation
  * - [HitTestResolver] — spatial indexing and command-to-node hit-test resolution
  * - [NativeSceneRenderer] — Android-native rendering backend
- * - Shared extensions: [io.fabianterhorst.isometric.compose.toComposePath] and
- *   [io.fabianterhorst.isometric.compose.toComposeColor]
+ * - Shared extensions: [toComposePath] and [toComposeColor]
  *
  * **Platform notes:**
  * - [DrawScope.render] uses Compose `DrawScope` APIs and is cross-platform compatible.

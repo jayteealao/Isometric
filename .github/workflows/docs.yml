@@ -42,7 +42,7 @@ jobs:
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Generate Dokka API docs
-        run: ./gradlew dokkaGeneratePublicationHtml
+        run: ./gradlew :dokkaGeneratePublicationHtml
 
       - name: Copy Dokka output into site
         run: cp -r build/dokka/html site/public/api
