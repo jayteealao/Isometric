@@ -188,7 +188,7 @@ class ShapeNode(
             output.add(
                 RenderCommand(
                     commandId = "${nodeId}_${path.hashCode()}",
-                    points = emptyList(), // Will be filled by engine
+                    points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
                     color = color,
                     originalPath = path,
                     originalShape = transformedShape,
@@ -216,7 +216,7 @@ class PathNode(
         output.add(
             RenderCommand(
                 commandId = nodeId,
-                points = emptyList(), // Will be filled by engine
+                points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
                 color = color,
                 originalPath = transformedPath,
                 originalShape = null,
