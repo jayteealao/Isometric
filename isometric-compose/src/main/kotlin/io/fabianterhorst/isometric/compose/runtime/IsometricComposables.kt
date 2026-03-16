@@ -19,16 +19,26 @@ import io.fabianterhorst.isometric.Shape
 annotation class IsometricComposable
 
 /**
- * Add a 3D shape to the isometric scene
+ * Add a 3D shape to the isometric scene.
  *
- * @param geometry The 3D shape to render
- * @param color The color of the shape (defaults to LocalDefaultColor)
+ * **Name disambiguation:** This composable shares its name with [io.fabianterhorst.isometric.Shape],
+ * the core geometry class that represents a 3D shape (collection of [Path]s). The [geometry]
+ * parameter accepts that class. If both are imported in the same file, use an import alias:
+ *
+ * ```kotlin
+ * import io.fabianterhorst.isometric.Shape as ShapeGeometry
+ * ```
+ *
+ * @param geometry The 3D [io.fabianterhorst.isometric.Shape] to render (e.g., [io.fabianterhorst.isometric.shapes.Prism])
+ * @param color The color of the shape (defaults to [LocalDefaultColor])
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the shape is visible
+ * @see Group
+ * @see Batch
  */
 @IsometricComposable
 @Composable
