@@ -73,14 +73,20 @@ internal class SpatialGrid(
     }
 
     fun query(x: Double, y: Double, radius: Double = 0.0): List<String> {
-        val minCol = max(0, floor((x - radius) / cellSize).toInt())
-        val maxCol = min(cols - 1, floor((x + radius) / cellSize).toInt())
-        val minRow = max(0, floor((y - radius) / cellSize).toInt())
-        val maxRow = min(rows - 1, floor((y + radius) / cellSize).toInt())
+        val rawMinCol = floor((x - radius) / cellSize).toInt()
+        val rawMaxCol = floor((x + radius) / cellSize).toInt()
+        val rawMinRow = floor((y - radius) / cellSize).toInt()
+        val rawMaxRow = floor((y + radius) / cellSize).toInt()
 
-        if (maxRow < 0 || maxCol < 0 || minRow >= rows || minCol >= cols) {
+        // Early return for queries entirely outside the grid (check before clamping)
+        if (rawMaxCol < 0 || rawMinCol >= cols || rawMaxRow < 0 || rawMinRow >= rows) {
             return emptyList()
         }
+
+        val minCol = max(0, rawMinCol)
+        val maxCol = min(cols - 1, rawMaxCol)
+        val minRow = max(0, rawMinRow)
+        val maxRow = min(rows - 1, rawMaxRow)
 
         val ids = LinkedHashSet<String>()
         for (row in minRow..maxRow) {
