@@ -11,10 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
+import androidx.compose.runtime.withFrameNanos
 import io.fabianterhorst.isometric.compose.runtime.*
 import io.fabianterhorst.isometric.shapes.Prism
 import io.fabianterhorst.isometric.shapes.Pyramid
-import androidx.compose.runtime.withFrameNanos
 import kotlin.math.PI
 import kotlin.math.sin
 

@@ -38,6 +38,7 @@ annotation class IsometricComposable
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the shape is visible
  * @see Group
+ * @see Path
  * @see Batch
  */
 @IsometricComposable
