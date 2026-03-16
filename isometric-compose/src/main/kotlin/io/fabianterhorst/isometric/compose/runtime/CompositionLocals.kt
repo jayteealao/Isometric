@@ -1,7 +1,6 @@
 package io.fabianterhorst.isometric.compose.runtime
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.IsometricEngine
@@ -11,25 +10,25 @@ import io.fabianterhorst.isometric.SceneProjector
 /**
  * CompositionLocal for providing default color to shapes
  */
-val LocalDefaultColor = compositionLocalOf {
+val LocalDefaultColor = staticCompositionLocalOf {
     IsoColor(33.0, 150.0, 243.0) // Default blue
 }
 
 /**
  * CompositionLocal for providing light direction to the scene
  */
-val LocalLightDirection = compositionLocalOf {
+val LocalLightDirection = staticCompositionLocalOf {
     SceneProjector.DEFAULT_LIGHT_DIRECTION.normalize()
 }
 
 /**
  * CompositionLocal for providing render options
  */
-val LocalRenderOptions = compositionLocalOf {
+val LocalRenderOptions = staticCompositionLocalOf {
     RenderOptions.Default
 }
 
-val LocalStrokeStyle = compositionLocalOf<StrokeStyle> {
+val LocalStrokeStyle = staticCompositionLocalOf<StrokeStyle> {
     StrokeStyle.FillAndStroke()
 }
 
@@ -79,7 +78,7 @@ class ColorPalette(
         "ColorPalette(primary=$primary, secondary=$secondary, accent=$accent, background=$background, surface=$surface, error=$error)"
 }
 
-val LocalColorPalette = compositionLocalOf {
+val LocalColorPalette = staticCompositionLocalOf {
     ColorPalette()
 }
 
