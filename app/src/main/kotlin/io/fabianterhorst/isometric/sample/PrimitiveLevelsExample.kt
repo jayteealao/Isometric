@@ -14,7 +14,7 @@ import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.compose.runtime.*
 import io.fabianterhorst.isometric.shapes.Prism
 import io.fabianterhorst.isometric.shapes.Pyramid
-import kotlinx.coroutines.delay
+import androidx.compose.runtime.withFrameNanos
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -72,8 +72,9 @@ fun IsometricScope.AnimatedShapeHighLevel() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            rotation += PI / 90
+            withFrameNanos {
+                rotation += PI / 90
+            }
         }
     }
 
@@ -93,8 +94,9 @@ fun AnimatedShapeLowLevel() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            rotation += PI / 90
+            withFrameNanos {
+                rotation += PI / 90
+            }
         }
     }
 
@@ -261,8 +263,9 @@ fun MixedLevelExample() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            angle += PI / 90
+            withFrameNanos {
+                angle += PI / 90
+            }
         }
     }
 

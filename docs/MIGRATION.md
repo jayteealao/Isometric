@@ -284,8 +284,9 @@ fun AnimatedScene() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            rotation += 0.02
+            withFrameNanos {
+                rotation += 0.02
+            }
         }
     }
 

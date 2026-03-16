@@ -12,7 +12,6 @@ import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.compose.runtime.*
 import io.fabianterhorst.isometric.shapes.*
-import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.math.cos
@@ -122,8 +121,9 @@ fun HierarchySample() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            groupRotation += PI / 180
+            withFrameNanos {
+                groupRotation += PI / 180
+            }
         }
     }
 
@@ -185,9 +185,10 @@ fun AnimationSample() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            angle += PI / 90
-            wave += PI / 60
+            withFrameNanos {
+                angle += PI / 90
+                wave += PI / 60
+            }
         }
     }
 
@@ -388,8 +389,9 @@ fun PerformanceSample() {
 
     LaunchedEffect(animationEnabled) {
         while (animationEnabled) {
-            delay(16)
-            wave += PI / 30
+            withFrameNanos {
+                wave += PI / 30
+            }
         }
     }
 

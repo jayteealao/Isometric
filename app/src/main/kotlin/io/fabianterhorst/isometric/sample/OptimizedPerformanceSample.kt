@@ -9,7 +9,6 @@ import io.fabianterhorst.isometric.IsoColor
 import io.fabianterhorst.isometric.Point
 import io.fabianterhorst.isometric.compose.runtime.*
 import io.fabianterhorst.isometric.shapes.Prism
-import kotlinx.coroutines.delay
 import kotlin.math.sin
 import kotlin.math.PI
 
@@ -37,8 +36,9 @@ fun OptimizedPerformanceSample() {
 
     LaunchedEffect(animationEnabled) {
         while (animationEnabled) {
-            delay(16)
-            wave += PI / 30
+            withFrameNanos {
+                wave += PI / 30
+            }
         }
     }
 
@@ -217,8 +217,9 @@ fun PerformanceComparisonDemo() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            wave += PI / 30
+            withFrameNanos {
+                wave += PI / 30
+            }
         }
     }
 

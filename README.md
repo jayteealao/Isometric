@@ -257,8 +257,9 @@ fun AnimatedScene() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16) // ~60fps
-            angle += PI / 90
+            withFrameNanos {
+                angle += PI / 90
+            }
         }
     }
 
@@ -342,8 +343,9 @@ fun AnimatedScene() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            angle += PI / 90
+            withFrameNanos {
+                angle += PI / 90
+            }
         }
     }
 

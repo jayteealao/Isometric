@@ -15,7 +15,6 @@ import io.fabianterhorst.isometric.compose.runtime.SceneConfig
 import io.fabianterhorst.isometric.compose.runtime.Shape
 import io.fabianterhorst.isometric.compose.runtime.TapEvent
 import io.fabianterhorst.isometric.shapes.*
-import kotlinx.coroutines.delay
 import kotlin.math.PI
 
 class ComposeActivity : ComponentActivity() {
@@ -133,11 +132,11 @@ fun ComplexSceneSample() {
 fun AnimatedSample() {
     var angle by remember { mutableStateOf(0.0) }
 
-    // TODO(WS8): Replace delay(16) with withFrameNanos for proper frame pacing
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16) // ~60fps
-            angle += PI / 90
+            withFrameNanos {
+                angle += PI / 90
+            }
         }
     }
 

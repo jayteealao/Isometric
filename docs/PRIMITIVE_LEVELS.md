@@ -126,8 +126,9 @@ fun PulsingShape() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            scale = 1.0 + sin(System.currentTimeMillis() / 500.0) * 0.2
+            withFrameNanos { frameTimeNanos ->
+                scale = 1.0 + sin(frameTimeNanos / 500_000_000.0) * 0.2
+            }
         }
     }
 

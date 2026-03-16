@@ -367,8 +367,9 @@ fun RotatingStructure() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            angle += PI / 180
+            withFrameNanos {
+                angle += PI / 180
+            }
         }
     }
 
@@ -483,8 +484,9 @@ fun PerformanceGrid() {
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(16)
-            wave += PI / 30
+            withFrameNanos {
+                wave += PI / 30
+            }
         }
     }
 
