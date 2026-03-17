@@ -1,5 +1,7 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Strip any trailing slash so paths like `${base}/foo/` work in both dev and prod
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <StarlightPage
@@ -30,7 +32,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
             <code>@Composable</code> syntax.
           </p>
           <div class="hero-actions">
-            <a href="/getting-started/quickstart/" class="btn btn-primary">
+            <a href={`${base}/getting-started/quickstart/`} class="btn btn-primary">
               Get Started
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
             </a>
@@ -42,7 +44,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
         </div>
         <div class="hero-visual">
           <div class="hero-image-wrap">
-            <img src="/screenshots/complex-scene.png" alt="Complex isometric scene built with the Isometric library" width="820" height="680" />
+            <img src={`${base}/screenshots/complex-scene.png`} alt="Complex isometric scene built with the Isometric library" width="820" height="680" />
           </div>
         </div>
       </div>
@@ -81,7 +83,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
             <svg class="arrow-down" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m5 12 7 7 7-7"/></svg>
           </div>
           <div class="showcase-result">
-            <img src="/screenshots/simple-cube.png" alt="Blue isometric cube rendered from the code" width="400" height="300" />
+            <img src={`${base}/screenshots/simple-cube.png`} alt="Blue isometric cube rendered from the code" width="400" height="300" />
           </div>
         </div>
       </div>
@@ -159,28 +161,28 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
       <h2>Shape catalog</h2>
       <p class="gallery-sub">Six built-in geometries, ready to compose.</p>
       <div class="gallery-grid">
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-prism.png" alt="Prism" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-prism.png`} alt="Prism" width="360" height="320" loading="lazy" />
           <span class="shape-label">Prism</span>
         </a>
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-pyramid.png" alt="Pyramid" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-pyramid.png`} alt="Pyramid" width="360" height="320" loading="lazy" />
           <span class="shape-label">Pyramid</span>
         </a>
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-cylinder.png" alt="Cylinder" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-cylinder.png`} alt="Cylinder" width="360" height="320" loading="lazy" />
           <span class="shape-label">Cylinder</span>
         </a>
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-octahedron.png" alt="Octahedron" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-octahedron.png`} alt="Octahedron" width="360" height="320" loading="lazy" />
           <span class="shape-label">Octahedron</span>
         </a>
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-stairs.png" alt="Stairs" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-stairs.png`} alt="Stairs" width="360" height="320" loading="lazy" />
           <span class="shape-label">Stairs</span>
         </a>
-        <a href="/guides/shapes/" class="shape-card">
-          <img src="/screenshots/shape-knot.png" alt="Knot" width="360" height="320" loading="lazy" />
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-knot.png`} alt="Knot" width="360" height="320" loading="lazy" />
           <span class="shape-label">Knot</span>
         </a>
       </div>
@@ -190,7 +192,7 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
     <section class="cta">
       <h2>Ready to build?</h2>
       <p>Get your first isometric scene running in under a minute.</p>
-      <a href="/getting-started/quickstart/" class="btn btn-primary btn-lg">
+      <a href={`${base}/getting-started/quickstart/`} class="btn btn-primary btn-lg">
         Quick Start Guide
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
       </a>

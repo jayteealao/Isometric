@@ -4,6 +4,7 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
 	site: 'https://jayteealao.github.io/Isometric',
+	base: '/Isometric',
 	integrations: [
 		starlight({
 			title: 'Isometric',
@@ -76,7 +77,7 @@ export default defineConfig({
 				},
 				{
 					label: 'API Reference',
-					link: '/api/',
+					link: '/Isometric/api/',
 					attrs: { target: '_blank' },
 				},
 			],
