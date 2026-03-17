@@ -1,0 +1,14 @@
+Isometric
+Copyright 2017 Fabian Terhorst (original work)
+Copyright 2024-2026 jayteealao (derivative work)
+
+This product includes software developed by Fabian Terhorst
+(https://github.com/FabianTerhorst/Isometric).
+
+This is a fork that has been substantially rewritten:
+  - Full Kotlin rewrite of the core rendering engine
+  - Jetpack Compose integration with custom runtime applier
+  - Android View adapter layer
+  - Performance benchmark harness
+
+Licensed under the Apache License, Version 2.0.
