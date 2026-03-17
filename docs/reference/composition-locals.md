@@ -1,0 +1,137 @@
+---
+title: CompositionLocals
+description: Theme defaults and scene-wide configuration via CompositionLocal
+sidebar:
+  order: 3
+---
+
+Isometric exposes six public `CompositionLocal` values that control default rendering behaviour throughout the scene tree. Override any of them with `CompositionLocalProvider` to change the defaults for an entire subtree without threading parameters through every composable call.
+
+## Reference Table
+
+| Name | Type | Default | Purpose |
+|------|------|---------|---------|
+| `LocalDefaultColor` | `IsoColor` | Material Blue `IsoColor(33, 150, 243)` | Color applied to shapes that omit an explicit `color` parameter |
+| `LocalLightDirection` | `Vector` | `Vector(2, -1, 3).normalize()` | Direction of the scene light source, used for per-face shading |
+| `LocalRenderOptions` | `RenderOptions` | `RenderOptions.Default` | Controls depth sorting, back-face culling, bounds checking |
+| `LocalStrokeStyle` | `StrokeStyle` | `StrokeStyle.FillAndStroke()` | How shape edges are drawn (fill only, stroke only, or both) |
+| `LocalColorPalette` | `ColorPalette` | `ColorPalette()` | Named semantic colors (`primary`, `secondary`, `accent`, etc.) |
+| `LocalIsometricEngine` | `IsometricEngine` | Error if not inside a scene | Access to the projection engine for coordinate conversion |
+
+`LocalBenchmarkHooks` also exists but is internal and defaults to `null`. It is used exclusively by the benchmark harness and should not be overridden in application code.
+
+## Overriding Defaults
+
+Wrap your scene (or any subtree within it) in `CompositionLocalProvider` to change the ambient values:
+
+```kotlin
+@Composable
+fun ThemedScene() {
+    CompositionLocalProvider(
+        LocalDefaultColor provides IsoColor(76, 175, 80),
+        LocalLightDirection provides Vector(0.0, -1.0, 2.0).normalize(),
+        LocalStrokeStyle provides StrokeStyle.FillOnly
+    ) {
+        IsometricScene {
+            // All shapes here default to green, top-down lighting, no stroke
+            Shape(geometry = Prism(Point.ORIGIN, 2.0, 2.0, 2.0))
+            Shape(geometry = Prism(Point(3.0, 0.0, 0.0), 1.0, 1.0, 3.0))
+        }
+    }
+}
+```
+
+## Per-Subtree Theming
+
+You can nest providers to apply different themes to different parts of the scene. Each provider overrides only the locals it specifies; the rest inherit from the parent.
+
+```kotlin
+@Composable
+fun MultiThemeScene() {
+    IsometricScene {
+        // Default blue shapes
+        Shape(geometry = Prism(Point.ORIGIN))
+
+        // Red subtree
+        CompositionLocalProvider(LocalDefaultColor provides IsoColor.RED) {
+            Shape(geometry = Prism(Point(2.0, 0.0, 0.0)))
+            Shape(geometry = Prism(Point(2.0, 2.0, 0.0)))
+        }
+
+        // Green subtree with custom palette
+        CompositionLocalProvider(
+            LocalDefaultColor provides IsoColor.GREEN,
+            LocalColorPalette provides ColorPalette(
+                primary = IsoColor.GREEN,
+                secondary = IsoColor.CYAN
+            )
+        ) {
+            val palette = LocalColorPalette.current
+            Shape(
+                geometry = Prism(Point(0.0, 2.0, 0.0)),
+                color = palette.secondary
+            )
+        }
+    }
+}
+```
+
+## Using LocalIsometricEngine
+
+`LocalIsometricEngine` provides access to the `IsometricEngine` instance that drives the current scene. The most common use case is converting between world coordinates and screen coordinates.
+
+```kotlin
+@Composable
+fun CoordinateDisplay() {
+    val engine = LocalIsometricEngine.current
+    val worldPoint = Point(1.0, 1.0, 1.0)
+
+    // Convert a world point to screen position
+    val screenPos = engine.worldToScreen(worldPoint, 800, 600)
+    Text("Screen position: (${screenPos.x}, ${screenPos.y})")
+}
+```
+
+> **Caution**
+>
+Reading `LocalIsometricEngine.current` outside of an `IsometricScene` throws an `IllegalStateException`. Always access it from composables that are children of an `IsometricScene`.
+
+## Why staticCompositionLocalOf?
+
+All Isometric locals use `staticCompositionLocalOf` rather than `compositionLocalOf`. Static locals do not track reads per-composable, so when the value changes, the entire subtree beneath the provider recomposes. This is the correct trade-off here because:
+
+1. **Engine and light direction rarely change** -- they are typically set once per scene.
+2. **When they do change, every shape is affected** -- a new light direction reshades every face, so targeted invalidation would save no work.
+3. **Lower overhead** -- static locals skip per-read tracking, reducing memory and allocation pressure during composition.
+
+If you need a value that changes frequently and only affects a few consumers, prefer regular Compose `mutableStateOf` over a `CompositionLocal`.
+
+## ColorPalette
+
+`ColorPalette` groups six named color roles for consistent theming. Read it via `LocalColorPalette.current` and reference roles by name:
+
+```kotlin
+@Composable
+fun IsometricScope.PaletteDemo() {
+    val palette = LocalColorPalette.current
+    Shape(geometry = Prism(Point.ORIGIN, 2.0, 2.0, 2.0), color = palette.primary)
+    Shape(geometry = Prism(Point(3.0, 0.0, 0.0)), color = palette.accent)
+    Shape(geometry = Prism(Point(0.0, 3.0, 0.0)), color = palette.surface)
+}
+```
+
+Create a custom palette by constructing a new `ColorPalette` or calling `copy()` on an existing one:
+
+```kotlin
+val darkPalette = ColorPalette(
+    primary = IsoColor(30, 30, 30),
+    secondary = IsoColor(60, 60, 60),
+    accent = IsoColor(0, 255, 128),
+    background = IsoColor.BLACK,
+    surface = IsoColor(50, 50, 50),
+    error = IsoColor.RED
+)
+
+// Or modify an existing palette
+val modified = LocalColorPalette.current.copy(accent = IsoColor.YELLOW)
+```

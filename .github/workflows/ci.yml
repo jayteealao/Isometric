@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ── Markdown lint ────────────────────────────────────────────────────────────
+  markdown:
+    name: Lint markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint .md and .mdx files
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            **/*.md
+            site/src/content/docs/**/*.mdx
+            !CHANGELOG.md
+            !docs/internal/**
+            !node_modules/**
+            !**/build/**
+            !site/dist/**
+          config: .markdownlint.json
+
+  # ── External link check ──────────────────────────────────────────────────────
+  links:
+    name: Check external links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check HTTP/HTTPS links in source files
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Scope to user-facing files only. The docs site
+          # (jayteealao.github.io/Isometric) only deploys after merge to
+          # main, so those links are excluded to avoid pre-deploy 404s.
+          args: >-
+            --no-progress
+            --scheme https
+            --scheme http
+            --exclude-loopback
+            --exclude 'jayteealao\.github\.io'
+            README.md
+            CONTRIBUTING.md
+          fail: true
+
+  # ── Commit message lint (PRs only) ───────────────────────────────────────────
+  commits:
+    name: Lint commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install commitlint
+        run: npm install -g @commitlint/cli @commitlint/config-conventional
+
+      - name: Lint commits in PR
+        run: |
+          npx commitlint \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to   ${{ github.event.pull_request.head.sha }} \
+            --verbose
+
+  # ── Gradle build + test + API check ──────────────────────────────────────────
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build all modules
+        run: ./gradlew build
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+      - name: Check API compatibility
+        run: ./gradlew apiCheck
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"

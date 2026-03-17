@@ -1,0 +1,787 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Strip any trailing slash so paths like `${base}/foo/` work in both dev and prod
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Isometric',
+    description: 'Declarative isometric rendering for Jetpack Compose',
+    template: 'splash',
+    tableOfContents: false,
+    editUrl: false,
+    lastUpdated: false,
+    pagefind: false,
+  }}
+  hasSidebar={false}
+>
+  <div class="landing not-content">
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-text">
+          <p class="hero-badge">Jetpack Compose</p>
+          <h1>
+            Build isometric scenes<br />
+            <span class="hero-accent">declaratively.</span>
+          </h1>
+          <p class="hero-sub">
+            A Compose Runtime library for interactive 3D isometric rendering.
+            Shapes, transforms, gestures, and camera &mdash; all in familiar
+            <code>@Composable</code> syntax.
+          </p>
+          <div class="hero-actions">
+            <a href={`${base}/getting-started/quickstart/`} class="btn btn-primary">
+              Get Started
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+            <a href="https://github.com/jayteealao/Isometric" class="btn btn-ghost">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+              GitHub
+            </a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-image-wrap">
+            <img src={`${base}/screenshots/complex-scene.png`} alt="Complex isometric scene built with the Isometric library" width="820" height="680" />
+          </div>
+        </div>
+      </div>
+      <div class="hero-grid-bg" aria-hidden="true"></div>
+    </section>
+
+    <!-- ============ CODE SHOWCASE ============ -->
+    <section class="showcase">
+      <div class="showcase-inner">
+        <div class="showcase-header">
+          <h2>Five lines. One scene.</h2>
+          <p>
+            Drop an <code>IsometricScene</code> into any composable.
+            The library handles projection, depth sorting, and rendering.
+          </p>
+        </div>
+        <div class="showcase-split">
+          <div class="showcase-code">
+            <div class="code-window">
+              <div class="code-titlebar">
+                <span class="code-dot" style="background: #ff5f57;"></span>
+                <span class="code-dot" style="background: #febc2e;"></span>
+                <span class="code-dot" style="background: #28c840;"></span>
+                <span class="code-filename">MyScene.kt</span>
+              </div>
+              <pre><code><span class="kw">IsometricScene</span> &#123;
+    <span class="fn">Shape</span>(
+        geometry = <span class="fn">Prism</span>(<span class="ty">Point</span>.<span class="ct">ORIGIN</span>),
+        color = <span class="ty">IsoColor</span>.<span class="ct">BLUE</span>
+    )
+&#125;</code></pre>
+            </div>
+          </div>
+          <div class="showcase-arrow" aria-hidden="true">
+            <svg class="arrow-right" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <svg class="arrow-down" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m5 12 7 7 7-7"/></svg>
+          </div>
+          <div class="showcase-result">
+            <img src={`${base}/screenshots/simple-cube.png`} alt="Blue isometric cube rendered from the code" width="400" height="300" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FEATURES ============ -->
+    <section class="features">
+      <h2>Everything you need</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+          </div>
+          <h3>Declarative API</h3>
+          <p>
+            Shape, Group, and Path composables that read like a scene description.
+            Transforms accumulate automatically.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <h3>High Performance</h3>
+          <p>
+            Dirty tracking, scene caching, spatial indexing, and an optional
+            native canvas path for ~2&times; draw speed.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"/><path d="m12 12 4 10 1.7-4.3L22 16Z"/></svg>
+          </div>
+          <h3>Interactive Gestures</h3>
+          <p>
+            Built-in tap and drag with spatial hit testing. Camera pan and zoom
+            via CameraState.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <h3>6 Built-in Shapes</h3>
+          <p>
+            Prism, Pyramid, Cylinder, Octahedron, Stairs, and Knot out of the box.
+            Extend with extrude and CustomNode.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H2v13h20V7h-5l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+          </div>
+          <h3>Camera &amp; Viewport</h3>
+          <p>
+            Pan, zoom, and animate the camera. CameraState integrates with Compose
+            animations for smooth transitions.
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </div>
+          <h3>Custom Shapes</h3>
+          <p>
+            Build any geometry with Path faces, extrude 2D shapes into 3D solids,
+            or drop to raw ComposeNode for full control.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SHAPE GALLERY ============ -->
+    <section class="gallery">
+      <h2>Shape catalog</h2>
+      <p class="gallery-sub">Six built-in geometries, ready to compose.</p>
+      <div class="gallery-grid">
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-prism.png`} alt="Prism" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Prism</span>
+        </a>
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-pyramid.png`} alt="Pyramid" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Pyramid</span>
+        </a>
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-cylinder.png`} alt="Cylinder" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Cylinder</span>
+        </a>
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-octahedron.png`} alt="Octahedron" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Octahedron</span>
+        </a>
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-stairs.png`} alt="Stairs" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Stairs</span>
+        </a>
+        <a href={`${base}/guides/shapes/`} class="shape-card">
+          <img src={`${base}/screenshots/shape-knot.png`} alt="Knot" width="360" height="320" loading="lazy" />
+          <span class="shape-label">Knot</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ CTA ============ -->
+    <section class="cta">
+      <h2>Ready to build?</h2>
+      <p>Get your first isometric scene running in under a minute.</p>
+      <a href={`${base}/getting-started/quickstart/`} class="btn btn-primary btn-lg">
+        Quick Start Guide
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+    </section>
+  </div>
+</StarlightPage>
+
+<style>
+  /* ==============================
+     LANDING PAGE STYLES
+     Uses Starlight CSS variables for full theme compatibility.
+     ============================== */
+
+  .landing {
+    --_pad-x: clamp(1rem, 5vw, 3rem);
+    font-family: var(--__sl-font);
+    color: var(--sl-color-white);
+    overflow-x: hidden;
+  }
+
+  /* Prevent any horizontal overflow at the page level */
+  :global(html), :global(body) {
+    overflow-x: hidden;
+  }
+
+  /* ---- HERO ---- */
+
+  .hero {
+    position: relative;
+    padding: 4rem var(--_pad-x) 3rem;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    max-width: 72rem;
+    margin: 0 auto;
+    align-items: center;
+  }
+
+  @media (min-width: 56rem) {
+    .hero-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+    }
+    .hero {
+      padding: 6rem var(--_pad-x) 5rem;
+    }
+  }
+
+  .hero-badge {
+    display: inline-block;
+    font-size: var(--sl-text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sl-color-gray-3);
+    margin-bottom: 0.75rem;
+  }
+
+  @media (min-width: 56rem) {
+    .hero-badge {
+      font-size: var(--sl-text-xs);
+      color: var(--sl-color-accent);
+      border: 1px solid var(--sl-color-accent);
+      border-radius: 999px;
+      padding: 0.25em 0.9em;
+      margin-bottom: 1.25rem;
+    }
+  }
+
+  :root[data-theme='light'] .hero-badge {
+    color: var(--sl-color-accent-high);
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    margin: 0 0 1.25rem;
+  }
+
+  .hero-accent {
+    background: linear-gradient(135deg, var(--sl-color-accent), var(--sl-color-blue-high));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  :root[data-theme='light'] .hero-accent {
+    background: linear-gradient(135deg, var(--sl-color-accent), var(--sl-color-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: var(--sl-text-lg);
+    line-height: 1.6;
+    color: var(--sl-color-gray-2);
+    max-width: 32rem;
+    margin: 0 0 2rem;
+  }
+
+  .hero-sub code {
+    background: var(--sl-color-bg-inline-code);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: var(--__sl-font-mono);
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .hero-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .hero-image-wrap {
+    position: relative;
+    max-width: min(480px, 100%);
+    width: 100%;
+    animation: hero-float 6s ease-in-out infinite;
+  }
+
+  .hero-image-wrap img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.25));
+  }
+
+  :root[data-theme='light'] .hero-image-wrap img {
+    filter: drop-shadow(0 16px 32px rgba(0, 0, 0, 0.12));
+  }
+
+  @keyframes hero-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  /* Subtle isometric grid background */
+  .hero-grid-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.04;
+    background-image:
+      linear-gradient(30deg, var(--sl-color-accent) 1px, transparent 1px),
+      linear-gradient(150deg, var(--sl-color-accent) 1px, transparent 1px);
+    background-size: 60px 35px;
+    mask-image: radial-gradient(ellipse 70% 70% at 70% 50%, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 70% at 70% 50%, black 20%, transparent 70%);
+    pointer-events: none;
+  }
+
+  :root[data-theme='light'] .hero-grid-bg {
+    opacity: 0.06;
+  }
+
+  /* ---- BUTTONS ---- */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: var(--sl-text-base);
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 8px;
+    padding: 0.65em 1.4em;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--sl-color-accent) 40%, transparent);
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--sl-color-gray-4);
+    color: var(--sl-color-white);
+    background: transparent;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--sl-color-gray-2);
+    background: var(--sl-color-gray-6);
+  }
+
+  :root[data-theme='light'] .btn-ghost {
+    border-color: var(--sl-color-gray-5);
+    color: var(--sl-color-gray-1);
+  }
+
+  :root[data-theme='light'] .btn-ghost:hover {
+    border-color: var(--sl-color-gray-3);
+    background: var(--sl-color-gray-6);
+  }
+
+  .btn-lg {
+    font-size: var(--sl-text-lg);
+    padding: 0.75em 1.8em;
+  }
+
+  /* ---- CODE SHOWCASE ---- */
+
+  .showcase {
+    padding: 4rem var(--_pad-x);
+    border-top: 1px solid var(--sl-color-hairline-light);
+  }
+
+  .showcase-inner {
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+
+  .showcase-header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .showcase-header h2 {
+    font-size: var(--sl-text-h2);
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .showcase-header p {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-lg);
+    max-width: 36rem;
+    margin: 0 auto;
+  }
+
+  .showcase-header code {
+    background: var(--sl-color-bg-inline-code);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: var(--__sl-font-mono);
+  }
+
+  .showcase-split {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    align-items: center;
+    justify-items: center;
+  }
+
+  @media (min-width: 56rem) {
+    .showcase-split {
+      grid-template-columns: 1fr auto 1fr;
+    }
+  }
+
+  .showcase-code {
+    width: 100%;
+    max-width: min(420px, 100%);
+    min-width: 0;
+  }
+
+  .code-window {
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--sl-color-gray-6);
+    box-shadow: var(--sl-shadow-md);
+  }
+
+  :root[data-theme='light'] .code-window {
+    background: var(--sl-color-gray-7, hsl(224, 19%, 97%));
+    border-color: var(--sl-color-gray-5);
+  }
+
+  .code-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-bg-nav);
+  }
+
+  .code-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .code-filename {
+    margin-left: 0.5rem;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    font-family: var(--__sl-font-mono);
+  }
+
+  .code-window pre {
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-sm);
+    line-height: 1.7;
+    overflow-x: auto;
+    color: var(--sl-color-white);
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .code-window code {
+    font-family: inherit;
+  }
+
+  /* Syntax colors using Starlight semantic tokens */
+  .code-window .kw { color: var(--sl-color-blue-high); font-weight: 600; }
+  .code-window .fn { color: var(--sl-color-green-high); }
+  .code-window .ty { color: var(--sl-color-purple-high); }
+  .code-window .ct { color: var(--sl-color-orange-high); }
+
+  :root[data-theme='light'] .code-window .kw { color: var(--sl-color-blue); font-weight: 600; }
+  :root[data-theme='light'] .code-window .fn { color: var(--sl-color-green-high); }
+  :root[data-theme='light'] .code-window .ty { color: var(--sl-color-purple-high); }
+  :root[data-theme='light'] .code-window .ct { color: var(--sl-color-orange-high); }
+
+  .showcase-arrow {
+    color: var(--sl-color-gray-3);
+    display: flex;
+    justify-content: center;
+  }
+
+  .showcase-arrow .arrow-right {
+    display: none;
+  }
+
+  .showcase-arrow .arrow-down {
+    display: block;
+  }
+
+  @media (min-width: 56rem) {
+    .showcase-arrow .arrow-right { display: block; }
+    .showcase-arrow .arrow-down { display: none; }
+  }
+
+  .showcase-result {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .showcase-result img {
+    max-width: 280px;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.2));
+  }
+
+  :root[data-theme='light'] .showcase-result img {
+    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.1));
+  }
+
+  /* ---- FEATURES ---- */
+
+  .features {
+    padding: 4rem var(--_pad-x);
+    border-top: 1px solid var(--sl-color-hairline-light);
+  }
+
+  .features h2 {
+    text-align: center;
+    font-size: var(--sl-text-h2);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 3rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 1.5rem;
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 40rem) {
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (min-width: 64rem) {
+    .feature-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .feature-card {
+    display: flex;
+    flex-direction: column;
+    padding: 1.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    background: var(--sl-color-gray-6);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .feature-card p {
+    margin: 0;
+  }
+
+  .feature-card:hover {
+    border-color: var(--sl-color-gray-4);
+    transform: translateY(-2px);
+  }
+
+  :root[data-theme='light'] .feature-card {
+    background: var(--sl-color-bg);
+    border-color: var(--sl-color-gray-5);
+    box-shadow: var(--sl-shadow-sm);
+  }
+
+  :root[data-theme='light'] .feature-card:hover {
+    border-color: var(--sl-color-gray-4);
+    box-shadow: var(--sl-shadow-md);
+  }
+
+  .feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent);
+    margin-bottom: 1rem;
+  }
+
+  :root[data-theme='light'] .feature-icon {
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+  }
+
+  .feature-card h3 {
+    font-size: var(--sl-text-lg);
+    font-weight: 650;
+    margin: 0 0 0.5rem;
+  }
+
+  .feature-card p {
+    font-size: var(--sl-text-sm);
+    line-height: 1.65;
+    color: var(--sl-color-gray-2);
+    margin: 0;
+  }
+
+  .feature-card code {
+    background: var(--sl-color-bg-inline-code);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-size: 0.88em;
+    font-family: var(--__sl-font-mono);
+  }
+
+  /* ---- SHAPE GALLERY ---- */
+
+  .gallery {
+    padding: 4rem var(--_pad-x);
+    border-top: 1px solid var(--sl-color-hairline-light);
+    text-align: center;
+  }
+
+  .gallery h2 {
+    font-size: var(--sl-text-h2);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5rem;
+  }
+
+  .gallery-sub {
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-lg);
+    margin: 0 0 3rem;
+  }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    max-width: 64rem;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 40rem) {
+    .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (min-width: 64rem) {
+    .gallery-grid { grid-template-columns: repeat(6, 1fr); }
+  }
+
+  .shape-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 0.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 12px;
+    text-decoration: none;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .shape-card:hover {
+    border-color: var(--sl-color-accent);
+    transform: translateY(-3px);
+  }
+
+  :root[data-theme='light'] .shape-card {
+    border-color: var(--sl-color-gray-5);
+    box-shadow: var(--sl-shadow-sm);
+  }
+
+  :root[data-theme='light'] .shape-card:hover {
+    border-color: var(--sl-color-accent);
+    box-shadow: var(--sl-shadow-md);
+  }
+
+  .shape-card img {
+    width: 100%;
+    max-width: 120px;
+    height: auto;
+    object-fit: contain;
+    aspect-ratio: 1 / 1;
+  }
+
+  .shape-label {
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    color: var(--sl-color-white);
+    font-family: var(--__sl-font-mono);
+  }
+
+  /* ---- FOOTER CTA ---- */
+
+  .cta {
+    padding: 5rem var(--_pad-x);
+    text-align: center;
+    border-top: 1px solid var(--sl-color-hairline-light);
+  }
+
+  .cta h2 {
+    font-size: var(--sl-text-h2);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.75rem;
+  }
+
+  .cta p {
+    font-size: var(--sl-text-lg);
+    color: var(--sl-color-gray-2);
+    margin: 0 0 2rem;
+  }
+
+  /* ---- GENERAL ---- */
+
+  /* Remove default Starlight content container max-width for our landing layout */
+  .landing :global(.sl-markdown-content) {
+    max-width: none;
+  }
+
+/* Hide the Starlight-generated page title rendered above our custom content */
+  :global(.content-panel:has(> .sl-container > #_top)) {
+    display: none !important;
+  }
+</style>

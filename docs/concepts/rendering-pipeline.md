@@ -1,0 +1,177 @@
+---
+title: Rendering Pipeline
+description: From Compose recomposition to pixels on screen
+sidebar:
+  order: 3
+---
+
+This page traces the complete path from a Compose state change to pixels on screen. Understanding this pipeline helps you debug rendering issues and make informed performance decisions.
+
+## End-to-End Flow
+
+```
+Compose state change
+  |
+  v
+Recomposition: composables execute, node tree updates
+  |
+  v
+Is node tree dirty?  ----[no]----> Cache hit: reuse PreparedScene
+  |                                         |
+  [yes]                                     |
+  |                                         |
+  v                                         |
+Traverse node tree, engine.add() each shape |
+  |                                         |
+  v                                         |
+engine.projectScene(width, height)          |
+  |                                         |
+  v                                         |
+PreparedScene (sorted RenderCommands)  <----+
+  |
+  v
+DrawScope.drawPath() for each command
+  |
+  v
+Pixels on screen
+```
+
+When no state has changed, the entire left branch is skipped. The cached `PreparedScene` is drawn directly, making idle scenes essentially free.
+
+## Cache Invalidation
+
+Three independent conditions must all be clean for a cache hit. If any one changes, the scene re-projects:
+
+| Condition | What changed | How it is detected |
+|-----------|-------------|-------------------|
+| Dirty tree flag | A node's content changed (color, position, geometry) | `markDirty()` propagates to root, increments `sceneVersion` |
+| Projection version | Engine angle or scale changed | `projectionVersion` on `SceneProjector` increments |
+| Viewport dimensions | Canvas width or height changed (e.g., device rotation) | Width/height compared against cached `PreparedScene` dimensions |
+
+Additionally, `frameVersion` (set on `AdvancedSceneConfig`) acts as an external cache key. Incrementing it forces re-projection even when the other three conditions are clean.
+
+```kotlin
+// All three must match for a cache hit:
+val cacheValid = !tree.isDirty
+    && engine.projectionVersion == cachedVersion
+    && width == cachedScene.width
+    && height == cachedScene.height
+    && frameVersion == cachedFrameVersion
+```
+
+## RenderCommand
+
+`RenderCommand` is the atomic unit of rendering. Each command represents one face to draw:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commandId` | `String` | Unique identifier for this command (used in error reporting) |
+| `points` | `List<Point2D>` | Projected 2D screen coordinates of the face vertices |
+| `color` | `IsoColor` | Final color after lighting is applied |
+| `originalPath` | `Path` | The original 3D geometry before projection |
+| `originalShape` | `Shape?` | The parent shape, if this face came from a multi-face shape |
+| `ownerNodeId` | `String?` | The node that produced this command (used for hit testing) |
+
+A `Prism` produces six faces (six `RenderCommand` objects). After backface culling, typically three are visible. After bounds checking, commands for off-screen faces are discarded.
+
+```kotlin
+// Intercept render commands via onPreparedSceneReady
+IsometricScene(
+    config = AdvancedSceneConfig(
+        onPreparedSceneReady = { scene: PreparedScene ->
+            println("Rendering ${scene.commands.size} faces")
+            scene.commands.forEach { cmd ->
+                println("  ${cmd.commandId}: ${cmd.points.size} vertices, color=${cmd.color}")
+            }
+        }
+    )
+) {
+    Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(33, 150, 243))
+}
+```
+
+## Path Caching
+
+When `enablePathCaching = true` (set on `AdvancedSceneConfig`), the renderer pre-converts each `RenderCommand.points` list into an `androidx.compose.ui.graphics.Path` object and caches it.
+
+Without path caching, every frame allocates new `Path` objects from the point lists, draws them, and discards them. With path caching, paths are allocated once and reused until the `PreparedScene` changes.
+
+```kotlin
+IsometricScene(
+    config = AdvancedSceneConfig(enablePathCaching = true)
+) {
+    // 50 prisms = ~150 visible faces = ~150 Path objects cached
+    ForEach((0 until 50).toList()) { i ->
+        Shape(geometry = Prism(Point(i.toDouble() % 10, (i / 10).toDouble(), 0.0)))
+    }
+}
+```
+
+Path caching is most effective in scenes where the geometry is static or changes infrequently. In heavily animated scenes where the `PreparedScene` changes every frame, the cache is rebuilt each time and provides less benefit.
+
+## Native Canvas Path
+
+When `useNativeCanvas = true` on Android, `NativeSceneRenderer` bypasses Compose `DrawScope` entirely. Instead of creating Compose `Path` objects and calling `drawPath()`, it uses `android.graphics.Canvas` directly with reused `android.graphics.Paint` objects.
+
+This eliminates two layers of overhead:
+
+1. Compose `Path` object allocation and conversion
+2. `DrawScope` to `Canvas` delegation
+
+The result is roughly a 2x rendering speedup on Android. On other platforms, this flag is silently ignored, so you can set it unconditionally:
+
+```kotlin
+IsometricScene(
+    config = SceneConfig(useNativeCanvas = true)
+) {
+    // Rendered directly to android.graphics.Canvas on Android
+    // Falls back to standard DrawScope on other platforms
+    Shape(geometry = Prism(Point.ORIGIN))
+}
+```
+
+Native canvas rendering and path caching are independent. You can enable both, though on Android the native canvas path already avoids Compose `Path` allocation, so `enablePathCaching` provides less additional benefit.
+
+## PreparedScene
+
+`PreparedScene` is the output of `engine.projectScene()`. It is a self-contained snapshot of the projected scene:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commands` | `List<RenderCommand>` | Sorted list of face-draw commands, ready for rendering |
+| `width` | `Int` | Viewport width at the time of projection |
+| `height` | `Int` | Viewport height at the time of projection |
+
+The `PreparedScene` is cached between frames and reused when the node tree is clean. It can also be intercepted via the `onPreparedSceneReady` hook for purposes beyond rendering:
+
+```kotlin
+@Composable
+fun ExportableScene() {
+    var lastScene by remember { mutableStateOf<PreparedScene?>(null) }
+
+    IsometricScene(
+        config = AdvancedSceneConfig(
+            onPreparedSceneReady = { lastScene = it }
+        )
+    ) {
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(33, 150, 243))
+        Shape(geometry = Pyramid(Point(2.0, 0.0, 0.0)), color = IsoColor(76, 175, 80))
+    }
+
+    // Use the prepared scene for export or analysis
+    lastScene?.let { scene ->
+        Text("Scene has ${scene.commands.size} render commands")
+    }
+}
+```
+
+Use cases for intercepting the `PreparedScene`:
+
+- **Export** -- serialize the commands to SVG or another vector format
+- **Testing** -- assert the number of visible faces, verify colors after lighting
+- **Analytics** -- track scene complexity over time
+- **Server-side rendering** -- project on the server, send commands to the client
+
+> **Tip**
+>
+The `PreparedScene` contains fully projected 2D coordinates and final colors. Everything needed to reproduce the rendered image is in the command list, making it a natural serialization boundary.

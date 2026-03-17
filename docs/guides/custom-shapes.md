@@ -1,0 +1,92 @@
+---
+title: Custom Shapes
+description: Create custom geometry with Path, extrude, and CustomNode
+sidebar:
+  order: 6
+---
+
+There are three approaches to creating custom geometry in Isometric, each offering a different level of control.
+
+## 1. Path
+
+The `Path` composable renders a 2D polygon face positioned in 3D space. Use it for flat surfaces like floors, walls, or labels.
+
+```kotlin
+Path(
+    path = io.fabianterhorst.isometric.Path(
+        Point(0.0, 0.0, 1.0),
+        Point(2.0, 0.0, 1.0),
+        Point(2.0, 2.0, 1.0)
+    ),
+    color = IsoColor.RED
+)
+```
+
+> **Note**
+>
+The `Path` class name collides with `kotlin.io.path.Path`. Use an import alias to avoid ambiguity:
+
+```kotlin
+import io.fabianterhorst.isometric.Path as IsoPath
+```
+
+## 2. Shape.extrude
+
+`Shape.extrude` takes a 2D `Path` and lifts it along the Z axis to produce a 3D solid. This is the easiest way to create non-rectangular geometry.
+
+```kotlin
+val trianglePath = io.fabianterhorst.isometric.Path(
+    Point(0.0, 0.0, 0.0),
+    Point(2.0, 0.0, 0.0),
+    Point(2.0, 2.0, 0.0)
+)
+val extrudedShape = Shape.extrude(trianglePath, height = 1.0)
+
+// Use in scene:
+Shape(geometry = extrudedShape, color = IsoColor.RED)
+```
+
+The resulting shape includes all side faces and both the top and bottom caps.
+
+## 3. CustomNode
+
+`CustomNode` is an escape hatch for cases where the built-in composables are not sufficient. It gives you direct access to the render pipeline. The `render` lambda receives a `RenderContext` (which carries accumulated parent transforms) and a `nodeId` (unique identifier for this node), and should return a `List<RenderCommand>`.
+
+```kotlin
+CustomNode(
+    position = Point(0.0, 0.0, 0.0),
+    render = { context, nodeId ->
+        // Create a triangular face in 3D space
+        val trianglePath = io.fabianterhorst.isometric.Path(
+            Point(0.0, 0.0, 0.0),
+            Point(2.0, 0.0, 0.0),
+            Point(1.0, 1.0, 1.0)
+        )
+        // Apply accumulated transforms from parent Groups
+        val transformed = context.applyTransformsToPath(trianglePath)
+
+        // Build a RenderCommand manually
+        listOf(
+            RenderCommand(
+                commandId = nodeId,
+                points = transformed.points.map { pt ->
+                    // Project 3D → 2D (simplified; real projection happens in engine)
+                    Point2D(pt.x, pt.y)
+                },
+                color = IsoColor.RED,
+                originalPath = transformed,
+                originalShape = null,
+                ownerNodeId = nodeId
+            )
+        )
+    }
+)
+```
+
+Use `CustomNode` when you need to:
+
+- Generate render commands procedurally at draw time
+- Integrate with external geometry sources
+- Implement rendering techniques not covered by the standard composables
+
+For most use cases, `Path` and `Shape.extrude` are sufficient.

@@ -1,26 +1,48 @@
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.dokka)
+    id("isometric.publishing")
 }
 
-group = "io.fabianterhorst"
+group = "io.github.jayteealao"
 version = "1.0.0"
 
-dependencies {
-    // Pure Kotlin/JVM - NO Android dependencies
-    implementation(kotlin("stdlib"))
-
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.0")
-}
-
 kotlin {
-    jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-    }
+    jvmToolchain(17)
 }
 
 tasks.test {
     useJUnit()
+}
+
+mavenPublishing {
+    coordinates(
+        groupId = "io.github.jayteealao",
+        artifactId = "isometric-core",
+        version = version.toString()
+    )
+
+    pom {
+        name.set("Isometric Core")
+        description.set("Platform-agnostic isometric rendering engine for Kotlin")
+
+        // Upstream attribution — this module is the fork of the original Java library
+        developers {
+            developer {
+                id.set("fabianterhorst")
+                name.set("Fabian Terhorst")
+                url.set("https://github.com/FabianTerhorst")
+            }
+        }
+    }
+}
+
+dependencies {
+    // Pure Kotlin/JVM - NO Android dependencies
+    implementation(libs.kotlin.stdlib)
+
+    // Testing
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.test.junit)
 }

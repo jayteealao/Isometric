@@ -1,0 +1,159 @@
+---
+title: Scene Graph
+description: Architecture, node types, dirty tracking, and the rendering pipeline
+sidebar:
+  order: 1
+---
+
+The Isometric library is organized into three layers. Understanding these layers helps you reason about performance, debugging, and advanced usage patterns.
+
+## Three-Layer Architecture
+
+```
++---------------------------------------------+
+|          Composable API                      |
+|  Shape, Group, Path, Batch, CustomNode       |
+|  ForEach, IsometricScene                     |
++---------------------------------------------+
+               |  builds / updates
+               v
++---------------------------------------------+
+|          Node Tree                           |
+|  ShapeNode, GroupNode, PathNode,             |
+|  BatchNode, CustomRenderNode                 |
+|  Dirty tracking, transform accumulation      |
++---------------------------------------------+
+               |  traverses / projects
+               v
++---------------------------------------------+
+|          Rendering Engine                    |
+|  IsometricEngine -> PreparedScene -> Canvas  |
+|  Depth sorting, culling, path projection     |
++---------------------------------------------+
+```
+
+**Composable API** is what you write. `Shape`, `Group`, and `Path` are `@Composable` functions that describe what to render declaratively.
+
+**Node Tree** is what Compose maintains. Each composable maps to an `IsometricNode` subclass. The tree tracks parent-child relationships, accumulated transforms, and dirty state.
+
+**Rendering Engine** is what produces pixels. `IsometricEngine` traverses the node tree, projects 3D geometry to 2D screen coordinates, sorts by depth, and emits a `PreparedScene` containing `RenderCommand` objects that are drawn to the canvas.
+
+## Node Types
+
+Every composable maps to exactly one node type:
+
+| Composable | Node Type | Purpose |
+|------------|-----------|---------|
+| `Shape` | `ShapeNode` | Single 3D geometry with color, position, rotation, and scale |
+| `Group` | `GroupNode` | Transform container -- children inherit translation, rotation, and scale |
+| `Path` | `PathNode` | Single 2D polygon face with color (useful for custom faces or flat overlays) |
+| `Batch` | `BatchNode` | Multiple shapes submitted together for efficient bulk rendering |
+| `CustomNode` | `CustomRenderNode` | Escape hatch -- emit raw `RenderCommand` objects directly |
+
+`GroupNode` is the only node type that has children. All others are leaf nodes. A typical scene tree looks like:
+
+```
+Root (GroupNode)
+  +-- GroupNode (translated)
+  |     +-- ShapeNode (a prism)
+  |     +-- ShapeNode (a cylinder)
+  +-- ShapeNode (standalone shape)
+  +-- PathNode (a flat face)
+```
+
+## Dirty Tracking
+
+When a node's properties change (for example, a `ShapeNode`'s color or position), the node calls `markDirty()`. This propagates up the tree to the root:
+
+1. The changed node marks itself dirty.
+2. Each ancestor up to the root is marked dirty.
+3. The root's `onDirty` callback fires.
+4. `sceneVersion` increments.
+5. The canvas is invalidated, triggering a redraw.
+
+On the next frame, only the dirty subtree is re-traversed. Clean subtrees are skipped entirely. This is why animating one shape in a 200-shape scene is cheap -- 199 nodes are untouched.
+
+```kotlin
+// Only this shape recomposes when `color` changes
+var color by remember { mutableStateOf(IsoColor.BLUE) }
+
+IsometricScene {
+    Shape(geometry = Prism(Point.ORIGIN), color = color)       // recomposes
+    Shape(geometry = Prism(Point(2.0, 0.0, 0.0)))              // untouched
+    Shape(geometry = Prism(Point(4.0, 0.0, 0.0)))              // untouched
+}
+```
+
+## The Compose Runtime Integration
+
+The library uses Compose's tree-management runtime (the same machinery that powers Compose UI and Compose HTML). The key integration point is `IsometricApplier`, which implements the `Applier<IsometricNode>` interface.
+
+Compose calls methods on the applier to build and update the node tree:
+
+- **`insertTopDown` / `insertBottomUp`** -- add new nodes when composables appear
+- **`remove`** -- delete nodes when composables leave the composition
+- **`move`** -- reorder nodes when a `ForEach` list changes
+
+This is analogous to how Compose UI uses `UiApplier` with `LayoutNode`. The key difference is that isometric nodes have no layout pass -- they go straight from the node tree to projection.
+
+## High-Level vs Low-Level
+
+Most users work at the composable level:
+
+```kotlin
+IsometricScene {
+    Group(position = Point(1.0, 0.0, 0.0)) {
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor.BLUE)
+    }
+}
+```
+
+Advanced users can drop to the node level using `ComposeNode` for direct node manipulation:
+
+```kotlin
+IsometricScene {
+    ComposeNode<ShapeNode, IsometricApplier>(
+        factory = { ShapeNode() },
+        update = {
+            set(myShape) { this.shape = it }
+            set(myColor) { this.color = it }
+        }
+    )
+}
+```
+
+The engine can also be used standalone, outside of Compose entirely:
+
+```kotlin
+val engine = IsometricEngine()
+engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
+val scene: PreparedScene = engine.projectScene(width = 800, height = 600)
+// Draw scene.commands to any canvas
+```
+
+This is useful for server-side rendering, image export, or integration with non-Compose UI frameworks.
+
+## RenderContext
+
+`RenderContext` accumulates transforms as the engine traverses the node tree. When a `ShapeNode` sits inside a rotated `GroupNode`, the context carries the group's rotation so the shape inherits it.
+
+The context provides four methods:
+
+- **`withTransform(transform)`** -- pushes a transform onto the stack and returns a new context
+- **`applyTransformsToShape(shape)`** -- applies all accumulated transforms to a `Shape`
+- **`applyTransformsToPath(path)`** -- applies all accumulated transforms to a `Path`
+- **`applyTransformsToPoint(point)`** -- applies all accumulated transforms to a single `Point`
+
+You rarely interact with `RenderContext` directly. It is used internally during tree traversal and is exposed in `CustomRenderNode` for advanced escape-hatch rendering:
+
+```kotlin
+CustomNode(render = { context, nodeId ->
+    val transformedPoint = context.applyTransformsToPoint(Point(1.0, 1.0, 0.0))
+    // Emit a list of RenderCommand using the transformed coordinates
+    listOf(/* your RenderCommands here */)
+})
+```
+
+> **Tip**
+>
+If you are building a standard scene with shapes and groups, you never need to think about `RenderContext`. It exists for the rare cases where you need full control over how geometry is projected.
