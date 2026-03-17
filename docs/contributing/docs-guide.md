@@ -24,7 +24,19 @@ npm install
 npm run dev
 ```
 
-This starts a dev server at `http://localhost:4321` with hot-reload. Changes to `.mdx` files are reflected immediately.
+This starts a dev server at `http://localhost:4321/Isometric/` with hot-reload. Changes to `.mdx` files are reflected immediately.
+
+> **Note**
+>
+The **API Reference** sidebar link (`/api/`) requires the Dokka output to be generated first. In CI this happens automatically, but locally you need to run it once:
+
+```bash
+# from the repo root
+./gradlew :dokkaGeneratePublicationHtml
+cp -r build/dokka/html site/public/api
+```
+
+`site/public/api/` is gitignored — re-run these commands whenever the Kotlin source changes and you need an up-to-date API reference locally.
 
 To build the production site:
 
