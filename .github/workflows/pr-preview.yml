@@ -1,0 +1,80 @@
+name: PR Preview
+
+# Deploys a preview of the docs site to Cloudflare Pages for every PR.
+#
+# Setup (one-time):
+#   1. Create a Cloudflare Pages project named "isometric-docs" connected to
+#      this repo (or create it via API). Set "Build command" to empty and
+#      "Build output directory" to site/dist — we build in CI below.
+#   2. Add these repository secrets (Settings → Secrets → Actions):
+#        CLOUDFLARE_API_TOKEN  — a Cloudflare API token with Pages:Edit permission
+#        CLOUDFLARE_ACCOUNT_ID — your Cloudflare account ID
+#   3. Uncomment the steps below.
+#
+# How it works:
+#   - Builds the site with base:'/' (no subpath — CF Pages uses its own domain).
+#   - Deploys to a branch-named preview URL: https://<branch>.isometric-docs.pages.dev
+#   - Cloudflare posts the preview URL as a PR comment automatically.
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'isometric-core/src/main/**'
+      - 'isometric-compose/src/main/**'
+      - 'build.gradle'
+      - '**/*.gradle.kts'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Deploy preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Generate Dokka API docs
+        run: ./gradlew :dokkaGeneratePublicationHtml
+
+      - name: Copy Dokka output into site
+        run: cp -r build/dokka/html site/public/api
+
+      - name: Build docs site (base path = / for Cloudflare Pages domain)
+        working-directory: site
+        env:
+          SITE_BASE: /
+        run: |
+          npm ci
+          npm run build
+
+      # Uncomment once CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set:
+      #
+      # - name: Deploy to Cloudflare Pages
+      #   uses: cloudflare/wrangler-action@v3
+      #   with:
+      #     apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      #     accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      #     command: >-
+      #       pages deploy site/dist
+      #       --project-name=isometric-docs
+      #       --branch=${{ github.head_ref }}
+      #       --commit-hash=${{ github.sha }}
