@@ -30,4 +30,5 @@ benchmark-results-*/
 .agents/
 .claude/*
 !.claude/skills/
+.claude/skills/*/
 skills-lock.json
