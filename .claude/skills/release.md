@@ -120,15 +120,32 @@ The following five secrets must exist and have a **recent** update timestamp:
 | `SIGNING_KEY` | ASCII-armored private key (single line, no headers) |
 
 If any are missing or suspiciously old (e.g. `SIGNING_KEY` predating this
-session), re-upload:
+session), re-upload. Source the passphrase from your local Gradle properties
+— never hard-code it:
 
 ```bash
+# Read passphrase from ~/.gradle/gradle.properties (never hard-code it)
+GPG_PASSPHRASE=$(grep '^signingInMemoryKeyPassword=' ~/.gradle/gradle.properties | cut -d= -f2)
 SIGNING_KEY=$(gpg --batch --yes --pinentry-mode loopback \
-    --passphrase "<GPG_PASSPHRASE>" \
-    --export-secret-keys --armor <GPG_KEY_ID> \
+    --passphrase "$GPG_PASSPHRASE" \
+    --export-secret-keys --armor 764AB554 \
     | grep -v '\-\-' | grep -v '^=.' | tr -d '\n')
 gh secret set SIGNING_KEY -R jayteealao/Isometric --body "$SIGNING_KEY"
+unset GPG_PASSPHRASE
 ```
+
+> **Safer alternative** — pipe the passphrase via `--passphrase-fd 0` so it
+> never appears in the process list:
+>
+> ```bash
+> GPG_PASSPHRASE=$(grep '^signingInMemoryKeyPassword=' ~/.gradle/gradle.properties | cut -d= -f2)
+> SIGNING_KEY=$(echo "$GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+>     --passphrase-fd 0 \
+>     --export-secret-keys --armor 764AB554 \
+>     | grep -v '\-\-' | grep -v '^=.' | tr -d '\n')
+> gh secret set SIGNING_KEY -R jayteealao/Isometric --body "$SIGNING_KEY"
+> unset GPG_PASSPHRASE
+> ```
 
 ### 1.7 Generate / update the changelog
 
