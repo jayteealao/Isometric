@@ -92,6 +92,7 @@ fun CustomGroundPlane() {
 ```
 
 Key points:
+
 - Use `context.applyTransformsToPath` to apply the accumulated parent transforms (position, rotation, scale) to your custom geometry.
 - Set `ownerNodeId = nodeId` so hit testing can identify which `CustomNode` was tapped.
 - The `points` field is left empty because `projectScene` produces new commands with projected 2D points.

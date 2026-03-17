@@ -21,6 +21,7 @@ jobs:
             **/*.md
             site/src/content/docs/**/*.mdx
             !CHANGELOG.md
+            !docs/internal/**
             !node_modules/**
             !**/build/**
             !site/dist/**
@@ -36,16 +37,16 @@ jobs:
       - name: Check HTTP/HTTPS links in source files
         uses: lycheeverse/lychee-action@v2
         with:
-          # Only check http/https links using --include so lychee never even
-          # attempts to parse root-relative (/guides/...) or local paths.
+          # Scope to user-facing files only. docs/ and site/ contain
+          # root-relative Astro site paths (/guides/...) that cannot be
+          # resolved without a built site, so they are excluded here.
           args: >-
             --no-progress
-            --include 'https?://'
+            --scheme https
+            --scheme http
             --exclude-loopback
             README.md
             CONTRIBUTING.md
-            docs/**/*.md
-            site/src/content/docs/**/*.mdx
           fail: true
 
   # ── Commit message lint (PRs only) ───────────────────────────────────────────

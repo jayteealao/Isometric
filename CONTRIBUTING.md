@@ -20,18 +20,21 @@ Thank you for your interest in contributing!
 ## Running Tests
 
 ### Unit tests
+
 ```bash
 ./gradlew :isometric-core:test
 ./gradlew :isometric-compose:testDebugUnitTest
 ```
 
 ### Paparazzi snapshot tests
+
 ```bash
 ./gradlew :isometric-compose:recordPaparazziDebug   # Generate/update golden images
 ./gradlew :isometric-compose:verifyPaparazziDebug    # Verify against golden images
 ```
 
 ### Sample app
+
 ```bash
 ./gradlew :app:installDebug
 ```

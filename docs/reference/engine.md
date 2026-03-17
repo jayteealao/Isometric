@@ -136,6 +136,7 @@ interface SceneProjector {
 ```
 
 This abstraction enables:
+
 - **Testing** -- supply a fake projector that returns canned `PreparedScene` data without running real 3D math.
 - **Custom projections** -- implement an alternative projection (e.g., oblique, dimetric) while reusing the Compose runtime.
 

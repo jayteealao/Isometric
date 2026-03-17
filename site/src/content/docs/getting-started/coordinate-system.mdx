@@ -31,6 +31,7 @@ screenY = originY - x · scale · sin(angle) - y · scale · sin(angle) - z · s
 ```
 
 Where:
+
 - `originX, originY` is the projection origin on screen (center-bottom of the viewport by default).
 - `scale` is the number of pixels per world unit (default: **70**).
 - `angle` is the isometric angle (default: **π/6**).

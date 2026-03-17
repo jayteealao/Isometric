@@ -114,6 +114,7 @@ Path caching is most effective in scenes where the geometry is static or changes
 When `useNativeCanvas = true` on Android, `NativeSceneRenderer` bypasses Compose `DrawScope` entirely. Instead of creating Compose `Path` objects and calling `drawPath()`, it uses `android.graphics.Canvas` directly with reused `android.graphics.Paint` objects.
 
 This eliminates two layers of overhead:
+
 1. Compose `Path` object allocation and conversion
 2. `DrawScope` to `Canvas` delegation
 
