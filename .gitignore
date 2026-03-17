@@ -25,3 +25,8 @@ benchmark-results-*/
 
 # Maestro screenshots (root level only)
 /screenshots/
+
+# Claude Code
+.agents/
+.claude/
+skills-lock.json
