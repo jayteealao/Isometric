@@ -1,0 +1,27 @@
+public final class io/github/jayteealao/isometric/view/AndroidCanvasRenderer {
+	public static final field INSTANCE Lio/github/jayteealao/isometric/view/AndroidCanvasRenderer;
+	public final fun renderIsometric (Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/PreparedScene;)V
+}
+
+public final class io/github/jayteealao/isometric/view/IsometricView : android/view/View {
+	public fun <init> (Landroid/content/Context;)V
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;I)V
+	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;)V
+	public final fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
+	public final fun clear ()V
+	public fun onTouchEvent (Landroid/view/MotionEvent;)Z
+	public fun performClick ()Z
+	public final fun setBoundsCheck (Z)V
+	public final fun setClickListener (Lio/github/jayteealao/isometric/view/IsometricView$OnItemClickListener;)V
+	public final fun setCull (Z)V
+	public final fun setHitOrder (Lio/github/jayteealao/isometric/HitOrder;)V
+	public final fun setSort (Z)V
+	public final fun setTouchRadius (D)V
+}
+
+public abstract interface class io/github/jayteealao/isometric/view/IsometricView$OnItemClickListener {
+	public abstract fun onClick (Lio/github/jayteealao/isometric/RenderCommand;)V
+}
+
