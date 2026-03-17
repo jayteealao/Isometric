@@ -37,14 +37,15 @@ jobs:
       - name: Check HTTP/HTTPS links in source files
         uses: lycheeverse/lychee-action@v2
         with:
-          # Scope to user-facing files only. docs/ and site/ contain
-          # root-relative Astro site paths (/guides/...) that cannot be
-          # resolved without a built site, so they are excluded here.
+          # Scope to user-facing files only. The docs site
+          # (jayteealao.github.io/Isometric) only deploys after merge to
+          # main, so those links are excluded to avoid pre-deploy 404s.
           args: >-
             --no-progress
             --scheme https
             --scheme http
             --exclude-loopback
+            --exclude 'jayteealao\.github\.io'
             README.md
             CONTRIBUTING.md
           fail: true
