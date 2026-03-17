@@ -9,7 +9,7 @@ on:
       - 'isometric-core/src/main/**'
       - 'isometric-compose/src/main/**'
       - 'build.gradle'
-      - '*.gradle.kts'
+      - '**/*.gradle.kts'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
