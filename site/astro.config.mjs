@@ -2,9 +2,13 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+// Allow overriding the base path for PR preview builds (e.g. SITE_BASE=/ for
+// Cloudflare Pages, which uses its own domain and needs no subpath prefix).
+const siteBase = process.env.SITE_BASE ?? '/Isometric';
+
 export default defineConfig({
 	site: 'https://jayteealao.github.io/Isometric',
-	base: '/Isometric',
+	base: siteBase,
 	integrations: [
 		starlight({
 			title: 'Isometric',

@@ -210,6 +210,57 @@ Example:
 class Prism(...)
 ```
 
+## CI Checks
+
+Every PR runs three automated checks defined in `.github/workflows/ci.yml`:
+
+### Markdown lint
+
+All `.md` and `.mdx` files are linted with [markdownlint](https://github.com/DavidAnson/markdownlint). Rules are configured in `.markdownlint.json`. To run locally:
+
+```bash
+npx markdownlint-cli2 "**/*.md" "site/src/content/docs/**/*.mdx"
+```
+
+Common failures and fixes:
+
+| Rule | Failure | Fix |
+|------|---------|-----|
+| MD022 | Heading not surrounded by blank lines | Add a blank line before and after every heading |
+| MD031 | Code fence not surrounded by blank lines | Add a blank line before and after every ` ``` ` block |
+| MD032 | List not surrounded by blank lines | Add a blank line before the first list item |
+
+### External link check
+
+[lychee](https://lychee.cli.rs/) checks all HTTP/HTTPS links in source files for 404s. Internal root-relative links (`/guides/...`) are excluded — they're validated at build time by Astro.
+
+### Commit message lint
+
+PRs enforce [Conventional Commits](https://www.conventionalcommits.org/) via [commitlint](https://commitlint.js.org/). Every commit on a PR branch must start with a type prefix:
+
+```
+feat: add cylinder extrusion support
+fix: correct depth sorting for overlapping prisms
+docs: update quickstart with camera example
+refactor: extract hit-test resolver into separate class
+test: add snapshot test for Stairs geometry
+build: upgrade Dokka to 2.2.0
+ci: cache Gradle wrapper in docs workflow
+chore: update copyright year
+```
+
+The allowed types are: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`.
+
+## Changelog
+
+The `CHANGELOG.md` is generated from commit history using [git-cliff](https://git-cliff.org/). The configuration is in `cliff.toml`. To preview what the next release changelog entry would look like:
+
+```bash
+git-cliff --unreleased
+```
+
+Do not edit `CHANGELOG.md` manually — it is regenerated on release.
+
 ## Style Guide for Code Examples
 
 1. **Self-contained.** Every code block should be copy-pasteable. Include all necessary imports conceptually (the reader should know what to import) but avoid long import lists in the example itself.
