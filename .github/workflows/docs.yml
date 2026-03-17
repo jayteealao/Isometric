@@ -56,11 +56,10 @@ jobs:
           npm ci
           npm run build
 
-      - name: Check internal links
-        uses: lycheeverse/lychee-action@v2
-        with:
-          args: --no-progress --offline --include-fragments --root-dir site/dist site/dist/
-          fail: true
+      # TODO: Re-enable link checking once a base-path-aware solution is in place.
+      # Astro builds with base:'/Isometric' emit files at dist/ (no subdir) but
+      # all hrefs are /Isometric/..., so lychee --root-dir site/dist resolves
+      # /Isometric/foo/ → site/dist/Isometric/foo/ which doesn't exist.
 
       - uses: actions/upload-pages-artifact@v3
         with:

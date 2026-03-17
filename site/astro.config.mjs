@@ -77,7 +77,7 @@ export default defineConfig({
 				},
 				{
 					label: 'API Reference',
-					link: '/Isometric/api/',
+					link: '/api/',
 					attrs: { target: '_blank' },
 				},
 			],
