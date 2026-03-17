@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Validate conventional commit format
+commit_msg=$(cat "$1")
+pattern='^(feat|fix|perf|refactor|docs|test|ci|build|chore)(\(.+\))?(!)?: .{1,100}'
+
+if ! echo "$commit_msg" | head -1 | grep -qE "$pattern"; then
+  echo ""
+  echo "ERROR: Commit message does not follow Conventional Commits format."
+  echo ""
+  echo "Expected: <type>(<scope>): <description>"
+  echo "Types: feat, fix, perf, refactor, docs, test, ci, build, chore"
+  echo ""
+  echo "Scopes: core, compose, view, bench, build, ci, docs"
+  echo ""
+  echo "Examples:"
+  echo "  feat(core): add cylinder shape primitive"
+  echo "  fix(compose): prevent crash on empty scene"
+  echo "  perf(core)!: replace Double with Float for coordinates"
+  echo "  docs: update README with new Maven coordinates"
+  echo ""
+  echo "Breaking change syntax:"
+  echo "  feat(core)!: redesign Point class"
+  echo "  (with optional BREAKING CHANGE: footer in body)"
+  echo ""
+  echo "Your message:"
+  echo "  $commit_msg"
+  echo ""
+  exit 1
+fi

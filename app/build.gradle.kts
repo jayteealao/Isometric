@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.fabianterhorst.isometric.sample"
+    namespace = "io.github.jayteealao.isometric.sample"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.fabianterhorst.isometric.sample"
+        applicationId = "io.github.jayteealao.isometric.sample"
         minSdk = 24
         targetSdk = 33
         versionCode = 1
@@ -39,7 +39,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"  // Compatible with Kotlin 1.9.0
+        kotlinCompilerExtensionVersion = "1.5.8"  // Compatible with Kotlin 1.9.22
     }
 }
 
@@ -60,4 +60,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.6.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.truth:truth:1.1.3")
 }
