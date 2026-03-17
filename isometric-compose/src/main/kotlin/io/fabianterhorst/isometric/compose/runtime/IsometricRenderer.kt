@@ -152,8 +152,8 @@ class IsometricRenderer(
      *
      * Delegates to [NativeSceneRenderer] for the actual Android-specific draw calls.
      *
-     * @throws IllegalStateException if called on a non-Android platform
-     * @throws NoClassDefFoundError if android.graphics.Canvas is unavailable
+     * @throws IllegalStateException if the renderer has been [close]d
+     * @throws NoClassDefFoundError if android.graphics.Canvas is unavailable (non-Android platform)
      */
     fun DrawScope.renderNative(
         rootNode: GroupNode,
