@@ -7,3 +7,9 @@ rules:
   footer-max-line-length: [0]
   # Don't enforce sentence case on subjects
   subject-case: [0]
+  # Allow project-specific scoping types used in historical commits
+  type-enum:
+    - 2
+    - always
+    - [build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test,
+       assets, benchmark, compose, core, engine, renderer]

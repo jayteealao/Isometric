@@ -1111,6 +1111,7 @@ version = "1.1.0"  // was "1.0.0"
 ```
 
 Determine the version using conventional commits:
+
 - Any `feat` commits since last release → bump MINOR
 - Only `fix`/`perf` commits → bump PATCH
 - Any `BREAKING CHANGE` → bump MAJOR
@@ -1244,6 +1245,7 @@ Complete these items before the first release:
 - [ ] All unit tests pass
 
 ### Commit & Changelog
+
 - [ ] `.githooks/commit-msg` hook created
 - [ ] `installGitHooks` Gradle task wired up
 - [ ] `cliff.toml` created and configured

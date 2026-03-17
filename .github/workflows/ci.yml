@@ -35,13 +35,15 @@ jobs:
       - name: Check HTTP/HTTPS links in source files
         uses: lycheeverse/lychee-action@v2
         with:
-          # Only check external (http/https) links — internal root-relative
-          # paths (/guides/...) require a built site and are excluded by scheme.
+          # Only check external (http/https) links. Root-relative paths like
+          # /guides/... are site-relative and only resolve against a built Astro
+          # site, so they are explicitly excluded here.
           args: >-
             --no-progress
             --scheme https
             --scheme http
             --exclude-loopback
+            --exclude '^/'
             README.md
             CONTRIBUTING.md
             docs/**/*.md

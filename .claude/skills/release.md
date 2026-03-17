@@ -21,9 +21,11 @@ proceed to the next phase until the current one is clean.
 ### 1.1 Determine the version
 
 If the user has not specified a version, run:
+
 ```bash
 git cliff --bumped-version
 ```
+
 Present the suggested version and ask the user to confirm before continuing.
 The version must follow SemVer (`MAJOR.MINOR.PATCH`). Do **not** use a
 `-SNAPSHOT` suffix for releases.
@@ -247,11 +249,13 @@ at each:
 | `Publish to Maven Central` | `./gradlew publishAndReleaseToMavenCentral` | Bad signing credentials, wrong key format |
 
 If `Publish to Maven Central` fails with a signing error:
+
 1. Re-export the key: `gpg --export-secret-keys --armor 5B94324C764AB554 | grep -v '\-\-' | grep -v '^=.' | tr -d '\n'`
 2. Re-upload: `gh secret set SIGNING_KEY -R jayteealao/Isometric --body "$KEY"`
 3. Re-run the workflow: `gh run rerun <RUN_ID>`
 
 If it fails with a 401 from Maven Central:
+
 1. Check `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` are still valid
 2. User tokens expire — regenerate at [central.sonatype.com](https://central.sonatype.com) → Account → Generate User Token
 3. Re-upload both secrets and re-run
@@ -355,7 +359,7 @@ Confirm title, tag, and release notes look correct.
 
 Report the following to the user:
 
-```
+```text
 ✅ Release vX.Y.Z complete
 
 Published:
