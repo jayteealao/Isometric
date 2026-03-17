@@ -19,12 +19,14 @@ buildscript {
 plugins {
     id 'com.android.application' version '8.2.2' apply false
     id 'com.android.library' version '8.2.2' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.10' apply false
+    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
 //    id 'com.google.dagger.hilt.android' version '2.44' apply false
 //    id 'project-report'
 //    id 'org.jmailen.kotlinter' version "3.12.0" apply false
-    id 'org.jetbrains.kotlin.jvm' version '1.9.10' apply false
+    id 'org.jetbrains.kotlin.jvm' version '1.9.22' apply false
     id 'org.jetbrains.dokka' version '2.1.0'
+    id 'com.vanniktech.maven.publish' version '0.30.0' apply false
+    id 'org.jetbrains.kotlinx.binary-compatibility-validator' version '0.17.0'
 }
 
 //allprojects {
@@ -47,4 +49,30 @@ dependencies {
 // We configure it to also delete the root build directory.
 tasks.named('clean').configure {
     delete rootProject.layout.buildDirectory
+}
+
+// ── Binary Compatibility Validator ───────────────────────────────────────────
+// Tracks public ABI in .api files; run `./gradlew apiDump` to regenerate,
+// `./gradlew apiCheck` to validate (used in CI).
+apiValidation {
+    ignoredProjects += ["app", "isometric-benchmark"]
+}
+
+// ── Git hooks ─────────────────────────────────────────────────────────────────
+// Uses a typed Copy task (not a closure) to stay configuration-cache compatible.
+tasks.register('installGitHooks', Copy) {
+    group = 'setup'
+    description = 'Install git hooks from .githooks/ into .git/hooks/'
+    from layout.projectDirectory.dir(".githooks")
+    into layout.projectDirectory.dir(".git/hooks")
+    filePermissions {
+        unix("rwxr-xr-x")
+    }
+}
+
+// ── Changelog ─────────────────────────────────────────────────────────────────
+tasks.register('changelog', Exec) {
+    group = 'release'
+    description = 'Generate CHANGELOG.md from conventional commits using git-cliff'
+    commandLine 'git', 'cliff', '-o', 'CHANGELOG.md'
 }
