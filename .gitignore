@@ -26,7 +26,8 @@ benchmark-results-*/
 # Maestro screenshots (root level only)
 /screenshots/
 
-# Claude Code
+# Claude Code — ignore personal/ephemeral config but track shared skills
 .agents/
-.claude/
+.claude/*
+!.claude/skills/
 skills-lock.json
