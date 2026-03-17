@@ -1,0 +1,126 @@
+---
+title: Composables Reference
+description: Complete reference for all Isometric composables
+sidebar:
+  order: 1
+---
+
+### IsometricScene
+
+Entry point composable. Two overloads:
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| modifier | Modifier | Modifier | Standard Compose modifier |
+| config | SceneConfig | SceneConfig() | Scene configuration |
+| content | IsometricScope.() -> Unit | — | Scene content |
+
+### Shape
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| geometry | Shape | — | Required. The 3D shape geometry |
+| color | IsoColor | LocalDefaultColor | Shape color |
+| position | Point | Point(0,0,0) | Additional position offset |
+| rotation | Double | 0.0 | Rotation angle in radians |
+| scale | Double | 1.0 | Uniform scale factor |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle |
+
+### Group
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| position | Point | Point(0,0,0) | Group position offset |
+| rotation | Double | 0.0 | Group rotation (applied to all children) |
+| scale | Double | 1.0 | Group scale (applied to all children) |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle for entire group |
+| renderOptions | RenderOptions? | null | Override render options for this subtree |
+| content | IsometricScope.() -> Unit | — | Child shapes and groups |
+
+Transforms accumulate through the hierarchy. A shape inside a rotated group inherits the group's rotation.
+
+### Path (composable)
+
+Renders a 2D polygon face positioned in 3D space. Used for flat surfaces like floors, walls, or labels.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| path | Path | — | Required. The 2D polygon face |
+| color | IsoColor | LocalDefaultColor | Face color |
+| position | Point | Point(0,0,0) | Additional position offset |
+| rotation | Double | 0.0 | Rotation angle in radians |
+| scale | Double | 1.0 | Uniform scale factor |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle |
+
+> **Caution**
+>
+Name collision with `kotlin.io.path.Path` — use an import alias:
+```kotlin
+import io.fabianterhorst.isometric.Path as IsoPath
+```
+
+### Batch
+
+Takes `shapes: List<Shape>` instead of single geometry. Efficient for rendering many shapes with the same transforms.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| shapes | List\<Shape\> | — | Required. Shapes to render |
+| color | IsoColor | LocalDefaultColor | Color applied to all shapes |
+| position | Point | Point(0,0,0) | Position offset |
+| rotation | Double | 0.0 | Rotation angle |
+| scale | Double | 1.0 | Scale factor |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle |
+
+```kotlin
+// Render many shapes efficiently with shared transforms
+val buildings = (0 until 10).map { i ->
+    Prism(position = Point(i * 2.0, 0.0, 0.0))
+}
+Batch(
+    shapes = buildings,
+    color = IsoColor(33, 150, 243),
+    position = Point(-10.0, 0.0, 0.0)
+)
+```
+
+### If
+
+| Param | Type | Description |
+|---|---|---|
+| condition | Boolean | When false, children are removed from the scene graph |
+| content | IsometricScope.() -> Unit | Content to conditionally render |
+
+```kotlin
+var showRoof by remember { mutableStateOf(true) }
+// ...
+If(showRoof) {
+    Shape(geometry = Pyramid(Point(0.0, 0.0, 2.0)), color = IsoColor.RED)
+}
+```
+
+### ForEach
+
+| Param | Type | Description |
+|---|---|---|
+| items | List\<T\> | Items to iterate |
+| key | ((T) -> Any)? | Optional key function for stable identity |
+| content | IsometricScope.(T) -> Unit | Content for each item |
+
+```kotlin
+ForEach(items = buildings, key = { it.id }) { building ->
+    Shape(geometry = Prism(Point(building.x, building.y, 0.0)), color = building.color)
+}
+```
+
+### CustomNode
+
+Escape hatch for custom rendering. Takes a `render` lambda that returns `List<RenderCommand>`.
