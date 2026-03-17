@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**/*.md'
+      - '**/*.mdx'
+      - 'site/src/content/**'
+      - 'docs/**'
+      - '.markdownlint.json'
+      - '.commitlintrc.yml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ── Markdown lint ────────────────────────────────────────────────────────────
+  markdown:
+    name: Lint markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint .md and .mdx files
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: |
+            **/*.md
+            site/src/content/docs/**/*.mdx
+            !node_modules/**
+            !**/build/**
+            !site/dist/**
+          config: .markdownlint.json
+
+  # ── External link check ──────────────────────────────────────────────────────
+  links:
+    name: Check external links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check HTTP/HTTPS links in source files
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Only check external (http/https) links — internal root-relative
+          # paths (/guides/...) require a built site and are excluded by scheme.
+          args: >-
+            --no-progress
+            --scheme https
+            --scheme http
+            --exclude-loopback
+            README.md
+            CONTRIBUTING.md
+            docs/**/*.md
+            site/src/content/docs/**/*.mdx
+          fail: true
+
+  # ── Commit message lint (PRs only) ───────────────────────────────────────────
+  commits:
+    name: Lint commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install commitlint
+        run: npm install -g @commitlint/cli @commitlint/config-conventional
+
+      - name: Lint commits in PR
+        run: |
+          npx commitlint \
+            --from ${{ github.event.pull_request.base.sha }} \
+            --to   ${{ github.event.pull_request.head.sha }} \
+            --verbose
