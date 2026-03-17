@@ -50,9 +50,16 @@ fun IsometricScene(
     config: SceneConfig = SceneConfig(),
     content: @Composable IsometricScope.() -> Unit
 ) {
+    // Remember a stable engine so that AdvancedSceneConfig receives the same
+    // instance across recompositions. Without this, AdvancedSceneConfig's
+    // default parameter (IsometricEngine()) would create a fresh engine on
+    // every call, invalidating remember(config.engine) in the advanced overload
+    // and causing renderer teardown/rebuild on every parent recomposition.
+    val engine = remember { IsometricEngine() }
     IsometricScene(
         modifier = modifier,
         config = AdvancedSceneConfig(
+            engine = engine,
             renderOptions = config.renderOptions,
             lightDirection = config.lightDirection,
             defaultColor = config.defaultColor,
