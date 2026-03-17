@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.fabianterhorst.isometric.benchmark"
+    namespace = "io.github.jayteealao.isometric.benchmark"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.fabianterhorst.isometric.benchmark"
+        applicationId = "io.github.jayteealao.isometric.benchmark"
         minSdk = 24
         targetSdk = 33
         versionCode = 1
@@ -39,7 +39,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"
+        kotlinCompilerExtensionVersion = "1.5.8"  // Compatible with Kotlin 1.9.22
     }
 }
 
