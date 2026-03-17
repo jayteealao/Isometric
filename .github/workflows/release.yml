@@ -23,12 +23,17 @@ jobs:
       - name: Validate version matches tag
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          GRADLE_VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' isometric-core/build.gradle.kts | head -1)
-          if [ "$TAG" != "$GRADLE_VERSION" ]; then
-            echo "ERROR: Tag v$TAG does not match Gradle version $GRADLE_VERSION"
-            exit 1
-          fi
-          echo "Version check passed: $GRADLE_VERSION"
+          FAILED=0
+          for MODULE in isometric-core isometric-compose isometric-android-view; do
+            MODULE_VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' "$MODULE/build.gradle.kts" | head -1)
+            if [ "$TAG" != "$MODULE_VERSION" ]; then
+              echo "ERROR: Tag v$TAG does not match $MODULE version $MODULE_VERSION"
+              FAILED=1
+            else
+              echo "Version check passed: $MODULE = $MODULE_VERSION"
+            fi
+          done
+          [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Build and test
         run: ./gradlew build test apiCheck

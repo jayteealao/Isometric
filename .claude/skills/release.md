@@ -124,8 +124,8 @@ session), re-upload:
 
 ```bash
 SIGNING_KEY=$(gpg --batch --yes --pinentry-mode loopback \
-    --passphrase "37HIbYJKdClqDZfMQlwVJWroCvCi" \
-    --export-secret-keys --armor 5B94324C764AB554 \
+    --passphrase "<GPG_PASSPHRASE>" \
+    --export-secret-keys --armor <GPG_KEY_ID> \
     | grep -v '\-\-' | grep -v '^=.' | tr -d '\n')
 gh secret set SIGNING_KEY -R jayteealao/Isometric --body "$SIGNING_KEY"
 ```
@@ -382,7 +382,7 @@ Next version:   X.Y+1.0-SNAPSHOT (on main)
 | Modules | `isometric-core`, `isometric-compose`, `isometric-android-view` |
 | GPG Key ID | `764AB554` |
 | GPG Fingerprint | `37823EE2BB39B1996E0B3E655B94324C764AB554` |
-| GPG Key Passphrase | `37HIbYJKdClqDZfMQlwVJWroCvCi` |
+| GPG Key Passphrase | stored in `~/.gradle/gradle.properties` as `signingInMemoryKeyPassword` — do not commit |
 | Central Portal | [central.sonatype.com](https://central.sonatype.com) |
 | Default branch | `main` |
 | Release trigger | GitHub Release creation on `main` |

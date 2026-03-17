@@ -20,6 +20,7 @@ jobs:
           globs: |
             **/*.md
             site/src/content/docs/**/*.mdx
+            !CHANGELOG.md
             !node_modules/**
             !**/build/**
             !site/dist/**
@@ -35,15 +36,12 @@ jobs:
       - name: Check HTTP/HTTPS links in source files
         uses: lycheeverse/lychee-action@v2
         with:
-          # Only check external (http/https) links. Root-relative paths like
-          # /guides/... are site-relative and only resolve against a built Astro
-          # site, so they are explicitly excluded here.
+          # Only check http/https links using --include so lychee never even
+          # attempts to parse root-relative (/guides/...) or local paths.
           args: >-
             --no-progress
-            --scheme https
-            --scheme http
+            --include 'https?://'
             --exclude-loopback
-            --exclude '^/'
             README.md
             CONTRIBUTING.md
             docs/**/*.md

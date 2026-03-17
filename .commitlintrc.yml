@@ -2,7 +2,8 @@ extends:
   - '@commitlint/config-conventional'
 
 rules:
-  # Allow long bodies and footers (e.g. co-author lines, detailed explanations)
+  # Allow long headers, bodies, and footers for detailed commit messages
+  header-max-length: [1, always, 120]
   body-max-line-length: [0]
   footer-max-line-length: [0]
   # Don't enforce sentence case on subjects
