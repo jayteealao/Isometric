@@ -327,6 +327,10 @@ public final class io/github/jayteealao/isometric/compose/runtime/ShapeNode : io
 	public final fun setShape (Lio/github/jayteealao/isometric/Shape;)V
 }
 
+public final class io/github/jayteealao/isometric/compose/runtime/StackKt {
+	public static final fun Stack (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;ILio/github/jayteealao/isometric/StackAxis;DLkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+}
+
 public abstract class io/github/jayteealao/isometric/compose/runtime/StrokeStyle {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle$Companion;
@@ -391,5 +395,9 @@ public final class io/github/jayteealao/isometric/compose/runtime/TapEvent {
 	public final fun getY ()D
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/TileGridKt {
+	public static final fun TileGrid (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;IILio/github/jayteealao/isometric/TileGridConfig;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
 }
 

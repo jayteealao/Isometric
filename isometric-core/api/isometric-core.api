@@ -263,6 +263,54 @@ public final class io/github/jayteealao/isometric/Shape$Companion {
 	public static synthetic fun extrude$default (Lio/github/jayteealao/isometric/Shape$Companion;Lio/github/jayteealao/isometric/Path;DILjava/lang/Object;)Lio/github/jayteealao/isometric/Shape;
 }
 
+public final class io/github/jayteealao/isometric/StackAxis : java/lang/Enum {
+	public static final field X Lio/github/jayteealao/isometric/StackAxis;
+	public static final field Y Lio/github/jayteealao/isometric/StackAxis;
+	public static final field Z Lio/github/jayteealao/isometric/StackAxis;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun unitPoint ()Lio/github/jayteealao/isometric/Point;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/StackAxis;
+	public static fun values ()[Lio/github/jayteealao/isometric/StackAxis;
+}
+
+public final class io/github/jayteealao/isometric/TileCoordinate {
+	public static final field Companion Lio/github/jayteealao/isometric/TileCoordinate$Companion;
+	public static final field ORIGIN Lio/github/jayteealao/isometric/TileCoordinate;
+	public fun <init> (II)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()I
+	public final fun getY ()I
+	public fun hashCode ()I
+	public final fun isWithin (II)Z
+	public final fun minus (Lio/github/jayteealao/isometric/TileCoordinate;)Lio/github/jayteealao/isometric/TileCoordinate;
+	public final fun plus (Lio/github/jayteealao/isometric/TileCoordinate;)Lio/github/jayteealao/isometric/TileCoordinate;
+	public final fun toPoint (DD)Lio/github/jayteealao/isometric/Point;
+	public static synthetic fun toPoint$default (Lio/github/jayteealao/isometric/TileCoordinate;DDILjava/lang/Object;)Lio/github/jayteealao/isometric/Point;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/TileCoordinate$Companion {
+}
+
+public final class io/github/jayteealao/isometric/TileCoordinateExtensionsKt {
+	public static final fun screenToTile (Lio/github/jayteealao/isometric/IsometricEngine;DDIIDDLio/github/jayteealao/isometric/Point;)Lio/github/jayteealao/isometric/TileCoordinate;
+	public static synthetic fun screenToTile$default (Lio/github/jayteealao/isometric/IsometricEngine;DDIIDDLio/github/jayteealao/isometric/Point;ILjava/lang/Object;)Lio/github/jayteealao/isometric/TileCoordinate;
+	public static final fun toTileCoordinate (Lio/github/jayteealao/isometric/Point;DLio/github/jayteealao/isometric/Point;)Lio/github/jayteealao/isometric/TileCoordinate;
+	public static synthetic fun toTileCoordinate$default (Lio/github/jayteealao/isometric/Point;DLio/github/jayteealao/isometric/Point;ILjava/lang/Object;)Lio/github/jayteealao/isometric/TileCoordinate;
+}
+
+public final class io/github/jayteealao/isometric/TileGridConfig {
+	public fun <init> ()V
+	public fun <init> (DLio/github/jayteealao/isometric/Point;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (DLio/github/jayteealao/isometric/Point;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElevation ()Lkotlin/jvm/functions/Function1;
+	public final fun getOriginOffset ()Lio/github/jayteealao/isometric/Point;
+	public final fun getTileSize ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/jayteealao/isometric/Vector {
 	public static final field Companion Lio/github/jayteealao/isometric/Vector$Companion;
 	public fun <init> (DDD)V
