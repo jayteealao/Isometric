@@ -47,4 +47,4 @@ Yes. The `isometric-core` module is pure Kotlin/JVM with no Android dependency. 
 
 ### "How do I use the old View API?"
 
-The `isometric-android-view` module provides `IsometricView` for the traditional Android View system. See the [Migration guide](/migration/view-to-compose/) for details on moving to Compose.
+The `isometric-android-view` module provides `IsometricView` for the traditional Android View system. See the [Migration guide](migration/view-to-compose.md) for details on moving to Compose.

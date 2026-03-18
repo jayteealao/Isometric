@@ -33,9 +33,9 @@ fun BuildingScene() {
 
 | Value | Screen direction | Unit point |
 |-------|-----------------|------------|
-| `StackAxis.Z` | Vertical (upward) | `Point(0, 0, 1)` |
-| `StackAxis.X` | Right-and-forward | `Point(1, 0, 0)` |
-| `StackAxis.Y` | Left-and-forward | `Point(0, 1, 0)` |
+| `StackAxis.Z` | Vertical (upward) | `Point(0.0, 0.0, 1.0)` |
+| `StackAxis.X` | Right-and-forward | `Point(1.0, 0.0, 0.0)` |
+| `StackAxis.Y` | Left-and-forward | `Point(0.0, 1.0, 0.0)` |
 
 ```kotlin
 // Eight columns spaced 1.5 world units along X
@@ -49,9 +49,15 @@ Stack(count = 5, axis = StackAxis.Y, gap = 2.0) { _ ->
 }
 ```
 
+## Gap Validation
+
+`gap` must be non-zero and finite. Zero or `NaN`/infinite values throw `IllegalArgumentException`
+at runtime. Use a negative value to reverse direction instead of zero.
+
 ## Positioning a Stack
 
-`Stack` always starts at world origin. Wrap it in a `Group` to move it:
+`Stack` places its first child at the current origin of its parent scope. Wrap it in a `Group`
+to shift that origin:
 
 ```kotlin
 Group(position = Point(2.0, 3.0, 0.0)) {

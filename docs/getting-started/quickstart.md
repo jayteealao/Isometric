@@ -9,7 +9,7 @@ This guide walks you through creating your first isometric scene with Isometric 
 
 ## Step 1: Add the Dependency
 
-Make sure you have Isometric set up in your project. See the [Installation](/getting-started/installation/) guide for details.
+Make sure you have Isometric set up in your project. See the [Installation](installation.md) guide for details.
 
 ## Step 2: Create Your First Scene
 
@@ -106,6 +106,6 @@ fun InteractiveScene() {
 
 Now that you have a working scene, explore further:
 
-- **[Coordinate System](/getting-started/coordinate-system/)** — understand how isometric coordinates map to the screen.
-- **[Shapes](/guides/shapes/)** — learn about all available geometries: Prism, Pyramid, Cylinder, Octahedron, Stairs, and Knot.
-- **[Animation](/guides/animation/)** — bring your scenes to life with animated transforms and transitions.
+- **[Coordinate System](coordinate-system.md)** — understand how isometric coordinates map to the screen.
+- **[Shapes](../guides/shapes.md)** — learn about all available geometries: Prism, Pyramid, Cylinder, Octahedron, Stairs, and Knot.
+- **[Animation](../guides/animation.md)** — bring your scenes to life with animated transforms and transitions.

@@ -87,4 +87,4 @@ npm install
 npm run dev
 ```
 
-This starts a local dev server at `http://localhost:4321`. Pages are MDX files in `site/src/content/docs/`. See the [Documentation Guide](/contributing/docs-guide) for details on writing docs.
+This starts a local dev server at `http://localhost:4321`. Pages are MDX files in `site/src/content/docs/`. See the [Documentation Guide](docs-guide.md) for details on writing docs.

@@ -174,7 +174,7 @@ Use standard Markdown tables for API references:
 Link to other docs pages using root-relative paths:
 
 ```mdx
-See the [Composables Reference](/reference/composables) for details.
+See the [Composables Reference](../reference/composables.md) for details.
 ```
 
 ## Screenshot Workflow
@@ -192,7 +192,7 @@ Documentation screenshots are generated from code, not captured manually:
    ```
 4. Reference in MDX:
    ```mdx
-   ![Scene description](/screenshots/my-scene.png)
+   ![Scene description](../screenshots/my-scene.png.md)
    ```
 
 ## KDoc Conventions

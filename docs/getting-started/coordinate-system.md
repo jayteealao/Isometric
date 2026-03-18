@@ -106,8 +106,8 @@ tile at `TileCoordinate(3, 5)` with `tileSize = 1.0` occupies the world-space re
 
 `TileCoordinate` axis directions follow the world axes:
 
-- **x** — increases right-and-forward on screen (same as world X).
-- **y** — increases left-and-forward on screen (same as world Y).
+- **x** — increases right-and-down on screen (same as world X).
+- **y** — increases left-and-down on screen (same as world Y).
 
 `TileCoordinate.ORIGIN` is the tile at (0, 0) — the grid's world origin corner.
 

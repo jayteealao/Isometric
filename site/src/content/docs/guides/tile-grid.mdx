@@ -100,17 +100,22 @@ near tile edges may be attributed to the wrong tile. See
 
 `onTileClick` always inverse-projects taps to the z = 0 plane. When tiles are elevated, this
 can misattribute taps near edges. Use `GestureConfig.onTap` with `screenToTile()` directly,
-passing the known surface elevation, and omit `onTileClick`:
+passing the known surface elevation, and omit `onTileClick`.
+
+Hold the engine in a `remember`ed variable and pass it to `AdvancedSceneConfig`. This gives
+the `onTap` closure direct access to the engine — `LocalIsometricEngine` is only provided
+inside the `IsometricScene` content lambda and cannot be read in the outer composable body:
 
 ```kotlin
 @Composable
 fun ElevatedTileScene(heights: Map<TileCoordinate, Double>) {
-    val engine = LocalIsometricEngine.current
     var size by remember { mutableStateOf(IntSize.Zero) }
+    val engine = remember { IsometricEngine() }
 
     IsometricScene(
         modifier = Modifier.fillMaxSize().onSizeChanged { size = it },
-        config = SceneConfig(
+        config = AdvancedSceneConfig(
+            engine = engine,
             gestures = GestureConfig(
                 onTap = { event ->
                     val coord = engine.screenToTile(
@@ -136,8 +141,7 @@ fun ElevatedTileScene(heights: Map<TileCoordinate, Double>) {
 }
 ```
 
-Obtain the engine via `LocalIsometricEngine.current`. See
-[Engine — Tile Coordinate Helpers](/reference/engine/#tile-coordinate-helpers) for full
+See [Engine — Tile Coordinate Helpers](/reference/engine/#tile-coordinate-helpers) for full
 parameter details on `screenToTile`.
 
 ## Positioning the Grid
