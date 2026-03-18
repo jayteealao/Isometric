@@ -24,7 +24,7 @@ depth = x + y - 2 * z
 - **Higher x or y** pushes the face closer to the viewer (drawn on top).
 - **Higher z** pushes the face further from the viewer (drawn behind).
 
-This formula follows directly from the isometric projection geometry. A shape at ground level in the foreground (high x, high y, low z) has a large depth value and is drawn last, appearing on top. See [Coordinate System](/getting-started/coordinate-system/) for the full projection math.
+This formula follows directly from the isometric projection geometry. A shape at ground level in the foreground (high x, high y, low z) has a large depth value and is drawn last, appearing on top. See [Coordinate System](../getting-started/coordinate-system.md) for the full projection math.
 
 ## The Sorting Pipeline
 

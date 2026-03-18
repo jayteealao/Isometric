@@ -142,6 +142,12 @@ fun IsometricEngine.screenToTile(
 | `elevation` | `Double` | `0.0` | Z-plane to intersect during inverse projection. Use the surface z of the tile layer. |
 | `originOffset` | `Point` | `Point.ORIGIN` | World position of the grid's (0, 0) corner. Must match `TileGridConfig.originOffset`. |
 
+> **Note**
+>
+`TileGrid`'s built-in `onTileClick` always calls `screenToTile` with `elevation = 0.0`.
+For elevated terrain, use `screenToTile` directly via `AdvancedSceneConfig` as shown in
+[Tile Grid — Tap Accuracy with Elevation](../guides/tile-grid.md#tap-accuracy-with-elevation).
+
 For terrain where elevation varies per tile, use `screenToWorld` directly and call
 `Point.toTileCoordinate` after determining the correct layer.
 

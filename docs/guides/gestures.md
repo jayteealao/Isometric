@@ -152,8 +152,9 @@ IsometricScene(
 
 > **Caution**
 >
-Do not use both `GestureConfig.onTap` and `TileGrid`'s `onTileClick` simultaneously — both
-receive the same tap event, causing double-handling. Use one or the other.
+`GestureConfig.onTap` and `TileGrid`'s `onTileClick` both receive every tap — `onTap` fires
+first, then `onTileClick`. If both are active, you will handle the same tap twice. Use one
+or the other.
 
 For elevated terrain where the default z = 0 assumption is incorrect, use `GestureConfig.onTap`
 with `IsometricEngine.screenToTile()` directly and omit `onTileClick`. See
