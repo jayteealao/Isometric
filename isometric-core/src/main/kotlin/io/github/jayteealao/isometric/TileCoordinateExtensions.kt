@@ -16,6 +16,7 @@ fun Point.toTileCoordinate(
     tileSize: Double = 1.0,
     originOffset: Point = Point.ORIGIN
 ): TileCoordinate {
+    require(tileSize.isFinite()) { "tileSize must be finite, got $tileSize" }
     require(tileSize > 0.0) { "tileSize must be positive, got $tileSize" }
     return TileCoordinate(
         x = floor((x - originOffset.x) / tileSize).toInt(),
