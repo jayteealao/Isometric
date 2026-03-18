@@ -2,7 +2,7 @@
 title: Tile Grid
 description: Render and interact with an isometric tile grid using TileGrid
 sidebar:
-  order: 4
+  order: 3
 ---
 
 `TileGrid` renders a regular W×H isometric tile grid and routes tap events to discrete tile
