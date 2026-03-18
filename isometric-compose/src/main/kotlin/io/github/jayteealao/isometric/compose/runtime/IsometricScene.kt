@@ -260,8 +260,8 @@ fun IsometricScene(
         }
     }
 
-    // Keep fresh references for the pointer-input coroutine, which is launched once
-    // via pointerInput(Unit) and would otherwise capture stale values.
+    // Keep fresh references for the pointer-input coroutine, which is keyed on
+    // gesturesActive and would otherwise capture stale values.
     val currentRenderContext by rememberUpdatedState(renderContext)
     val currentCanvasWidth by rememberUpdatedState(canvasWidth)
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)

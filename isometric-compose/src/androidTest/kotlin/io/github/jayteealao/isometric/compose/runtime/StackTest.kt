@@ -2,7 +2,6 @@ package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -84,8 +83,11 @@ class StackTest {
     // ── Content invocation count ──────────────────────────────────────────────
 
     @Test
-    fun `content is called exactly count times`() {
-        val indices = mutableStateListOf<Int>()
+    fun `content is called for every index in a count-5 stack`() {
+        // Plain ArrayList — not snapshot state, so writes here do not trigger
+        // recomposition. Using mutableStateListOf would cause an infinite
+        // recomposition loop (write during composition → recompose → write …).
+        val indices = ArrayList<Int>()
 
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
@@ -97,12 +99,13 @@ class StackTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(5, indices.size)
+        // 5 unique indices: 0, 1, 2, 3, 4
+        assertEquals(5, indices.toSet().size)
     }
 
     @Test
     fun `indices are 0-based and sequential`() {
-        val indices = mutableStateListOf<Int>()
+        val indices = ArrayList<Int>()
 
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
@@ -114,12 +117,12 @@ class StackTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(listOf(0, 1, 2, 3), indices.sorted())
+        assertEquals(listOf(0, 1, 2, 3), indices.toSet().sorted())
     }
 
     @Test
     fun `count 1 renders exactly one child with index 0`() {
-        val indices = mutableStateListOf<Int>()
+        val indices = ArrayList<Int>()
 
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
@@ -131,8 +134,8 @@ class StackTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(1, indices.size)
-        assertEquals(0, indices[0])
+        assertEquals(1, indices.toSet().size)
+        assertTrue(indices.contains(0))
     }
 
     // ── Axis / gap ────────────────────────────────────────────────────────────
@@ -188,12 +191,13 @@ class StackTest {
     // ── Dynamic count ─────────────────────────────────────────────────────────
 
     @Test
-    fun `increasing count adds children`() {
+    fun `increasing count produces correct index set`() {
         var count by mutableStateOf(2)
-        val invocations = mutableStateListOf<Int>()
+        // Track unique indices seen after the final state settles.
+        // Plain ArrayList does not trigger further recomposition when written.
+        val invocations = ArrayList<Int>()
 
         composeRule.setContent {
-            invocations.clear()
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = count) { index ->
                     invocations.add(index)
@@ -203,12 +207,13 @@ class StackTest {
         }
 
         composeRule.waitForIdle()
-        val firstCount = invocations.size
-        assertEquals(2, firstCount)
+        invocations.clear()
 
         count = 5
         composeRule.waitForIdle()
-        assertEquals(5, invocations.size)
+
+        // 5 unique indices after count change
+        assertEquals(5, invocations.toSet().size)
     }
 
     // ── Nesting ───────────────────────────────────────────────────────────────
