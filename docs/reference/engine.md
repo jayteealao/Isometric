@@ -144,9 +144,11 @@ fun IsometricEngine.screenToTile(
 
 > **Note**
 >
-`TileGrid`'s built-in `onTileClick` always calls `screenToTile` with `elevation = 0.0`.
-For elevated terrain, use `screenToTile` directly via `AdvancedSceneConfig` as shown in
-[Tile Grid — Tap Accuracy with Elevation](../guides/tile-grid.md#tap-accuracy-with-elevation).
+`TileGrid`'s built-in `onTileClick` calls `screenToTile` using `TileGridConfig.originOffset.z`
+as the Z-plane, so grids at a fixed elevation (raised platforms) resolve taps correctly
+automatically. For terrain where **elevation varies per tile**, use `screenToWorld` directly and
+call `Point.toTileCoordinate` after determining the correct layer, or use `screenToTile` via
+`AdvancedSceneConfig` as shown in [Tile Grid — Tap Accuracy with Elevation](../guides/tile-grid.md#tap-accuracy-with-elevation).
 
 For terrain where elevation varies per tile, use `screenToWorld` directly and call
 `Point.toTileCoordinate` after determining the correct layer.

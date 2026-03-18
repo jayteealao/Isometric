@@ -54,6 +54,9 @@ internal class TileGestureHub {
      * registered handler and invokes the handler if the tile falls within the
      * grid's declared bounds.
      *
+     * Uses [TileGridConfig.originOffset].z as the Z-plane for inverse projection so that
+     * grids elevated above z = 0 (e.g. raised platforms) produce correct tile coordinates.
+     *
      * Called by IsometricScene during tap event processing, after the
      * user-facing [GestureConfig.onTap] callback has already fired.
      *
@@ -80,7 +83,7 @@ internal class TileGestureHub {
                 viewportWidth = viewportWidth,
                 viewportHeight = viewportHeight,
                 tileSize = reg.config.tileSize,
-                elevation = 0.0,
+                elevation = reg.config.originOffset.z,
                 originOffset = reg.config.originOffset
             )
             if (tile.isWithin(reg.gridWidth, reg.gridHeight)) {
