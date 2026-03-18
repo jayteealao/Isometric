@@ -204,10 +204,11 @@ branch, push, and wait again.
 ### 2.4 Merge the PR
 
 ```bash
-gh pr merge --squash --auto
+gh pr merge --rebase
 ```
 
-Use `--squash` to keep `main` history clean. After merge:
+Use `--rebase` for a fast-forward merge — all release-prep commits land individually on
+`master` with their full history preserved. After merge:
 
 ```bash
 git checkout main
