@@ -29,10 +29,10 @@ export default defineConfig({
 					label: 'Guides',
 					items: [
 						{ label: 'Shapes', slug: 'guides/shapes' },
+						{ label: 'Stack', slug: 'guides/stack' },
+						{ label: 'Tile Grid', slug: 'guides/tile-grid' },
 						{ label: 'Animation', slug: 'guides/animation' },
 						{ label: 'Gestures', slug: 'guides/gestures' },
-						{ label: 'Tile Grid', slug: 'guides/tile-grid' },
-						{ label: 'Stack', slug: 'guides/stack' },
 						{ label: 'Theming & Colors', slug: 'guides/theming' },
 						{ label: 'Camera & Viewport', slug: 'guides/camera' },
 						{ label: 'Custom Shapes', slug: 'guides/custom-shapes' },

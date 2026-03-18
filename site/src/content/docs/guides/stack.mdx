@@ -2,7 +2,7 @@
 title: Stack
 description: Arrange shapes in a line along a world axis with the Stack composable
 sidebar:
-  order: 5
+  order: 2
 ---
 
 `Stack` places `count` children at equal `gap` spacing along a chosen world axis. It replaces
