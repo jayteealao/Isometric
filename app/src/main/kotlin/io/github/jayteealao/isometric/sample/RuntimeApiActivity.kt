@@ -74,6 +74,31 @@ fun RuntimeApiSamplesScreen() {
                 onClick = { selectedSample = 5 },
                 text = { Text("Performance") }
             )
+            Tab(
+                selected = selectedSample == 6,
+                onClick = { selectedSample = 6 },
+                text = { Text("Stack") }
+            )
+            Tab(
+                selected = selectedSample == 7,
+                onClick = { selectedSample = 7 },
+                text = { Text("Tile Grid") }
+            )
+            Tab(
+                selected = selectedSample == 8,
+                onClick = { selectedSample = 8 },
+                text = { Text("Opt. Perf") }
+            )
+            Tab(
+                selected = selectedSample == 9,
+                onClick = { selectedSample = 9 },
+                text = { Text("Perf Cmp") }
+            )
+            Tab(
+                selected = selectedSample == 10,
+                onClick = { selectedSample = 10 },
+                text = { Text("Low Level") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -84,6 +109,11 @@ fun RuntimeApiSamplesScreen() {
                 3 -> RuntimeInteractiveSample()
                 4 -> ConditionalSample()
                 5 -> PerformanceSample()
+                6 -> StackExample()
+                7 -> TileGridExample()
+                8 -> OptimizedPerformanceSample()
+                9 -> PerformanceComparisonDemo()
+                10 -> MixedLevelExample()
             }
         }
     }
