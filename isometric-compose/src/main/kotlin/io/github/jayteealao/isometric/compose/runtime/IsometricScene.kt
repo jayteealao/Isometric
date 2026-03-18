@@ -96,6 +96,7 @@ fun IsometricScene(
 
     // Create root node and applier
     val rootNode = remember { GroupNode() }
+    val tileGestureHub = remember { TileGestureHub() }
     val engine = remember(config.engine) { config.engine }
     val renderer = remember(engine, config.enablePathCaching, config.enableSpatialIndex, config.spatialIndexCellSize) {
         IsometricRenderer(
@@ -248,6 +249,7 @@ fun IsometricScene(
                 if (currentIsometricEngine != null) {
                     add(LocalIsometricEngine provides currentIsometricEngine!!)
                 }
+                add(LocalTileGestureHub provides tileGestureHub)
             }
             CompositionLocalProvider(*providers.toTypedArray()) {
                 IsometricScopeImpl.currentContent()
@@ -269,12 +271,12 @@ fun IsometricScene(
     // Render to canvas with gesture handling.
     // Pointer input is installed when gestures are explicitly enabled OR when a
     // CameraState is provided (for default drag-to-pan behavior).
-    val gesturesActive = config.gestures.enabled || config.cameraState != null
+    val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
     Canvas(
         modifier = modifier
             .then(
                 if (gesturesActive) {
-                    Modifier.pointerInput(Unit) {
+                    Modifier.pointerInput(gesturesActive) {
                         awaitPointerEventScope {
                             var isDragging = false
                             var dragStartPos: Offset? = null
@@ -355,6 +357,21 @@ fun IsometricScene(
                                                     node = hitNode
                                                 )
                                             )
+
+                                            // Route to any registered TileGrid tap handlers.
+                                            // Uses hitX/hitY (camera-corrected) so screenToTile
+                                            // receives engine-space coordinates, matching the
+                                            // coordinate space that screenToWorld expects.
+                                            val isometricEngine = currentIsometricEngine
+                                            if (tileGestureHub.hasHandlers && isometricEngine != null) {
+                                                tileGestureHub.dispatch(
+                                                    tapX = hitX,
+                                                    tapY = hitY,
+                                                    viewportWidth = currentCanvasWidth,
+                                                    viewportHeight = currentCanvasHeight,
+                                                    engine = isometricEngine
+                                                )
+                                            }
                                         }
 
                                         isDragging = false
