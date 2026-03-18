@@ -11,12 +11,12 @@ Isometric ships with six built-in shape geometries. Each constructor takes a `po
 
 | Shape | Preview | Constructor | Notes |
 |-------|---------|-------------|-------|
-| Prism | ![Prism](../screenshots/shape-prism.png.md) | `Prism(position, width=1, depth=1, height=1)` | Rectangular box |
-| Pyramid | ![Pyramid](../screenshots/shape-pyramid.png.md) | `Pyramid(position, width=1, depth=1, height=1)` | Pyramid |
-| Cylinder | ![Cylinder](../screenshots/shape-cylinder.png.md) | `Cylinder(position, radius=1, height=1, vertices=20)` | `vertices` controls smoothness |
-| Octahedron | ![Octahedron](../screenshots/shape-octahedron.png.md) | `Octahedron(position)` | Fixed unit size |
-| Stairs | ![Stairs](../screenshots/shape-stairs.png.md) | `Stairs(position, stepCount)` | `stepCount` is required |
-| Knot | ![Knot](../screenshots/shape-knot.png.md) | `Knot(position)` | `@ExperimentalIsometricApi`, known depth-sorting issues |
+| Prism | ![Prism](/screenshots/shape-prism.png) | `Prism(position, width=1, depth=1, height=1)` | Rectangular box |
+| Pyramid | ![Pyramid](/screenshots/shape-pyramid.png) | `Pyramid(position, width=1, depth=1, height=1)` | Pyramid |
+| Cylinder | ![Cylinder](/screenshots/shape-cylinder.png) | `Cylinder(position, radius=1, height=1, vertices=20)` | `vertices` controls smoothness |
+| Octahedron | ![Octahedron](/screenshots/shape-octahedron.png) | `Octahedron(position)` | Fixed unit size |
+| Stairs | ![Stairs](/screenshots/shape-stairs.png) | `Stairs(position, stepCount)` | `stepCount` is required |
+| Knot | ![Knot](/screenshots/shape-knot.png) | `Knot(position)` | `@ExperimentalIsometricApi`, known depth-sorting issues |
 
 ## Using the Shape Composable
 
@@ -77,11 +77,11 @@ val rotated = box.rotateZ(Point(0.5, 0.5, 0.0), Math.PI / 4) // 45 degrees
 
 **Before extrusion** — a flat triangle path:
 
-![Before extrude](../screenshots/extrude-before.png.md)
+![Before extrude](/screenshots/extrude-before.png)
 
 **After extrusion** — a triangular prism:
 
-![After extrude](../screenshots/extrude-after.png.md)
+![After extrude](/screenshots/extrude-after.png)
 
 ```kotlin
 val trianglePath = io.fabianterhorst.isometric.Path(

@@ -310,6 +310,7 @@ git push origin HEAD
 ```
 
 Must be **BUILD SUCCESSFUL** with zero test failures. If it fails:
+
 1. Read the error output carefully
 2. Fix the root cause
 3. Commit the fix with an appropriate message

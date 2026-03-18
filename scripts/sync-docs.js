@@ -42,18 +42,37 @@ function findMdx(dir) {
 }
 
 // ── Rewrite absolute doc-site links → relative .md paths ─────────────────────
-// Matches [text](/path) and [text](/path#anchor).
+// Matches [text](/path) and [text](/path#anchor) in prose sections only.
 // srcRel is the source file path relative to SRC (e.g. 'guides/tile-grid.mdx').
-// External links (https://…) and same-page anchors (#…) are left untouched.
+//
+// Skips:
+//   - External links (https://…) — no leading slash, not matched
+//   - Same-page anchors (#…)     — no leading slash, not matched
+//   - Asset paths (/screenshots/foo.png, /favicon.svg, etc.) — have a file
+//     extension and must not gain a .md suffix
+//   - Content inside fenced code blocks — split on fence boundaries and only
+//     process even-indexed (prose) segments so example code is never mangled
 function rewriteLinks(content, srcRel) {
   const srcDir = dirname(srcRel.replace(/\\/g, '/'));
-  return content.replace(
-    /\[([^\]]*)\]\(\/((?:[^)#\s])+)(#[^)\s]*)?\)/g,
-    (_, text, path, anchor = '') => {
-      const relPath = relative(srcDir, path.replace(/\/$/, '') + '.md').replace(/\\/g, '/');
-      return `[${text}](${relPath}${anchor})`;
-    }
-  );
+
+  // Split on fenced code blocks so we never rewrite links inside examples.
+  // Odd-indexed segments are inside fences; even-indexed are prose/frontmatter.
+  const segments = content.split(/(^```[\s\S]*?^```)/gm);
+
+  return segments.map((seg, i) => {
+    if (i % 2 === 1) return seg; // inside a code fence — leave untouched
+
+    return seg.replace(
+      /\[([^\]]*)\]\(\/((?:[^)#\s])+)(#[^)\s]*)?\)/g,
+      (match, text, path, anchor = '') => {
+        const stripped = path.replace(/\/$/, '');
+        // Skip asset paths that carry a file extension (images, PDFs, etc.)
+        if (/\.[a-zA-Z0-9]{1,6}$/.test(stripped)) return match;
+        const relPath = relative(srcDir, stripped + '.md').replace(/\\/g, '/');
+        return `[${text}](${relPath}${anchor})`;
+      }
+    );
+  }).join('');
 }
 
 // ── Convert MDX → plain Markdown ─────────────────────────────────────────────
