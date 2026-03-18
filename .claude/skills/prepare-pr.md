@@ -49,9 +49,14 @@ and URL and continue.
 # Derive a title from the most significant commit (feat > fix > docs > build > chore)
 git log origin/master..HEAD --oneline
 
+TEMPLATE=""
+if [[ -f .github/PULL_REQUEST_TEMPLATE.md ]]; then
+  TEMPLATE="$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+fi
+
 gh pr create \
   --title "<conventional commit title>" \
-  --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)" \
+  --body "${TEMPLATE}" \
   --base master
 ```
 
@@ -134,11 +139,12 @@ For each changed Kotlin source file in `isometric-core/src/main/` or
 `isometric-compose/src/main/`, check for new or modified public declarations:
 
 ```bash
-git diff origin/master..HEAD \
+git diff -U0 origin/master..HEAD \
   -- "isometric-core/src/main/kotlin/**" \
   -- "isometric-compose/src/main/kotlin/**" \
-  | grep "^++" -A1 | grep "^+" \
-  | grep -E "public |fun |class |object |interface |enum "
+  | grep "^+" \
+  | grep -v "^+++" \
+  | grep -E "\b(public|internal)\s+(class|object|interface|enum|fun|val|var)\b"
 ```
 
 Read the actual source files for any new public types or functions and verify the
