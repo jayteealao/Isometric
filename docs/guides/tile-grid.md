@@ -90,17 +90,21 @@ TileGrid(
 }
 ```
 
-> **Caution**
+> **Note**
 >
-`onTileClick` assumes a flat z = 0 ground plane for hit-testing. For elevated terrain, taps
-near tile edges may be attributed to the wrong tile. See
-[Tap Accuracy with Elevation](#tap-accuracy-with-elevation) for the escape hatch.
+`onTileClick` uses `TileGridConfig.originOffset.z` as the projection plane, so grids at a
+fixed elevation (raised platforms) resolve taps correctly without any extra work. Only
+**per-tile variable elevation** (height-map terrain) requires the escape hatch below.
 
 ## Tap Accuracy with Elevation
 
-`onTileClick` always inverse-projects taps to the z = 0 plane. When tiles are elevated, this
-can misattribute taps near edges. Use `GestureConfig.onTap` with `screenToTile()` directly,
-passing the known surface elevation, and omit `onTileClick`.
+`onTileClick` inverse-projects taps against the grid's base Z-plane (`TileGridConfig.originOffset.z`).
+This is accurate for flat grids at any uniform elevation. When individual tiles have **different
+heights** (height-map terrain), taps near elevated edges can be attributed to the wrong tile
+because the projection cannot know which tile's surface was hit.
+
+For variable-elevation terrain, use `GestureConfig.onTap` with `screenToTile()` directly,
+passing the known surface elevation for the tile layer, and omit `onTileClick`.
 
 Hold the engine in a `remember`ed variable and pass it to `AdvancedSceneConfig`. This gives
 the `onTap` closure direct access to the engine — `LocalIsometricEngine` is only provided
@@ -108,7 +112,7 @@ inside the `IsometricScene` content lambda and cannot be read in the outer compo
 
 ```kotlin
 @Composable
-fun ElevatedTileScene(heights: Map<TileCoordinate, Double>) {
+fun VariableElevationTileScene(heights: Map<TileCoordinate, Double>) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val engine = remember { IsometricEngine() }
 
@@ -118,12 +122,15 @@ fun ElevatedTileScene(heights: Map<TileCoordinate, Double>) {
             engine = engine,
             gestures = GestureConfig(
                 onTap = { event ->
+                    // Use ground-plane (z = 0) as a first approximation,
+                    // then look up the actual elevation for that tile and re-project
+                    // if accuracy at steep terrain edges is required.
                     val coord = engine.screenToTile(
                         screenX = event.x,
                         screenY = event.y,
                         viewportWidth = size.width,
                         viewportHeight = size.height,
-                        elevation = 0.0  // adjust to the known surface z if needed
+                        elevation = 0.0
                     )
                     if (coord.isWithin(10, 10)) { /* handle */ }
                 }
