@@ -245,11 +245,35 @@ Fetch general PR comments (bot summaries, top-level remarks):
 gh pr view <PR_NUMBER> --json comments --jq '.comments[] | { author: .author.login, body: .body }'
 ```
 
-Fetch inline review thread comments (file + line annotations):
+Fetch inline review threads via GraphQL — this returns thread IDs needed for resolution later.
+Record the `threadId` alongside each comment so it can be resolved after the fix is applied:
 
 ```bash
-gh api repos/jayteealao/Isometric/pulls/<PR_NUMBER>/comments \
-  --jq '.[] | { author: .user.login, file: .path, line: .line, body: .body }'
+gh api graphql -f query='
+{
+  repository(owner: "jayteealao", name: "Isometric") {
+    pullRequest(number: <PR_NUMBER>) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          comments(first: 10) {
+            nodes {
+              author { login }
+              body
+              path
+              originalLine
+            }
+          }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved == false)
+  | { threadId: .id, author: .comments.nodes[0].author.login,
+      file: .comments.nodes[0].path, line: .comments.nodes[0].originalLine,
+      body: .comments.nodes[0].body }'
 ```
 
 Fetch formal review submissions (approved / request changes):
@@ -266,6 +290,7 @@ gh api repos/jayteealao/Isometric/pulls/<PR_NUMBER>/reviews \
 | CodeRabbit | `coderabbitai` |
 | Greptile | `greptile-dev` |
 | Gemini Code Assist | `gemini-code-assist` |
+| Codex | `chatgpt-codex-connector[bot]` |
 | Human reviewer | any other login |
 
 ### 5.3 Classify each comment
@@ -293,7 +318,24 @@ apply. Apply approved ones and commit. Skip declined ones and note the reason.
 
 **🟢 Informational:** Summarise in the Phase 9 report. No action taken.
 
-After all fixes, push:
+### 5.5 Resolve fixed threads
+
+After each fix is committed, mark the corresponding review thread as resolved using the
+`threadId` captured in Phase 5.1. Only resolve threads for items that were actually fixed
+or deliberately declined — leave open threads for deferred items:
+
+```bash
+gh api graphql -f query='
+mutation {
+  resolveReviewThread(input: { threadId: "<THREAD_ID>" }) {
+    thread { isResolved }
+  }
+}'
+```
+
+General PR comments (top-level, not in threads) cannot be resolved via API — no action needed.
+
+After all fixes and resolutions, push:
 
 ```bash
 git push origin HEAD
@@ -436,6 +478,54 @@ git push --force-with-lease origin HEAD
 
 ## Phase 9 — Final Readiness Report
 
+### 9.1 Check actual PR blocking state
+
+Before declaring readiness, verify the PR's live state on GitHub:
+
+```bash
+gh pr view <PR_NUMBER> --json reviewDecision,statusCheckRollup \
+  --jq '{
+    decision: .reviewDecision,
+    failing: [.statusCheckRollup[] | select(.conclusion != "SUCCESS" and .conclusion != null) | {name: .name, conclusion: .conclusion}],
+    pending: [.statusCheckRollup[] | select(.status == "IN_PROGRESS" or .status == "QUEUED") | {name: .name}]
+  }'
+```
+
+| `reviewDecision` value | Meaning |
+|---|---|
+| `APPROVED` | All required reviews approved — clear to merge |
+| `CHANGES_REQUESTED` | A reviewer has requested changes — must be addressed |
+| `REVIEW_REQUIRED` | Required reviews not yet submitted — waiting |
+| `null` | No review requirements configured |
+
+If any checks are failing or `reviewDecision` is `CHANGES_REQUESTED`, mark those items ❌
+in the report and stop. Do **not** proceed to the merge command.
+
+### 9.2 Resolve any remaining open threads
+
+Check for unresolved threads that were fixed but not yet resolved in Phase 5.5:
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "jayteealao", name: "Isometric") {
+    pullRequest(number: <PR_NUMBER>) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          comments(first: 1) { nodes { author { login } body } }
+        }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | {threadId: .id, author: .comments.nodes[0].author.login, snippet: .comments.nodes[0].body[:80]}'
+```
+
+Resolve any threads whose fix was already committed and pushed.
+
+### 9.3 Present summary
+
 Present a summary table:
 
 ```
@@ -455,10 +545,14 @@ PR: #<number> — <title>
    - CodeRabbit: N blocking fixed, M suggestions (K applied, J deferred)
    - Greptile: informational only
    - Gemini: N/A (error creating summary)
+   - Codex: N blocking fixed
+   - All resolved threads marked resolved
 ✅ Local CI: BUILD SUCCESSFUL
 ✅ Markdown lint: clean
 ✅ PR body: checklist complete, summary filled
 ✅ Rebased onto origin/master (fast-forward eligible)
+✅ GitHub CI: all checks passing
+✅ Review decision: APPROVED (or: no review required)
 
 Ready for rebase+merge:
   gh pr merge <PR_NUMBER> --rebase
