@@ -19,6 +19,8 @@ Isometric is a Kotlin library for rendering interactive isometric (2.5D) scenes 
 - **Per-node dirty tracking** — only changed subtrees re-render
 - **Built-in animation** — vsync-aligned via `withFrameNanos`
 - **Gesture handling** — tap and drag with spatial-indexed hit testing
+- **Tile grid** — `TileGrid` composable for isometric tile maps with automatic tap-to-tile routing
+- **Stack layout** — `Stack` composable for 1D arrangement along any world axis (X, Y, or Z)
 - **Camera control** — pan and zoom with `CameraState`
 - **6 built-in shapes** — Prism, Pyramid, Cylinder, Octahedron, Stairs, Knot
 - **Custom shapes** — extrude paths or implement `CustomNode` for full control
@@ -69,6 +71,8 @@ See the [Quick Start guide](site/src/content/docs/getting-started/quickstart.mdx
 - [**Shapes Guide**](site/src/content/docs/guides/shapes.mdx) — Built-in shapes, transforms, and custom geometry
 - [**Animation**](site/src/content/docs/guides/animation.mdx) — vsync-aligned animation with `withFrameNanos`
 - [**Gestures**](site/src/content/docs/guides/gestures.mdx) — Tap and drag with spatial hit testing
+- [**Tile Grid**](site/src/content/docs/guides/tile-grid.mdx) — Render and interact with isometric tile grids
+- [**Stack**](site/src/content/docs/guides/stack.mdx) — Arrange shapes along a world axis
 - [**Camera**](site/src/content/docs/guides/camera.mdx) — Pan and zoom with `CameraState`
 - [**Theming & Colors**](site/src/content/docs/guides/theming.mdx) — `IsoColor`, palettes, lighting, stroke styles
 - [**Custom Shapes**](site/src/content/docs/guides/custom-shapes.mdx) — `Path`, `Shape.extrude`, and `CustomNode`

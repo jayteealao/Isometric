@@ -109,6 +109,66 @@ fun findItemAt(
 ): RenderCommand?
 ```
 
+## Tile Coordinate Helpers
+
+Extension functions that bridge continuous 3D world coordinates and the discrete tile grid
+system.
+
+### screenToTile
+
+Extension function on `IsometricEngine`. Converts a screen tap point to the `TileCoordinate`
+of the tile cell that contains it. Chains `screenToWorld` with `Point.toTileCoordinate`
+internally.
+
+```kotlin
+fun IsometricEngine.screenToTile(
+    screenX: Double,
+    screenY: Double,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    tileSize: Double = 1.0,
+    elevation: Double = 0.0,
+    originOffset: Point = Point.ORIGIN
+): TileCoordinate
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `screenX` | `Double` | — | Screen x-coordinate of the tap (pixels). |
+| `screenY` | `Double` | — | Screen y-coordinate of the tap (pixels). |
+| `viewportWidth` | `Int` | — | Scene viewport width (pixels). |
+| `viewportHeight` | `Int` | — | Scene viewport height (pixels). |
+| `tileSize` | `Double` | `1.0` | World units per tile side. Must match `TileGridConfig.tileSize`. |
+| `elevation` | `Double` | `0.0` | Z-plane to intersect during inverse projection. Use the surface z of the tile layer. |
+| `originOffset` | `Point` | `Point.ORIGIN` | World position of the grid's (0, 0) corner. Must match `TileGridConfig.originOffset`. |
+
+For terrain where elevation varies per tile, use `screenToWorld` directly and call
+`Point.toTileCoordinate` after determining the correct layer.
+
+### Point.toTileCoordinate
+
+Extension function on `Point`. Converts a continuous world point to the `TileCoordinate` of
+the cell that contains it. Uses `floor()` division so negative coordinates map correctly.
+
+```kotlin
+fun Point.toTileCoordinate(
+    tileSize: Double = 1.0,
+    originOffset: Point = Point.ORIGIN
+): TileCoordinate
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tileSize` | `Double` | `1.0` | World units per tile side. Must be positive and finite. |
+| `originOffset` | `Point` | `Point.ORIGIN` | World position of the grid's (0, 0) corner. |
+
+The z-coordinate of the receiver `Point` is ignored — only x and y determine the tile.
+
+```kotlin
+Point(3.7, 5.2, 0.0).toTileCoordinate()        // TileCoordinate(3, 5)
+Point(-0.3, 0.0, 0.0).toTileCoordinate()        // TileCoordinate(-1, 0) — floor, not truncation
+```
+
 ## projectionVersion
 
 A `Long` counter that increments whenever `angle` or `scale` changes. Caches that depend on projected output can check this value to know when their data is stale.

@@ -62,7 +62,7 @@ Renders a 2D polygon face positioned in 3D space. Used for flat surfaces like fl
 >
 Name collision with `kotlin.io.path.Path` — use an import alias:
 ```kotlin
-import io.fabianterhorst.isometric.Path as IsoPath
+import io.github.jayteealao.isometric.Path as IsoPath
 ```
 
 ### Batch
@@ -124,3 +124,53 @@ ForEach(items = buildings, key = { it.id }) { building ->
 ### CustomNode
 
 Escape hatch for custom rendering. Takes a `render` lambda that returns `List<RenderCommand>`.
+
+### TileGrid
+
+`IsometricScope` extension composable. Renders a width × height isometric tile grid and routes
+tap events to tile coordinates. No `GestureConfig` is required on the enclosing `IsometricScene`
+when `onTileClick` is provided — gesture handling activates automatically.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `width` | `Int` | — | Required. Number of tile columns. Must be ≥ 1. |
+| `height` | `Int` | — | Required. Number of tile rows. Must be ≥ 1. |
+| `config` | `TileGridConfig` | `TileGridConfig()` | Tile size, world origin, optional per-tile elevation. |
+| `onTileClick` | `((TileCoordinate) -> Unit)?` | `null` | Called when the user taps a tile within the grid bounds. |
+| `content` | `@Composable IsometricScope.(TileCoordinate) -> Unit` | — | Required. Rendered in each tile's local coordinate space. |
+
+```kotlin
+TileGrid(
+    width = 10,
+    height = 10,
+    onTileClick = { coord -> selectedTile = coord }
+) { coord ->
+    Shape(
+        geometry = Prism(Point.ORIGIN),
+        color = if (coord == selectedTile) IsoColor(33, 150, 243) else IsoColor(200, 200, 200)
+    )
+}
+```
+
+> **Caution**
+>
+`onTileClick` assumes a flat z = 0 ground plane. Elevated terrain requires the escape hatch —
+see [Tile Grid — Tap Accuracy with Elevation](../guides/tile-grid.md#tap-accuracy-with-elevation).
+
+### Stack
+
+`IsometricScope` extension composable. Arranges `count` children at equal `gap` spacing along
+a world axis.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `count` | `Int` | — | Required. Number of children. Must be ≥ 1. |
+| `axis` | `StackAxis` | `StackAxis.Z` | World axis along which children are arranged. |
+| `gap` | `Double` | `1.0` | World-unit distance between consecutive child origins. Must be non-zero and finite. Negative values reverse direction. |
+| `content` | `@Composable IsometricScope.(index: Int) -> Unit` | — | Required. Receives zero-based index. |
+
+```kotlin
+Stack(count = 5, axis = StackAxis.Z, gap = 1.0) { floor ->
+    Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(33, 150, floor * 40))
+}
+```

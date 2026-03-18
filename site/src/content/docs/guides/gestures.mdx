@@ -97,3 +97,64 @@ IsometricScene(
     config = SceneConfig(gestures = GestureConfig.Disabled)
 ) { ... }
 ```
+
+## Tile Grid Tap Routing
+
+`TileGrid` provides its own tap routing mechanism separate from `GestureConfig.onTap`. Passing
+an `onTileClick` callback to `TileGrid` enables automatic screen-to-tile conversion — no
+`GestureConfig` is needed on `IsometricScene`.
+
+```kotlin
+IsometricScene(modifier = Modifier.fillMaxSize()) {
+    TileGrid(
+        width = 10,
+        height = 10,
+        onTileClick = { coord ->
+            // TileCoordinate — no coordinate math required
+            selectedTile = coord
+        }
+    ) { coord ->
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(200, 200, 200))
+    }
+}
+```
+
+This differs from `GestureConfig.onTap` in two ways:
+
+- **Delivers a `TileCoordinate`**, not raw screen coordinates or a hit-tested node.
+- **Scoped to grid bounds** — taps outside the grid's `width × height` area are silently ignored.
+
+### Combining with Drag Gestures
+
+Tile tap routing and `GestureConfig` drag callbacks coexist without conflict:
+
+```kotlin
+val camera = remember { CameraState() }
+
+IsometricScene(
+    modifier = Modifier.fillMaxSize(),
+    config = SceneConfig(
+        cameraState = camera,
+        gestures = GestureConfig(
+            onDrag = { event -> camera.pan(event.x / 50.0, -event.y / 50.0) }
+        )
+    )
+) {
+    TileGrid(
+        width = 10,
+        height = 10,
+        onTileClick = { coord -> selectedTile = coord }
+    ) { coord ->
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(200, 200, 200))
+    }
+}
+```
+
+:::caution
+Do not use both `GestureConfig.onTap` and `TileGrid`'s `onTileClick` simultaneously — both
+receive the same tap event, causing double-handling. Use one or the other.
+:::
+
+For elevated terrain where the default z = 0 assumption is incorrect, use `GestureConfig.onTap`
+with `IsometricEngine.screenToTile()` directly and omit `onTileClick`. See
+[Tile Grid — Tap Accuracy with Elevation](/guides/tile-grid/#tap-accuracy-with-elevation).
