@@ -40,11 +40,32 @@ The core module has unit tests covering all fundamental types:
 | `CircleTest` | Circle path generation with configurable vertex count |
 | `IsometricEngineTest` | Engine construction, `add`/`clear`, `projectScene`, hit testing |
 | `IsometricEngineProjectionTest` | `worldToScreen`, `screenToWorld` round-trip accuracy |
+| `TileCoordinateTest` | Construction, `equals`/`hashCode`/`toString`, `plus`/`minus` operators, `isWithin`, `toPoint`, `ORIGIN` |
+| `TileGridConfigTest` | Default values, `tileSize` validation, elevation lambda storage, `equals`/`hashCode` (elevation excluded), `toString` |
+| `TileCoordinateExtensionsTest` | `Point.toTileCoordinate` with positive/negative/boundary coords, floor-not-truncation, `screenToTile` round-trip |
+| `StackAxisTest` | All three enum values, `unitPoint()` unit vectors, one-non-zero-component invariant |
 
 All test files are located under:
 
 ```
 isometric-core/src/test/kotlin/io/fabianterhorst/isometric/
+```
+
+WS9 test files use the updated package:
+
+```
+isometric-core/src/test/kotlin/io/github/jayteealao/isometric/
+```
+
+The compose module also has instrumented tests that run on a device or emulator:
+
+| Test Class | Covers |
+|------------|--------|
+| `TileGridTest` | Per-tile content invocation, bounds enforcement, `onTileClick` wiring, elevation function inputs |
+| `StackTest` | Item count, axis directions, gap validation, negative gap, nested stacks |
+
+```bash
+./gradlew :isometric-compose:connectedAndroidTest
 ```
 
 ## Screenshot Generation

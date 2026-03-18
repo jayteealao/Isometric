@@ -88,3 +88,27 @@ A few rules to keep in mind:
 - **Positive Z is up.** A shape at `z = 3.0` appears higher on screen than a shape at `z = 0.0`.
 - **X and Y are symmetric.** Swapping a shape's X and Y values mirrors it across the vertical center line.
 - When placing shapes relative to each other, think in world units. A prism at `Point(2.0, 0.0, 0.0)` is exactly 2 world units along the X axis from the origin.
+
+## Tile Coordinates
+
+For tile-grid scenarios the library provides a second coordinate type: `TileCoordinate`. Where
+`Point` uses continuous `Double` values in 3D world space, `TileCoordinate` uses discrete `Int`
+values for grid cells.
+
+```
+TileCoordinate(x: Int, y: Int)   — discrete column/row in the tile grid
+Point(x, y, z: Double)           — continuous position in 3D world space
+```
+
+The relationship is controlled by `TileGridConfig.tileSize` (world units per tile side). A
+tile at `TileCoordinate(3, 5)` with `tileSize = 1.0` occupies the world-space rectangle
+`[3.0, 4.0) × [5.0, 6.0)` in the XY plane.
+
+`TileCoordinate` axis directions follow the world axes:
+
+- **x** — increases right-and-forward on screen (same as world X).
+- **y** — increases left-and-forward on screen (same as world Y).
+
+`TileCoordinate.ORIGIN` is the tile at (0, 0) — the grid's world origin corner.
+
+For more on working with tile grids, see the [Tile Grid guide](../guides/tile-grid.md).

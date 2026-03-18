@@ -12,6 +12,12 @@ package io.github.jayteealao.isometric
  * @param elevation Optional per-tile elevation function. Returns the z-coordinate of the
  *   tile surface for the given [TileCoordinate]. When null, all tiles sit at
  *   [originOffset].z. Use for terrain height maps.
+ *
+ * **Note:** [elevation] is excluded from [equals] and [hashCode]. Two configs with the
+ * same [tileSize] and [originOffset] compare equal regardless of their elevation functions.
+ * This is intentional — lambda literals do not have stable identity across recompositions,
+ * so including them would cause spurious inequality and unnecessary gesture-hub
+ * re-registration on every recomposition.
  */
 class TileGridConfig(
     val tileSize: Double = 1.0,
