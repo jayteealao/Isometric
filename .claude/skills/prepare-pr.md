@@ -383,15 +383,36 @@ gh pr edit <PR_NUMBER> --title "<corrected title>"
 
 ---
 
-## Phase 8 — Rebase onto Master
+## Phase 8 — Pull, Rebase onto Master, Push
 
-### 8.1 Fetch latest master
+### 8.1 Fetch everything
 
 ```bash
-git fetch origin master
+git fetch origin
 ```
 
-### 8.2 Rebase
+Fetch all remotes at once — this updates `origin/master` and `origin/<branch>` in
+one round-trip.
+
+### 8.2 Integrate remote changes on the feature branch
+
+Check whether the remote feature branch has commits the local branch does not:
+
+```bash
+git log HEAD..origin/$(git branch --show-current) --oneline
+```
+
+If any commits appear, fast-forward the local branch before doing anything else:
+
+```bash
+git rebase origin/$(git branch --show-current)
+```
+
+This handles commits pushed by CI bots, other collaborators, or a previous session.
+If this rebase has conflicts the local and remote feature branches have diverged in
+an incompatible way — stop and report to the user before proceeding.
+
+### 8.3 Rebase onto master
 
 ```bash
 git rebase origin/master
@@ -401,8 +422,10 @@ If there are conflicts, stop immediately. Report each conflicting file by name a
 show the conflict markers. **Do not resolve conflicts automatically.** Present each
 conflict to the user and wait for instruction before continuing.
 
-If the rebase succeeds cleanly, push with force-with-lease (safe force — refuses if
-the remote has commits not in the local branch):
+### 8.4 Push
+
+If both rebases succeeded cleanly, push with force-with-lease (refuses if the remote
+has commits the local branch still does not know about — a final safety net):
 
 ```bash
 git push --force-with-lease origin HEAD
