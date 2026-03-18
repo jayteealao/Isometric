@@ -216,7 +216,7 @@ git pull origin main
 git log --oneline -5
 ```
 
-Confirm the merge commit is present on `main`.
+Confirm the release-prep commits are present on `main`.
 
 ---
 

@@ -45,7 +45,7 @@ class TileCoordinate(
     override fun equals(other: Any?): Boolean =
         other is TileCoordinate && x == other.x && y == other.y
 
-    override fun hashCode(): Int = 31 * x + y
+    override fun hashCode(): Int = x * 1_000_003 xor y
 
     override fun toString(): String = "TileCoordinate($x, $y)"
 

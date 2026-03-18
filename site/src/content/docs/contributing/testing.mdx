@@ -45,13 +45,13 @@ The core module has unit tests covering all fundamental types:
 | `TileCoordinateExtensionsTest` | `Point.toTileCoordinate` with positive/negative/boundary coords, floor-not-truncation, `screenToTile` round-trip |
 | `StackAxisTest` | All three enum values, `unitPoint()` unit vectors, one-non-zero-component invariant |
 
-All test files are located under:
+Pre-WS9 test files are located under:
 
 ```
 isometric-core/src/test/kotlin/io/fabianterhorst/isometric/
 ```
 
-WS9 test files use the updated package:
+WS9 and later test files use the updated package:
 
 ```
 isometric-core/src/test/kotlin/io/github/jayteealao/isometric/
