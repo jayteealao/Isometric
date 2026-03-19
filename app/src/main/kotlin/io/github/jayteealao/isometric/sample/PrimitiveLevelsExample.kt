@@ -137,14 +137,11 @@ fun SmartUpdatingShape(rotation: Double) {
         },
         update = {
             set(rotation) { newRotation ->
-                // Only update if rotation changed by at least 0.1 radians
+                // Only update if rotation changed by at least 0.01 radians
                 val currentRotation = this.rotation
-                if (kotlin.math.abs(newRotation - currentRotation) > 0.1) {
+                if (kotlin.math.abs(newRotation - currentRotation) > 0.01) {
                     this.rotation = newRotation
                     markDirty()
-                    println("Updated rotation: $newRotation")
-                } else {
-                    println("Skipped update (change too small)")
                 }
             }
         }
@@ -272,7 +269,7 @@ fun MixedLevelExample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         // HIGH-LEVEL: Easy to use for standard shapes
         Shape(
-            geometry = Prism(position = Point(-2.0, 0.0, 0.0)),
+            geometry = Prism(position = Point(-3.0, 0.0, 0.0)),
             color = IsoColor(255.0, 0.0, 0.0)
         )
 
@@ -287,11 +284,11 @@ fun MixedLevelExample() {
         // LOW-LEVEL: Custom behavior when needed
         SmartUpdatingShape(rotation = angle)
 
-        // CUSTOM NODE: Completely new node type
+        // CUSTOM NODE: Completely new node type — well-separated shapes
         MultiShape(
             shapes = listOf(
-                Prism(position = Point(2.0, 0.0, 0.0)),
-                Prism(position = Point(2.5, 0.0, 0.0))
+                Prism(position = Point(3.0, 0.0, 0.0)),
+                Prism(position = Point(3.0, 2.0, 0.0))
             ),
             colors = listOf(
                 IsoColor(0.0, 0.0, 255.0),
