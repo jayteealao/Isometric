@@ -28,12 +28,12 @@ fun TileGridExample() {
 
     IsometricScene(modifier = Modifier.fillMaxSize()) {
         TileGrid(
-            width = 10,
-            height = 10,
+            width = 6,
+            height = 6,
             onTileClick = { coord -> selectedTile = coord }
         ) { coord ->
             Shape(
-                geometry = Prism(),
+                geometry = Prism(width = 0.9, depth = 0.9, height = 0.3),
                 color = if (coord == selectedTile) IsoColor(33.0, 150.0, 243.0) else IsoColor(120.0, 144.0, 156.0)
             )
         }
