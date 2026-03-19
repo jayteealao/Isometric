@@ -99,6 +99,11 @@ fun RuntimeApiSamplesScreen() {
                 onClick = { selectedSample = 10 },
                 text = { Text("Low Level") }
             )
+            Tab(
+                selected = selectedSample == 11,
+                onClick = { selectedSample = 11 },
+                text = { Text("Grid Stack") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -114,6 +119,7 @@ fun RuntimeApiSamplesScreen() {
                 8 -> OptimizedPerformanceSample()
                 9 -> PerformanceComparisonDemo()
                 10 -> MixedLevelExample()
+                11 -> GridStackExample()
             }
         }
     }

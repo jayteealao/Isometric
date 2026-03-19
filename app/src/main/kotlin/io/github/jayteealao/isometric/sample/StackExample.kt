@@ -16,14 +16,12 @@ import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
 
 /**
- * Demonstrates all three [StackAxis] values and the composability of [Stack]
- * with [TileGrid].
+ * Demonstrates all three [StackAxis] values.
  *
- * Four sub-scenes:
+ * Three sub-scenes:
  * 1. Vertical Z-axis tower — the hero scenario
  * 2. Horizontal X-axis row
- * 3. Horizontal Y-axis row
- * 4. [Stack] nested inside [TileGrid] content — towers of varying height per tile
+ * 3. Depth Y-axis row of pyramids
  */
 @Composable
 fun StackExample() {
@@ -36,32 +34,40 @@ fun StackExample() {
 
     IsometricScene(modifier = Modifier.fillMaxSize()) {
 
-        // 1. Vertical tower — 4 floors stacked along Z
-        Group(position = Point(0.0, 0.0, 0.0)) {
+        // 1. Vertical tower — 4 floors stacked along Z (hero scenario)
+        Group(position = Point(1.0, 1.0, 0.0)) {
             Stack(count = 4, axis = StackAxis.Z, gap = 1.0) { floor ->
                 Shape(geometry = Prism(), color = floorColors[floor])
             }
         }
 
-        // 2. Horizontal row — 6 prisms along X, spaced 1.5 world units
-        Group(position = Point(0.0, 4.0, 0.0)) {
-            Stack(count = 6, axis = StackAxis.X, gap = 1.5) { _ ->
+        // 2. Horizontal row — 4 prisms along X, spaced 1.5 world units
+        Group(position = Point(-1.0, 4.0, 0.0)) {
+            Stack(count = 4, axis = StackAxis.X, gap = 1.5) { _ ->
                 Shape(geometry = Prism(), color = IsoColor(120.0, 144.0, 156.0))
             }
         }
 
-        // 3. Depth row — 5 pyramids along Y, spaced 1.5 world units
+        // 3. Depth row — 3 pyramids along Y, spaced 1.5 world units
         Group(position = Point(4.0, 0.0, 0.0)) {
-            Stack(count = 5, axis = StackAxis.Y, gap = 1.5) { _ ->
+            Stack(count = 3, axis = StackAxis.Y, gap = 1.5) { _ ->
                 Shape(geometry = Pyramid(), color = IsoColor(156.0, 39.0, 176.0))
             }
         }
+    }
+}
 
-        // 4. Stack inside TileGrid — each tile carries a tower whose height equals x+y+1
+/**
+ * Demonstrates [Stack] nested inside [TileGrid] — each tile carries a tower
+ * whose height varies by grid position.
+ */
+@Composable
+fun GridStackExample() {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
         TileGrid(
             width = 3,
             height = 3,
-            config = TileGridConfig(originOffset = Point(-6.0, 0.0, 0.0))
+            config = TileGridConfig(originOffset = Point(0.0, 0.0, 0.0))
         ) { coord ->
             val towerHeight = coord.x + coord.y + 1
             Stack(count = towerHeight, axis = StackAxis.Z, gap = 0.5) { _ ->
