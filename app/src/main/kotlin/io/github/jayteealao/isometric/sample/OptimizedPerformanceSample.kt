@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.compose.runtime.*
 import io.github.jayteealao.isometric.shapes.Prism
@@ -25,14 +26,15 @@ import kotlin.math.PI
 
 @Composable
 fun OptimizedPerformanceSample() {
-    var gridSize by remember { mutableStateOf(10) }
+    var gridSize by remember { mutableStateOf(6) }
     var enableSpatialIndex by remember { mutableStateOf(true) }
-    var useNativeCanvas by remember { mutableStateOf(true) }
+    var useNativeCanvas by remember { mutableStateOf(false) }
     var animationEnabled by remember { mutableStateOf(false) }
     var wave by remember { mutableStateOf(0.0) }
     var clickCount by remember { mutableStateOf(0) }
     var lastClickTime by remember { mutableStateOf(0L) }
     var avgClickTime by remember { mutableStateOf(0.0) }
+    val engine = remember { IsometricEngine() }
 
     LaunchedEffect(animationEnabled) {
         while (animationEnabled) {
@@ -70,7 +72,7 @@ fun OptimizedPerformanceSample() {
                 Slider(
                     value = gridSize.toFloat(),
                     onValueChange = { gridSize = it.toInt() },
-                    valueRange = 3f..20f
+                    valueRange = 3f..12f
                 )
 
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -111,10 +113,10 @@ fun OptimizedPerformanceSample() {
             }
         }
 
-        // Optimized Scene with unified API
+        // Scene with gesture handling
         IsometricScene(
-            modifier = Modifier.weight(1f),
-            config = AdvancedSceneConfig(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(
                 gestures = GestureConfig(
                     onTap = {
                         val startTime = System.nanoTime()
@@ -128,10 +130,7 @@ fun OptimizedPerformanceSample() {
                         }
                         lastClickTime = System.currentTimeMillis()
                     }
-                ),
-                useNativeCanvas = useNativeCanvas,
-                enablePathCaching = true,
-                enableSpatialIndex = enableSpatialIndex
+                )
             )
         ) {
             ForEach(
@@ -214,6 +213,7 @@ fun OptimizedPerformanceSample() {
 fun PerformanceComparisonDemo() {
     var useOptimized by remember { mutableStateOf(true) }
     var wave by remember { mutableStateOf(0.0) }
+    val engine = remember { IsometricEngine() }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -243,24 +243,14 @@ fun PerformanceComparisonDemo() {
         if (useOptimized) {
             // Optimized version with all optimizations enabled
             IsometricScene(
-                modifier = Modifier.weight(1f),
-                config = AdvancedSceneConfig(
-                    useNativeCanvas = true,
-                    enablePathCaching = true,
-                    enableSpatialIndex = true
-                )
+                modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
                 LargeAnimatedGrid(wave)
             }
         } else {
-            // Standard version with optimizations disabled
+            // Standard version
             IsometricScene(
-                modifier = Modifier.weight(1f),
-                config = AdvancedSceneConfig(
-                    useNativeCanvas = false,
-                    enablePathCaching = false,
-                    enableSpatialIndex = false
-                )
+                modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
                 LargeAnimatedGrid(wave)
             }
@@ -294,15 +284,15 @@ fun PerformanceComparisonDemo() {
 
 @Composable
 private fun IsometricScope.LargeAnimatedGrid(wave: Double) {
-    ForEach((0..15).toList()) { x ->
-        ForEach((0..15).toList()) { y ->
+    ForEach((0..7).toList()) { x ->
+        ForEach((0..7).toList()) { y ->
             val height = 1.0 + sin(wave + x * 0.3 + y * 0.3) * 0.5
 
             Shape(
                 geometry = Prism(
                     position = Point(
-                        (x - 7.5) * 1.2,
-                        (y - 7.5) * 1.2,
+                        (x - 3.5) * 1.2,
+                        (y - 3.5) * 1.2,
                         0.0
                     ),
                     width = 1.0,
@@ -310,8 +300,8 @@ private fun IsometricScope.LargeAnimatedGrid(wave: Double) {
                     height = height
                 ),
                 color = IsoColor(
-                    (x / 15.0) * 255,
-                    (y / 15.0) * 255,
+                    (x / 7.0) * 255,
+                    (y / 7.0) * 255,
                     150.0
                 )
             )
