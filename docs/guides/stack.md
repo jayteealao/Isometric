@@ -1,0 +1,120 @@
+---
+title: Stack
+description: Arrange shapes in a line along a world axis with the Stack composable
+sidebar:
+  order: 2
+---
+
+`Stack` places `count` children at equal `gap` spacing along a chosen world axis. It replaces
+the manual `ForEach` pattern of multiplying an index by a step size, and composes naturally
+inside `TileGrid` content blocks and `Group` composables.
+
+## Basic Usage
+
+The default axis is `StackAxis.Z` (vertical) with a gap of `1.0` world unit. Each child
+receives its zero-based `index` in the content lambda and renders in its own local coordinate
+space — `Point.ORIGIN` is the child's slot origin.
+
+```kotlin
+@Composable
+fun BuildingScene() {
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Stack(count = 5, axis = StackAxis.Z, gap = 1.0) { floor ->
+            Shape(
+                geometry = Prism(Point.ORIGIN),
+                color = IsoColor(33, 150, floor * 40)
+            )
+        }
+    }
+}
+```
+
+## StackAxis
+
+| Value | Screen direction | Unit point |
+|-------|-----------------|------------|
+| `StackAxis.Z` | Vertical (upward) | `Point(0.0, 0.0, 1.0)` |
+| `StackAxis.X` | Right-and-forward | `Point(1.0, 0.0, 0.0)` |
+| `StackAxis.Y` | Left-and-forward | `Point(0.0, 1.0, 0.0)` |
+
+```kotlin
+// Eight columns spaced 1.5 world units along X
+Stack(count = 8, axis = StackAxis.X, gap = 1.5) { _ ->
+    Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(33, 150, 243))
+}
+
+// Five rows along Y
+Stack(count = 5, axis = StackAxis.Y, gap = 2.0) { _ ->
+    Shape(geometry = Pyramid(Point.ORIGIN), color = IsoColor(156, 39, 176))
+}
+```
+
+## Gap Validation
+
+`gap` must be non-zero and finite. Zero or `NaN`/infinite values throw `IllegalArgumentException`
+at runtime. Use a negative value to reverse direction instead of zero.
+
+## Positioning a Stack
+
+`Stack` places its first child at the current origin of its parent scope. Wrap it in a `Group`
+to shift that origin:
+
+```kotlin
+Group(position = Point(2.0, 3.0, 0.0)) {
+    Stack(count = 4, axis = StackAxis.Z, gap = 1.0) { floor ->
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(255, 160, 0))
+    }
+}
+```
+
+## Negative Gap
+
+A negative `gap` reverses the stacking direction. `axis = StackAxis.Z, gap = -1.0` stacks
+downward from world origin — useful for stalactites or objects hanging from a ceiling.
+
+```kotlin
+Stack(count = 3, axis = StackAxis.Z, gap = -1.0) { _ ->
+    Shape(geometry = Pyramid(Point.ORIGIN), color = IsoColor(150, 100, 200))
+}
+```
+
+## Nested Stacks
+
+Two `Stack` composables can nest to produce a 2D arrangement. For interactive uniform tile
+grids with tap routing, prefer `TileGrid`. Nested stacks suit fixed 2D layouts without tap
+handling:
+
+```kotlin
+// 3×4 arrangement of pillars
+Stack(count = 3, axis = StackAxis.X, gap = 2.0) { _ ->
+    Stack(count = 4, axis = StackAxis.Y, gap = 2.0) { _ ->
+        Shape(geometry = Prism(Point.ORIGIN, height = 3.0), color = IsoColor(180, 180, 180))
+    }
+}
+```
+
+## Stack inside TileGrid
+
+`Stack` composes naturally inside `TileGrid` content blocks, letting you build towers of
+varying height per tile:
+
+```kotlin
+TileGrid(width = 5, height = 5) { coord ->
+    val floors = coord.x + coord.y + 1
+    Stack(count = floors, axis = StackAxis.Z, gap = 1.0) { _ ->
+        Shape(geometry = Prism(Point.ORIGIN, height = 0.8), color = IsoColor(0, 188, 212))
+    }
+}
+```
+
+## Variable Spacing
+
+`Stack` only supports uniform gaps. For non-uniform spacing — items of varying size stacked
+flush — use `ForEach` with a running offset accumulator and explicit `Group` positioning.
+
+## See Also
+
+- [Tile Grid guide](tile-grid.md) — uniform interactive tile grids with tap routing
+- [Shapes guide](shapes.md) — built-in shape types
+- [Composables reference — Stack](../reference/composables.md#stack)
+- [Composables reference — Group](../reference/composables.md#group)

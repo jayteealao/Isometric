@@ -1,67 +1,59 @@
 plugins {
-    id("com.android.library")
-    kotlin("android")
-    id("app.cash.paparazzi") version "1.3.0"
+    id("isometric.android.library")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.paparazzi)
+    id("isometric.publishing")
 }
 
+group = "io.github.jayteealao"
+version = "1.1.0-SNAPSHOT"
+
 android {
-    namespace = "io.fabianterhorst.isometric.compose"
-    compileSdk = 34
-
-    defaultConfig {
-        minSdk = 24
-        targetSdk = 33
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
-    }
+    namespace = "io.github.jayteealao.isometric.compose"
 
     buildFeatures {
         compose = true
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"  // Compatible with Kotlin 1.9.10
+        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
+    }
+
+    defaultConfig {
+        consumerProguardFiles("consumer-rules.pro")
+    }
+}
+
+mavenPublishing {
+    coordinates(
+        groupId = "io.github.jayteealao",
+        artifactId = "isometric-compose",
+        version = version.toString()
+    )
+
+    pom {
+        name.set("Isometric Compose")
+        description.set("Jetpack Compose integration for the Isometric rendering engine")
     }
 }
 
 dependencies {
-    // Core module
+    // api (not implementation) because Shape, Point, IsoColor, Vector etc. appear in
+    // composable signatures — consumers need direct access to core types.
+    // Internal collaborators (SceneGraph, IsometricProjection, DepthSorter, HitTester)
+    // are marked internal and don't leak through api.
     api(project(":isometric-core"))
 
     // Compose
-    val composeVersion = "1.5.0"
-    implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.foundation:foundation:$composeVersion")
-    implementation("androidx.compose.runtime:runtime:$composeVersion")
-    implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.ui.tooling.preview)
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("com.google.truth:truth:1.1.3")
-    androidTestImplementation("androidx.test.ext:junit:1.1.4")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:$composeVersion")
+    testImplementation(libs.truth)
+    androidTestImplementation(libs.compose.ui.test.junit4)
 
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
-    debugImplementation("androidx.compose.ui:ui-test-manifest:$composeVersion")
+    debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

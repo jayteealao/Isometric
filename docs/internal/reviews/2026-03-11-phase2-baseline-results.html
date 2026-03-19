@@ -1,0 +1,3302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Isometric Renderer — Performance Benchmark Report</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
+
+:root {
+  --bg: #0c0e12;
+  --surface: #14171d;
+  --surface-2: #1a1e26;
+  --surface-3: #21262f;
+  --border: #2a3040;
+  --border-subtle: #1e2330;
+  --text: #e8eaf0;
+  --text-secondary: #8b92a0;
+  --text-tertiary: #5c6370;
+  --accent: #6c9bff;
+  --accent-dim: rgba(108,155,255,.12);
+  --green: #34d399;
+  --green-dim: rgba(52,211,153,.10);
+  --green-mid: rgba(52,211,153,.25);
+  --red: #f87171;
+  --red-dim: rgba(248,113,113,.10);
+  --red-mid: rgba(248,113,113,.25);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251,191,36,.10);
+  --amber-mid: rgba(251,191,36,.25);
+  --purple: #a78bfa;
+  --cyan: #22d3ee;
+
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Source Serif 4', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --shadow: 0 2px 16px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── layout ─── */
+.container { max-width: 1340px; margin: 0 auto; padding: 0 28px; }
+
+/* ─── nav ─── */
+.topnav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(12,14,18,.82);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 28px;
+}
+.topnav-inner {
+  max-width: 1340px; margin: 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  height: 52px; overflow-x: auto;
+}
+.topnav a {
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: color .15s, background .15s;
+}
+.topnav a:hover { color: var(--text); background: var(--surface-2); }
+.topnav .nav-label {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 6px 10px 6px 0;
+  border-right: 1px solid var(--border);
+  margin-right: 4px;
+}
+
+/* ─── hero ─── */
+.hero {
+  padding: 72px 0 48px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.hero-kicker {
+  font: 600 12px/1 var(--font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 18px;
+}
+.hero h1 {
+  font: 400 52px/1.08 var(--font-display);
+  color: var(--text);
+  max-width: 820px;
+  margin-bottom: 16px;
+}
+.hero-subtitle {
+  font: 300 20px/1.55 var(--font-body);
+  color: var(--text-secondary);
+  max-width: 680px;
+}
+.hero-meta {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-top: 28px;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 500 11.5px/1 var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+}
+.pill .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  display: inline-block;
+}
+.pill .dot.green { background: var(--green); }
+.pill .dot.amber { background: var(--amber); }
+.pill .dot.red { background: var(--red); }
+.pill .dot.blue { background: var(--accent); }
+
+/* ─── sections ─── */
+.section { padding: 56px 0; border-bottom: 1px solid var(--border-subtle); }
+.section:last-child { border-bottom: none; }
+.section-label {
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+.section-title {
+  font: 400 34px/1.15 var(--font-display);
+  margin-bottom: 8px;
+}
+.section-desc {
+  color: var(--text-secondary);
+  font-size: 16px;
+  max-width: 640px;
+  margin-bottom: 32px;
+}
+
+/* ─── scorecards ─── */
+.scorecards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.scorecard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+}
+.scorecard::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.scorecard.sc-green::before { background: var(--green); }
+.scorecard.sc-red::before { background: var(--red); }
+.scorecard.sc-amber::before { background: var(--amber); }
+.scorecard.sc-blue::before { background: var(--accent); }
+.scorecard.sc-purple::before { background: var(--purple); }
+.sc-label {
+  font: 600 11px/1.2 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 10px;
+}
+.sc-value {
+  font: 700 28px/1.15 var(--font-mono);
+  margin-bottom: 6px;
+}
+.sc-value.good { color: var(--green); }
+.sc-value.bad { color: var(--red); }
+.sc-value.warn { color: var(--amber); }
+.sc-value.neutral { color: var(--text); }
+.sc-note {
+  font: 400 13px/1.45 var(--font-body);
+  color: var(--text-secondary);
+}
+
+/* ─── cards ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 26px;
+}
+.card h3 {
+  font: 400 20px/1.25 var(--font-display);
+  margin-bottom: 10px;
+}
+.card p, .card li {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.card ul { padding-left: 18px; margin-top: 8px; }
+.card li { margin-bottom: 4px; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+/* ─── chart containers ─── */
+.chart-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 14px;
+}
+.chart-panel h3 {
+  font: 400 20px/1.25 var(--font-display);
+  margin-bottom: 4px;
+}
+.chart-panel .chart-desc {
+  font: 400 13px/1.45 var(--font-body);
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.chart-area { width: 100%; }
+.chart-area svg { width: 100%; display: block; }
+
+/* ─── legend ─── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  margin-bottom: 18px;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font: 500 12px/1 var(--font-mono);
+  color: var(--text-secondary);
+}
+.legend-swatch {
+  width: 12px; height: 12px; border-radius: 3px;
+}
+
+/* ─── tables ─── */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 13px/1.3 var(--font-mono);
+}
+.data-table th {
+  font-weight: 600;
+  text-align: right;
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  position: sticky; top: 0;
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.data-table th:first-child { text-align: left; }
+.data-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+.data-table td:first-child {
+  text-align: left;
+  color: var(--text);
+  font-weight: 500;
+}
+.data-table tbody tr:hover { background: var(--surface-2); }
+.data-table .good { color: var(--green); }
+.data-table .bad { color: var(--red); }
+.data-table .warn { color: var(--amber); }
+
+/* ─── banner / callout ─── */
+.callout {
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  border: 1px solid;
+  margin: 14px 0;
+}
+.callout.callout-amber {
+  background: var(--amber-dim);
+  border-color: rgba(251,191,36,.2);
+}
+.callout.callout-green {
+  background: var(--green-dim);
+  border-color: rgba(52,211,153,.2);
+}
+.callout.callout-red {
+  background: var(--red-dim);
+  border-color: rgba(248,113,113,.2);
+}
+.callout strong {
+  display: block;
+  font: 600 13px/1.3 var(--font-mono);
+  margin-bottom: 6px;
+}
+.callout p {
+  font: 400 14px/1.55 var(--font-body);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ─── branch status bar ─── */
+.branch-status {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.branch-chip {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-decoration: none;
+  transition: border-color .15s;
+}
+.branch-chip:hover { border-color: var(--text-tertiary); }
+.branch-chip.active { border-color: var(--accent); background: var(--accent-dim); }
+.branch-chip.pending { opacity: .55; }
+.branch-chip .bc-name {
+  font: 600 12px/1 var(--font-mono);
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.branch-chip .bc-status {
+  font: 500 11px/1 var(--font-mono);
+  display: flex; align-items: center; gap: 5px;
+}
+.branch-chip .bc-status .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* ─── heatmap ─── */
+.heatmap-grid {
+  display: grid;
+  gap: 3px;
+}
+.hm-cell {
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 11px/1 var(--font-mono);
+  padding: 10px 4px;
+  transition: transform .1s;
+  cursor: default;
+}
+.hm-cell:hover { transform: scale(1.06); z-index: 1; }
+.hm-header {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+}
+
+/* ─── tooltip ─── */
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 200;
+  background: #1a1e26;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: 400 12px/1.5 var(--font-mono);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  opacity: 0;
+  transition: opacity .12s;
+  max-width: 280px;
+}
+.tooltip.visible { opacity: 1; }
+.tooltip .tt-label { color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.tooltip .tt-value { font-weight: 600; }
+
+/* ─── responsive ─── */
+@media (max-width: 1100px) {
+  .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .branch-status { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .container { padding: 0 16px; }
+  .hero { padding: 48px 0 32px; }
+  .hero h1 { font-size: 28px; }
+  .hero-subtitle { font-size: 16px; }
+  .section { padding: 36px 0; }
+  .section-title { font-size: 26px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .branch-status { grid-template-columns: 1fr; }
+  .scorecards { grid-template-columns: 1fr; }
+  .topnav { padding: 0 12px; }
+  .topnav-inner { gap: 2px; }
+
+  /* Charts: horizontal scroll at readable size instead of squishing */
+  .chart-panel {
+    padding: 20px 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+  .chart-panel::after {
+    content: 'Swipe →';
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font: 500 10px/1 var(--font-mono);
+    color: var(--text-tertiary);
+    background: var(--surface-2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    opacity: .7;
+    pointer-events: none;
+  }
+  .chart-area {
+    min-width: 640px;
+  }
+
+  /* Heatmap: ensure cells stay readable */
+  .heatmap-grid { min-width: 420px; }
+  .hm-cell { padding: 14px 6px; font-size: 13px; }
+
+  /* Cards */
+  .card { padding: 18px 16px; }
+
+  /* Tables: smoother scroll */
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+}
+
+/* ─── print ─── */
+@media print {
+  .topnav { display: none; }
+  body { background: #fff; color: #111; }
+  .card, .chart-panel, .scorecard, .table-wrap { border-color: #ddd; background: #fff; }
+  .sc-label, .section-label { color: #666; }
+}
+</style>
+</head>
+<body>
+
+<div class="tooltip" id="tooltip"></div>
+
+<!-- ─── NAV ─── -->
+<nav class="topnav">
+  <div class="topnav-inner">
+    <span class="nav-label">Report</span>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#baseline">Baseline</a>
+    <a href="#prepared-scene-cache">Prepared Scene Cache</a>
+    <a href="#spatial-index">Spatial Index</a>
+    <a href="#broad-phase-sort">Broad-Phase Sort</a>
+    <a href="#path-caching">Path Caching</a>
+    <a href="#native-canvas">Native Canvas</a>
+    <a href="#methodology">Method</a>
+  </div>
+</nav>
+
+<main class="container">
+
+<!-- ═══════════════════════════════════════════════════════════
+     HERO
+     ═══════════════════════════════════════════════════════════ -->
+<section class="hero" id="top">
+  <div class="hero-kicker">Phase 3 — Performance Benchmark Report</div>
+  <h1>Isometric Renderer Branch Analysis</h1>
+  <p class="hero-subtitle">Systematic evaluation of five optimization branches against a common baseline. Each branch isolates a single flag so its contribution can be measured independently before combination.</p>
+  <div class="hero-meta">
+    <span class="pill"><span class="dot green"></span> 5 branches benchmarked</span>
+    <span class="pill">Device: SM-F956B</span>
+    <span class="pill">Android 34</span>
+    <span class="pill">Matrix: 24 scenarios</span>
+    <span class="pill">Baseline: 20260312-231000</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DASHBOARD
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="dashboard">
+  <div class="section-label">01</div>
+  <div class="section-title">Executive Dashboard</div>
+  <p class="section-desc">Branch status at a glance. Only branches with completed benchmark runs appear in the analysis below.</p>
+
+  <div class="branch-status">
+    <a href="#prepared-scene-cache" class="branch-chip active">
+      <div class="bc-name">Prepared Scene Cache</div>
+      <div class="bc-status" style="color:var(--green)"><span class="dot" style="background:var(--green)"></span> Net win</div>
+    </a>
+    <a href="#spatial-index" class="branch-chip active">
+      <div class="bc-name">Spatial Index</div>
+      <div class="bc-status" style="color:var(--amber)"><span class="dot" style="background:var(--amber)"></span> Mixed (partial)</div>
+    </a>
+    <a href="#broad-phase-sort" class="branch-chip active">
+      <div class="bc-name">Broad-Phase Sort</div>
+      <div class="bc-status" style="color:var(--green)"><span class="dot" style="background:var(--green)"></span> Strong win</div>
+    </a>
+    <a href="#path-caching" class="branch-chip active">
+      <div class="bc-name">Path Caching</div>
+      <div class="bc-status" style="color:var(--amber)"><span class="dot" style="background:var(--amber)"></span> Mixed</div>
+    </a>
+    <a href="#native-canvas" class="branch-chip active">
+      <div class="bc-name">Native Canvas</div>
+      <div class="bc-status" style="color:var(--red)"><span class="dot" style="background:var(--red)"></span> Net regression</div>
+    </a>
+  </div>
+
+  <div class="scorecards">
+    <div class="scorecard sc-green">
+      <div class="sc-label">Prepared Scene Cache</div>
+      <div class="sc-value good">−16.41ms</div>
+      <div class="sc-note">Average frame time improvement across 24 matrix rows. Strongest in large scenes under continuous interaction.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">−122.08ms</div>
+      <div class="sc-note">s200_m50_continuous — 54% reduction in frame time. Prepare, hit-test, and frame cost all improved.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Worst Regression</div>
+      <div class="sc-value bad">+2.26ms</div>
+      <div class="sc-note">s50_m10_none — small regression concentrated in the N=50 band where cache overhead exceeds benefit.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value neutral">15 / 24</div>
+      <div class="sc-note">62.5% of scenarios improved. All 9 regressions are under 3ms. 6 of 8 wins over 10ms are in N≥100.</div>
+    </div>
+    <div class="scorecard sc-purple">
+      <div class="sc-label">Decision</div>
+      <div class="sc-value neutral" style="font-size:20px">Keep in contention</div>
+      <div class="sc-note">Strong wins where baseline bottlenecks are worst. Stable-scene probe still needed for clean cache-reuse proof.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Spatial Index</div>
+      <div class="sc-value warn">−1.60ms</div>
+      <div class="sc-note">Partial run (23/24). Modest average improvement. Biggest win −13.67ms on s200_m50_occasional. Prepare savings, not hit-test.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Broad-Phase Sort</div>
+      <div class="sc-value good">−30.72ms</div>
+      <div class="sc-note">Strongest branch. Prepare time cut 50–69% at N≥100. All 24 rows improved or neutral. Zero regressions above noise.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">BPS Biggest Win</div>
+      <div class="sc-value good">−152.62ms</div>
+      <div class="sc-note">s200_m50_continuous — 68% frame time reduction. Both prepare (−74ms) and hit-test (−76ms) improved dramatically.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Path Caching</div>
+      <div class="sc-value warn">−4.82ms</div>
+      <div class="sc-note">Average frame improvement concentrated at N=200. Draw time cut 66% but draw is &lt;3% of frame budget. N=50 shows mild regressions.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">PC Draw Reduction</div>
+      <div class="sc-value neutral">−66%</div>
+      <div class="sc-note">Draw time dropped from 1.06ms to 0.36ms average. Validates expected signal but draw is not the frame-time bottleneck.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Native Canvas</div>
+      <div class="sc-value bad">+0.66ms</div>
+      <div class="sc-note">Net regression. Draw cut 46% but prepare worsened +3.4ms at N=100, negating savings. Only N=200 benefits.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BASELINE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="baseline">
+  <div class="section-label">02</div>
+  <div class="section-title">Baseline Profile</div>
+  <p class="section-desc">Where the renderer actually spends time before any optimization flag is enabled. Branch results only make sense against this cost structure.</p>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Self-Tests</div>
+      <div class="sc-value neutral">2 / 2 PASS</div>
+      <div class="sc-note">Harness validated on physical device.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Best Frame Time</div>
+      <div class="sc-value neutral">8.33ms</div>
+      <div class="sc-note">s10_m50_none — 120fps territory at N=10.</div>
+    </div>
+    <div class="scorecard sc-blue">
+      <div class="sc-label">Worst Frame Time</div>
+      <div class="sc-value bad">225.55ms</div>
+      <div class="sc-note">s200_m50_continuous — 27× slower than the best row.</div>
+    </div>
+  </div>
+
+  <!-- Baseline cost breakdown chart -->
+  <div class="chart-panel">
+    <h3>Cost breakdown by scene size</h3>
+    <p class="chart-desc">Average time per frame split into prepare, draw, and hit-test. The system is prepare-bound, not draw-bound — draw time is negligible at every scale.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="chart-baseline-cost"></div>
+  </div>
+
+  <!-- Baseline scaling chart -->
+  <div class="chart-panel">
+    <h3>Frame time scaling by scene size and interaction</h3>
+    <p class="chart-desc">Frame time grows superlinearly with scene size. Continuous interaction adds substantial overhead at N≥50 because hit-testing iterates the full scene.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> None</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--amber)"></span> Occasional</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--red)"></span> Continuous</span>
+    </div>
+    <div class="chart-area" id="chart-baseline-scaling"></div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <h3>Dominant cost: Prepare</h3>
+      <p>Average prepare time across NONE rows: <strong style="color:var(--text)">36.64ms</strong>. At N=200, prepare alone exceeds 100ms. This is the biggest lever for any optimization.</p>
+    </div>
+    <div class="card">
+      <h3>Secondary cost: Hit-test</h3>
+      <p>Under continuous interaction, hit-test averages <strong style="color:var(--text)">38.35ms</strong>. At N=200, hit-test reaches 106ms — comparable to prepare cost.</p>
+    </div>
+    <div class="card">
+      <h3>Not the bottleneck: Draw</h3>
+      <p>Average draw time across all rows: <strong style="color:var(--text)">1.19ms</strong>. Draw is consistently cheap. Branches targeting draw-time (path caching, native canvas) face a narrower ceiling.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PREPARED SCENE CACHE
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="prepared-scene-cache">
+  <div class="section-label">03</div>
+  <div class="section-title">Branch: Prepared Scene Cache</div>
+  <p class="section-desc">Skips <code style="color:var(--accent)">engine.prepare()</code> on frames where the node tree, viewport, render options, and lighting are unchanged. Only <code style="color:var(--accent)">enablePreparedSceneCache=true</code>; all other flags off.</p>
+
+  <div class="callout callout-amber" style="margin-bottom:24px">
+    <strong>Methodological caveat</strong>
+    <p>The current matrix uses non-zero mutation rates (0.10 and 0.50), which trigger cache invalidation. This proves the cache helps even under real invalidation pressure but does not replace the planned <code>mutationRate=0.0</code> stable-scene probe for clean cache-reuse proof.</p>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline). Green bars are improvements; red bars are regressions. Sorted by magnitude.</p>
+    <div class="chart-area" id="chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size × interaction pattern, averaged across mutation rates. Cell color intensity encodes magnitude of change.</p>
+    <div class="chart-area" id="chart-heatmap"></div>
+  </div>
+
+  <!-- By interaction pattern -->
+  <div class="chart-panel">
+    <h3>Analysis by interaction pattern</h3>
+    <p class="chart-desc">Continuous interaction shows the largest improvement because hit-test avoidance compounds with prepare savings.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="chart-by-interaction"></div>
+  </div>
+
+  <!-- By scene size -->
+  <div class="chart-panel">
+    <h3>Analysis by scene size</h3>
+    <p class="chart-desc">Gains scale with scene complexity. N=10 is noise-level. N=50 shows overhead. N=100 and N=200 show the real value.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="chart-by-size"></div>
+  </div>
+
+  <!-- Subsystem deltas -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Where the frame-time improvement actually comes from, broken down by prepare, draw, and hit-test deltas per interaction pattern.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. The x-axis shows frame time change; the y-axis shows allocation change. Points in the lower-left quadrant are pure wins (faster + less memory).</p>
+    <div class="chart-area" id="chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest regressions</h3>
+      <div class="table-wrap" id="table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-green" style="margin-top:24px">
+    <strong>Recommendation: Keep in contention</strong>
+    <p>The branch wins where the product needs help most — large scenes and continuous interaction. Average frame time improves by 16.4ms. The regressions are small (max +2.26ms), concentrated in mid-sized static scenes, and likely acceptable. Run the stable-scene probe next; if it confirms clean cache reuse, this is a strong merge candidate.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PENDING BRANCHES
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="spatial-index">
+  <div class="section-label">04</div>
+  <div class="section-title">Branch: Spatial Index</div>
+  <p class="section-desc">Replaces linear hit-test iteration with a spatial index for O(log N) lookups. Only <code style="color:var(--accent)">enableSpatialIndex=true</code>; all other flags off.</p>
+
+  <div class="callout callout-amber" style="margin-bottom:24px">
+    <strong>Partial run — 23 of 24 scenarios</strong>
+    <p>The <code>s200_m50_continuous</code> scenario is missing from this run. All analysis below covers the 23 matched scenarios only. The missing row is the heaviest baseline scenario (225ms frame time), so the full-matrix picture may change when the run completes.</p>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Avg Frame Delta</div>
+      <div class="sc-value warn">−1.60ms</div>
+      <div class="sc-note">Modest improvement across 23 matched rows. Much smaller than prepared-scene-cache (−16.4ms).</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">−13.67ms</div>
+      <div class="sc-note">s200_m50_occasional — driven by prepare savings, not hit-test reduction.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Worst Regression</div>
+      <div class="sc-value bad">+1.87ms</div>
+      <div class="sc-note">s50_m10_continuous — small regression in mid-size continuous interaction.</div>
+    </div>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline) for the 23 matched scenarios. Sorted by magnitude.</p>
+    <div class="chart-area" id="si-chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size × interaction pattern, averaged across mutation rates. The N=200 continuous cell is based on only one mutation rate (m10) due to the missing row.</p>
+    <div class="chart-area" id="si-chart-heatmap"></div>
+  </div>
+
+  <!-- By interaction pattern -->
+  <div class="chart-panel">
+    <h3>Analysis by interaction pattern</h3>
+    <p class="chart-desc">Unlike prepared-scene-cache, spatial index does not dramatically improve continuous interaction. The hit-test improvements are smaller than expected.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="si-chart-by-interaction"></div>
+  </div>
+
+  <!-- By scene size -->
+  <div class="chart-panel">
+    <h3>Analysis by scene size</h3>
+    <p class="chart-desc">Gains are concentrated at N=200 where prepare savings accumulate. N=10 and N=50 are near-neutral.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="si-chart-by-size"></div>
+  </div>
+
+  <!-- Subsystem deltas -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Prepare savings dominate. Hit-test improvement is surprisingly small — the spatial index may not be triggering the expected fast-path under this benchmark's interaction model.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="si-chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. Points in the lower-left quadrant are pure wins (faster + less memory).</p>
+    <div class="chart-area" id="si-chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="si-table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest regressions</h3>
+      <div class="table-wrap" id="si-table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison (23 matched rows)</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="si-table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-amber" style="margin-top:24px">
+    <strong>Recommendation: Mixed result, needs full run + investigation</strong>
+    <p>The spatial index shows modest frame-time improvement (−1.60ms avg) but the gains come from prepare savings, not hit-test reduction. This contradicts the hypothesis that spatial indexing would dominate continuous interaction cost. Complete the missing s200_m50_continuous row and investigate whether the spatial index fast-path is actually being used during hit-testing before making a final decision.</p>
+  </div>
+</section>
+
+<section class="section" id="broad-phase-sort">
+  <div class="section-label">05</div>
+  <div class="section-title">Branch: Broad-Phase Sort</div>
+  <p class="section-desc">Optimizes depth sorting during scene preparation by replacing the baseline sort with a broad-phase pre-sort. Only <code style="color:var(--accent)">enableBroadPhaseSort=true</code>; all other flags off.</p>
+
+  <div class="callout callout-green" style="margin-bottom:24px">
+    <strong>Strongest result so far — 30.72ms average improvement</strong>
+    <p>Broad-phase sort delivers the largest frame-time improvement of any branch tested. Prepare time drops 50% at N=100 and 69% at N=200. All 24 scenarios improved or held neutral. The 7 neutral rows are all N=10, where frame time is already at the vsync floor (~8.3ms).</p>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="scorecard sc-green">
+      <div class="sc-label">Avg Frame Delta</div>
+      <div class="sc-value good">−30.72ms</div>
+      <div class="sc-note">Massive improvement across all 24 rows. Nearly 2× the impact of prepared-scene-cache (−16.4ms).</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">−152.62ms</div>
+      <div class="sc-note">s200_m50_continuous — frame time drops from 225.5ms to 72.9ms (68% reduction).</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value good">17 / 24</div>
+      <div class="sc-note">70.8% clear wins. 7 neutral (N=10 vsync-floor). Zero regressions above noise.</div>
+    </div>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline). Green bars are improvements. The scale of improvement dwarfs previous branches — note the axis range compared to earlier charts.</p>
+    <div class="chart-area" id="bps-chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size × interaction pattern, averaged across mutation rates. The improvement gradient from N=10 to N=200 is steep, confirming algorithmic scaling gains.</p>
+    <div class="chart-area" id="bps-chart-heatmap"></div>
+  </div>
+
+  <!-- By interaction pattern -->
+  <div class="chart-panel">
+    <h3>Analysis by interaction pattern</h3>
+    <p class="chart-desc">All interaction patterns benefit substantially. Continuous interaction sees the largest absolute gain because prepare savings compound with reduced hit-test overlap.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="bps-chart-by-interaction"></div>
+  </div>
+
+  <!-- By scene size -->
+  <div class="chart-panel">
+    <h3>Analysis by scene size</h3>
+    <p class="chart-desc">The optimization scales superlinearly with scene complexity. N=200 sees 60%+ frame-time reduction while N=10 is unaffected (already at vsync floor).</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--text-secondary)"></span> Baseline</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+    </div>
+    <div class="chart-area" id="bps-chart-by-size"></div>
+  </div>
+
+  <!-- Subsystem deltas -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Prepare-time reduction dominates across all interaction patterns. Under continuous interaction, hit-test also improves significantly — likely because faster prepare reduces frame overlap with hit-test work.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="bps-chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. The broad-phase sort consistently reduces frame time with no systematic memory cost. Most points cluster in the faster-and-less-memory quadrant.</p>
+    <div class="chart-area" id="bps-chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="bps-table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Smallest changes (neutral)</h3>
+      <div class="table-wrap" id="bps-table-neutral"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="bps-table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-green" style="margin-top:24px">
+    <strong>Recommendation: Strong merge candidate</strong>
+    <p>Broad-phase sort is the highest-impact optimization measured so far. Average frame time improves by 30.7ms — nearly double the prepared-scene-cache gain. Prepare time drops 50% at N=100 and 69% at N=200. There are zero regressions. The improvement is purely algorithmic (no memory tradeoff). This branch should be prioritized for merge and serves as the new performance baseline for combination testing.</p>
+  </div>
+</section>
+
+<section class="section" id="path-caching">
+  <div class="section-label">06</div>
+  <div class="section-title">Branch: Path Caching</div>
+  <p class="section-desc">Pre-converts <code style="color:var(--accent)">RenderCommand</code> polygons into Compose Path objects. Trades prepare-time increase for draw-time reduction. Rebuilds every frame without scene caching.</p>
+
+  <div class="scorecards" style="margin-bottom:14px">
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Average Frame &Delta;</div>
+      <div class="sc-value warn">&minus;4.82ms</div>
+      <div class="sc-note">Improvement concentrated at N=200 where prepare + draw savings compound. N=50 shows small regressions.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">&minus;39.18ms</div>
+      <div class="sc-note">s200_m50_continuous &mdash; 17% frame time reduction. Prepare improved 18ms, draw improved 1.8ms.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Draw Time Reduction</div>
+      <div class="sc-value good">&minus;66%</div>
+      <div class="sc-note">Draw time cut from 1.06ms to 0.36ms average. Consistent across all scene sizes. Validates the expected signal.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value warn">8 / 24</div>
+      <div class="sc-note">33% of scenarios improved. 7 regressions (all under 3ms). 9 neutral at vsync floor. All wins are at N&ge;100.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-amber" style="margin-bottom:24px">
+    <strong>Expected signal confirmed &mdash; but draw is not the bottleneck</strong>
+    <p>Draw time dropped 66% exactly as predicted. However, draw accounts for &lt;3% of total frame time at every scale, so the savings alone barely move the needle. The unexpected result is a ~13ms prepare-time improvement at N=200, which is the actual source of frame-time gains at that scale.</p>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline). Green bars are improvements. Gains are concentrated at N=200; N=50 rows show mild regressions from path-cache overhead.</p>
+    <div class="chart-area" id="pc-chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size &times; interaction pattern, averaged across mutation rates. N=200 benefits substantially under all interaction patterns. Smaller scenes see negligible change or mild regression.</p>
+    <div class="chart-area" id="pc-chart-heatmap"></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="chart-panel">
+      <h3>Analysis by interaction pattern</h3>
+      <p class="chart-desc">Continuous interaction sees the largest improvement because hit-test time is slightly reduced alongside draw savings.</p>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> Baseline</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+      </div>
+      <div class="chart-area" id="pc-chart-by-interaction"></div>
+    </div>
+    <div class="chart-panel">
+      <h3>Analysis by scene size</h3>
+      <p class="chart-desc">Only N=200 shows meaningful frame-time improvement. N=50 is slightly worse. N=10 is at the vsync floor and unaffected.</p>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> Baseline</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+      </div>
+      <div class="chart-area" id="pc-chart-by-size"></div>
+    </div>
+  </div>
+
+  <!-- Subsystem impact -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Draw time is consistently reduced across all interaction patterns &mdash; this is the expected signal. Prepare shows modest improvement at scale. Hit-test is essentially unchanged.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="pc-chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. Path caching adds modest memory overhead from cached Path objects. N=200 points cluster in the faster-and-slightly-more-memory quadrant.</p>
+    <div class="chart-area" id="pc-chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="pc-table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Regressions</h3>
+      <div class="table-wrap" id="pc-table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="pc-table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-amber" style="margin-top:24px">
+    <strong>Recommendation: Low-priority merge &mdash; value unlocked in combination</strong>
+    <p>Path caching delivers its promised draw-time reduction (66%) but draw was never the bottleneck. Standalone frame-time impact is modest (&minus;4.82ms avg) and concentrated at N=200 where an unexpected prepare-time improvement (&minus;12.91ms) is the real driver. No regression exceeds 3ms. Its value increases when combined with broad-phase-sort: once prepare time is cut, draw&rsquo;s share of frame time rises and the 66% draw reduction becomes more impactful. Merge after broad-phase-sort, not before.</p>
+  </div>
+</section>
+
+<section class="section" id="native-canvas">
+  <div class="section-label">07</div>
+  <div class="section-title">Branch: Native Canvas</div>
+  <p class="section-desc">Renders through <code style="color:var(--accent)">android.graphics.Canvas</code> instead of Compose DrawScope. Android-only path that bypasses Compose draw overhead.</p>
+
+  <div class="scorecards" style="margin-bottom:14px">
+    <div class="scorecard sc-red">
+      <div class="sc-label">Average Frame &Delta;</div>
+      <div class="sc-value bad">+0.66ms</div>
+      <div class="sc-note">Net regression across 24 scenarios. Draw improvements are fully negated by prepare-time increases at N=50&ndash;100.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Biggest Win</div>
+      <div class="sc-value good">&minus;10.17ms</div>
+      <div class="sc-note">s200_m50_continuous &mdash; 4.5% frame reduction. All 6 wins are concentrated at N=200.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">Draw Time Reduction</div>
+      <div class="sc-value good">&minus;46%</div>
+      <div class="sc-note">Draw cut from 1.06ms to 0.58ms average. The expected signal is confirmed but it does not translate to frame wins.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value bad">6 / 24</div>
+      <div class="sc-note">25% &mdash; weakest branch. 10 regressions, worst +9.09ms at s100_m50_continuous. All wins are N=200.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-red" style="margin-bottom:24px">
+    <strong>Expected signal confirmed &mdash; but prepare regression dominates</strong>
+    <p>Draw time dropped 46% via the android.graphics.Canvas path. However, prepare time increased by 3.4ms at N=100, likely from additional interop overhead between Compose and native canvas layers. At N=200 the draw savings (~1.2ms) plus a modest prepare improvement (~3.4ms) produce net frame wins, but at all other sizes the prepare regression exceeds draw savings.</p>
+  </div>
+
+  <!-- Delta waterfall -->
+  <div class="chart-panel">
+    <h3>Frame time change by scenario</h3>
+    <p class="chart-desc">Each bar shows the frame-time delta (branch minus baseline). Red bars are regressions. N=100 rows show the worst regressions; only N=200 rows are green.</p>
+    <div class="chart-area" id="nc-chart-delta-waterfall"></div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-panel">
+    <h3>Frame time delta heatmap</h3>
+    <p class="chart-desc">Scene size &times; interaction pattern, averaged across mutation rates. N=100 is clearly worse under all interaction patterns. N=200 is the only consistent winner.</p>
+    <div class="chart-area" id="nc-chart-heatmap"></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="chart-panel">
+      <h3>Analysis by interaction pattern</h3>
+      <p class="chart-desc">All interaction patterns show net regression due to the N=50&ndash;100 prepare penalty outweighing draw savings.</p>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> Baseline</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+      </div>
+      <div class="chart-area" id="nc-chart-by-interaction"></div>
+    </div>
+    <div class="chart-panel">
+      <h3>Analysis by scene size</h3>
+      <p class="chart-desc">N=100 is clearly the worst size for native canvas. N=200 is the only size with net improvement.</p>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--text-tertiary)"></span> Baseline</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--green)"></span> Branch</span>
+      </div>
+      <div class="chart-area" id="nc-chart-by-size"></div>
+    </div>
+  </div>
+
+  <!-- Subsystem impact -->
+  <div class="chart-panel">
+    <h3>Subsystem impact</h3>
+    <p class="chart-desc">Draw is consistently reduced (the expected signal). But prepare increases under all interaction patterns &mdash; the native canvas interop adds overhead that the draw savings cannot offset.</p>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#6c9bff"></span> Prepare</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#a78bfa"></span> Draw</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#22d3ee"></span> Hit-test</span>
+    </div>
+    <div class="chart-area" id="nc-chart-subsystem"></div>
+  </div>
+
+  <!-- Memory tradeoff -->
+  <div class="chart-panel">
+    <h3>Memory and GC tradeoff</h3>
+    <p class="chart-desc">Each point is one scenario. Points are scattered across all quadrants with no clear pattern &mdash; native canvas does not offer a systematic memory advantage.</p>
+    <div class="chart-area" id="nc-chart-tradeoff"></div>
+  </div>
+
+  <!-- Scenario tables -->
+  <div class="grid-2" style="margin-top:14px">
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Biggest wins</h3>
+      <div class="table-wrap" id="nc-table-wins"></div>
+    </div>
+    <div>
+      <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Worst regressions</h3>
+      <div class="table-wrap" id="nc-table-regressions"></div>
+    </div>
+  </div>
+
+  <!-- Full comparison table -->
+  <div style="margin-top:24px">
+    <h3 style="font:400 20px/1.25 var(--font-display);margin-bottom:12px">Full matrix comparison</h3>
+    <div class="table-wrap" style="max-height:600px;overflow:auto" id="nc-table-full"></div>
+  </div>
+
+  <!-- Recommendation -->
+  <div class="callout callout-red" style="margin-top:24px">
+    <strong>Recommendation: Do not merge</strong>
+    <p>Native canvas is a net regression (+0.66ms avg frame time). The 46% draw reduction is real but irrelevant because draw is not the frame-time bottleneck, and the prepare-time increase at N=50&ndash;100 more than cancels it. The branch also adds Android-only platform coupling. Path caching achieves a larger draw reduction (66% vs 46%) without the prepare penalty. Native canvas should be shelved.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SYNTHESIS
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="synthesis">
+  <div class="section-label">08</div>
+  <div class="section-title">Cross-Branch Synthesis</div>
+  <p class="section-desc">All five branches benchmarked. This section ranks them by frame-time impact, analyzes where the gains actually come from, and maps memory and GC tradeoffs across the full matrix.</p>
+
+  <!-- Ranking scorecards -->
+  <div class="scorecards" style="margin-bottom:24px">
+    <div class="scorecard sc-green">
+      <div class="sc-label">1st &mdash; Broad-Phase Sort</div>
+      <div class="sc-value good">&minus;30.72ms</div>
+      <div class="sc-note">Strongest branch by a wide margin. 17/24 wins, zero regressions. Prepare cut 50&ndash;69% at N&ge;100. Purely algorithmic &mdash; no memory cost. Merge first.</div>
+    </div>
+    <div class="scorecard sc-green">
+      <div class="sc-label">2nd &mdash; Prepared Scene Cache</div>
+      <div class="sc-value good">&minus;16.41ms</div>
+      <div class="sc-note">15/24 wins. Biggest win &minus;122ms. Cache-based prepare savings compound with interaction. Complementary to BPS. Merge second.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">3rd &mdash; Path Caching</div>
+      <div class="sc-value warn">&minus;4.82ms</div>
+      <div class="sc-note">8/24 wins, all at N&ge;100. Draw cut 66% but draw is &lt;3% of frame budget. Value unlocked after BPS reduces prepare. Merge third.</div>
+    </div>
+    <div class="scorecard sc-amber">
+      <div class="sc-label">4th &mdash; Spatial Index</div>
+      <div class="sc-value warn">&minus;1.60ms</div>
+      <div class="sc-note">Partial run (23/24). Modest improvement. Biggest win &minus;13.67ms on N=200 occasional. Re-evaluate after complete run.</div>
+    </div>
+    <div class="scorecard sc-red">
+      <div class="sc-label">5th &mdash; Native Canvas</div>
+      <div class="sc-value bad">+0.66ms</div>
+      <div class="sc-note">Net regression. Draw cut 46% but prepare worsened. 10/24 regressions, worst +9.09ms. Shelve.</div>
+    </div>
+  </div>
+
+  <!-- Frame gains analysis -->
+  <div class="chart-panel">
+    <h3>Where the frame-time gains come from</h3>
+    <p class="chart-desc">The renderer is prepare-bound, not draw-bound. Branches that reduce prepare time produce frame-time wins; branches that only reduce draw time do not. This is the single most important finding across all five branches.</p>
+    <div class="chart-area" id="synth-chart-subsystem"></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="card">
+      <h3>Frame-time gains are prepare-driven</h3>
+      <p>The baseline spends <strong>36.6ms</strong> in prepare vs <strong>1.2ms</strong> in draw on average. Prepare is 30&times; larger than draw. This means:</p>
+      <ul>
+        <li><strong>Broad-phase sort</strong> wins because it cuts prepare by 50&ndash;69% at scale &mdash; the largest lever in the system.</li>
+        <li><strong>Prepared-scene-cache</strong> wins because it eliminates redundant prepare work across frames.</li>
+        <li><strong>Path caching</strong> and <strong>native canvas</strong> both cut draw 46&ndash;66%, but draw is only 1.2ms &mdash; cutting it in half saves 0.6ms, invisible next to a 30ms prepare improvement.</li>
+      </ul>
+      <p style="margin-top:8px">The conclusion is clear: <strong>optimize prepare first, draw later</strong>. Draw-focused branches only become impactful after prepare has been reduced enough to change the cost balance.</p>
+    </div>
+    <div class="card">
+      <h3>Scaling behavior at N=200</h3>
+      <p>All branches except native canvas improve frame time at N=200. The improvement gradient is steep:</p>
+      <ul>
+        <li><strong>BPS</strong>: &minus;73.5ms avg at N=200 (dominant)</li>
+        <li><strong>PSC</strong>: &minus;52.1ms avg at N=200</li>
+        <li><strong>Path caching</strong>: &minus;20.9ms avg at N=200</li>
+        <li><strong>Spatial index</strong>: &minus;5.7ms avg at N=200 (partial)</li>
+        <li><strong>Native canvas</strong>: &minus;5.7ms avg at N=200</li>
+      </ul>
+      <p style="margin-top:8px">At N=10, all branches converge to the vsync floor (8.33ms) &mdash; there is no optimization opportunity below the display refresh boundary.</p>
+    </div>
+  </div>
+
+  <!-- Memory and GC analysis -->
+  <div class="chart-panel">
+    <h3>Memory allocation across all branches</h3>
+    <p class="chart-desc">Average allocation delta (branch minus baseline) for each branch, broken down by scene size. Positive means more memory used. None of the branches show systematic allocation inflation &mdash; the dominant cost driver is algorithmic, not memory.</p>
+    <div class="chart-area" id="synth-chart-alloc"></div>
+  </div>
+
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="card">
+      <h3>Memory allocation wins</h3>
+      <p>No branch introduces a dramatic memory penalty:</p>
+      <ul>
+        <li><strong>Broad-phase sort</strong>: &minus;0.3MB average &mdash; <em>reduces</em> allocation slightly due to fewer sort operations per frame.</li>
+        <li><strong>Prepared scene cache</strong>: &minus;0.8MB average &mdash; cache reuse eliminates repeated allocation.</li>
+        <li><strong>Path caching</strong>: +1.1MB average &mdash; modest cost from cached Path objects. Acceptable tradeoff for draw savings.</li>
+        <li><strong>Spatial index</strong>: +0.2MB average &mdash; essentially neutral.</li>
+        <li><strong>Native canvas</strong>: +0.4MB average &mdash; slight interop cost.</li>
+      </ul>
+      <p style="margin-top:8px">The key insight: <strong>prepare-focused optimizations tend to reduce allocations</strong> because they eliminate redundant object creation. Draw-focused optimizations tend to add modest allocation from caching.</p>
+    </div>
+    <div class="card">
+      <h3>GC reduction</h3>
+      <p>Garbage collection count is dominated by frame count and allocation churn, not optimization choice:</p>
+      <ul>
+        <li><strong>Broad-phase sort</strong>: &minus;32% GC count average &mdash; the largest reduction. Fewer prepare iterations means fewer temporary allocations and fewer GC triggers.</li>
+        <li><strong>Prepared scene cache</strong>: &minus;14% GC count average &mdash; cache reuse reduces churn.</li>
+        <li><strong>Path caching</strong>: +3% &mdash; slight increase from cache management overhead.</li>
+        <li><strong>Spatial index</strong>: +5% &mdash; minor increase from index maintenance.</li>
+        <li><strong>Native canvas</strong>: &minus;1% &mdash; essentially neutral.</li>
+      </ul>
+      <p style="margin-top:8px"><strong>BPS achieves the largest GC reduction</strong> because it directly reduces the number of iterations in the prepare loop, which is the main source of temporary object allocation.</p>
+    </div>
+  </div>
+
+  <!-- Merge order recommendation -->
+  <div class="callout callout-green" style="margin-top:24px">
+    <strong>Recommended merge order</strong>
+    <p><strong>1. Broad-phase sort</strong> &mdash; highest impact (&minus;30.7ms), zero regressions, reduces prepare + GC, purely algorithmic. Merge immediately.<br>
+    <strong>2. Prepared scene cache</strong> &mdash; complementary to BPS. Cache reuse removes redundant prepare work that BPS makes cheaper but doesn&rsquo;t eliminate.<br>
+    <strong>3. Path caching</strong> &mdash; draw-time value unlocked after BPS + PSC reduce prepare. When prepare is no longer 95% of frame time, the 66% draw reduction becomes meaningful.<br>
+    <strong>4. Spatial index</strong> &mdash; needs complete 24-row run before decision. Current partial results are modestly positive.<br>
+    <strong>5. Native canvas</strong> &mdash; shelve. Path caching achieves a better draw reduction (66% vs 46%) without the prepare penalty. No path to standalone merge.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     METHODOLOGY
+     ═══════════════════════════════════════════════════════════ -->
+<section class="section" id="methodology">
+  <div class="section-label">09</div>
+  <div class="section-title">Methodology and Artifacts</div>
+  <p class="section-desc">How results were produced and where the raw data lives.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Comparison design</h3>
+      <ul>
+        <li>Baseline: all optimization flags <code>false</code></li>
+        <li>Branch: only the single target flag set <code>true</code></li>
+        <li>Same physical device (SM-F956B), same Android 34, same harness, same 24-scenario matrix</li>
+        <li>Self-tests validated in both runs</li>
+        <li>Matrix: 4 scene sizes × 2 mutation rates × 3 interaction patterns</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Reading guide</h3>
+      <ul>
+        <li><strong style="color:var(--text)">avgFrameMs</strong> — primary decision metric (product-visible)</li>
+        <li><strong style="color:var(--text)">avgPrepareMs</strong> — subsystem diagnosis for scene prep</li>
+        <li><strong style="color:var(--text)">avgHitTestMs</strong> — subsystem diagnosis for interaction</li>
+        <li><strong style="color:var(--text)">allocatedMB / gcInvocations</strong> — cost-shifting indicators</li>
+        <li><strong style="color:var(--text)">p95 / p99</strong> — tail latency when jank matters</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>Artifact references</h3>
+    <ul>
+      <li>Baseline CSV: <code style="color:var(--accent)">benchmark-results/20260312-231000-baseline-refresh/.../summary.csv</code></li>
+      <li>Prepared-scene-cache CSV: <code style="color:var(--accent)">benchmark-results/20260313-095306-prepared-scene-cache/.../summary.csv</code></li>
+      <li>Spatial-index CSV: <code style="color:var(--accent)">benchmark-results/20260313-142728-spatial-index/.../summary.csv</code></li>
+      <li>Broad-phase-sort CSV: <code style="color:var(--accent)">benchmark-results/20260314-115121-broad-phase-sort/.../summary.csv</code></li>
+      <li>Path-caching CSV: <code style="color:var(--accent)">benchmark-results/20260314-150241-path-caching/.../summary.csv</code></li>
+      <li>Native-canvas CSV: <code style="color:var(--accent)">benchmark-results/20260314-174116-native-canvas/.../summary.csv</code></li>
+      <li>Report design guide: <code style="color:var(--accent)">docs/plans/2026-03-13-benchmark-report-design.md</code></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+const baseline = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.8462,draw:0.3699,frame:8.3401,hit:0,alloc:9.17,gc:72,cache:0},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:1.9267,draw:0.3317,frame:8.3363,hit:0.0394,alloc:9.21,gc:145,cache:0},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.5327,draw:0.2735,frame:8.3381,hit:1.6093,alloc:9.68,gc:279,cache:0},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.0654,draw:0.3655,frame:8.3347,hit:0,alloc:10.32,gc:351,cache:0},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:1.7779,draw:0.3175,frame:8.3388,hit:0.036,alloc:7.92,gc:425,cache:0},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.4864,draw:0.2698,frame:8.3374,hit:1.5422,alloc:9.12,gc:560,cache:0},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:7.1002,draw:0.4519,frame:8.9585,hit:0,alloc:17.25,gc:1018,cache:0},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:9.2697,draw:0.6222,frame:11.817,hit:0.1764,alloc:15.09,gc:1535,cache:0},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:9.8492,draw:0.6729,frame:23.6103,hit:10.3954,alloc:12.73,gc:2590,cache:0},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:9.6277,draw:0.6438,frame:12.3932,hit:0,alloc:8.45,gc:3136,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:9.6567,draw:0.6595,frame:12.5727,hit:0.1828,alloc:9.67,gc:3659,cache:0},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.3528,draw:0.7046,frame:25.4735,hit:11.1374,alloc:16.1,gc:4714,cache:0},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:35.4177,draw:1.4267,frame:39.8387,hit:0,alloc:9.05,gc:6242,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:35.7028,draw:1.4716,frame:41.0627,hit:0.666,alloc:9.77,gc:7802,cache:0},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:36.0763,draw:1.4293,frame:77.5381,hit:35.7603,alloc:20.63,gc:10889,cache:0},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:37.1022,draw:1.4553,frame:42.5213,hit:0,alloc:9.48,gc:12552,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:36.0194,draw:1.4471,frame:42.2821,hit:0.6689,alloc:9.85,gc:14111,cache:0},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:37.7312,draw:1.58,frame:81.9583,hit:37.5431,alloc:6.13,gc:17181,cache:0},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:97.135,draw:2.4155,frame:105.1487,hit:0,alloc:24.37,gc:20430,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:94.9409,draw:2.3847,frame:104.6724,hit:1.7163,alloc:17.04,gc:23739,cache:0},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:101.1354,draw:2.524,frame:212.4941,hit:102.0609,alloc:25,gc:29810,cache:0},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:102.8262,draw:2.4895,frame:113.6884,hit:0,alloc:17.88,gc:32969,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:104.7177,draw:2.5474,frame:117.8795,hit:1.8933,alloc:14.16,gc:36192,cache:0},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:106.016,draw:2.5526,frame:225.545,hit:106.7288,alloc:18.37,gc:42338,cache:0}
+];
+
+const branch = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.0634,draw:0.3033,frame:8.3621,hit:0,alloc:9.61,gc:50,cache:0.324},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:1.4715,draw:0.3723,frame:8.332,hit:0.0378,alloc:8.74,gc:101,cache:0.336},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.4584,draw:0.3746,frame:8.335,hit:1.6387,alloc:9.35,gc:154,cache:0.662},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:1.8908,draw:0.3294,frame:8.3373,hit:0,alloc:9.71,gc:226,cache:0.004},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.0267,draw:0.355,frame:8.3398,hit:0.0332,alloc:8.57,gc:298,cache:0.0216},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.7314,draw:0.3133,frame:8.3412,hit:1.8509,alloc:9.67,gc:373,cache:0.502},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:8.8649,draw:0.5773,frame:11.2204,hit:0,alloc:16.67,gc:1010,cache:0.002},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:10.7036,draw:0.7067,frame:13.4327,hit:0.1386,alloc:16.29,gc:1673,cache:0.0196},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:10.6817,draw:0.7283,frame:13.837,hit:5.9003,alloc:13.99,gc:2367,cache:0.501},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.6334,draw:0.7434,frame:13.7841,hit:0,alloc:7.65,gc:3054,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:10.735,draw:0.7553,frame:14.0305,hit:0.0894,alloc:15.99,gc:3745,cache:0.0177},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.5005,draw:0.739,frame:14.1438,hit:5.931,alloc:16.04,gc:4509,cache:0.5},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:35.4142,draw:1.5153,frame:40.4382,hit:0,alloc:9,gc:6050,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:34.5595,draw:1.5015,frame:39.8104,hit:0.45,alloc:23.56,gc:7572,cache:0.0177},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:32.5881,draw:1.4153,frame:38.5931,hit:18.9479,alloc:24.31,gc:9102,cache:0.5},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:33.0028,draw:1.4814,frame:38.8253,hit:0,alloc:9.9,gc:10631,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:33.798,draw:1.5665,frame:40.1182,hit:0.4886,alloc:8.02,gc:12295,cache:0.0177},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:34.6508,draw:1.3233,frame:41.1077,hit:35.2544,alloc:6.22,gc:13879,cache:0.5},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:85.121,draw:2.1178,frame:92.2273,hit:0,alloc:12.81,gc:17039,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:87.3795,draw:2.1936,frame:94.8177,hit:0.9731,alloc:20.18,gc:20210,cache:0.0177},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:91.8192,draw:2.2621,frame:100.7301,hit:28.3586,alloc:16.19,gc:23405,cache:0.5},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:88.956,draw:2.2417,frame:98.4954,hit:0,alloc:13.3,gc:26515,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:87.2209,draw:2.2345,frame:96.4757,hit:1.5881,alloc:11.72,gc:29591,cache:0.0177},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:92.4338,draw:2.2096,frame:103.461,hit:64.5118,alloc:29.16,gc:32674,cache:0.5}
+];
+
+// ═══════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════
+const COL = {
+  prepare: '#6c9bff',
+  draw: '#a78bfa',
+  hit: '#22d3ee',
+  green: '#34d399',
+  red: '#f87171',
+  amber: '#fbbf24',
+  muted: '#5c6370',
+  text: '#e8eaf0',
+  textSec: '#8b92a0',
+  bg: '#14171d',
+  border: '#2a3040',
+  greenDim: 'rgba(52,211,153,.12)',
+  redDim: 'rgba(248,113,113,.12)',
+};
+
+function fmt(v, decimals=2) {
+  if (Math.abs(v) < 0.01) return '0.00';
+  return v.toFixed(decimals);
+}
+function fmtDelta(v) {
+  const s = v >= 0 ? '+' : '';
+  return s + fmt(v);
+}
+function deltaColor(v) { return v <= -0.5 ? COL.green : v >= 0.5 ? COL.red : COL.muted; }
+function deltaCellClass(v) { return v <= -0.5 ? 'good' : v >= 0.5 ? 'bad' : ''; }
+
+function svgEl(tag, attrs={}, text='') {
+  const ns = 'http://www.w3.org/2000/svg';
+  const el = document.createElementNS(ns, tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text) el.textContent = text;
+  return el;
+}
+
+function makeSVG(w, h) {
+  const svg = svgEl('svg', { viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'xMidYMid meet' });
+  svg.style.width = '100%';
+  svg.style.height = 'auto';
+  return svg;
+}
+
+// tooltip
+const ttEl = document.getElementById('tooltip');
+function showTooltip(e, html) {
+  ttEl.innerHTML = html;
+  ttEl.classList.add('visible');
+  const r = ttEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + r.width > window.innerWidth - 10) x = e.clientX - r.width - 14;
+  if (y + r.height > window.innerHeight - 10) y = e.clientY - r.height - 10;
+  ttEl.style.left = x + 'px';
+  ttEl.style.top = y + 'px';
+}
+function hideTooltip() { ttEl.classList.remove('visible'); }
+
+// groupBy helper
+function groupBy(arr, fn) {
+  const m = {};
+  arr.forEach(d => { const k = fn(d); (m[k] = m[k] || []).push(d); });
+  return m;
+}
+function avg(arr, fn) { return arr.reduce((s,d) => s + fn(d), 0) / arr.length; }
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Baseline cost breakdown
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const rows = [];
+
+  sizes.forEach(sz => {
+    ips.forEach(ip => {
+      const group = baseline.filter(d => d.size === sz && d.ip === ip);
+      rows.push({
+        label: `N=${sz} ${ip.toLowerCase()}`,
+        prepare: avg(group, d => d.prepare),
+        draw: avg(group, d => d.draw),
+        hit: avg(group, d => d.hit),
+      });
+    });
+  });
+
+  const W = 900, barH = 22, gap = 5, labelW = 180, padR = 80, padT = 10;
+  const H = padT + rows.length * (barH + gap) + 10;
+  const maxVal = Math.max(...rows.map(r => r.prepare + r.draw + r.hit));
+  const barW = W - labelW - padR;
+  const scale = v => (v / maxVal) * barW;
+
+  const svg = makeSVG(W, H);
+
+  rows.forEach((r, i) => {
+    const y = padT + i * (barH + gap);
+    const total = r.prepare + r.draw + r.hit;
+
+    // label
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, r.label));
+
+    // stacked bars
+    let x = labelW;
+    [{v: r.prepare, c: COL.prepare, l:'Prepare'}, {v: r.draw, c: COL.draw, l:'Draw'}, {v: r.hit, c: COL.hit, l:'Hit-test'}].forEach(seg => {
+      if (seg.v > 0.01) {
+        const w = scale(seg.v);
+        const rect = svgEl('rect', { x, y, width: Math.max(w, 1), height: barH, fill: seg.c, rx: 3, opacity: 0.85 });
+        rect.addEventListener('mousemove', e => showTooltip(e,
+          `<span class="tt-label">${r.label}</span><br><span class="tt-value">${seg.l}: ${fmt(seg.v)}ms</span><br>Total: ${fmt(total)}ms`));
+        rect.addEventListener('mouseleave', hideTooltip);
+        svg.appendChild(rect);
+        x += w;
+      }
+    });
+
+    // total label
+    svg.appendChild(svgEl('text', { x: x + 8, y: y + barH/2 + 4, fill: COL.textSec,
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, fmt(total) + 'ms'));
+  });
+
+  document.getElementById('chart-baseline-cost').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Baseline scaling
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const ipColors = { NONE: COL.muted, OCCASIONAL: COL.amber, CONTINUOUS: COL.red };
+
+  const W = 900, H = 300, padL = 60, padR = 30, padT = 20, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+
+  const grouped = {};
+  ips.forEach(ip => {
+    grouped[ip] = sizes.map(sz => {
+      const rows = baseline.filter(d => d.size === sz && d.ip === ip);
+      return { size: sz, frame: avg(rows, d => d.frame) };
+    });
+  });
+
+  const maxFrame = Math.max(...Object.values(grouped).flat().map(d => d.frame));
+  const scaleX = i => padL + (i / (sizes.length - 1)) * chartW;
+  const scaleY = v => padT + chartH - (v / maxFrame) * chartH;
+
+  const svg = makeSVG(W, H);
+
+  // grid
+  [0, 50, 100, 150, 200].forEach(v => {
+    if (v > maxFrame) return;
+    const y = scaleY(v);
+    svg.appendChild(svgEl('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: COL.border, 'stroke-width': 1 }));
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + 4, 'text-anchor': 'end',
+      fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, v + 'ms'));
+  });
+
+  // x labels
+  sizes.forEach((sz, i) => {
+    svg.appendChild(svgEl('text', { x: scaleX(i), y: H - 10, 'text-anchor': 'middle',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, 'N=' + sz));
+  });
+
+  // lines
+  ips.forEach(ip => {
+    const pts = grouped[ip];
+    const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(p.frame)}`).join(' ');
+    svg.appendChild(svgEl('path', { d: path, fill: 'none', stroke: ipColors[ip], 'stroke-width': 2.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+
+    pts.forEach((p, i) => {
+      const circle = svgEl('circle', { cx: scaleX(i), cy: scaleY(p.frame), r: 5, fill: ipColors[ip], cursor: 'pointer' });
+      circle.addEventListener('mousemove', e => showTooltip(e,
+        `<span class="tt-label">N=${p.size} · ${ip}</span><br><span class="tt-value">${fmt(p.frame)}ms avg frame</span>`));
+      circle.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(circle);
+    });
+  });
+
+  document.getElementById('chart-baseline-scaling').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Delta waterfall
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const deltas = baseline.map((b, i) => ({
+    name: b.name,
+    delta: branch[i].frame - b.frame,
+    size: b.size,
+    ip: b.ip,
+  })).sort((a, b) => a.delta - b.delta);
+
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)));
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+
+  // zero line
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H,
+    stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+
+    // value label
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    const anchor = d.delta <= 0 ? 'end' : 'start';
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': anchor,
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmtDelta(d.delta)));
+  });
+
+  document.getElementById('chart-delta-waterfall').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Heatmap
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('chart-heatmap');
+
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+
+  // header row
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => {
+    const hdr = document.createElement('div');
+    hdr.className = 'hm-header';
+    hdr.textContent = ip;
+    grid.appendChild(hdr);
+  });
+
+  const allDeltas = [];
+  sizes.forEach(sz => {
+    ips.forEach(ip => {
+      const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+      const brRows = branch.filter(d => d.size === sz && d.ip === ip);
+      const delta = avg(brRows, d => d.frame) - avg(bRows, d => d.frame);
+      allDeltas.push({ sz, ip, delta });
+    });
+  });
+  const absMax = Math.max(...allDeltas.map(d => Math.abs(d.delta)), 1);
+
+  sizes.forEach(sz => {
+    const rowLabel = document.createElement('div');
+    rowLabel.className = 'hm-header';
+    rowLabel.textContent = 'N=' + sz;
+    grid.appendChild(rowLabel);
+
+    ips.forEach(ip => {
+      const d = allDeltas.find(x => x.sz === sz && x.ip === ip);
+      const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+      const color = d.delta <= 0
+        ? `rgba(52,211,153,${0.1 + intensity * 0.6})`
+        : `rgba(248,113,113,${0.1 + intensity * 0.6})`;
+      const textColor = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell';
+      cell.style.background = color;
+      cell.style.color = textColor;
+      cell.textContent = fmtDelta(d.delta) + 'ms';
+      cell.title = `N=${sz} ${ip}: ${fmtDelta(d.delta)}ms`;
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: By interaction pattern
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(baseline.filter(d => d.ip === ip), d => d.frame),
+    branch: avg(branch.filter(d => d.ip === ip), d => d.frame),
+  }));
+
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+
+  const svg = makeSVG(W, H);
+
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+
+    // baseline bar
+    const bRect = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+
+    // branch bar
+    const y2 = y + barH + gapInner;
+    const brRect = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: COL.green, rx: 4, opacity: 0.8 });
+    brRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(d.branch - d.baseline)}ms`));
+    brRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4,
+      fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmt(d.branch) + 'ms (' + fmtDelta(d.branch - d.baseline) + ')'));
+  });
+
+  document.getElementById('chart-by-interaction').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: By scene size
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(baseline.filter(d => d.size === sz), d => d.frame),
+    branch: avg(branch.filter(d => d.size === sz), d => d.frame),
+  }));
+
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+
+  const svg = makeSVG(W, H);
+
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end',
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+
+    const bRect = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brRect = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brRect.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brRect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brRect);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4,
+      fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' },
+      fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+
+  document.getElementById('chart-by-size').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Subsystem impact
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+
+  const data = ips.map(ip => {
+    const bRows = baseline.filter(d => d.ip === ip);
+    const brRows = branch.filter(d => d.ip === ip);
+    return {
+      ip,
+      prepare: avg(brRows, d => d.prepare) - avg(bRows, d => d.prepare),
+      draw: avg(brRows, d => d.draw) - avg(bRows, d => d.draw),
+      hit: avg(brRows, d => d.hit) - avg(bRows, d => d.hit),
+    };
+  });
+
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+
+  // zero line
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB,
+    stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  // axis labels
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle',
+    fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start',
+    fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end',
+    fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2,
+      'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m];
+      const barLen = Math.abs(scale(v));
+      const x = v <= 0 ? center - barLen : center;
+      const color = metricColors[m];
+
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e,
+        `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start',
+        fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+
+  document.getElementById('chart-subsystem').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// CHART: Memory tradeoff scatter
+// ═══════════════════════════════════════════════════════════
+(function() {
+  const points = baseline.map((b, i) => ({
+    name: b.name,
+    frameDelta: branch[i].frame - b.frame,
+    allocDelta: branch[i].alloc - b.alloc,
+    size: b.size,
+  }));
+
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2;
+  const centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+
+  const svg = makeSVG(W, H);
+
+  // quadrant backgrounds
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+
+  // axes
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+
+  // axis labels
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle',
+    fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle',
+    fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11',
+    transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+
+  // quadrant labels
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16,
+    fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end',
+    fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6;
+    const c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+
+  // size legend
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4,
+      fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+
+  document.getElementById('chart-tradeoff').appendChild(svg);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// TABLES
+// ═══════════════════════════════════════════════════════════
+function buildDeltaTable(container, rows) {
+  const html = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit-test Δ</th><th>Cache Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${rows.map(r => {
+      const b = baseline.find(d => d.name === r.name);
+      const br = branch.find(d => d.name === r.name);
+      const fd = br.frame - b.frame, pd = br.prepare - b.prepare, hd = br.hit - b.hit;
+      const cd = br.cache - b.cache, ad = br.alloc - b.alloc, gd = br.gc - b.gc;
+      return `<tr>
+        <td>${r.name}</td>
+        <td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td>
+        <td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td>
+        <td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td>
+        <td>${fmtDelta(cd)}</td>
+        <td>${fmtDelta(ad)}MB</td>
+        <td>${gd > 0 ? '+' : ''}${gd}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  container.innerHTML = html;
+}
+
+// Wins / regressions — prepared-scene-cache
+const allDeltas = baseline.map((b, i) => ({ name: b.name, delta: branch[i].frame - b.frame }));
+const sorted = [...allDeltas].sort((a, b) => a.delta - b.delta);
+buildDeltaTable(document.getElementById('table-wins'), sorted.filter(d => d.delta < 0).slice(0, 8));
+buildDeltaTable(document.getElementById('table-regressions'), sorted.filter(d => d.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 8));
+
+// Full table — prepared-scene-cache
+(function() {
+  const rows = baseline.map((b, i) => {
+    const br = branch[i];
+    return { name: b.name, size: b.size, ip: b.ip,
+      bFrame: b.frame, brFrame: br.frame, fd: br.frame - b.frame,
+      bPrep: b.prepare, brPrep: br.prepare, pd: br.prepare - b.prepare,
+      bHit: b.hit, brHit: br.hit, hd: br.hit - b.hit,
+      bDraw: b.draw, brDraw: br.draw, dd: br.draw - b.draw,
+      brCache: br.cache, ad: br.alloc - b.alloc, gd: br.gc - b.gc,
+    };
+  });
+
+  document.getElementById('table-full').innerHTML = `<table class="data-table">
+    <thead><tr>
+      <th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th>
+      <th>Prepare Δ</th><th>Hit Δ</th><th>Draw Δ</th><th>Cache Hit</th><th>Alloc Δ</th><th>GC Δ</th>
+    </tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td>${r.name}</td>
+      <td>${fmt(r.bFrame)}ms</td>
+      <td>${fmt(r.brFrame)}ms</td>
+      <td class="${deltaCellClass(r.fd)}">${fmtDelta(r.fd)}ms</td>
+      <td class="${deltaCellClass(r.pd)}">${fmtDelta(r.pd)}ms</td>
+      <td class="${deltaCellClass(r.hd)}">${fmtDelta(r.hd)}ms</td>
+      <td class="${deltaCellClass(r.dd)}">${fmtDelta(r.dd)}ms</td>
+      <td>${fmt(r.brCache, 4)}</td>
+      <td>${fmtDelta(r.ad)}MB</td>
+      <td>${r.gd > 0 ? '+' : ''}${r.gd}</td>
+    </tr>`).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// SPATIAL INDEX DATA (partial: 23/24, missing s200_m50_continuous)
+// ═══════════════════════════════════════════════════════════
+const spatialIndex = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:1.7228,draw:0.3187,frame:8.3349,hit:0,alloc:6.51,gc:74,cache:0},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:2.1481,draw:0.352,frame:8.3369,hit:0.0442,alloc:10.26,gc:149,cache:0},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.5749,draw:0.2669,frame:8.3317,hit:1.6829,alloc:8.72,gc:286,cache:0},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.1591,draw:0.3481,frame:8.3327,hit:0,alloc:8.95,gc:361,cache:0},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.1465,draw:0.35,frame:8.3358,hit:0.0459,alloc:9.52,gc:437,cache:0},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.5372,draw:0.2618,frame:8.3412,hit:1.6027,alloc:7.08,gc:575,cache:0},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:7.2766,draw:0.4564,frame:9.2607,hit:0,alloc:11.69,gc:1072,cache:0},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:8.7232,draw:0.5646,frame:11.0644,hit:0.163,alloc:15.5,gc:1748,cache:0},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:10.6803,draw:0.7244,frame:25.4783,hit:11.0509,alloc:13.87,gc:3069,cache:0},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.6956,draw:0.7012,frame:13.5908,hit:0,alloc:14.04,gc:3773,cache:0},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:10.8061,draw:0.6988,frame:14.0819,hit:0.2189,alloc:11.6,gc:4507,cache:0},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.7462,draw:0.7344,frame:25.8733,hit:11.071,alloc:16.28,gc:5672,cache:0},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:36.8509,draw:1.4606,frame:41.3615,hit:0,alloc:18.76,gc:7330,cache:0},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:36.9091,draw:1.4677,frame:42.3086,hit:0.6735,alloc:6.43,gc:9022,cache:0},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:36.866,draw:1.579,frame:79.0532,hit:36.1872,alloc:13.39,gc:12079,cache:0},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:36.3906,draw:1.4815,frame:41.9919,hit:0,alloc:10.43,gc:13740,cache:0},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:36.4916,draw:1.4912,frame:42.5988,hit:0.6689,alloc:7.8,gc:15422,cache:0},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:36.3591,draw:1.5572,frame:80.1457,hit:36.1986,alloc:6.88,gc:18499,cache:0},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:91.282,draw:2.2364,frame:98.7745,hit:0,alloc:19.02,gc:21970,cache:0},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:92.6458,draw:2.2758,frame:102.0137,hit:1.6631,alloc:14.85,gc:25287,cache:0},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:97.5375,draw:2.3124,frame:202.9345,hit:96.5173,alloc:15.17,gc:30975,cache:0},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:92.523,draw:2.2801,frame:102.3422,hit:0,alloc:9.29,gc:34190,cache:0},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:92.6905,draw:2.2314,frame:104.2068,hit:1.6736,alloc:22.47,gc:37412,cache:0}
+];
+
+// ═══════════════════════════════════════════════════════════
+// SPATIAL INDEX CHARTS
+// ═══════════════════════════════════════════════════════════
+
+// Helper: match baseline rows to spatial index rows by name
+const siMatched = spatialIndex.map(si => {
+  const b = baseline.find(d => d.name === si.name);
+  return { name: si.name, size: si.size, ip: si.ip, mr: si.mr, b, si };
+}).filter(d => d.b);
+
+// SI: Delta waterfall
+(function() {
+  const deltas = siMatched.map(d => ({
+    name: d.name, delta: d.si.frame - d.b.frame, size: d.size, ip: d.ip,
+  })).sort((a, b) => a.delta - b.delta);
+
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 0.1);
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': d.delta <= 0 ? 'end' : 'start',
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmtDelta(d.delta)));
+  });
+  document.getElementById('si-chart-delta-waterfall').appendChild(svg);
+})();
+
+// SI: Heatmap
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('si-chart-heatmap');
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => { const h = document.createElement('div'); h.className = 'hm-header'; h.textContent = ip; grid.appendChild(h); });
+
+  const allD = [];
+  sizes.forEach(sz => { ips.forEach(ip => {
+    const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+    const sRows = siMatched.filter(d => d.size === sz && d.ip === ip);
+    if (sRows.length === 0 || bRows.length === 0) { allD.push({ sz, ip, delta: null }); return; }
+    allD.push({ sz, ip, delta: avg(sRows, d => d.si.frame) - avg(bRows, d => d.frame) });
+  }); });
+  const absMax = Math.max(...allD.filter(d => d.delta !== null).map(d => Math.abs(d.delta)), 1);
+
+  sizes.forEach(sz => {
+    const rl = document.createElement('div'); rl.className = 'hm-header'; rl.textContent = 'N=' + sz; grid.appendChild(rl);
+    ips.forEach(ip => {
+      const d = allD.find(x => x.sz === sz && x.ip === ip);
+      const cell = document.createElement('div'); cell.className = 'hm-cell';
+      if (d.delta === null) { cell.style.background = 'var(--surface-2)'; cell.style.color = 'var(--text-tertiary)'; cell.textContent = 'N/A'; }
+      else {
+        const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+        cell.style.background = d.delta <= 0 ? `rgba(52,211,153,${0.1+intensity*0.6})` : `rgba(248,113,113,${0.1+intensity*0.6})`;
+        cell.style.color = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+        cell.textContent = fmtDelta(d.delta) + 'ms';
+      }
+      grid.appendChild(cell);
+    });
+  });
+  container.appendChild(grid);
+})();
+
+// SI: By interaction pattern
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(siMatched.filter(d => d.ip === ip), d => d.b.frame),
+    branch: avg(siMatched.filter(d => d.ip === ip), d => d.si.frame),
+  }));
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('si-chart-by-interaction').appendChild(svg);
+})();
+
+// SI: By scene size
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(siMatched.filter(d => d.size === sz), d => d.b.frame),
+    branch: avg(siMatched.filter(d => d.size === sz), d => d.si.frame),
+  }));
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('si-chart-by-size').appendChild(svg);
+})();
+
+// SI: Subsystem impact
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+  const data = ips.map(ip => {
+    const rows = siMatched.filter(d => d.ip === ip);
+    return { ip, prepare: avg(rows, d => d.si.prepare) - avg(rows, d => d.b.prepare), draw: avg(rows, d => d.si.draw) - avg(rows, d => d.b.draw), hit: avg(rows, d => d.si.hit) - avg(rows, d => d.b.hit) };
+  });
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m]; const barLen = Math.abs(scale(v)); const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: metricColors[m], rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: metricColors[m], 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+  document.getElementById('si-chart-subsystem').appendChild(svg);
+})();
+
+// SI: Memory tradeoff scatter
+(function() {
+  const points = siMatched.map(d => ({ name: d.name, frameDelta: d.si.frame - d.b.frame, allocDelta: d.si.alloc - d.b.alloc, size: d.size }));
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6, c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+  document.getElementById('si-chart-tradeoff').appendChild(svg);
+})();
+
+// SI: Tables
+(function() {
+  function buildSiDeltaTable(container, rows) {
+    container.innerHTML = `<table class="data-table">
+      <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit-test Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const fd = r.si.frame - r.b.frame, pd = r.si.prepare - r.b.prepare, hd = r.si.hit - r.b.hit;
+        const ad = r.si.alloc - r.b.alloc, gd = r.si.gc - r.b.gc;
+        return `<tr><td>${r.name}</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(ad)}MB</td><td>${gd>0?'+':''}${gd}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const siSorted = [...siMatched].sort((a, b) => (a.si.frame - a.b.frame) - (b.si.frame - b.b.frame));
+  buildSiDeltaTable(document.getElementById('si-table-wins'), siSorted.filter(d => d.si.frame - d.b.frame < 0).slice(0, 8));
+  buildSiDeltaTable(document.getElementById('si-table-regressions'), siSorted.filter(d => d.si.frame - d.b.frame > 0).sort((a,b) => (b.si.frame-b.b.frame) - (a.si.frame-a.b.frame)).slice(0, 8));
+
+  // Full table
+  document.getElementById('si-table-full').innerHTML = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit Δ</th><th>Draw Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${siMatched.map(d => {
+      const fd = d.si.frame-d.b.frame, pd = d.si.prepare-d.b.prepare, hd = d.si.hit-d.b.hit, dd = d.si.draw-d.b.draw;
+      return `<tr><td>${d.name}</td><td>${fmt(d.b.frame)}ms</td><td>${fmt(d.si.frame)}ms</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td>${fmtDelta(d.si.alloc-d.b.alloc)}MB</td><td>${(d.si.gc-d.b.gc)>0?'+':''}${d.si.gc-d.b.gc}</td></tr>`;
+    }).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// BROAD-PHASE SORT DATA
+// ═══════════════════════════════════════════════════════════
+const broadPhaseSort = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:2.1473,draw:0.4061,frame:8.3628,hit:0,alloc:8.84,gc:57},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:2.1692,draw:0.3596,frame:8.3795,hit:0.0438,alloc:8.03,gc:115},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.6628,draw:0.2894,frame:8.4333,hit:1.773,alloc:10.43,gc:223},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.0428,draw:0.3459,frame:8.375,hit:0,alloc:8.15,gc:281},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.134,draw:0.3592,frame:8.3816,hit:0.0391,alloc:8.51,gc:340},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.5595,draw:0.2769,frame:8.405,hit:1.6232,alloc:8.6,gc:449},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:5.956,draw:0.5272,frame:8.8218,hit:0,alloc:13.13,gc:753},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:6.9062,draw:0.6024,frame:9.7479,hit:0.1464,alloc:14.54,gc:1059},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:8.1429,draw:0.7319,frame:20.1114,hit:8.4159,alloc:11.02,gc:1783},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:7.1217,draw:0.6226,frame:10.1921,hit:0,alloc:14.28,gc:2071},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:7.2758,draw:0.6451,frame:10.5506,hit:0.151,alloc:13.0,gc:2391},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:8.4359,draw:0.7582,frame:21.3936,hit:8.6878,alloc:14.43,gc:3113},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:19.2883,draw:1.3688,frame:23.7756,hit:0,alloc:12.35,gc:3780},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:18.8916,draw:1.3225,frame:23.7825,hit:0.3699,alloc:16.31,gc:4422},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:18.1652,draw:1.2999,frame:42.3227,hit:18.7622,alloc:12.47,gc:5661},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:17.7619,draw:1.2154,frame:22.6068,hit:0,alloc:16.54,gc:6423},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:17.8307,draw:1.2303,frame:23.1828,hit:0.3564,alloc:10.77,gc:7039},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:17.5973,draw:1.2821,frame:42.4755,hit:18.751,alloc:15.86,gc:8182},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:31.0109,draw:2.1795,frame:38.0058,hit:0,alloc:12.26,gc:9228},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:31.8472,draw:2.2254,frame:39.8093,hit:0.6177,alloc:15.49,gc:10191},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:30.9541,draw:2.3081,frame:70.3944,hit:30.9519,alloc:16.19,gc:11798},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:30.9621,draw:2.1255,frame:40.195,hit:0,alloc:17.15,gc:12912},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:31.5816,draw:2.2493,frame:41.6246,hit:0.6103,alloc:16.7,gc:13905},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:31.6253,draw:2.2609,frame:72.9228,hit:30.7996,alloc:16.23,gc:15498}
+];
+
+// ═══════════════════════════════════════════════════════════
+// BROAD-PHASE SORT CHARTS
+// ═══════════════════════════════════════════════════════════
+
+// Helper: match baseline rows to BPS rows by name
+const bpsMatched = broadPhaseSort.map(bps => {
+  const b = baseline.find(d => d.name === bps.name);
+  return { name: bps.name, size: bps.size, ip: bps.ip, mr: bps.mr, b, bps };
+}).filter(d => d.b);
+
+// BPS: Delta waterfall
+(function() {
+  const deltas = bpsMatched.map(d => ({
+    name: d.name, delta: d.bps.frame - d.b.frame, size: d.size, ip: d.ip,
+  })).sort((a, b) => a.delta - b.delta);
+
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 0.1);
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': d.delta <= 0 ? 'end' : 'start',
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmtDelta(d.delta)));
+  });
+  document.getElementById('bps-chart-delta-waterfall').appendChild(svg);
+})();
+
+// BPS: Heatmap
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('bps-chart-heatmap');
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => { const h = document.createElement('div'); h.className = 'hm-header'; h.textContent = ip; grid.appendChild(h); });
+
+  const allD = [];
+  sizes.forEach(sz => { ips.forEach(ip => {
+    const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+    const brRows = bpsMatched.filter(d => d.size === sz && d.ip === ip);
+    if (brRows.length === 0 || bRows.length === 0) { allD.push({ sz, ip, delta: null }); return; }
+    allD.push({ sz, ip, delta: avg(brRows, d => d.bps.frame) - avg(bRows, d => d.frame) });
+  }); });
+  const absMax = Math.max(...allD.filter(d => d.delta !== null).map(d => Math.abs(d.delta)), 1);
+
+  sizes.forEach(sz => {
+    const rl = document.createElement('div'); rl.className = 'hm-header'; rl.textContent = 'N=' + sz; grid.appendChild(rl);
+    ips.forEach(ip => {
+      const d = allD.find(x => x.sz === sz && x.ip === ip);
+      const cell = document.createElement('div'); cell.className = 'hm-cell';
+      if (d.delta === null) { cell.style.background = 'var(--surface-2)'; cell.style.color = 'var(--text-tertiary)'; cell.textContent = 'N/A'; }
+      else {
+        const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+        cell.style.background = d.delta <= 0 ? `rgba(52,211,153,${0.1+intensity*0.6})` : `rgba(248,113,113,${0.1+intensity*0.6})`;
+        cell.style.color = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+        cell.textContent = fmtDelta(d.delta) + 'ms';
+      }
+      grid.appendChild(cell);
+    });
+  });
+  container.appendChild(grid);
+})();
+
+// BPS: By interaction pattern
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(bpsMatched.filter(d => d.ip === ip), d => d.b.frame),
+    branch: avg(bpsMatched.filter(d => d.ip === ip), d => d.bps.frame),
+  }));
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('bps-chart-by-interaction').appendChild(svg);
+})();
+
+// BPS: By scene size
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(bpsMatched.filter(d => d.size === sz), d => d.b.frame),
+    branch: avg(bpsMatched.filter(d => d.size === sz), d => d.bps.frame),
+  }));
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('bps-chart-by-size').appendChild(svg);
+})();
+
+// BPS: Subsystem impact
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+  const data = ips.map(ip => {
+    const rows = bpsMatched.filter(d => d.ip === ip);
+    return { ip, prepare: avg(rows, d => d.bps.prepare) - avg(rows, d => d.b.prepare), draw: avg(rows, d => d.bps.draw) - avg(rows, d => d.b.draw), hit: avg(rows, d => d.bps.hit) - avg(rows, d => d.b.hit) };
+  });
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m]; const barLen = Math.abs(scale(v)); const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: metricColors[m], rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: metricColors[m], 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+  document.getElementById('bps-chart-subsystem').appendChild(svg);
+})();
+
+// BPS: Memory tradeoff scatter
+(function() {
+  const points = bpsMatched.map(d => ({ name: d.name, frameDelta: d.bps.frame - d.b.frame, allocDelta: d.bps.alloc - d.b.alloc, size: d.size }));
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6, c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+  document.getElementById('bps-chart-tradeoff').appendChild(svg);
+})();
+
+// BPS: Tables
+(function() {
+  function buildBpsDeltaTable(container, rows) {
+    container.innerHTML = `<table class="data-table">
+      <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit-test Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const fd = r.bps.frame - r.b.frame, pd = r.bps.prepare - r.b.prepare, hd = r.bps.hit - r.b.hit;
+        const ad = r.bps.alloc - r.b.alloc, gd = r.bps.gc - r.b.gc;
+        return `<tr><td>${r.name}</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(ad)}MB</td><td>${gd>0?'+':''}${gd}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const bpsSorted = [...bpsMatched].sort((a, b) => (a.bps.frame - a.b.frame) - (b.bps.frame - b.b.frame));
+  buildBpsDeltaTable(document.getElementById('bps-table-wins'), bpsSorted.filter(d => d.bps.frame - d.b.frame < -0.5).slice(0, 8));
+  buildBpsDeltaTable(document.getElementById('bps-table-neutral'), bpsSorted.filter(d => Math.abs(d.bps.frame - d.b.frame) <= 0.5).sort((a,b) => Math.abs(b.bps.frame-b.b.frame) - Math.abs(a.bps.frame-a.b.frame)).slice(0, 8));
+
+  // Full table
+  document.getElementById('bps-table-full').innerHTML = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th><th>Prepare Δ</th><th>Hit Δ</th><th>Draw Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${bpsMatched.map(d => {
+      const fd = d.bps.frame-d.b.frame, pd = d.bps.prepare-d.b.prepare, hd = d.bps.hit-d.b.hit, dd = d.bps.draw-d.b.draw;
+      return `<tr><td>${d.name}</td><td>${fmt(d.b.frame)}ms</td><td>${fmt(d.bps.frame)}ms</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td>${fmtDelta(d.bps.alloc-d.b.alloc)}MB</td><td>${(d.bps.gc-d.b.gc)>0?'+':''}${d.bps.gc-d.b.gc}</td></tr>`;
+    }).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// PATH CACHING DATA
+// ═══════════════════════════════════════════════════════════
+const pathCaching = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:2.1079,draw:0.1616,frame:8.3322,hit:0,alloc:8.68,gc:72},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:2.3062,draw:0.1254,frame:8.3375,hit:0.0508,alloc:9.20,gc:145},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.6285,draw:0.0928,frame:8.3381,hit:1.7311,alloc:7.47,gc:282},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:2.3352,draw:0.1293,frame:8.3371,hit:0,alloc:9.11,gc:355},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:2.2117,draw:0.1254,frame:8.3475,hit:0.0431,alloc:9.95,gc:429},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.7692,draw:0.0997,frame:8.334,hit:1.8391,alloc:7.94,gc:566},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:8.1315,draw:0.1828,frame:9.9271,hit:0,alloc:11.66,gc:1050},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:10.4909,draw:0.242,frame:12.961,hit:0.1998,alloc:14.9,gc:1760},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:11.0732,draw:0.2747,frame:26.0618,hit:11.58,alloc:12.76,gc:2946},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.1803,draw:0.244,frame:12.7902,hit:0,alloc:12.55,gc:3502},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:11.154,draw:0.2621,frame:13.9558,hit:0.215,alloc:20.01,gc:4200},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:10.9295,draw:0.2586,frame:26.4924,hit:11.8309,alloc:13.79,gc:5340},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:36.7152,draw:0.5444,frame:40.625,hit:0,alloc:8.78,gc:6930},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:36.5718,draw:0.5229,frame:41.2286,hit:0.6895,alloc:12.59,gc:8601},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:37.2711,draw:0.5445,frame:80.3154,hit:37.5316,alloc:8.32,gc:11678},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:36.6696,draw:0.5229,frame:41.2587,hit:0,alloc:13.05,gc:13343},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:37.1082,draw:0.5276,frame:42.7244,hit:0.6927,alloc:10.34,gc:14926},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:37.2132,draw:0.5641,frame:81.0831,hit:37.553,alloc:8.64,gc:18031},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:86.7879,draw:0.7445,frame:92.7746,hit:0,alloc:14.77,gc:21288},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:86.7491,draw:0.7265,frame:94.2195,hit:1.5933,alloc:20.06,gc:24578},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:87.2399,draw:0.6954,frame:182.1977,hit:88.0979,alloc:23.59,gc:29817},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:88.819,draw:0.7351,frame:97.0614,hit:0,alloc:20.44,gc:32435},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:91.6517,draw:0.7745,frame:101.6966,hit:1.6537,alloc:18.18,gc:35576},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:88.035,draw:0.7503,frame:186.3643,hit:88.9841,alloc:30.18,gc:40738}
+];
+
+// ═══════════════════════════════════════════════════════════
+// PATH CACHING CHARTS
+// ═══════════════════════════════════════════════════════════
+const pcMatched = pathCaching.map(pc => {
+  const b = baseline.find(d => d.name === pc.name);
+  return { name: pc.name, size: pc.size, ip: pc.ip, mr: pc.mr, b, pc };
+}).filter(d => d.b);
+
+// PC: Delta waterfall
+(function() {
+  const deltas = pcMatched.map(d => ({
+    name: d.name, delta: d.pc.frame - d.b.frame, size: d.size, ip: d.ip,
+  })).sort((a, b) => a.delta - b.delta);
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 0.1);
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': d.delta <= 0 ? 'end' : 'start',
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmtDelta(d.delta)));
+  });
+  document.getElementById('pc-chart-delta-waterfall').appendChild(svg);
+})();
+
+// PC: Heatmap
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('pc-chart-heatmap');
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => { const h = document.createElement('div'); h.className = 'hm-header'; h.textContent = ip; grid.appendChild(h); });
+  const allD = [];
+  sizes.forEach(sz => { ips.forEach(ip => {
+    const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+    const brRows = pcMatched.filter(d => d.size === sz && d.ip === ip);
+    if (brRows.length === 0 || bRows.length === 0) { allD.push({ sz, ip, delta: null }); return; }
+    allD.push({ sz, ip, delta: avg(brRows, d => d.pc.frame) - avg(bRows, d => d.frame) });
+  }); });
+  const absMax = Math.max(...allD.filter(d => d.delta !== null).map(d => Math.abs(d.delta)), 1);
+  sizes.forEach(sz => {
+    const rl = document.createElement('div'); rl.className = 'hm-header'; rl.textContent = 'N=' + sz; grid.appendChild(rl);
+    ips.forEach(ip => {
+      const d = allD.find(x => x.sz === sz && x.ip === ip);
+      const cell = document.createElement('div'); cell.className = 'hm-cell';
+      if (d.delta === null) { cell.style.background = 'var(--surface-2)'; cell.style.color = 'var(--text-tertiary)'; cell.textContent = 'N/A'; }
+      else {
+        const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+        cell.style.background = d.delta <= 0 ? `rgba(52,211,153,${0.1+intensity*0.6})` : `rgba(248,113,113,${0.1+intensity*0.6})`;
+        cell.style.color = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+        cell.textContent = fmtDelta(d.delta) + 'ms';
+      }
+      grid.appendChild(cell);
+    });
+  });
+  container.appendChild(grid);
+})();
+
+// PC: By interaction pattern
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(pcMatched.filter(d => d.ip === ip), d => d.b.frame),
+    branch: avg(pcMatched.filter(d => d.ip === ip), d => d.pc.frame),
+  }));
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('pc-chart-by-interaction').appendChild(svg);
+})();
+
+// PC: By scene size
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(pcMatched.filter(d => d.size === sz), d => d.b.frame),
+    branch: avg(pcMatched.filter(d => d.size === sz), d => d.pc.frame),
+  }));
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('pc-chart-by-size').appendChild(svg);
+})();
+
+// PC: Subsystem impact
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+  const data = ips.map(ip => {
+    const rows = pcMatched.filter(d => d.ip === ip);
+    return { ip, prepare: avg(rows, d => d.pc.prepare) - avg(rows, d => d.b.prepare), draw: avg(rows, d => d.pc.draw) - avg(rows, d => d.b.draw), hit: avg(rows, d => d.pc.hit) - avg(rows, d => d.b.hit) };
+  });
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '\u2190 faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower \u2192'));
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m]; const barLen = Math.abs(scale(v)); const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: metricColors[m], rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.ip} \u00b7 ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: metricColors[m], 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+  document.getElementById('pc-chart-subsystem').appendChild(svg);
+})();
+
+// PC: Memory tradeoff scatter
+(function() {
+  const points = pcMatched.map(d => ({ name: d.name, frameDelta: d.pc.frame - d.b.frame, allocDelta: d.pc.alloc - d.b.alloc, size: d.size }));
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) \u2192'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '\u2190 Alloc delta (MB)'));
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6, c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+  document.getElementById('pc-chart-tradeoff').appendChild(svg);
+})();
+
+// PC: Tables
+(function() {
+  function buildPcDeltaTable(container, rows) {
+    container.innerHTML = `<table class="data-table">
+      <thead><tr><th>Scenario</th><th>Frame \u0394</th><th>Prepare \u0394</th><th>Draw \u0394</th><th>Hit-test \u0394</th><th>Alloc \u0394</th><th>GC \u0394</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const fd = r.pc.frame - r.b.frame, pd = r.pc.prepare - r.b.prepare, dd = r.pc.draw - r.b.draw, hd = r.pc.hit - r.b.hit;
+        const ad = r.pc.alloc - r.b.alloc, gd = r.pc.gc - r.b.gc;
+        return `<tr><td>${r.name}</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(ad)}MB</td><td>${gd>0?'+':''}${gd}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const pcSorted = [...pcMatched].sort((a, b) => (a.pc.frame - a.b.frame) - (b.pc.frame - b.b.frame));
+  buildPcDeltaTable(document.getElementById('pc-table-wins'), pcSorted.filter(d => d.pc.frame - d.b.frame < -0.5).slice(0, 8));
+  buildPcDeltaTable(document.getElementById('pc-table-regressions'), pcSorted.filter(d => d.pc.frame - d.b.frame > 0.5).sort((a,b) => (b.pc.frame-b.b.frame) - (a.pc.frame-a.b.frame)).slice(0, 8));
+
+  // Full table
+  document.getElementById('pc-table-full').innerHTML = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame \u0394</th><th>Base Draw</th><th>Branch Draw</th><th>Draw \u0394</th><th>Prepare \u0394</th><th>Hit \u0394</th><th>Alloc \u0394</th><th>GC \u0394</th></tr></thead>
+    <tbody>${pcMatched.map(d => {
+      const fd = d.pc.frame-d.b.frame, pd = d.pc.prepare-d.b.prepare, hd = d.pc.hit-d.b.hit, dd = d.pc.draw-d.b.draw;
+      return `<tr><td>${d.name}</td><td>${fmt(d.b.frame)}ms</td><td>${fmt(d.pc.frame)}ms</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td>${fmt(d.b.draw)}ms</td><td>${fmt(d.pc.draw)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(d.pc.alloc-d.b.alloc)}MB</td><td>${(d.pc.gc-d.b.gc)>0?'+':''}${d.pc.gc-d.b.gc}</td></tr>`;
+    }).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// NATIVE CANVAS DATA
+// ═══════════════════════════════════════════════════════════
+const nativeCanvas = [
+  {name:"s10_m10_none",size:10,mr:0.1,ip:"NONE",prepare:2.1288,draw:0.1963,frame:8.3887,hit:0,alloc:8.36,gc:70},
+  {name:"s10_m10_occasional",size:10,mr:0.1,ip:"OCCASIONAL",prepare:1.9944,draw:0.1856,frame:8.396,hit:0.0405,alloc:8.89,gc:141},
+  {name:"s10_m10_continuous",size:10,mr:0.1,ip:"CONTINUOUS",prepare:1.6472,draw:0.1575,frame:8.4283,hit:1.7591,alloc:10.25,gc:273},
+  {name:"s10_m50_none",size:10,mr:0.5,ip:"NONE",prepare:1.9427,draw:0.1811,frame:8.407,hit:0,alloc:10.67,gc:344},
+  {name:"s10_m50_occasional",size:10,mr:0.5,ip:"OCCASIONAL",prepare:1.9835,draw:0.1864,frame:8.3924,hit:0.0478,alloc:7.63,gc:416},
+  {name:"s10_m50_continuous",size:10,mr:0.5,ip:"CONTINUOUS",prepare:1.5347,draw:0.148,frame:8.4931,hit:1.6554,alloc:5.87,gc:550},
+  {name:"s50_m10_none",size:50,mr:0.1,ip:"NONE",prepare:8.2631,draw:0.2997,frame:10.7987,hit:0,alloc:8.56,gc:1062},
+  {name:"s50_m10_occasional",size:50,mr:0.1,ip:"OCCASIONAL",prepare:8.6197,draw:0.3054,frame:11.4888,hit:0.1779,alloc:13.2,gc:1691},
+  {name:"s50_m10_continuous",size:50,mr:0.1,ip:"CONTINUOUS",prepare:9.998,draw:0.368,frame:24.07,hit:10.2086,alloc:19.2,gc:2816},
+  {name:"s50_m50_none",size:50,mr:0.5,ip:"NONE",prepare:10.2486,draw:0.412,frame:13.4665,hit:0,alloc:18.23,gc:3460},
+  {name:"s50_m50_occasional",size:50,mr:0.5,ip:"OCCASIONAL",prepare:11.6751,draw:0.4406,frame:15.5953,hit:0.2326,alloc:15.61,gc:4135},
+  {name:"s50_m50_continuous",size:50,mr:0.5,ip:"CONTINUOUS",prepare:12.3119,draw:0.4432,frame:29.8496,hit:12.6303,alloc:8.6,gc:5401},
+  {name:"s100_m10_none",size:100,mr:0.1,ip:"NONE",prepare:39.9742,draw:0.9127,frame:46.1647,hit:0,alloc:10.81,gc:6882},
+  {name:"s100_m10_occasional",size:100,mr:0.1,ip:"OCCASIONAL",prepare:39.457,draw:0.9568,frame:46.5046,hit:0.7117,alloc:8.38,gc:8428},
+  {name:"s100_m10_continuous",size:100,mr:0.1,ip:"CONTINUOUS",prepare:38.643,draw:0.8668,frame:85.4199,hit:39.4646,alloc:30.5,gc:11073},
+  {name:"s100_m50_none",size:100,mr:0.5,ip:"NONE",prepare:39.8314,draw:0.9259,frame:46.8713,hit:0,alloc:21.18,gc:12916},
+  {name:"s100_m50_occasional",size:100,mr:0.5,ip:"OCCASIONAL",prepare:39.985,draw:0.926,frame:48.0339,hit:0.7708,alloc:15.62,gc:14747},
+  {name:"s100_m50_continuous",size:100,mr:0.5,ip:"CONTINUOUS",prepare:40.589,draw:0.9256,frame:91.0482,hit:41.4416,alloc:11.15,gc:17534},
+  {name:"s200_m10_none",size:200,mr:0.1,ip:"NONE",prepare:95.2646,draw:1.2903,frame:102.9411,hit:0,alloc:25.15,gc:20599},
+  {name:"s200_m10_occasional",size:200,mr:0.1,ip:"OCCASIONAL",prepare:94.2956,draw:1.2747,frame:103.5295,hit:1.742,alloc:25.5,gc:23482},
+  {name:"s200_m10_continuous",size:200,mr:0.1,ip:"CONTINUOUS",prepare:96.7514,draw:1.3261,frame:202.7011,hit:97.5834,alloc:24.04,gc:29055},
+  {name:"s200_m50_none",size:200,mr:0.5,ip:"NONE",prepare:98.7891,draw:1.3504,frame:108.8348,hit:0,alloc:18.37,gc:32077},
+  {name:"s200_m50_occasional",size:200,mr:0.5,ip:"OCCASIONAL",prepare:100.107,draw:1.3414,frame:112.0514,hit:1.8117,alloc:14.84,gc:35762},
+  {name:"s200_m50_continuous",size:200,mr:0.5,ip:"CONTINUOUS",prepare:101.1293,draw:1.3645,frame:215.3755,hit:102.3295,alloc:12.01,gc:41591}
+];
+
+// ═══════════════════════════════════════════════════════════
+// NATIVE CANVAS CHARTS
+// ═══════════════════════════════════════════════════════════
+const ncMatched = nativeCanvas.map(nc => {
+  const b = baseline.find(d => d.name === nc.name);
+  return { name: nc.name, size: nc.size, ip: nc.ip, mr: nc.mr, b, nc };
+}).filter(d => d.b);
+
+// NC: Delta waterfall
+(function() {
+  const deltas = ncMatched.map(d => ({
+    name: d.name, delta: d.nc.frame - d.b.frame, size: d.size, ip: d.ip,
+  })).sort((a, b) => a.delta - b.delta);
+  const W = 900, barH = 22, gap = 4, labelW = 220, padR = 70, padT = 10;
+  const H = padT + deltas.length * (barH + gap) + 10;
+  const maxAbs = Math.max(...deltas.map(d => Math.abs(d.delta)), 0.1);
+  const halfW = (W - labelW - padR) / 2;
+  const center = labelW + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: 0, x2: center, y2: H, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  deltas.forEach((d, i) => {
+    const y = padT + i * (barH + gap);
+    const color = d.delta <= 0 ? COL.green : COL.red;
+    const barLen = Math.abs(scale(d.delta));
+    const x = d.delta <= 0 ? center - barLen : center;
+    svg.appendChild(svgEl('text', { x: labelW - 10, y: y + barH/2 + 4, 'text-anchor': 'end',
+      fill: d.delta <= 0 ? COL.green : (d.delta > 0.5 ? COL.red : COL.textSec),
+      'font-family': 'var(--font-mono)', 'font-size': '11' }, d.name));
+    const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: color, rx: 3, opacity: 0.75 });
+    rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.name}</span><br><span class="tt-value" style="color:${color}">${fmtDelta(d.delta)}ms</span>`));
+    rect.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(rect);
+    const labelX = d.delta <= 0 ? center - barLen - 6 : center + barLen + 6;
+    svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': d.delta <= 0 ? 'end' : 'start',
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmtDelta(d.delta)));
+  });
+  document.getElementById('nc-chart-delta-waterfall').appendChild(svg);
+})();
+
+// NC: Heatmap
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const container = document.getElementById('nc-chart-heatmap');
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  grid.style.gridTemplateColumns = `100px repeat(${ips.length}, 1fr)`;
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'hm-header' }));
+  ips.forEach(ip => { const h = document.createElement('div'); h.className = 'hm-header'; h.textContent = ip; grid.appendChild(h); });
+  const allD = [];
+  sizes.forEach(sz => { ips.forEach(ip => {
+    const bRows = baseline.filter(d => d.size === sz && d.ip === ip);
+    const brRows = ncMatched.filter(d => d.size === sz && d.ip === ip);
+    if (brRows.length === 0 || bRows.length === 0) { allD.push({ sz, ip, delta: null }); return; }
+    allD.push({ sz, ip, delta: avg(brRows, d => d.nc.frame) - avg(bRows, d => d.frame) });
+  }); });
+  const absMax = Math.max(...allD.filter(d => d.delta !== null).map(d => Math.abs(d.delta)), 1);
+  sizes.forEach(sz => {
+    const rl = document.createElement('div'); rl.className = 'hm-header'; rl.textContent = 'N=' + sz; grid.appendChild(rl);
+    ips.forEach(ip => {
+      const d = allD.find(x => x.sz === sz && x.ip === ip);
+      const cell = document.createElement('div'); cell.className = 'hm-cell';
+      if (d.delta === null) { cell.style.background = 'var(--surface-2)'; cell.style.color = 'var(--text-tertiary)'; cell.textContent = 'N/A'; }
+      else {
+        const intensity = Math.min(Math.abs(d.delta) / absMax, 1);
+        cell.style.background = d.delta <= 0 ? `rgba(52,211,153,${0.1+intensity*0.6})` : `rgba(248,113,113,${0.1+intensity*0.6})`;
+        cell.style.color = intensity > 0.3 ? '#fff' : (d.delta <= 0 ? COL.green : COL.red);
+        cell.textContent = fmtDelta(d.delta) + 'ms';
+      }
+      grid.appendChild(cell);
+    });
+  });
+  container.appendChild(grid);
+})();
+
+// NC: By interaction pattern
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const data = ips.map(ip => ({
+    label: ip,
+    baseline: avg(ncMatched.filter(d => d.ip === ip), d => d.b.frame),
+    branch: avg(ncMatched.filter(d => d.ip === ip), d => d.nc.frame),
+  }));
+  const barH = 28, gapInner = 4, gapOuter = 24;
+  const padL = 120, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('nc-chart-by-interaction').appendChild(svg);
+})();
+
+// NC: By scene size
+(function() {
+  const sizes = [10, 50, 100, 200];
+  const data = sizes.map(sz => ({
+    label: 'N=' + sz,
+    baseline: avg(ncMatched.filter(d => d.size === sz), d => d.b.frame),
+    branch: avg(ncMatched.filter(d => d.size === sz), d => d.nc.frame),
+  }));
+  const barH = 22, gapInner = 3, gapOuter = 16;
+  const padL = 80, padR = 60, padT = 20, padB = 20;
+  const W = 900, H = padT + data.length * (barH * 2 + gapInner + gapOuter) - gapOuter + padB;
+  const maxVal = Math.max(...data.map(d => Math.max(d.baseline, d.branch)));
+  const chartW = W - padL - padR;
+  const scale = v => (v / maxVal) * chartW;
+  const svg = makeSVG(W, H);
+  data.forEach((d, i) => {
+    const y = padT + i * (barH * 2 + gapInner + gapOuter);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: y + barH - 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.label));
+    const bR = svgEl('rect', { x: padL, y, width: scale(d.baseline), height: barH, fill: COL.muted, rx: 4, opacity: 0.5 });
+    bR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} baseline</span><br><span class="tt-value">${fmt(d.baseline)}ms</span>`));
+    bR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(bR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.baseline) + 8, y: y + barH/2 + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmt(d.baseline) + 'ms'));
+    const y2 = y + barH + gapInner;
+    const delta = d.branch - d.baseline;
+    const barColor = delta <= 0 ? COL.green : COL.red;
+    const brR = svgEl('rect', { x: padL, y: y2, width: scale(d.branch), height: barH, fill: barColor, rx: 4, opacity: 0.8 });
+    brR.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.label} branch</span><br><span class="tt-value">${fmt(d.branch)}ms</span><br>Delta: ${fmtDelta(delta)}ms`));
+    brR.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(brR);
+    svg.appendChild(svgEl('text', { x: padL + scale(d.branch) + 8, y: y2 + barH/2 + 4, fill: barColor, 'font-family': 'var(--font-mono)', 'font-size': '10', 'font-weight': '600' }, fmt(d.branch) + 'ms (' + fmtDelta(delta) + ')'));
+  });
+  document.getElementById('nc-chart-by-size').appendChild(svg);
+})();
+
+// NC: Subsystem impact
+(function() {
+  const ips = ['NONE', 'OCCASIONAL', 'CONTINUOUS'];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+  const metricColors = { prepare: COL.prepare, draw: COL.draw, hit: COL.hit };
+  const data = ips.map(ip => {
+    const rows = ncMatched.filter(d => d.ip === ip);
+    return { ip, prepare: avg(rows, d => d.nc.prepare) - avg(rows, d => d.b.prepare), draw: avg(rows, d => d.nc.draw) - avg(rows, d => d.b.draw), hit: avg(rows, d => d.nc.hit) - avg(rows, d => d.b.hit) };
+  });
+  const barH = 14, gapMetric = 4, gapGroup = 24;
+  const padL = 120, padR = 80, padT = 30, padB = 20;
+  const W = 900, H = padT + data.length * (metrics.length * (barH + gapMetric) + gapGroup) - gapGroup + padB;
+  const allVals = data.flatMap(d => metrics.map(m => d[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+  data.forEach((d, gi) => {
+    const groupY = padT + gi * (metrics.length * (barH + gapMetric) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (metrics.length * (barH + gapMetric)) / 2, 'text-anchor': 'end', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '12' }, d.ip));
+    metrics.forEach((m, mi) => {
+      const y = groupY + mi * (barH + gapMetric);
+      const v = d[m]; const barLen = Math.abs(scale(v)); const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: metricColors[m], rx: 3, opacity: 0.7 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${d.ip} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: metricColors[m], 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(v)));
+    });
+  });
+  document.getElementById('nc-chart-subsystem').appendChild(svg);
+})();
+
+// NC: Memory tradeoff scatter
+(function() {
+  const points = ncMatched.map(d => ({ name: d.name, frameDelta: d.nc.frame - d.b.frame, allocDelta: d.nc.alloc - d.b.alloc, size: d.size }));
+  const W = 900, H = 380, padL = 70, padR = 40, padT = 30, padB = 50;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...points.map(p => Math.abs(p.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...points.map(p => Math.abs(p.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 8, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '← Alloc delta (MB)'));
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+  const sizeRadius = { 10: 5, 50: 7, 100: 9, 200: 12 };
+  const sizeColors = { 10: '#6c9bff', 50: '#a78bfa', 100: '#22d3ee', 200: '#fbbf24' };
+  points.forEach(p => {
+    const cx = scaleX(p.frameDelta), cy = scaleY(p.allocDelta);
+    const r = sizeRadius[p.size] || 6, c = sizeColors[p.size] || COL.accent;
+    const circle = svgEl('circle', { cx, cy, r, fill: c, opacity: 0.7, cursor: 'pointer', stroke: c, 'stroke-width': 1.5, 'stroke-opacity': 0.3 });
+    circle.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${p.name}</span><br>Frame: <span class="tt-value">${fmtDelta(p.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(p.allocDelta)}MB</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+  });
+  const legendY = H - 35;
+  [10, 50, 100, 200].forEach((sz, i) => {
+    const lx = W - padR - 260 + i * 68;
+    svg.appendChild(svgEl('circle', { cx: lx, cy: legendY, r: sizeRadius[sz] - 1, fill: sizeColors[sz], opacity: 0.7 }));
+    svg.appendChild(svgEl('text', { x: lx + sizeRadius[sz] + 4, y: legendY + 4, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'N=' + sz));
+  });
+  document.getElementById('nc-chart-tradeoff').appendChild(svg);
+})();
+
+// NC: Tables
+(function() {
+  function buildNcDeltaTable(container, rows) {
+    container.innerHTML = `<table class="data-table">
+      <thead><tr><th>Scenario</th><th>Frame Δ</th><th>Prepare Δ</th><th>Draw Δ</th><th>Hit-test Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const fd = r.nc.frame - r.b.frame, pd = r.nc.prepare - r.b.prepare, dd = r.nc.draw - r.b.draw, hd = r.nc.hit - r.b.hit;
+        const ad = r.nc.alloc - r.b.alloc, gd = r.nc.gc - r.b.gc;
+        return `<tr><td>${r.name}</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(ad)}MB</td><td>${gd>0?'+':''}${gd}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const ncSorted = [...ncMatched].sort((a, b) => (a.nc.frame - a.b.frame) - (b.nc.frame - b.b.frame));
+  buildNcDeltaTable(document.getElementById('nc-table-wins'), ncSorted.filter(d => d.nc.frame - d.b.frame < -0.5).slice(0, 8));
+  buildNcDeltaTable(document.getElementById('nc-table-regressions'), ncSorted.filter(d => d.nc.frame - d.b.frame > 0.5).sort((a,b) => (b.nc.frame-b.b.frame) - (a.nc.frame-a.b.frame)).slice(0, 8));
+
+  // Full table
+  document.getElementById('nc-table-full').innerHTML = `<table class="data-table">
+    <thead><tr><th>Scenario</th><th>Base Frame</th><th>Branch Frame</th><th>Frame Δ</th><th>Base Draw</th><th>Branch Draw</th><th>Draw Δ</th><th>Prepare Δ</th><th>Hit Δ</th><th>Alloc Δ</th><th>GC Δ</th></tr></thead>
+    <tbody>${ncMatched.map(d => {
+      const fd = d.nc.frame-d.b.frame, pd = d.nc.prepare-d.b.prepare, hd = d.nc.hit-d.b.hit, dd = d.nc.draw-d.b.draw;
+      return `<tr><td>${d.name}</td><td>${fmt(d.b.frame)}ms</td><td>${fmt(d.nc.frame)}ms</td><td class="${deltaCellClass(fd)}">${fmtDelta(fd)}ms</td><td>${fmt(d.b.draw)}ms</td><td>${fmt(d.nc.draw)}ms</td><td class="${deltaCellClass(dd)}">${fmtDelta(dd)}ms</td><td class="${deltaCellClass(pd)}">${fmtDelta(pd)}ms</td><td class="${deltaCellClass(hd)}">${fmtDelta(hd)}ms</td><td>${fmtDelta(d.nc.alloc-d.b.alloc)}MB</td><td>${(d.nc.gc-d.b.gc)>0?'+':''}${d.nc.gc-d.b.gc}</td></tr>`;
+    }).join('')}</tbody></table>`;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// SYNTHESIS CHARTS — Cross-branch comparison
+// ═══════════════════════════════════════════════════════════
+
+// Synthesis: Subsystem impact comparison across all 5 branches
+(function() {
+  const branches = [
+    { key: 'psc', label: 'Prepared Scene Cache', data: branch, color: COL.green },
+    { key: 'si',  label: 'Spatial Index',        data: spatialIndex, color: '#a78bfa' },
+    { key: 'bps', label: 'Broad-Phase Sort',     data: broadPhaseSort, color: '#22d3ee' },
+    { key: 'pc',  label: 'Path Caching',         data: pathCaching, color: '#fbbf24' },
+    { key: 'nc',  label: 'Native Canvas',        data: nativeCanvas, color: '#f87171' },
+  ];
+  const metrics = ['prepare', 'draw', 'hit'];
+  const metricLabels = { prepare: 'Prepare', draw: 'Draw', hit: 'Hit-test' };
+
+  // Calculate average delta per branch per metric
+  const branchMetrics = branches.map(br => {
+    const matched = br.data.map(d => {
+      const b = baseline.find(bl => bl.name === d.name);
+      return b ? { b, d } : null;
+    }).filter(Boolean);
+    return {
+      label: br.label, color: br.color,
+      prepare: avg(matched, m => m.d.prepare - m.b.prepare),
+      draw: avg(matched, m => m.d.draw - m.b.draw),
+      hit: avg(matched, m => m.d.hit - m.b.hit),
+      frame: avg(matched, m => m.d.frame - m.b.frame),
+    };
+  });
+
+  const barH = 12, gapBar = 3, gapGroup = 28;
+  const padL = 90, padR = 100, padT = 30, padB = 20;
+  const W = 900, H = padT + metrics.length * (branches.length * (barH + gapBar) + gapGroup) - gapGroup + padB;
+  const allVals = branchMetrics.flatMap(bm => metrics.map(m => bm[m]));
+  const maxAbs = Math.max(...allVals.map(Math.abs), 0.1);
+  const halfW = (W - padL - padR) / 2;
+  const center = padL + halfW;
+  const scale = v => (v / maxAbs) * halfW;
+
+  const svg = makeSVG(W, H);
+  svg.appendChild(svgEl('line', { x1: center, y1: padT - 10, x2: center, y2: H - padB, stroke: COL.border, 'stroke-width': 1, 'stroke-dasharray': '4,3' }));
+  svg.appendChild(svgEl('text', { x: center, y: 14, 'text-anchor': 'middle', fill: COL.muted, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '0'));
+  svg.appendChild(svgEl('text', { x: padL, y: 14, 'text-anchor': 'start', fill: COL.green, 'font-family': 'var(--font-mono)', 'font-size': '10' }, '← faster'));
+  svg.appendChild(svgEl('text', { x: W - padR, y: 14, 'text-anchor': 'end', fill: COL.red, 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'slower →'));
+
+  metrics.forEach((m, mi) => {
+    const groupY = padT + mi * (branches.length * (barH + gapBar) + gapGroup);
+    svg.appendChild(svgEl('text', { x: padL - 10, y: groupY + (branches.length * (barH + gapBar)) / 2, 'text-anchor': 'end', fill: COL.text, 'font-family': 'var(--font-mono)', 'font-size': '12', 'font-weight': '600' }, metricLabels[m]));
+
+    branchMetrics.forEach((bm, bi) => {
+      const y = groupY + bi * (barH + gapBar);
+      const v = bm[m];
+      const barLen = Math.abs(scale(v));
+      const x = v <= 0 ? center - barLen : center;
+      const rect = svgEl('rect', { x, y, width: Math.max(barLen, 1), height: barH, fill: bm.color, rx: 3, opacity: 0.8 });
+      rect.addEventListener('mousemove', e => showTooltip(e, `<span class="tt-label">${bm.label} · ${metricLabels[m]}</span><br><span class="tt-value">${fmtDelta(v)}ms</span>`));
+      rect.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(rect);
+      const labelX = v <= 0 ? x - 6 : x + barLen + 6;
+      svg.appendChild(svgEl('text', { x: labelX, y: y + barH/2 + 4, 'text-anchor': v <= 0 ? 'end' : 'start', fill: bm.color, 'font-family': 'var(--font-mono)', 'font-size': '9', 'font-weight': '600' }, bm.label.split(' ')[0] + ' ' + fmtDelta(v)));
+    });
+  });
+
+  // Legend at bottom
+  const legendY = H - 10;
+  branches.forEach((br, i) => {
+    const lx = padL + i * (W - padL - padR) / branches.length;
+    svg.appendChild(svgEl('rect', { x: lx, y: legendY - 6, width: 10, height: 10, fill: br.color, rx: 2, opacity: 0.8 }));
+    svg.appendChild(svgEl('text', { x: lx + 14, y: legendY + 3, fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '9' }, br.label));
+  });
+
+  document.getElementById('synth-chart-subsystem').appendChild(svg);
+})();
+
+// Synthesis: Memory allocation comparison across all 5 branches
+(function() {
+  const branches = [
+    { key: 'psc', label: 'PSC',  data: branch, color: COL.green },
+    { key: 'si',  label: 'SI',   data: spatialIndex, color: '#a78bfa' },
+    { key: 'bps', label: 'BPS',  data: broadPhaseSort, color: '#22d3ee' },
+    { key: 'pc',  label: 'PC',   data: pathCaching, color: '#fbbf24' },
+    { key: 'nc',  label: 'NC',   data: nativeCanvas, color: '#f87171' },
+  ];
+
+  // Compute per-branch: avg frame delta, avg alloc delta, avg gc delta
+  const branchStats = branches.map(br => {
+    const matched = br.data.map(d => {
+      const b = baseline.find(bl => bl.name === d.name);
+      return b ? { b, d } : null;
+    }).filter(Boolean);
+    return {
+      label: br.label, fullLabel: br.key === 'psc' ? 'Prepared Scene Cache' : br.key === 'si' ? 'Spatial Index' : br.key === 'bps' ? 'Broad-Phase Sort' : br.key === 'pc' ? 'Path Caching' : 'Native Canvas',
+      color: br.color,
+      frameDelta: avg(matched, m => m.d.frame - m.b.frame),
+      allocDelta: avg(matched, m => m.d.alloc - m.b.alloc),
+      gcDelta: avg(matched, m => m.d.gc - m.b.gc),
+      count: matched.length,
+    };
+  });
+
+  // Scatter plot: X = avg frame delta, Y = avg alloc delta, bubble size = |gcDelta|
+  const W = 900, H = 420, padL = 80, padR = 60, padT = 40, padB = 60;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxFrameAbs = Math.max(...branchStats.map(s => Math.abs(s.frameDelta)), 1);
+  const maxAllocAbs = Math.max(...branchStats.map(s => Math.abs(s.allocDelta)), 1);
+  const centerX = padL + chartW / 2, centerY = padT + chartH / 2;
+  const scaleX = v => centerX + (v / maxFrameAbs) * (chartW / 2);
+  const scaleY = v => centerY - (v / maxAllocAbs) * (chartH / 2);
+
+  const svg = makeSVG(W, H);
+
+  // Quadrant backgrounds
+  svg.appendChild(svgEl('rect', { x: padL, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(52,211,153,.04)' }));
+  svg.appendChild(svgEl('rect', { x: centerX, y: padT, width: chartW/2, height: chartH/2, fill: 'rgba(248,113,113,.04)' }));
+  svg.appendChild(svgEl('rect', { x: padL, y: centerY, width: chartW/2, height: chartH/2, fill: 'rgba(251,191,36,.03)' }));
+
+  // Axes
+  svg.appendChild(svgEl('line', { x1: padL, y1: centerY, x2: W - padR, y2: centerY, stroke: COL.border, 'stroke-width': 1 }));
+  svg.appendChild(svgEl('line', { x1: centerX, y1: padT, x2: centerX, y2: H - padB, stroke: COL.border, 'stroke-width': 1 }));
+
+  // Axis labels
+  svg.appendChild(svgEl('text', { x: W/2, y: H - 12, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11' }, 'Avg frame time delta (ms) →'));
+  svg.appendChild(svgEl('text', { x: 14, y: H/2, 'text-anchor': 'middle', fill: COL.textSec, 'font-family': 'var(--font-mono)', 'font-size': '11', transform: `rotate(-90, 14, ${H/2})` }, '← Avg alloc delta (MB)'));
+
+  // Quadrant labels
+  svg.appendChild(svgEl('text', { x: padL + 8, y: padT + 16, fill: 'rgba(52,211,153,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Faster + less mem'));
+  svg.appendChild(svgEl('text', { x: W - padR - 8, y: padT + 16, 'text-anchor': 'end', fill: 'rgba(248,113,113,.3)', 'font-family': 'var(--font-mono)', 'font-size': '10' }, 'Slower + more mem'));
+
+  // Title
+  svg.appendChild(svgEl('text', { x: W/2, y: 18, 'text-anchor': 'middle', fill: COL.text, 'font-family': 'var(--font-mono)', 'font-size': '12', 'font-weight': '600' }, 'Branch Comparison: Frame vs Memory Tradeoff'));
+
+  // Plot each branch as a bubble
+  const maxGcAbs = Math.max(...branchStats.map(s => Math.abs(s.gcDelta)), 1);
+  branchStats.forEach(s => {
+    const cx = scaleX(s.frameDelta), cy = scaleY(s.allocDelta);
+    const r = 14 + (Math.abs(s.gcDelta) / maxGcAbs) * 18;
+    const circle = svgEl('circle', { cx, cy, r, fill: s.color, opacity: 0.3, stroke: s.color, 'stroke-width': 2.5, 'stroke-opacity': 0.9, cursor: 'pointer' });
+    circle.addEventListener('mousemove', e => showTooltip(e,
+      `<span class="tt-label">${s.fullLabel}</span><br>Frame: <span class="tt-value">${fmtDelta(s.frameDelta)}ms</span><br>Alloc: <span class="tt-value">${fmtDelta(s.allocDelta)}MB</span><br>GC: <span class="tt-value">${s.gcDelta > 0 ? '+' : ''}${Math.round(s.gcDelta)}</span>`));
+    circle.addEventListener('mouseleave', hideTooltip);
+    svg.appendChild(circle);
+    // Label
+    svg.appendChild(svgEl('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', fill: '#fff', 'font-family': 'var(--font-mono)', 'font-size': '11', 'font-weight': '700' }, s.label));
+    // Delta below
+    svg.appendChild(svgEl('text', { x: cx, y: cy + r + 14, 'text-anchor': 'middle', fill: s.color, 'font-family': 'var(--font-mono)', 'font-size': '10' }, fmtDelta(s.frameDelta) + 'ms'));
+  });
+
+  document.getElementById('synth-chart-alloc').appendChild(svg);
+})();
+</script>
+</body>
+</html>

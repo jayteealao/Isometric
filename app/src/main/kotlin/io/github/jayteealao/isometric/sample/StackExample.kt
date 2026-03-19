@@ -1,0 +1,72 @@
+package io.github.jayteealao.isometric.sample
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.StackAxis
+import io.github.jayteealao.isometric.TileGridConfig
+import io.github.jayteealao.isometric.compose.runtime.Group
+import io.github.jayteealao.isometric.compose.runtime.IsometricScene
+import io.github.jayteealao.isometric.compose.runtime.Shape
+import io.github.jayteealao.isometric.compose.runtime.Stack
+import io.github.jayteealao.isometric.compose.runtime.TileGrid
+import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
+
+/**
+ * Demonstrates all three [StackAxis] values and the composability of [Stack]
+ * with [TileGrid].
+ *
+ * Four sub-scenes:
+ * 1. Vertical Z-axis tower — the hero scenario
+ * 2. Horizontal X-axis row
+ * 3. Horizontal Y-axis row
+ * 4. [Stack] nested inside [TileGrid] content — towers of varying height per tile
+ */
+@Composable
+fun StackExample() {
+    val floorColors = listOf(
+        IsoColor(33.0, 150.0, 243.0),   // blue  — ground floor
+        IsoColor(76.0, 175.0, 80.0),    // green — middle floor
+        IsoColor(255.0, 193.0, 7.0),    // amber — upper floor
+        IsoColor(244.0, 67.0, 54.0)     // red   — roof
+    )
+
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+
+        // 1. Vertical tower — 4 floors stacked along Z
+        Group(position = Point(0.0, 0.0, 0.0)) {
+            Stack(count = 4, axis = StackAxis.Z, gap = 1.0) { floor ->
+                Shape(geometry = Prism(), color = floorColors[floor])
+            }
+        }
+
+        // 2. Horizontal row — 6 prisms along X, spaced 1.5 world units
+        Group(position = Point(0.0, 4.0, 0.0)) {
+            Stack(count = 6, axis = StackAxis.X, gap = 1.5) { _ ->
+                Shape(geometry = Prism(), color = IsoColor(120.0, 144.0, 156.0))
+            }
+        }
+
+        // 3. Depth row — 5 pyramids along Y, spaced 1.5 world units
+        Group(position = Point(4.0, 0.0, 0.0)) {
+            Stack(count = 5, axis = StackAxis.Y, gap = 1.5) { _ ->
+                Shape(geometry = Pyramid(), color = IsoColor(156.0, 39.0, 176.0))
+            }
+        }
+
+        // 4. Stack inside TileGrid — each tile carries a tower whose height equals x+y+1
+        TileGrid(
+            width = 3,
+            height = 3,
+            config = TileGridConfig(originOffset = Point(-6.0, 0.0, 0.0))
+        ) { coord ->
+            val towerHeight = coord.x + coord.y + 1
+            Stack(count = towerHeight, axis = StackAxis.Z, gap = 0.5) { _ ->
+                Shape(geometry = Prism(height = 0.4), color = IsoColor(0.0, 188.0, 212.0))
+            }
+        }
+    }
+}

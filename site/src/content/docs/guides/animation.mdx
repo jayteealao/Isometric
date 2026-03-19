@@ -1,0 +1,72 @@
+---
+title: Animation
+description: Animate shapes with vsync-aligned frame callbacks
+sidebar:
+  order: 2
+---
+
+Isometric uses `withFrameNanos` for vsync-aligned animation. This ties updates to the display refresh rate, producing smooth motion without wasted work. Do not use `delay`-based loops for animation.
+
+## Basic Rotation
+
+Spin an octahedron continuously by incrementing the rotation angle each frame:
+
+```kotlin
+@Composable
+fun SpinningScene() {
+    var angle by remember { mutableDoubleStateOf(0.0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { frameTimeNanos ->
+                angle += 0.02
+            }
+        }
+    }
+
+    IsometricScene {
+        Shape(
+            geometry = Octahedron(Point.ORIGIN),
+            rotation = angle,
+            rotationOrigin = Point(0.5, 0.5, 0.5)
+        )
+    }
+}
+```
+
+## Wave Animation with ForEach
+
+Combine `ForEach` with a time-varying offset to create a rippling grid:
+
+```kotlin
+@Composable
+fun WaveScene() {
+    var time by remember { mutableDoubleStateOf(0.0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { time += 0.02 }
+        }
+    }
+
+    IsometricScene {
+        ForEach((0 until 5).toList()) { i ->
+            ForEach((0 until 5).toList()) { j ->
+                val z = sin(time + i * 0.5 + j * 0.3) * 0.5
+                Shape(
+                    geometry = Prism(Point(i.toDouble(), j.toDouble(), z)),
+                    color = IsoColor(33, 150, 243)
+                )
+            }
+        }
+    }
+}
+```
+
+## Performance
+
+Isometric tracks dirty state per node. When `angle` or `time` changes, only the affected `Shape` composables recompose — the rest of the scene tree is skipped entirely. This makes it practical to animate individual shapes in a large scene without paying the cost of a full re-render.
+
+:::tip
+Use `remember` for expensive geometry computations so they are not recalculated every frame. Only the properties that actually change (like `rotation` or `position`) should depend on the animated value.
+:::

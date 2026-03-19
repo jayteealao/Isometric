@@ -1,48 +1,29 @@
 plugins {
-    id("com.android.library")
-    kotlin("android")
+    id("isometric.android.library")
+    id("isometric.publishing")
 }
 
+group = "io.github.jayteealao"
+version = "1.1.0-SNAPSHOT"
+
 android {
-    namespace = "io.fabianterhorst.isometric.view"
-    compileSdk = 34
+    namespace = "io.github.jayteealao.isometric.view"
+}
 
-    defaultConfig {
-        minSdk = 24
-        targetSdk = 33
+mavenPublishing {
+    coordinates(
+        groupId = "io.github.jayteealao",
+        artifactId = "isometric-android-view",
+        version = version.toString()
+    )
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = "11"
+    pom {
+        name.set("Isometric Android View")
+        description.set("Android View-based adapter for the Isometric rendering engine")
     }
 }
 
 dependencies {
-    // Core module
     api(project(":isometric-core"))
-
-    // Android
-    implementation("androidx.annotation:annotation:1.5.0")
-
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.4")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
+    implementation(libs.annotation)
 }

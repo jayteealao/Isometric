@@ -1,0 +1,161 @@
+---
+title: Gestures
+description: Handle tap and drag interactions with spatial hit testing
+sidebar:
+  order: 3
+---
+
+Gesture handling is configured through `GestureConfig`, passed inside a `SceneConfig`. By default, gestures are disabled (`GestureConfig.Disabled`).
+
+## Tap Handling
+
+Provide an `onTap` callback to receive tap events. Each `TapEvent` contains screen coordinates and an optional hit-tested node:
+
+```kotlin
+IsometricScene(
+    config = SceneConfig(
+        gestures = GestureConfig(
+            onTap = { event: TapEvent ->
+                // event.x, event.y — screen coordinates
+                // event.node — the IsometricNode that was hit (nullable)
+                println("Tapped: ${event.node?.nodeId}")
+            }
+        )
+    )
+) {
+    Shape(geometry = Prism(Point.ORIGIN), color = IsoColor.BLUE)
+}
+```
+
+### TapEvent
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `x` | `Double` | Screen X coordinate of the tap |
+| `y` | `Double` | Screen Y coordinate of the tap |
+| `node` | `IsometricNode?` | The node under the tap point, or `null` if tapping empty space |
+
+### DragEvent
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `x` | `Double` | Screen X coordinate of the current pointer position |
+| `y` | `Double` | Screen Y coordinate of the current pointer position |
+
+## Drag Handling
+
+`GestureConfig` provides three drag callbacks:
+
+- **onDragStart** — fired once when the drag begins (after exceeding the threshold), receives a `DragEvent`
+- **onDrag** — fired on each move during the drag, receives a `DragEvent`
+- **onDragEnd** — fired when the pointer is released
+
+The `dragThreshold` property (default `8f`) controls how many pixels of movement are required before a drag gesture is recognized. This prevents accidental drags during taps.
+
+## Example: Tap to Change Color, Drag to Pan
+
+```kotlin
+@Composable
+fun InteractiveScene() {
+    var shapeColor by remember { mutableStateOf(IsoColor.BLUE) }
+    val camera = remember { CameraState() }
+
+    IsometricScene(
+        config = SceneConfig(
+            cameraState = camera,
+            gestures = GestureConfig(
+                onTap = { event ->
+                    if (event.node != null) {
+                        shapeColor = IsoColor(
+                            (0..255).random(),
+                            (0..255).random(),
+                            (0..255).random()
+                        )
+                    }
+                },
+                onDrag = { event ->
+                    camera.pan(event.x / 50.0, -event.y / 50.0)
+                }
+            )
+        )
+    ) {
+        Shape(geometry = Prism(Point.ORIGIN), color = shapeColor)
+    }
+}
+```
+
+## Hit Testing Performance
+
+Hit testing uses spatial indexing, giving O(1) lookup performance regardless of scene complexity. This means tap and drag callbacks respond quickly even in scenes with hundreds of shapes.
+
+## Disabling Gestures
+
+Gestures are disabled by default. You can also explicitly pass `GestureConfig.Disabled` to make intent clear:
+
+```kotlin
+IsometricScene(
+    config = SceneConfig(gestures = GestureConfig.Disabled)
+) { ... }
+```
+
+## Tile Grid Tap Routing
+
+`TileGrid` provides its own tap routing mechanism separate from `GestureConfig.onTap`. Passing
+an `onTileClick` callback to `TileGrid` enables automatic screen-to-tile conversion — no
+`GestureConfig` is needed on `IsometricScene`.
+
+```kotlin
+IsometricScene(modifier = Modifier.fillMaxSize()) {
+    TileGrid(
+        width = 10,
+        height = 10,
+        onTileClick = { coord ->
+            // TileCoordinate — no coordinate math required
+            selectedTile = coord
+        }
+    ) { coord ->
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(200, 200, 200))
+    }
+}
+```
+
+This differs from `GestureConfig.onTap` in two ways:
+
+- **Delivers a `TileCoordinate`**, not raw screen coordinates or a hit-tested node.
+- **Scoped to grid bounds** — taps outside the grid's `width × height` area are silently ignored.
+
+### Combining with Drag Gestures
+
+Tile tap routing and `GestureConfig` drag callbacks coexist without conflict:
+
+```kotlin
+val camera = remember { CameraState() }
+
+IsometricScene(
+    modifier = Modifier.fillMaxSize(),
+    config = SceneConfig(
+        cameraState = camera,
+        gestures = GestureConfig(
+            onDrag = { event -> camera.pan(event.x / 50.0, -event.y / 50.0) }
+        )
+    )
+) {
+    TileGrid(
+        width = 10,
+        height = 10,
+        onTileClick = { coord -> selectedTile = coord }
+    ) { coord ->
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(200, 200, 200))
+    }
+}
+```
+
+> **Caution**
+>
+`GestureConfig.onTap` and `TileGrid`'s `onTileClick` both receive every tap — `onTap` fires
+first, then `onTileClick`. If both are active, you will handle the same tap twice. Use one
+or the other.
+
+For elevated terrain where the default z = 0 assumption is incorrect, use `GestureConfig.onTap`
+with `IsometricEngine.screenToTile()` directly and omit `onTileClick`. See
+[Tile Grid — Tap Accuracy with Elevation](tile-grid.md#tap-accuracy-with-elevation).

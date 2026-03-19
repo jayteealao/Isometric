@@ -19,7 +19,7 @@
 
             <!-- ADB launch intent for scripted runs -->
             <intent-filter>
-                <action android:name="io.fabianterhorst.isometric.benchmark.RUN" />
+                <action android:name="io.github.jayteealao.isometric.benchmark.RUN" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

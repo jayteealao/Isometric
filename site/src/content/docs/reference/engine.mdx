@@ -1,0 +1,245 @@
+---
+title: Engine & Projector
+description: IsometricEngine API and the SceneProjector interface
+sidebar:
+  order: 4
+---
+
+`IsometricEngine` is the core rendering engine that projects 3D geometry to 2D screen space. It implements the `SceneProjector` interface, which decouples rendering from the concrete engine to enable testing and custom projections.
+
+## IsometricEngine Constructor
+
+```kotlin
+class IsometricEngine(
+    angle: Double = PI / 6,        // 30 degrees
+    scale: Double = 70.0,          // pixels per world unit
+    colorDifference: Double = 0.20,// lighting contrast
+    lightColor: IsoColor = IsoColor.WHITE
+) : SceneProjector
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `angle` | `Double` | `PI / 6` (30 degrees) | Isometric projection angle in radians. Must be finite. |
+| `scale` | `Double` | `70.0` | Pixels per world unit. Must be positive and finite. |
+| `colorDifference` | `Double` | `0.20` | Strength of directional lighting on faces. Higher values produce more contrast between lit and shadowed faces. Must be non-negative. |
+| `lightColor` | `IsoColor` | `IsoColor.WHITE` | The color of the light source. Tint this to simulate warm or cool lighting. |
+
+Both `angle` and `scale` are mutable properties. Changing them at runtime rebuilds the internal projection matrix and increments `projectionVersion`.
+
+## Key Methods
+
+### worldToScreen
+
+Converts a 3D world point to 2D screen coordinates.
+
+```kotlin
+fun worldToScreen(
+    point: Point,
+    viewportWidth: Int,
+    viewportHeight: Int
+): Point2D
+```
+
+The origin is placed at the horizontal center (width / 2) and near the bottom (height * 0.9) of the viewport.
+
+### screenToWorld
+
+Unprojects a 2D screen point back to 3D world coordinates on a given Z plane. Because a screen point maps to a line in 3D, this returns the intersection with the horizontal plane at height `z`.
+
+```kotlin
+fun screenToWorld(
+    screenPoint: Point2D,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    z: Double = 0.0
+): Point
+```
+
+### add
+
+Adds geometry to the internal scene graph. Two overloads:
+
+```kotlin
+// Add all faces of a Shape
+fun add(shape: Shape, color: IsoColor)
+
+// Add a single Path with optional metadata
+fun add(
+    path: Path,
+    color: IsoColor,
+    originalShape: Shape? = null,
+    id: String? = null,
+    ownerNodeId: String? = null
+)
+```
+
+### clear
+
+Removes all items from the scene graph.
+
+```kotlin
+fun clear()
+```
+
+### projectScene
+
+Projects the 3D scene to 2D, applies culling, lighting, and depth sorting, then returns a `PreparedScene` containing sorted `RenderCommand` entries.
+
+```kotlin
+fun projectScene(
+    width: Int,
+    height: Int,
+    renderOptions: RenderOptions = RenderOptions.Default,
+    lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize()
+): PreparedScene
+```
+
+### findItemAt
+
+Hit tests a prepared scene at given screen coordinates. Returns the matching `RenderCommand` or `null`.
+
+```kotlin
+fun findItemAt(
+    preparedScene: PreparedScene,
+    x: Double,
+    y: Double,
+    order: HitOrder = HitOrder.FRONT_TO_BACK,
+    touchRadius: Double = 0.0
+): RenderCommand?
+```
+
+## Tile Coordinate Helpers
+
+Extension functions that bridge continuous 3D world coordinates and the discrete tile grid
+system.
+
+### screenToTile
+
+Extension function on `IsometricEngine`. Converts a screen tap point to the `TileCoordinate`
+of the tile cell that contains it. Chains `screenToWorld` with `Point.toTileCoordinate`
+internally.
+
+```kotlin
+fun IsometricEngine.screenToTile(
+    screenX: Double,
+    screenY: Double,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    tileSize: Double = 1.0,
+    elevation: Double = 0.0,
+    originOffset: Point = Point.ORIGIN
+): TileCoordinate
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `screenX` | `Double` | — | Screen x-coordinate of the tap (pixels). |
+| `screenY` | `Double` | — | Screen y-coordinate of the tap (pixels). |
+| `viewportWidth` | `Int` | — | Scene viewport width (pixels). |
+| `viewportHeight` | `Int` | — | Scene viewport height (pixels). |
+| `tileSize` | `Double` | `1.0` | World units per tile side. Must match `TileGridConfig.tileSize`. |
+| `elevation` | `Double` | `0.0` | Z-plane to intersect during inverse projection. Use the surface z of the tile layer. |
+| `originOffset` | `Point` | `Point.ORIGIN` | World position of the grid's (0, 0) corner. Must match `TileGridConfig.originOffset`. |
+
+:::note
+`TileGrid`'s built-in `onTileClick` calls `screenToTile` using `TileGridConfig.originOffset.z`
+as the Z-plane, so grids at a fixed elevation (raised platforms) resolve taps correctly
+automatically. For terrain where **elevation varies per tile**, use `screenToWorld` directly and
+call `Point.toTileCoordinate` after determining the correct layer, or use `screenToTile` via
+`AdvancedSceneConfig` as shown in [Tile Grid — Tap Accuracy with Elevation](/guides/tile-grid/#tap-accuracy-with-elevation).
+:::
+
+For terrain where elevation varies per tile, use `screenToWorld` directly and call
+`Point.toTileCoordinate` after determining the correct layer.
+
+### Point.toTileCoordinate
+
+Extension function on `Point`. Converts a continuous world point to the `TileCoordinate` of
+the cell that contains it. Uses `floor()` division so negative coordinates map correctly.
+
+```kotlin
+fun Point.toTileCoordinate(
+    tileSize: Double = 1.0,
+    originOffset: Point = Point.ORIGIN
+): TileCoordinate
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tileSize` | `Double` | `1.0` | World units per tile side. Must be positive and finite. |
+| `originOffset` | `Point` | `Point.ORIGIN` | World position of the grid's (0, 0) corner. |
+
+The z-coordinate of the receiver `Point` is ignored — only x and y determine the tile.
+
+```kotlin
+Point(3.7, 5.2, 0.0).toTileCoordinate()        // TileCoordinate(3, 5)
+Point(-0.3, 0.0, 0.0).toTileCoordinate()        // TileCoordinate(-1, 0) — floor, not truncation
+```
+
+## projectionVersion
+
+A `Long` counter that increments whenever `angle` or `scale` changes. Caches that depend on projected output can check this value to know when their data is stale.
+
+```kotlin
+val engine = IsometricEngine()
+val v1 = engine.projectionVersion // 0
+engine.scale = 100.0
+val v2 = engine.projectionVersion // 1
+```
+
+## SceneProjector Interface
+
+`SceneProjector` is the interface that `IsometricEngine` implements. Its purpose is dependency inversion: the Compose renderer depends on `SceneProjector`, not on `IsometricEngine` directly.
+
+```kotlin
+interface SceneProjector {
+    val projectionVersion: Long
+    fun add(shape: Shape, color: IsoColor)
+    fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?)
+    fun clear()
+    fun projectScene(width: Int, height: Int, renderOptions: RenderOptions, lightDirection: Vector): PreparedScene
+    fun findItemAt(preparedScene: PreparedScene, x: Double, y: Double, order: HitOrder, touchRadius: Double): RenderCommand?
+}
+```
+
+This abstraction enables:
+
+- **Testing** -- supply a fake projector that returns canned `PreparedScene` data without running real 3D math.
+- **Custom projections** -- implement an alternative projection (e.g., oblique, dimetric) while reusing the Compose runtime.
+
+## Direct Usage Outside Compose
+
+You can use `IsometricEngine` as a standalone projection library without the Compose runtime. This is useful for server-side rendering, screenshot generation, or integration with other UI frameworks.
+
+```kotlin
+fun renderToCommands(): List<RenderCommand> {
+    val engine = IsometricEngine(scale = 100.0)
+
+    // Build the scene
+    engine.add(Prism(Point.ORIGIN, 2.0, 2.0, 2.0), IsoColor(33, 150, 243))
+    engine.add(Pyramid(Point(0.0, 0.0, 2.0), 2.0, 2.0, 1.0), IsoColor.RED)
+
+    // Project to 2D
+    val scene = engine.projectScene(width = 800, height = 600)
+
+    // Iterate render commands (each is a projected polygon with color)
+    for (command in scene.commands) {
+        // command.points: List<Point2D> -- screen coordinates
+        // command.color: IsoColor -- lit and shaded color
+        // command.ownerNodeId: String? -- node identity for grouping
+    }
+
+    // Hit test
+    val hit = engine.findItemAt(scene, 400.0, 300.0)
+
+    // Clean up for next frame
+    engine.clear()
+
+    return scene.commands
+}
+```
+
+:::tip
+When using the engine directly, remember to call `clear()` before each frame if you are rebuilding the scene. The Compose runtime handles this automatically.
+:::

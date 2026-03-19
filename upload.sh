@@ -1,1 +1,0 @@
-./gradlew clean :lib:bintrayUpload
