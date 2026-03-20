@@ -33,7 +33,7 @@ fun TileGridExample() {
             onTileClick = { coord -> selectedTile = coord }
         ) { coord ->
             Shape(
-                geometry = Prism(width = 0.9, depth = 0.9, height = 0.3),
+                geometry = Prism(),
                 color = if (coord == selectedTile) IsoColor(33.0, 150.0, 243.0) else IsoColor(120.0, 144.0, 156.0)
             )
         }
