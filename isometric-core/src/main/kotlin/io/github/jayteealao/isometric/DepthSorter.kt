@@ -24,24 +24,33 @@ internal object DepthSorter {
      * comparison, and topological-sort behavior stay unchanged.
      */
     fun sort(items: List<TransformedItem>, options: RenderOptions): List<TransformedItem> {
+        // Pre-sort by depth descending so that faces farther from the viewer get
+        // lower indices. When Kahn's algorithm has multiple zero-in-degree nodes,
+        // it picks the lowest index first — this ensures a back-to-front default
+        // order, which is correct for the painter's algorithm. Without this,
+        // shared-edge face pairs that closerThan() cannot resolve (returns 0)
+        // would fall back to insertion order, causing side faces of later prisms
+        // to paint over top faces of earlier prisms.
+        val depthSorted = items.sortedByDescending { it.item.path.depth }
+
         val sortedItems = mutableListOf<TransformedItem>()
         val observer = Point(-10.0, -10.0, 20.0)
-        val length = items.size
+        val length = depthSorted.size
 
         // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
         val drawBefore = List(length) { mutableListOf<Int>() }
 
         if (options.enableBroadPhaseSort) {
-            val candidatePairs = buildBroadPhaseCandidatePairs(items, options.broadPhaseCellSize)
+            val candidatePairs = buildBroadPhaseCandidatePairs(depthSorted, options.broadPhaseCellSize)
             for (packed in candidatePairs) {
                 val i = (packed ushr 32).toInt()
                 val j = (packed and 0xFFFFFFFFL).toInt()
-                checkDepthDependency(items[i], items[j], i, j, drawBefore, observer)
+                checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer)
             }
         } else {
             for (i in 0 until length) {
                 for (j in 0 until i) {
-                    checkDepthDependency(items[i], items[j], i, j, drawBefore, observer)
+                    checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer)
                 }
             }
         }
@@ -90,7 +99,7 @@ internal object DepthSorter {
         // Process queue
         while (qHead < qTail) {
             val node = queue[qHead++]
-            sortedItems.add(items[node])
+            sortedItems.add(depthSorted[node])
             val depStart = depOffsets[node]
             val depEnd = depOffsets[node + 1]
             for (k in depStart until depEnd) {
@@ -105,7 +114,7 @@ internal object DepthSorter {
         // Append any remaining items (circular dependencies — fallback)
         for (i in 0 until length) {
             if (inDegree[i] > 0) {
-                sortedItems.add(items[i])
+                sortedItems.add(depthSorted[i])
             }
         }
 
