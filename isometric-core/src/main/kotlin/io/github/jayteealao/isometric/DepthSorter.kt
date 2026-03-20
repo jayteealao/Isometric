@@ -33,9 +33,9 @@ internal object DepthSorter {
 
         if (options.enableBroadPhaseSort) {
             val candidatePairs = buildBroadPhaseCandidatePairs(items, options.broadPhaseCellSize)
-            for (pair in candidatePairs) {
-                val i = pair.first
-                val j = pair.second
+            for (packed in candidatePairs) {
+                val i = (packed ushr 32).toInt()
+                val j = (packed and 0xFFFFFFFFL).toInt()
                 checkDepthDependency(items[i], items[j], i, j, drawBefore, observer)
             }
         } else {
@@ -46,27 +46,65 @@ internal object DepthSorter {
             }
         }
 
-        // Topological sort
-        val drawn = BooleanArray(length) { false }
-        var drawThisTurn = true
+        // Kahn's algorithm — O(V+E) topological sort
+        // Build in-degree counts and total edge count
+        val inDegree = IntArray(length)
+        var totalEdges = 0
+        for (i in 0 until length) {
+            val edgeCount = drawBefore[i].size
+            inDegree[i] = edgeCount
+            totalEdges += edgeCount
+        }
 
-        while (drawThisTurn) {
-            drawThisTurn = false
-            for (i in 0 until length) {
-                if (!drawn[i]) {
-                    val canDraw = drawBefore[i].all { drawn[it] }
-                    if (canDraw) {
-                        sortedItems.add(items[i])
-                        drawn[i] = true
-                        drawThisTurn = true
-                    }
+        // Build reverse adjacency in CSR (Compressed Sparse Row) format — zero boxing
+        // depOffsets[j] = start index in depEdges for node j's dependents
+        val depCount = IntArray(length)
+        for (i in 0 until length) {
+            for (j in drawBefore[i]) {
+                depCount[j]++
+            }
+        }
+        val depOffsets = IntArray(length + 1)
+        for (i in 0 until length) {
+            depOffsets[i + 1] = depOffsets[i] + depCount[i]
+        }
+        val depEdges = IntArray(totalEdges)
+        val depFill = IntArray(length) // tracks fill position per node
+        for (i in 0 until length) {
+            for (j in drawBefore[i]) {
+                depEdges[depOffsets[j] + depFill[j]] = i
+                depFill[j]++
+            }
+        }
+
+        // IntArray ring buffer queue — zero boxing
+        val queue = IntArray(length)
+        var qHead = 0
+        var qTail = 0
+        for (i in 0 until length) {
+            if (inDegree[i] == 0) {
+                queue[qTail++] = i
+            }
+        }
+
+        // Process queue
+        while (qHead < qTail) {
+            val node = queue[qHead++]
+            sortedItems.add(items[node])
+            val depStart = depOffsets[node]
+            val depEnd = depOffsets[node + 1]
+            for (k in depStart until depEnd) {
+                val dep = depEdges[k]
+                inDegree[dep]--
+                if (inDegree[dep] == 0) {
+                    queue[qTail++] = dep
                 }
             }
         }
 
-        // Add any remaining items (circular dependencies)
+        // Append any remaining items (circular dependencies — fallback)
         for (i in 0 until length) {
-            if (!drawn[i]) {
+            if (inDegree[i] > 0) {
                 sortedItems.add(items[i])
             }
         }
@@ -95,13 +133,21 @@ internal object DepthSorter {
             } else if (cmpPath > 0) {
                 drawBefore[j].add(i)
             }
+            // When cmpPath == 0 (coplanar or ambiguous), intentionally add no edge.
+            // Adding edges for these pairs disrupts correct top-face vs side-face
+            // ordering in tile grids. Kahn's algorithm handles the resulting
+            // zero-in-degree nodes in index order, which is deterministic enough.
         }
     }
 
+    /**
+     * Returns candidate pairs as Long-packed values: high 32 bits = larger index,
+     * low 32 bits = smaller index. Avoids Pair boxing entirely.
+     */
     private fun buildBroadPhaseCandidatePairs(
         items: List<TransformedItem>,
         cellSize: Double
-    ): List<Pair<Int, Int>> {
+    ): LongArray {
         val grid = hashMapOf<Long, MutableList<Int>>()
 
         items.forEachIndexed { index, item ->
@@ -119,7 +165,7 @@ internal object DepthSorter {
         }
 
         val seen = hashSetOf<Long>()
-        val pairs = mutableListOf<Pair<Int, Int>>()
+        val pairs = mutableListOf<Long>()
         for (bucket in grid.values) {
             if (bucket.size < 2) continue
             for (a in 0 until bucket.lastIndex) {
@@ -128,13 +174,13 @@ internal object DepthSorter {
                     val second = maxOf(bucket[a], bucket[b])
                     val key = pairKey(first, second)
                     if (seen.add(key)) {
-                        pairs.add(second to first)
+                        pairs.add(packPair(second, first))
                     }
                 }
             }
         }
 
-        return pairs
+        return pairs.toLongArray()
     }
 
     private fun cellKey(col: Int, row: Int): Long {
@@ -143,6 +189,11 @@ internal object DepthSorter {
 
     private fun pairKey(first: Int, second: Int): Long {
         return (first.toLong() shl 32) xor (second.toLong() and 0xffffffffL)
+    }
+
+    /** Pack two indices into a Long: high 32 bits = a, low 32 bits = b. */
+    private fun packPair(a: Int, b: Int): Long {
+        return (a.toLong() shl 32) or (b.toLong() and 0xFFFFFFFFL)
     }
 
     private fun TransformedItem.getBounds(): ItemBounds {
