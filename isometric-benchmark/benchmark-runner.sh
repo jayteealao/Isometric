@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-PACKAGE="io.fabianterhorst.isometric.benchmark"
+PACKAGE="io.github.jayteealao.isometric.benchmark"
 ACTIVITY="${PACKAGE}/.BenchmarkActivity"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DEVICE_RESULTS="/sdcard/Android/data/${PACKAGE}/files/benchmark-results"

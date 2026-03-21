@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.compose.runtime.AdvancedSceneConfig
 import io.github.jayteealao.isometric.compose.runtime.ForEach
@@ -46,6 +47,11 @@ fun BenchmarkScreen(
 ) {
     val items = remember { mutableStateListOf<GeneratedItem>() }
     val flags = config.flags
+
+    // Stable engine — must be remembered so IsometricScene's remember(config.engine)
+    // key doesn't change every recomposition, which would recreate the renderer and
+    // clear the PreparedScene cache on every frame.
+    val engine = remember { IsometricEngine() }
 
     // Single collector instance — shared by hooks and orchestrator
     val collector = remember { MetricsCollector(config.measurementFrames) }
@@ -96,6 +102,7 @@ fun BenchmarkScreen(
         IsometricScene(
             modifier = Modifier.fillMaxSize(),
             config = AdvancedSceneConfig(
+                engine = engine,
                 renderOptions = RenderOptions.Default.copy(
                     enableBroadPhaseSort = flags.enableBroadPhaseSort
                 ),

@@ -1,0 +1,31 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Runtime API - Opt. Perf screen"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
+# Swipe tab row left three times to reveal Opt. Perf tab
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+
+# Tap Opt. Perf tab
+- tapOn: "Opt. Perf"
+- waitForAnimationToEnd
+
+# Take screenshots
+- takeScreenshot: screenshots/opt_perf_01
