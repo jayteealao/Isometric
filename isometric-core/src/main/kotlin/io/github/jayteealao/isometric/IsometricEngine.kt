@@ -239,6 +239,62 @@ class IsometricEngine @JvmOverloads constructor(
         touchRadius: Double
     ): RenderCommand? = HitTester.findItemAt(preparedScene, x, y, order, touchRadius)
 
+    /**
+     * Async projection with GPU-accelerated depth sorting.
+     *
+     * Extracts a scalar depth key per face (`Point.depth = x + y - 2z` averaged over vertices),
+     * delegates to [SortingComputeBackend.sortByDepthKeys] for GPU radix sort, then reorders
+     * the transformed items by the returned indices.
+     */
+    override suspend fun projectSceneAsync(
+        width: Int,
+        height: Int,
+        renderOptions: RenderOptions,
+        lightDirection: Vector,
+        computeBackend: SortingComputeBackend,
+    ): PreparedScene {
+        val normalizedLight = lightDirection.normalize()
+        val originX = width / 2.0
+        val originY = height * 0.9
+
+        // Transform all items to 2D screen space (same as synchronous path)
+        val transformedItems = sceneGraph.items.mapNotNull { item ->
+            projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
+        }
+
+        // Sort by depth if enabled (same guard as synchronous path)
+        val sortedItems = if (renderOptions.enableDepthSorting) {
+            // Extract depth keys for GPU sort
+            val depthKeys = FloatArray(transformedItems.size) { i ->
+                val item = transformedItems[i].item
+                val avgDepth = item.path.points.sumOf { pt -> pt.x + pt.y - 2 * pt.z } / item.path.points.size
+                avgDepth.toFloat()
+            }
+
+            // GPU radix sort — returns back-to-front indices
+            val sortedIndices = computeBackend.sortByDepthKeys(depthKeys)
+
+            // Reorder by GPU-sorted indices
+            sortedIndices.map { transformedItems[it] }
+        } else {
+            transformedItems
+        }
+
+        // Convert to render commands (same as synchronous path)
+        val commands = sortedItems.map { transformedItem ->
+            RenderCommand(
+                commandId = transformedItem.item.id,
+                points = transformedItem.transformedPoints,
+                color = transformedItem.litColor,
+                originalPath = transformedItem.item.path,
+                originalShape = transformedItem.item.originalShape,
+                ownerNodeId = transformedItem.item.ownerNodeId
+            )
+        }
+
+        return PreparedScene(commands, width, height)
+    }
+
     private fun projectAndCull(
         item: SceneGraph.SceneItem,
         originX: Double,

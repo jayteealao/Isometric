@@ -55,6 +55,20 @@ interface SceneProjector {
     ): PreparedScene
 
     /**
+     * Async variant of [projectScene] that uses a [SortingComputeBackend] for depth sorting.
+     *
+     * Default implementation ignores the compute backend and delegates to the synchronous
+     * [projectScene]. Override in [IsometricEngine] to use the GPU sort.
+     */
+    suspend fun projectSceneAsync(
+        width: Int,
+        height: Int,
+        renderOptions: RenderOptions = RenderOptions.Default,
+        lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
+        computeBackend: SortingComputeBackend,
+    ): PreparedScene = projectScene(width, height, renderOptions, lightDirection)
+
+    /**
      * Find the frontmost item at a screen position (hit testing).
      */
     fun findItemAt(
