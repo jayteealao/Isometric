@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
+import io.github.jayteealao.isometric.SortingComputeBackend
 import io.github.jayteealao.isometric.compose.toComposeColor
 import io.github.jayteealao.isometric.compose.toComposePath
 
@@ -225,6 +226,86 @@ class IsometricRenderer(
         clearCache()
         benchmarkHooks = null
         onRenderError = null
+    }
+
+    // --- Async (GPU compute) API ---
+
+    /**
+     * Async scene preparation using a [SortingComputeBackend] for GPU-accelerated depth sorting.
+     *
+     * Must be called from a coroutine context (typically `Dispatchers.Default` via `withContext`).
+     * The result is stored in [currentPreparedScene] and can be drawn with [renderFromScene].
+     */
+    suspend fun prepareAsync(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int,
+        computeBackend: SortingComputeBackend,
+    ) {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+        if (width <= 0 || height <= 0) return
+        if (forceRebuild) clearCache()
+
+        if (cache.needsUpdate(rootNode, context, width, height)) {
+            benchmarkHooks?.onCacheMiss()
+            benchmarkHooks?.onPrepareStart()
+            val scene = cache.rebuildAsync(rootNode, context, width, height, computeBackend, onRenderError)
+            if (scene != null) {
+                hitTestResolver.rebuildIndices(rootNode, scene)
+            }
+            benchmarkHooks?.onPrepareEnd()
+        } else {
+            benchmarkHooks?.onCacheHit()
+        }
+    }
+
+    /**
+     * Draw a pre-built scene without running the prepare step.
+     *
+     * Used by the GPU compute path: the `LaunchedEffect` prepares the scene via [prepareAsync],
+     * then the Canvas lambda draws it via this method.
+     */
+    fun DrawScope.renderFromScene(
+        scene: PreparedScene,
+        strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
+    ) {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+
+        benchmarkHooks?.onDrawStart()
+        renderPreparedScene(
+            scene = scene,
+            strokeStyle = strokeStyle,
+            strokeComposeColor = when (strokeStyle) {
+                is StrokeStyle.FillOnly -> null
+                is StrokeStyle.Stroke -> strokeStyle.color.toComposeColor()
+                is StrokeStyle.FillAndStroke -> strokeStyle.color.toComposeColor()
+            },
+            strokeDrawStyle = when (strokeStyle) {
+                is StrokeStyle.FillOnly -> null
+                is StrokeStyle.Stroke -> Stroke(width = strokeStyle.width)
+                is StrokeStyle.FillAndStroke -> Stroke(width = strokeStyle.width)
+            },
+        )
+        benchmarkHooks?.onDrawEnd()
+    }
+
+    /**
+     * Draw a pre-built scene using native Android canvas without running the prepare step.
+     *
+     * Native-canvas variant of [renderFromScene] for the GPU compute + native draw path.
+     */
+    fun DrawScope.renderNativeFromScene(
+        scene: PreparedScene,
+        strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
+    ) {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+
+        benchmarkHooks?.onDrawStart()
+        with(nativeRenderer) {
+            renderNative(scene, strokeStyle, onRenderError)
+        }
+        benchmarkHooks?.onDrawEnd()
     }
 
     // --- Internal / Orchestration ---

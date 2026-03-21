@@ -23,7 +23,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.jayteealao.isometric.IsometricEngine
+import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
+import io.github.jayteealao.isometric.SortingComputeBackend
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Duration in milliseconds before a press is considered a long press. */
 private const val LONG_PRESS_TIMEOUT_MS = 500L
@@ -75,7 +79,9 @@ fun IsometricScene(
             strokeStyle = config.strokeStyle,
             gestures = config.gestures,
             useNativeCanvas = config.useNativeCanvas,
-            cameraState = config.cameraState
+            cameraState = config.cameraState,
+            renderBackend = config.renderBackend,
+            computeBackend = config.computeBackend,
         ),
         content = content
     )
@@ -276,6 +282,32 @@ fun IsometricScene(
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
 
+    // Async prepared scene state for GPU compute path.
+    // Called unconditionally to satisfy Compose's rules of hooks — remember count
+    // must be stable across recompositions regardless of config changes.
+    val isAsyncCompute = config.computeBackend.isAsync && config.computeBackend is SortingComputeBackend
+    val asyncPreparedScene = remember { mutableStateOf<PreparedScene?>(null) }
+
+    // Async compute path — runs prepareAsync() on Dispatchers.Default when dirty.
+    // Only activates for SortingComputeBackend. The CPU path is untouched.
+    if (isAsyncCompute) {
+        val computeBackend = config.computeBackend as SortingComputeBackend
+        LaunchedEffect(sceneVersion, canvasWidth, canvasHeight) {
+            if (canvasWidth <= 0 || canvasHeight <= 0) return@LaunchedEffect
+            withContext(Dispatchers.Default) {
+                renderer.prepareAsync(
+                    rootNode = rootNode,
+                    context = renderContext,
+                    width = canvasWidth,
+                    height = canvasHeight,
+                    computeBackend = computeBackend,
+                )
+            }
+            // Publish to state on the main thread (LaunchedEffect returns to main).
+            asyncPreparedScene.value = renderer.currentPreparedScene
+        }
+    }
+
     // Render to canvas with gesture handling.
     // Pointer input is installed when gestures are explicitly enabled OR when a
     // CameraState is provided (for default drag-to-pan behavior).
@@ -440,10 +472,17 @@ fun IsometricScene(
                 }
             )
     ) {
-        // Read sceneVersion to subscribe to node tree changes.
-        // When any node calls markDirty(), this triggers a Canvas redraw.
-        @Suppress("UNUSED_EXPRESSION")
-        sceneVersion
+        // Switch state subscription based on compute backend.
+        if (isAsyncCompute) {
+            // GPU path: subscribe to asyncPreparedScene state changes.
+            // The Canvas redraws when the LaunchedEffect publishes a new snapshot.
+            @Suppress("UNUSED_EXPRESSION")
+            asyncPreparedScene.value
+        } else {
+            // CPU path: subscribe to sceneVersion — unchanged from current behavior.
+            @Suppress("UNUSED_EXPRESSION")
+            sceneVersion
+        }
 
         // Read frameVersion to subscribe to external redraw requests.
         // Benchmarks use this to render static scenes every frame without mutating the tree.
@@ -476,19 +515,34 @@ fun IsometricScene(
             // Hook: before draw
             config.onBeforeDraw?.invoke(this)
 
-            with(renderer) {
-                if (config.useNativeCanvas) {
-                    renderNative(
-                        rootNode = rootNode,
-                        context = renderContext,
-                        strokeStyle = config.strokeStyle
-                    )
-                } else {
-                    render(
-                        rootNode = rootNode,
-                        context = renderContext,
-                        strokeStyle = config.strokeStyle
-                    )
+            if (isAsyncCompute) {
+                // GPU compute path: render from the async-prepared scene snapshot.
+                val scene = asyncPreparedScene.value
+                if (scene != null) {
+                    with(renderer) {
+                        if (config.useNativeCanvas) {
+                            renderNativeFromScene(scene, config.strokeStyle)
+                        } else {
+                            renderFromScene(scene, config.strokeStyle)
+                        }
+                    }
+                }
+            } else {
+                // CPU path: synchronous prepare + render — unchanged.
+                with(renderer) {
+                    if (config.useNativeCanvas) {
+                        renderNative(
+                            rootNode = rootNode,
+                            context = renderContext,
+                            strokeStyle = config.strokeStyle
+                        )
+                    } else {
+                        render(
+                            rootNode = rootNode,
+                            context = renderContext,
+                            strokeStyle = config.strokeStyle
+                        )
+                    }
                 }
             }
 

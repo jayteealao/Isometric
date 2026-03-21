@@ -6,6 +6,7 @@ import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.SceneProjector
+import io.github.jayteealao.isometric.SortingComputeBackend
 import io.github.jayteealao.isometric.Vector
 import io.github.jayteealao.isometric.compose.toComposeColor
 import io.github.jayteealao.isometric.compose.toComposePath
@@ -127,6 +128,65 @@ internal class SceneCache(
             scene
         } catch (e: Exception) {
             onRenderError?.invoke("rebuild", e)
+            null
+        }
+    }
+
+    /**
+     * Async variant of [rebuild] that uses a [SortingComputeBackend] for depth sorting.
+     *
+     * Collects render commands synchronously (same as [rebuild]), then calls
+     * [SceneProjector.projectSceneAsync] which delegates depth sorting to the GPU.
+     *
+     * Must be called from a coroutine context (GPU sort is always async).
+     */
+    suspend fun rebuildAsync(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int,
+        computeBackend: SortingComputeBackend,
+        onRenderError: ((String, Throwable) -> Unit)?
+    ): PreparedScene? {
+        return try {
+            val commands = mutableListOf<RenderCommand>()
+            rootNode.renderTo(commands, context)
+
+            engine.clear()
+            commands.forEach { command ->
+                engine.add(
+                    path = command.originalPath,
+                    color = command.color,
+                    originalShape = command.originalShape,
+                    id = command.commandId,
+                    ownerNodeId = command.ownerNodeId
+                )
+            }
+
+            val scene = engine.projectSceneAsync(
+                width = width,
+                height = height,
+                renderOptions = context.renderOptions,
+                lightDirection = context.lightDirection,
+                computeBackend = computeBackend,
+            )
+
+            currentPreparedScene = scene
+            cachedWidth = width
+            cachedHeight = height
+            cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+            cachedProjectionVersion = engine.projectionVersion
+
+            if (enablePathCaching) {
+                buildPathCache(scene)
+            }
+
+            rootNode.markClean()
+            cacheValid = true
+
+            scene
+        } catch (e: Exception) {
+            onRenderError?.invoke("rebuildAsync", e)
             null
         }
     }

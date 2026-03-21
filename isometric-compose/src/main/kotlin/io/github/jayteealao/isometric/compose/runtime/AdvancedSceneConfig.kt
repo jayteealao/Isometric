@@ -2,7 +2,9 @@ package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import io.github.jayteealao.isometric.ComputeBackend
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderOptions
@@ -63,6 +65,8 @@ class AdvancedSceneConfig(
     gestures: GestureConfig = GestureConfig.Disabled,
     useNativeCanvas: Boolean = false,
     cameraState: CameraState? = null,
+    renderBackend: RenderBackend = RenderBackend.Canvas,
+    computeBackend: ComputeBackend = ComputeBackend.Cpu,
     val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
@@ -85,7 +89,9 @@ class AdvancedSceneConfig(
     strokeStyle = strokeStyle,
     gestures = gestures,
     useNativeCanvas = useNativeCanvas,
-    cameraState = cameraState
+    cameraState = cameraState,
+    renderBackend = renderBackend,
+    computeBackend = computeBackend,
 ) {
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {

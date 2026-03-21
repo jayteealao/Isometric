@@ -1,10 +1,12 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.runtime.Immutable
+import io.github.jayteealao.isometric.ComputeBackend
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.SceneProjector.Companion.DEFAULT_LIGHT_DIRECTION
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Vector
+import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 
 /**
  * Core configuration for an isometric scene.
@@ -36,7 +38,9 @@ open class SceneConfig(
     val strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
     val gestures: GestureConfig = GestureConfig.Disabled,
     val useNativeCanvas: Boolean = false,
-    val cameraState: CameraState? = null
+    val cameraState: CameraState? = null,
+    val renderBackend: RenderBackend = RenderBackend.Canvas,
+    val computeBackend: ComputeBackend = ComputeBackend.Cpu,
 ) {
     override fun equals(other: Any?): Boolean =
         other != null &&
@@ -49,7 +53,9 @@ open class SceneConfig(
             strokeStyle == other.strokeStyle &&
             gestures == other.gestures &&
             useNativeCanvas == other.useNativeCanvas &&
-            cameraState === other.cameraState
+            cameraState === other.cameraState &&
+            renderBackend == other.renderBackend &&
+            computeBackend == other.computeBackend
 
     override fun hashCode(): Int {
         var result = renderOptions.hashCode()
@@ -60,6 +66,8 @@ open class SceneConfig(
         result = 31 * result + gestures.hashCode()
         result = 31 * result + useNativeCanvas.hashCode()
         result = 31 * result + (cameraState?.let { System.identityHashCode(it) } ?: 0)
+        result = 31 * result + renderBackend.hashCode()
+        result = 31 * result + computeBackend.hashCode()
         return result
     }
 
