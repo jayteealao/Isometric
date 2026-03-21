@@ -1,5 +1,6 @@
 plugins {
     id("isometric.android.library")
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.dokka)
     alias(libs.plugins.paparazzi)
     id("isometric.publishing")
@@ -13,10 +14,6 @@ android {
 
     buildFeatures {
         compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.compose.compiler.get()
     }
 
     defaultConfig {

@@ -1,16 +1,17 @@
 plugins {
     id("com.android.application")
     kotlin("android")
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "io.github.jayteealao.isometric.sample"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "io.github.jayteealao.isometric.sample"
         minSdk = 24
-        targetSdk = 33
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
@@ -37,10 +38,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"  // Compatible with Kotlin 1.9.22
-    }
 }
 
 dependencies {
@@ -49,15 +46,14 @@ dependencies {
     implementation(project(":isometric-compose"))       // For Compose samples
 
     // Android
-    implementation("androidx.appcompat:appcompat:1.5.1")
-    implementation("androidx.activity:activity-ktx:1.6.1")
+    implementation(libs.appcompat)
+    implementation(libs.activity.ktx)
 
-    // Compose (aligned with isometric-compose module)
-    val composeVersion = "1.5.0"
-    implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.material:material:$composeVersion")
-    implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
-    implementation("androidx.activity:activity-compose:1.6.1")
+    // Compose
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.activity.compose)
 
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
+    debugImplementation(libs.compose.ui.tooling)
 }

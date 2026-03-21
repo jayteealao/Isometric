@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    id("org.jetbrains.kotlin.jvm")
     alias(libs.plugins.dokka)
     id("isometric.publishing")
 }
@@ -45,4 +45,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }

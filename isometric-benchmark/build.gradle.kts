@@ -1,16 +1,17 @@
 plugins {
     id("com.android.application")
     kotlin("android")
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "io.github.jayteealao.isometric.benchmark"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "io.github.jayteealao.isometric.benchmark"
         minSdk = 24
-        targetSdk = 33
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }
@@ -37,10 +38,6 @@ android {
     buildFeatures {
         compose = true
     }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"  // Compatible with Kotlin 1.9.22
-    }
 }
 
 dependencies {
@@ -49,26 +46,25 @@ dependencies {
     implementation(project(":isometric-compose"))
 
     // Android
-    implementation("androidx.appcompat:appcompat:1.5.1")
-    implementation("androidx.activity:activity-ktx:1.6.1")
+    implementation(libs.appcompat)
+    implementation(libs.activity.ktx)
 
     // Compose
-    val composeVersion = "1.5.0"
-    implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.foundation:foundation:$composeVersion")
-    implementation("androidx.compose.runtime:runtime:$composeVersion")
-    implementation("androidx.compose.material:material:$composeVersion")
-    implementation("androidx.activity:activity-compose:1.6.1")
+    implementation(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.material)
+    implementation(libs.activity.compose)
 
     // Coroutines (for FramePacer / orchestrator)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation(libs.coroutines.android)
 
     // JSON serialization for config/results
     implementation("org.json:json:20231013")
 
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
+    debugImplementation(libs.compose.ui.tooling)
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("com.google.truth:truth:1.1.3")
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
 }

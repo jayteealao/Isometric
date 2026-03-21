@@ -17,16 +17,14 @@ buildscript {
 }
 
 plugins {
-    id 'com.android.application' version '8.2.2' apply false
-    id 'com.android.library' version '8.2.2' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
-//    id 'com.google.dagger.hilt.android' version '2.44' apply false
-//    id 'project-report'
-//    id 'org.jmailen.kotlinter' version "3.12.0" apply false
-    id 'org.jetbrains.kotlin.jvm' version '1.9.22' apply false
-    id 'org.jetbrains.dokka' version '2.1.0'
-    id 'com.vanniktech.maven.publish' version '0.30.0' apply false
-    id 'org.jetbrains.kotlinx.binary-compatibility-validator' version '0.17.0'
+    alias libs.plugins.android.application apply false
+    alias libs.plugins.android.library apply false
+    alias libs.plugins.kotlin.android apply false
+    alias libs.plugins.kotlin.jvm apply false
+    alias libs.plugins.kotlin.compose apply false
+    alias libs.plugins.dokka
+    alias libs.plugins.maven.publish apply false
+    alias libs.plugins.binary.compat
 }
 
 //allprojects {

@@ -14,5 +14,6 @@ dependencies {
     // via id("com.android.library") etc.
     implementation(libs.agp.gradle)
     implementation(libs.kotlin.gradle.plugin)
+    implementation(libs.compose.compiler.gradle.plugin)
     implementation(libs.vanniktech.publish.gradle.plugin)
 }
