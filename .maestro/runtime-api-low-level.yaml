@@ -1,0 +1,31 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Runtime API - Low Level screen"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
+# Swipe tab row left three times to reveal Low Level tab
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+
+# Tap Low Level tab
+- tapOn: "Low Level"
+- waitForAnimationToEnd
+
+# Take screenshots
+- takeScreenshot: screenshots/low_level_01

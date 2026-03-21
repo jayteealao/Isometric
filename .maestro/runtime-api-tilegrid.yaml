@@ -1,0 +1,27 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Runtime API - Tile Grid screen"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
+# Swipe tab row left twice to reveal Tile Grid tab
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+
+# Tap Tile Grid tab
+- tapOn: "Tile Grid"
+- waitForAnimationToEnd
+
+# Take screenshots
+- takeScreenshot: screenshots/tilegrid_01

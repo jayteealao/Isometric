@@ -1,0 +1,31 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Runtime API - Perf Cmp screen"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate from chooser to Runtime API
+- tapOn: "Runtime API"
+- waitForAnimationToEnd
+
+# Swipe tab row left three times to reveal Perf Cmp tab
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+- swipe:
+    start: 90%, 4%
+    end: 10%, 4%
+- waitForAnimationToEnd
+
+# Tap Perf Cmp tab
+- tapOn: "Perf Cmp"
+- waitForAnimationToEnd
+
+# Take screenshots
+- takeScreenshot: screenshots/perf_cmp_01

@@ -36,3 +36,11 @@ skills-lock.json
 # Downloaded vendor source for reference (not compiled into the project)
 vendor/
 webgpu-source.tar.gz
+
+# Performance deep-dive article series (HTML, generated — not for commit)
+docs/internal/reviews/perf-article-part*.html
+docs/internal/reviews/performance-deep-dive-part1.md
+
+# Benchmark comparison scripts (ephemeral analysis tooling)
+compare_benchmarks.py
+compare_gc.py
