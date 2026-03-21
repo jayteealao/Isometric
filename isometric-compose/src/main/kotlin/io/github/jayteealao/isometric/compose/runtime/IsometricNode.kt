@@ -87,11 +87,58 @@ abstract class IsometricNode {
         private set
 
     /**
-     * Unique identifier for this node.
-     * Uses a monotonically increasing atomic counter to guarantee collision-free IDs
-     * across the lifetime of the process, even under concurrent creation.
+     * Internal auto-generated identifier. Guaranteed unique across the process lifetime.
      */
-    val nodeId: String = "node_${nextId.getAndIncrement()}"
+    private val generatedNodeId: String = "node_${nextId.getAndIncrement()}"
+
+    /**
+     * Optional caller-supplied identifier. When non-null, becomes the effective [nodeId].
+     * Must be non-blank when set.
+     */
+    var explicitNodeId: String? = null
+        set(value) {
+            require(value == null || value.isNotBlank()) { "nodeId must be non-blank when provided" }
+            field = value
+        }
+
+    /**
+     * Effective identifier for this node.
+     *
+     * Returns [explicitNodeId] if the caller provided one, otherwise falls back to
+     * the auto-generated [generatedNodeId]. Used by hit-test resolution, render command
+     * ownership, and diagnostics.
+     */
+    val nodeId: String
+        get() = explicitNodeId ?: generatedNodeId
+
+    /**
+     * Opacity multiplier for this node's rendered output.
+     * Applied at render time by scaling the command color's alpha channel.
+     * Must be in 0..1 range.
+     */
+    var alpha: Float = 1f
+        set(value) {
+            require(value in 0f..1f) { "alpha must be in 0..1, got $value" }
+            field = value
+        }
+
+    /**
+     * Callback invoked when this node is tapped.
+     * Dispatched by [IsometricScene] after hit-test resolution.
+     */
+    var onClick: (() -> Unit)? = null
+
+    /**
+     * Callback invoked when this node is long-pressed.
+     * Dispatched by [IsometricScene] after long-press detection and hit-test resolution.
+     */
+    var onLongClick: (() -> Unit)? = null
+
+    /**
+     * Optional tag for testing and diagnostics.
+     * Does not affect rendering or hit testing.
+     */
+    var testTag: String? = null
 
     /**
      * Callback invoked when dirty propagation reaches a root node (parent == null).
@@ -188,6 +235,7 @@ class ShapeNode(
             scaleOrigin = scaleOrigin
         )
         val transformedShape = localContext.applyTransformsToShape(shape)
+        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
         // Convert shape to render commands — adds directly to accumulator
         for (path in transformedShape.paths) {
@@ -195,7 +243,7 @@ class ShapeNode(
                 RenderCommand(
                     commandId = "${nodeId}_${path.hashCode()}",
                     points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
-                    color = color,
+                    color = effectiveColor,
                     originalPath = path,
                     originalShape = transformedShape,
                     ownerNodeId = nodeId
@@ -230,12 +278,13 @@ class PathNode(
             scaleOrigin = scaleOrigin
         )
         val transformedPath = localContext.applyTransformsToPath(path)
+        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
         output.add(
             RenderCommand(
                 commandId = nodeId,
                 points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
-                color = color,
+                color = effectiveColor,
                 originalPath = transformedPath,
                 originalShape = null,
                 ownerNodeId = nodeId
@@ -270,6 +319,8 @@ class BatchNode(
             scaleOrigin = scaleOrigin
         )
 
+        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
+
         shapes.forEachIndexed { index, shape ->
             val transformedShape = localContext.applyTransformsToShape(shape)
 
@@ -278,7 +329,7 @@ class BatchNode(
                     RenderCommand(
                         commandId = "${nodeId}_${index}_${path.hashCode()}",
                         points = emptyList(),
-                        color = color,
+                        color = effectiveColor,
                         originalPath = path,
                         originalShape = transformedShape,
                         ownerNodeId = nodeId
@@ -320,6 +371,22 @@ class CustomRenderNode(
             scaleOrigin = scaleOrigin
         )
 
-        output += renderFunction(localContext, nodeId)
+        val commands = renderFunction(localContext, nodeId)
+        if (alpha < 1f) {
+            for (cmd in commands) {
+                output.add(
+                    RenderCommand(
+                        commandId = cmd.commandId,
+                        points = cmd.points,
+                        color = cmd.color.withAlpha(alpha),
+                        originalPath = cmd.originalPath,
+                        originalShape = cmd.originalShape,
+                        ownerNodeId = cmd.ownerNodeId
+                    )
+                )
+            }
+        } else {
+            output += commands
+        }
     }
 }

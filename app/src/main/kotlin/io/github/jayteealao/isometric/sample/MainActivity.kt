@@ -51,6 +51,11 @@ class MainActivity : ComponentActivity() {
                     description = "Declarative ComposeNode samples: hierarchy, gestures, conditional rendering, performance",
                     onClick = { onSelect(Intent(this@MainActivity, RuntimeApiActivity::class.java)) }
                 )
+                SampleCard(
+                    title = "Interaction API",
+                    description = "Per-node interaction: onClick, onLongClick, alpha transparency, stable nodeId, testTag",
+                    onClick = { onSelect(Intent(this@MainActivity, InteractionSamplesActivity::class.java)) }
+                )
             }
         }
     }

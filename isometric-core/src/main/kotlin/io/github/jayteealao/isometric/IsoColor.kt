@@ -149,6 +149,20 @@ data class IsoColor @JvmOverloads constructor(
     }
 
     /**
+     * Returns a copy of this color with the alpha channel scaled by [alpha].
+     *
+     * The [alpha] factor is multiplied against the existing alpha value, so
+     * `IsoColor(255, 0, 0, 200).withAlpha(0.5f)` produces alpha ≈ 100.
+     *
+     * @param alpha Opacity multiplier in 0&ndash;1 range.
+     * @throws IllegalArgumentException if [alpha] is outside 0&ndash;1.
+     */
+    fun withAlpha(alpha: Float): IsoColor {
+        require(alpha in 0f..1f) { "alpha must be in 0..1, got $alpha" }
+        return copy(a = (a * alpha).coerceIn(0.0, 255.0))
+    }
+
+    /**
      * Converts this color to an [IntArray] of four integer RGBA components,
      * each rounded to the nearest whole number in the 0&ndash;255 range.
      *
