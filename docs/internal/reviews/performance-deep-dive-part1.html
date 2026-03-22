@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Deep-Dive Part 1: Measuring Before Optimising</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    background: #fafafa;
+    color: #1a1a2e;
+    line-height: 1.7;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .series-banner {
+    background: #2563eb;
+    color: #fff;
+    text-align: center;
+    padding: 0.6rem 1rem;
+    font-size: 0.88rem;
+    letter-spacing: 0.03em;
+  }
+  .series-banner a {
+    color: #bfdbfe;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .series-banner a:hover { color: #fff; }
+  .series-banner strong { font-weight: 600; }
+
+  .wrapper {
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+  }
+
+  article {
+    background: #fff;
+    margin: 2rem auto;
+    padding: 2.5rem 2.5rem 3rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    max-width: 48rem;
+  }
+  @media (max-width: 640px) {
+    article { padding: 1.5rem 1.1rem 2rem; margin: 1rem 0.5rem; }
+  }
+
+  header { margin-bottom: 2rem; }
+
+  h1 {
+    font-size: 1.85rem;
+    line-height: 1.25;
+    color: #2563eb;
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+  }
+  @media (max-width: 640px) { h1 { font-size: 1.45rem; } }
+
+  h2 {
+    font-size: 1.4rem;
+    color: #2563eb;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 2px solid #dbeafe;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    color: #1e3a5f;
+    margin-top: 1.8rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  p { margin-bottom: 1rem; }
+
+  a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { color: #1d4ed8; }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  blockquote {
+    border-left: 4px solid #2563eb;
+    background: #eff6ff;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.95rem;
+    color: #1e3a5f;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 2rem 0;
+  }
+
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 1.1rem 1.25rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 1rem 0 1.25rem;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    -webkit-overflow-scrolling: touch;
+  }
+  pre code {
+    font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    background: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    background: #f1f5f9;
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: #1e1e2e;
+  }
+
+  /* Syntax highlighting */
+  .kw { color: #cba6f7; }       /* keywords */
+  .fn { color: #89b4fa; }       /* function names */
+  .str { color: #a6e3a1; }      /* strings */
+  .cmt { color: #6c7086; font-style: italic; }  /* comments */
+  .num { color: #fab387; }      /* numbers */
+  .type { color: #89dceb; }     /* types */
+  .op { color: #89b4fa; }       /* operators */
+  .prop { color: #f5c2e7; }     /* properties */
+  .annot { color: #f9e2af; }    /* annotations */
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0 1.25rem;
+    font-size: 0.92rem;
+  }
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+  }
+  th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #1e3a5f;
+  }
+  tr:nth-child(even) td { background: #fafbfd; }
+
+  ol, ul {
+    margin: 0.5rem 0 1rem 1.5rem;
+  }
+  li { margin-bottom: 0.35rem; }
+
+  nav.series-nav {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.85rem 1.25rem;
+    margin: 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.92rem;
+  }
+  nav.series-nav .nav-label { color: #64748b; font-weight: 500; }
+  nav.series-nav .nav-current { font-weight: 600; color: #1e3a5f; }
+
+  .teaser {
+    border-top: 2px solid #dbeafe;
+    margin-top: 2rem;
+    padding-top: 1.25rem;
+    font-style: italic;
+    color: #475569;
+  }
+</style>
+</head>
+<body>
+
+<div class="series-banner">
+  <strong>Performance Deep-Dive Series</strong> &mdash; Part 1 of 2 &nbsp;|&nbsp;
+  <a href="performance-deep-dive-part2.html">Part 2: Coplanar Faces and Topological Sort &rarr;</a>
+</div>
+
+<article class="wrapper">
+
+  <nav class="series-nav" aria-label="Series navigation">
+    <span class="nav-current">Part 1: Measuring Before Optimising</span>
+    <a href="performance-deep-dive-part2.html">Part 2: Coplanar Faces &amp; Topological Sort &rarr;</a>
+  </nav>
+
+  <header>
+    <h1>Performance Engineering on an Android Isometric Engine &mdash; Part 1: Measuring Before Optimising</h1>
+  </header>
+
+  <blockquote>
+    <p><strong>Series overview.</strong> This is the first instalment of an ongoing record of performance work on the
+    Isometric Kotlin library &mdash; a platform-agnostic 3D-to-2D isometric rendering engine with a
+    Jetpack Compose runtime. Later parts will extend the story as new optimisations land. The goal
+    is not a changelog but an explanation: why these choices, what the code is really doing, where
+    the bodies are buried, and where the headroom still lives.</p>
+  </blockquote>
+
+  <hr>
+
+  <section>
+    <h2>Why performance is harder than it looks for an isometric engine</h2>
+
+    <p>An isometric engine is, on the surface, a simple thing. You take a list of 3D polygons, project
+    them onto a 2D plane with a fixed oblique angle, sort them back-to-front, and paint them. There
+    are no meshes, no shaders, no depth buffer. The whole pipeline is software, and it runs on the
+    main thread on every frame.</p>
+
+    <p>That simplicity is both the engine's strength and its bottleneck. Because there is no GPU depth
+    test, the engine has to determine draw order by reasoning about polygon geometry. Because there is
+    no retained scene graph on the GPU, every frame that touches the scene must re-project every
+    visible face from world space to screen space. And because the engine lives inside Jetpack
+    Compose, the draw pipeline is entangled with the Compose recomposition lifecycle in ways that are
+    easy to misunderstand.</p>
+
+    <p>The practical consequence is that frame time blows up faster than you expect as scene complexity
+    grows. In the unoptimised baseline, a scene of 200 items renders in roughly <strong>105&ndash;225 ms</strong> depending
+    on interaction pattern &mdash; a range that spans from "barely acceptable on a 10fps display" to "visibly
+    broken on any modern device". Understanding <em>why</em> it is that slow, and <em>which</em> part of the pipeline
+    to attack first, required building a proper measurement framework before touching a single line of
+    production code.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 1: Building the Benchmark Harness</h2>
+
+    <h3>The measurement problem with Compose</h3>
+
+    <p>Measuring a Compose-based renderer is not the same as measuring a plain function. Compose's draw
+    pipeline is asynchronous: <code>Canvas.drawScope</code> executes during the <em>draw phase</em>, which is scheduled
+    by <code>Choreographer</code> and may happen one or more frames after the recomposition that produced the
+    content. A naive approach &mdash; wrap <code>IsometricScene</code> in a <code>LaunchedEffect</code>, measure wall-clock time
+    before and after, average over N frames &mdash; will produce measurements that mix recomposition time,
+    layout time, draw time, and frame-pacing jitter in a way that makes it impossible to attribute
+    cost to any specific subsystem.</p>
+
+    <p>The harness design document (written before a line of code was committed, which was intentional)
+    identified three timing sites that needed to be measured independently:</p>
+
+    <ol>
+      <li><strong>Prepare time</strong> &mdash; the time to run <code>projectScene()</code> inside <code>IsometricEngine</code>: transforming
+      3D points to 2D screen coordinates, applying lighting, running back-face culling, and sorting
+      faces by depth. This is pure CPU computation with no Compose involvement.</li>
+
+      <li><strong>Draw time</strong> &mdash; the time to iterate the sorted <code>PreparedScene.commands</code> list and issue
+      <code>drawPath()</code> calls on the Compose <code>DrawScope</code>. This is bounded by the number of visible faces
+      and the cost of each <code>Path</code> object.</li>
+
+      <li><strong>Hit-test time</strong> &mdash; the time to identify which rendered shape is under a given screen
+      coordinate. This matters because the benchmarks simulate user interaction (touch events), and
+      interactive scenes have meaningfully different performance profiles from static ones.</li>
+    </ol>
+
+    <p>These three times do not add up to the total frame budget. The difference is Compose overhead:
+    recomposition, layout, the <code>ForEach</code> slot machinery, and the OS frame-pacing gap between
+    <code>Choreographer</code> callbacks. The harness tracks that gap separately as <code>frame time</code>, measured as
+    the interval between consecutive <code>onDraw</code> completions.</p>
+
+    <h3>The <code>LocalBenchmarkHooks</code> contract</h3>
+
+    <p>The key architectural decision was how to get timing data out of the renderer without
+    contaminating the production code path. The chosen mechanism is a <code>CompositionLocal</code>:</p>
+
+    <pre><code><span class="cmt">// Production (in IsometricRenderer.draw):</span>
+benchmarkHooks?.<span class="fn">onPrepareStart</span>()
+<span class="kw">val</span> scene = engine.<span class="fn">projectScene</span>(width, height, renderOptions, lightDirection)
+benchmarkHooks?.<span class="fn">onPrepareEnd</span>()</code></pre>
+
+    <p><code>LocalBenchmarkHooks</code> defaults to <code>null</code>. In production builds running normally, the
+    null-check short-circuits with no allocation and essentially zero overhead. In the benchmark
+    Activity, a <code>BenchmarkHooksImpl</code> is provided via <code>CompositionLocalProvider</code>, and all timing
+    calls flow through it to a <code>MetricsCollector</code>.</p>
+
+    <p>The <code>forceRebuild</code> flag on <code>IsometricRenderer</code> follows the same zero-overhead pattern: it is a
+    property (not a function parameter) so that it can be set once before the benchmark loop without
+    changing the <code>render()</code> / <code>renderNative()</code> call signatures. Setting it to <code>true</code> bypasses the
+    prepared-scene cache on every frame, which is how the baseline measurement ensures it is measuring
+    the real cost of <code>projectScene()</code> rather than a cache hit.</p>
+
+    <h3>The 24-scenario matrix</h3>
+
+    <p>The benchmark matrix was designed to span three independent dimensions:</p>
+
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>Values</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Scene size (N)</td><td>10, 50, 100, 200</td><td>Covers vsync-floor, sub-60fps, mid-range, and overloaded regimes</td></tr>
+        <tr><td>Mutation rate</td><td>10%, 50%</td><td>Low and high churn; affects cache hit rates and recomposition frequency</td></tr>
+        <tr><td>Interaction pattern</td><td>NONE, OCCASIONAL, CONTINUOUS</td><td>Determines hit-test load; CONTINUOUS fires every other frame</td></tr>
+      </tbody>
+    </table>
+
+    <p>This gives 4 &times; 2 &times; 3 = 24 scenarios. Each scenario runs for 500 measurement frames across 3
+    iterations with an adaptive warmup phase (JIT needs time to stabilise; the harness waits until
+    frame-time coefficient of variation drops below 10% over a 20-frame window before counting
+    frames).</p>
+
+    <p>The "CONTINUOUS" interaction pattern deserves particular attention. It is not a realistic usage
+    pattern &mdash; real users do not tap the screen 60 times a second. But it creates a useful stress test
+    for the hit-test subsystem, and it has an interesting interaction with the prepared-scene cache
+    that only reveals itself at scale (more on this in Part 3).</p>
+
+    <h3>Self-tests as a correctness gate</h3>
+
+    <p>Before the matrix runs, two self-tests execute:</p>
+
+    <ul>
+      <li><strong><code>selftest_cache</code></strong> &mdash; N=10, mutationRate=0, all caches ON. Asserts that the cache hit rate
+      exceeds 95%. A static scene with no mutations should <em>always</em> hit the cache; if it doesn't, the
+      cache is broken or (as was discovered) the engine reference is unstable.</li>
+
+      <li><strong><code>selftest_sanity</code></strong> &mdash; N=10, mutationRate=0.10, all flags OFF. Asserts that average frame time
+      is below 20ms and observed mutation rate is within &plusmn;2% of configured rate. This catches
+      harness bugs (wrong mutation logic) and catastrophic regressions before they waste 10 minutes
+      of benchmark time.</li>
+    </ul>
+
+    <p>The self-tests proved their value almost immediately.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 2: The Prepared-Scene Cache &mdash; Skipping Work You Already Did</h2>
+
+    <h3>What <code>projectScene()</code> actually does</h3>
+
+    <p>Every call to <code>IsometricEngine.projectScene()</code> does this, for every item in the scene:</p>
+
+    <pre><code><span class="kw">val</span> transformedItems = sceneGraph.items.<span class="fn">mapNotNull</span> { item <span class="op">-&gt;</span>
+    <span class="fn">projectAndCull</span>(item, originX, originY, renderOptions, normalizedLight, width, height)
+}</code></pre>
+
+    <p>Inside <code>projectAndCull</code>, each face's polygon vertices are individually projected from 3D world
+    space to 2D screen space using the isometric projection formula, back-face culled, bounds-checked
+    against the viewport, and lit using the dot product of the face normal with the light direction.
+    The result is a new <code>List&lt;Point2D&gt;</code> per face, a new <code>IsoColor</code> per face, and a new
+    <code>TransformedItem</code> wrapping both. Then <code>DepthSorter.sort()</code> runs the O(N&sup2;) intersection test
+    to produce the draw order.</p>
+
+    <p>For a 200-item scene with an average of 3 visible faces per item, this is roughly 600 projection
+    calls, 600 lighting calculations, and a sort over 600 items &mdash; on every frame, even if the scene
+    has not changed at all since last frame.</p>
+
+    <h3>The cache design</h3>
+
+    <p>The prepared-scene cache stores the last <code>PreparedScene</code> alongside the conditions under which it
+    was produced. On the next call to <code>projectScene()</code>, it checks whether those conditions still hold:</p>
+
+    <pre><code><span class="kw">fun</span> <span class="fn">needsUpdate</span>(rootNode, context, width, height): <span class="type">Boolean</span> {
+    <span class="kw">val</span> currentInputs = <span class="type">PrepareInputs</span>(context.renderOptions, context.lightDirection)
+    <span class="kw">return</span> rootNode.isDirty <span class="op">||</span>
+           !cacheValid <span class="op">||</span>
+           width <span class="op">!=</span> cachedWidth <span class="op">||</span>
+           height <span class="op">!=</span> cachedHeight <span class="op">||</span>
+           currentInputs <span class="op">!=</span> cachedPrepareInputs <span class="op">||</span>
+           engine.projectionVersion <span class="op">!=</span> cachedProjectionVersion
+}</code></pre>
+
+    <p>If none of these conditions is true, the cache is returned as-is. The only cost is six comparisons
+    and a boolean OR &mdash; a few nanoseconds. The original commit message put it plainly: "fast path:
+    4 int comparisons + 1 reference check (~5ns). Slow path: full scene preparation (~65ms)."</p>
+
+    <p>The <code>isDirty</code> flag on <code>GroupNode</code> is the most important condition. It is set whenever any
+    <code>ShapeNode</code> inside the scene tree changes &mdash; when a <code>ForEach</code> slot updates an item's position,
+    colour, or geometry. The <code>markClean()</code> call at the end of a successful rebuild resets it.
+    <code>projectionVersion</code> is a monotonically incrementing counter on <code>IsometricEngine</code> that only changes
+    when the projection angle or scale changes at runtime; it signals that the 2D coordinates
+    themselves would change even if the scene content hasn't.</p>
+
+    <h3>The stable engine reference bug</h3>
+
+    <p>The self-test immediately revealed a 0% cache hit rate &mdash; not because the cache logic was wrong,
+    but because the engine it was caching on behalf of was being replaced on every recomposition.</p>
+
+    <p>The original <code>BenchmarkScreen</code> constructed <code>AdvancedSceneConfig</code> inline, like this:</p>
+
+    <pre><code><span class="fn">IsometricScene</span>(
+    config = <span class="type">AdvancedSceneConfig</span>(
+        <span class="cmt">// engine defaults to IsometricEngine() &mdash; creates a NEW instance here</span>
+        renderOptions = <span class="type">RenderOptions</span>.<span class="prop">Default</span>.<span class="fn">copy</span>(
+            enableBroadPhaseSort = flags.enableBroadPhaseSort
+        ),
+        frameVersion = frameVersion,  <span class="cmt">// incremented every frame</span>
+        ...
+    )
+)</code></pre>
+
+    <p><code>AdvancedSceneConfig.engine</code> has a default parameter of <code>IsometricEngine()</code>. Every time
+    <code>BenchmarkScreen</code> recomposes &mdash; which happens every time <code>frameVersion</code> increments, which happens
+    every frame &mdash; <code>AdvancedSceneConfig</code> is instantiated with a fresh <code>IsometricEngine()</code> object.</p>
+
+    <p>Inside <code>IsometricScene</code>, the renderer is keyed on the engine reference:</p>
+
+    <pre><code><span class="kw">val</span> engine = <span class="fn">remember</span>(config.engine) { config.engine }
+<span class="kw">val</span> renderer = <span class="fn">remember</span>(engine, ...) { <span class="type">IsometricRenderer</span>(engine, ...) }</code></pre>
+
+    <p>A new engine object means a new renderer object. A new renderer object means a fresh
+    <code>SceneCache</code> with <code>cacheValid = false</code>. The very first condition in <code>needsUpdate()</code> &mdash; <code>!cacheValid</code>
+    &mdash; fires on every single frame. The cache appeared to be working (the code was correct) but the
+    object it lived in was being discarded before it could ever be reused.</p>
+
+    <p>The fix was one line:</p>
+
+    <pre><code><span class="kw">val</span> engine = <span class="fn">remember</span> { <span class="type">IsometricEngine</span>() }</code></pre>
+
+    <p>With the engine stabilised in <code>remember{}</code>, the renderer is created once and its cache
+    accumulates state across frames. The self-test immediately passed with a 99% hit rate.</p>
+
+    <p>This is a good example of a class of Compose bugs where the <em>contract</em> is correct but
+    the <em>composition</em> breaks it. The cache logic was fine; the problem was that Compose's
+    object identity semantics require callers to ensure that the keys they pass to <code>remember()</code>
+    are stable. A new <code>IsometricEngine()</code> is structurally identical to the previous one but
+    referentially different &mdash; and reference equality is what <code>remember()</code> uses.</p>
+
+    <h3>What the cache buys in practice</h3>
+
+    <p>The cache hit rate at runtime is governed by probability. For a scene of N items where each item
+    independently mutates with probability <code>p</code> per frame, the probability that a given frame is a
+    cache hit (no item changed) is:</p>
+
+    <pre><code>P(cache hit) = (<span class="num">1</span> - p)^N</code></pre>
+
+    <p>At N=10, p=0.10: <code>0.9^10 &asymp; 34.9%</code> &mdash; consistent with the measured 32.4%.</p>
+
+    <p>At N=50, p=0.10: <code>0.9^50 &asymp; 0.5%</code> &mdash; consistent with the measured 0.2%.</p>
+
+    <p>At N=100 and above: effectively zero for any non-trivial mutation rate.</p>
+
+    <p>This means the prepared-scene cache only provides meaningful throughput improvement for small
+    scenes or for the specific pattern where mutations are externally gated. The "CONTINUOUS"
+    interaction pattern turns out to be the most valuable case: the orchestrator alternates between
+    hit-test frames (no mutation) and mutation frames, which produces exactly a 50% cache hit rate
+    regardless of scene size. This is what makes the cache genuinely useful at N=200 in the combined
+    run &mdash; every other frame skips the entire <code>projectScene()</code> call.</p>
+
+    <p>The single-branch PSC benchmark confirmed this: PSC alone delivered a <strong>&minus;17% average GC
+    reduction</strong> and <strong>2.40&times; speedup at N=200</strong> &mdash; respectable, but not the headline number. The cache
+    needs a companion optimisation to earn its keep for large scenes.</p>
+
+    <h3>Alternative approaches considered</h3>
+
+    <p>A version-counter approach (increment a scene version on every mutation, compare counters in the
+    cache check) was the original design. The final implementation kept the <code>isDirty</code> flag on the
+    node tree rather than a global version because it is cheaper to check (<code>isDirty</code> is set at the
+    node that changed; a global counter requires an extra field and an atomic write per mutation).
+    The downside is that <code>isDirty</code> is cleared by <code>markClean()</code> at the end of <code>rebuild()</code>, so it is
+    not idempotent across multiple concurrent renders &mdash; but the renderer is single-threaded, so this
+    is not a problem in practice.</p>
+
+    <p>A more aggressive approach would be per-item dirty tracking: cache the projected position and lit
+    colour for each item individually, and only re-project the items that changed. This would make the
+    cache useful at high mutation rates by only paying for the items that moved. The cost is
+    significantly more complex bookkeeping, and it does not help with the sort phase &mdash; even if only
+    one item changes, the sort must be rerun because that item's position relative to all others may
+    have changed. Given that sort cost dominates (see Part 3), per-item cache refinement was deprioritised.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 3: Broad-Phase Sort &mdash; Taming the O(N&sup2;) Bottleneck</h2>
+
+    <h3>Why depth sorting is O(N&sup2;) by design</h3>
+
+    <p>The isometric depth sort does not use a simple comparator. Isometric scenes can contain genuine
+    depth ambiguities &mdash; two shapes that partially overlap on screen, where neither is entirely in
+    front of the other &mdash; and a comparator-based sort does not handle these correctly or even
+    consistently. The correct algorithm is a <em>topological sort</em> on a dependency graph: face A must
+    be drawn before face B if A's projection lies behind B's from the viewer's perspective.</p>
+
+    <p>Building this graph requires testing every pair of faces for 2D screen-space overlap, then
+    resolving the ordering using 3D depth. The naive implementation is O(N&sup2;):</p>
+
+    <pre><code><span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span> until length) {
+    <span class="kw">val</span> itemA = items[i]
+    <span class="kw">for</span> (j <span class="kw">in</span> <span class="num">0</span> until i) {
+        <span class="kw">val</span> itemB = items[j]
+        <span class="kw">if</span> (<span class="type">IntersectionUtils</span>.<span class="fn">hasIntersection</span>(...)) {
+            <span class="kw">val</span> cmpPath = itemA.item.path.<span class="fn">closerThan</span>(itemB.item.path, observer)
+            <span class="cmt">// record dependency</span>
+        }
+    }
+}</code></pre>
+
+    <p>For a 200-item scene with 3 faces per item, this is 600 faces, roughly 180,000 pair tests per
+    frame. Each test calls <code>IntersectionUtils.hasIntersection()</code>, which checks whether two convex
+    polygons overlap in screen space. It is not a cheap operation.</p>
+
+    <p>The benchmarks confirmed the cost: at N=200, prepare time averaged <strong>97&ndash;107 ms</strong> in the baseline.
+    The sort was the reason.</p>
+
+    <h3>The broad-phase grid</h3>
+
+    <p>The fix is a classic technique from physics engines: before testing any pair, use a coarse spatial
+    grid to eliminate pairs whose axis-aligned bounding boxes do not even overlap. Only pairs that
+    share at least one grid cell need to be passed to the expensive intersection test.</p>
+
+    <pre><code><span class="kw">private fun</span> <span class="fn">buildBroadPhaseCandidatePairs</span>(
+    items: <span class="type">List</span>&lt;<span class="type">TransformedItem</span>&gt;,
+    cellSize: <span class="type">Double</span>
+): <span class="type">List</span>&lt;<span class="type">Pair</span>&lt;<span class="type">Int</span>, <span class="type">Int</span>&gt;&gt; {
+    <span class="kw">val</span> grid = <span class="type">HashMap</span>&lt;<span class="type">Long</span>, <span class="type">MutableList</span>&lt;<span class="type">Int</span>&gt;&gt;()
+
+    items.<span class="fn">forEachIndexed</span> { index, item <span class="op">-&gt;</span>
+        <span class="kw">val</span> bounds = item.<span class="fn">getBounds</span>()
+        <span class="kw">val</span> minCol = <span class="fn">floor</span>(bounds.minX / cellSize).<span class="fn">toInt</span>()
+        <span class="kw">val</span> maxCol = <span class="fn">floor</span>(bounds.maxX / cellSize).<span class="fn">toInt</span>()
+        <span class="kw">val</span> minRow = <span class="fn">floor</span>(bounds.minY / cellSize).<span class="fn">toInt</span>()
+        <span class="kw">val</span> maxRow = <span class="fn">floor</span>(bounds.maxY / cellSize).<span class="fn">toInt</span>()
+
+        <span class="kw">for</span> (row <span class="kw">in</span> minRow..maxRow) {
+            <span class="kw">for</span> (col <span class="kw">in</span> minCol..maxCol) {
+                grid.<span class="fn">getOrPut</span>(<span class="fn">cellKey</span>(col, row)) { <span class="fn">mutableListOf</span>() }.<span class="fn">add</span>(index)
+            }
+        }
+    }
+    <span class="cmt">// emit unique pairs from co-resident items</span>
+}</code></pre>
+
+    <p>Each face is placed into every grid cell it overlaps. Then, for each cell, every pair of faces
+    in that cell becomes a candidate for the expensive test. The cell key is packed into a <code>Long</code> as
+    <code>(col.toLong() shl 32) xor (row.toLong() and 0xffffffffL)</code> &mdash; this avoids boxing and keeps the
+    hash map fast. Pairs are deduplicated with a <code>HashSet&lt;Long&gt;</code> using the same bit-packing trick.</p>
+
+    <p>The performance impact was the largest single improvement measured: <strong>&minus;55% GC, 3.60&times; speedup at
+    N=200, &minus;82% frame time for the worst-case s200_m50_continuous scenario</strong>. No other single
+    optimisation came close.</p>
+
+    <h3>Why it works so well for isometric scenes specifically</h3>
+
+    <p>Isometric scenes have a structural property that makes broad-phase pruning particularly effective:
+    faces tend to cluster spatially. A prism at position (x, y, z) projects to a contiguous patch of
+    screen space. Its three visible faces all land near each other. A second prism at (x+5, y+5, z)
+    projects to a completely different patch. The two prisms have no screen-space overlap, and the
+    broad-phase grid rejects their face pairs without any intersection test at all.</p>
+
+    <p>The effective pruning ratio grows with scene density. In a sparse scene (N=10), most faces
+    already have no neighbours in the same cell, and the broad phase adds overhead without saving
+    much. This explains why BPS showed neutral results (&plusmn;0%) for N=10 scenarios &mdash; the grid overhead
+    matched the savings. At N=200, the pruning is dramatic: hundreds of far-apart faces are rejected
+    instantly, and only geometrically proximate pairs are tested.</p>
+
+    <h3>The cell size trade-off</h3>
+
+    <p>The <code>broadPhaseCellSize</code> parameter (default: 100 pixels) determines the coarseness of the grid.
+    Larger cells mean more false positives (pairs that share a cell but do not actually overlap), more
+    expensive <code>hasIntersection()</code> calls, and less pruning. Smaller cells mean finer exclusion but
+    more memory and more items in the <code>grid</code> map.</p>
+
+    <p>At the default scale (70 pixels per world unit), a typical face is 100&ndash;150 pixels wide on screen.
+    A cell size of 100 pixels ensures that most faces span 1&ndash;2 cells, which is the sweet spot: cells
+    are small enough to exclude distant pairs but large enough that each face does not span too many
+    cells. The <code>RenderOptions.broadPhaseCellSize</code> is a public parameter, allowing callers who use
+    non-default scales to tune this.</p>
+
+    <p>The <code>require(broadPhaseCellSize &gt; 0.0)</code> guard on <code>RenderOptions</code> construction is a deliberate
+    enforcement point &mdash; there is no meaningful interpretation of a zero or negative cell size, and
+    failing early at the construction site is better than producing silently wrong output later.</p>
+
+    <h3>What the tests check</h3>
+
+    <p>The parity tests for broad-phase sort verify two things: that the sort produces identical draw
+    order to the baseline for sparse scenes (where no pruning occurs), and for dense overlapping
+    scenes (where the graph is non-trivial). This is important because the optimisation changes
+    <em>which pairs are tested</em> but must not change <em>which orderings are emitted</em>. A bug in the
+    deduplication logic that caused a pair to be tested twice would not change correctness (the
+    dependency would just be recorded once anyway), but a bug that caused a pair to be missed would
+    produce incorrect draw order &mdash; a painter's-algorithm violation that would manifest as a z-fighting
+    flicker.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 4: Spatial Index for Hit Testing &mdash; From O(N) to O(k)</h2>
+
+    <h3>The hit-test bottleneck in interactive scenes</h3>
+
+    <p>Hit testing answers the question: "which shape did the user touch?" The naive implementation
+    iterates every <code>RenderCommand</code> in the prepared scene in reverse draw order (front-to-back) and
+    tests whether the touch point lies inside the command's polygon. For a 200-item scene with 3
+    visible faces each, this is up to 600 polygon containment tests per touch event.</p>
+
+    <p>In NONE interaction (no touches), this cost is zero. In OCCASIONAL (a tap every few seconds), it
+    is negligible. In CONTINUOUS (a simulated touch every other frame at 60fps), it contributes
+    <strong>102 ms</strong> to the frame at N=200 in the baseline &mdash; nearly the entire frame budget by itself.</p>
+
+    <p>The spatial index moves this from O(faces) to O(k) where k is the number of faces whose bounding
+    boxes contain the touch point. For a sparse layout, k is typically 1&ndash;5; for a densely overlapping
+    scene, k might be 10&ndash;20. In either case, the difference from 600 is dramatic.</p>
+
+    <h3>A bug hidden in two layers</h3>
+
+    <p>The spatial index implementation shipped with two bugs that cancelled each other out in basic
+    testing but showed up in the benchmarks:</p>
+
+    <p><strong>Bug 1: The index was only built inside the path-caching guard.</strong> The original code placed
+    <code>buildSpatialIndex()</code> inside an <code>if (enablePathCaching)</code> block. Setting
+    <code>enableSpatialIndex=true</code> without <code>enablePathCaching=true</code> would silently do nothing &mdash; the index
+    was never built, and the "fast path" code would find <code>spatialIndex == null</code> and fall through to
+    the slow path. The single-flag SI benchmark ran with path caching off, which means the entire
+    spatial index branch measured <em>the O(N) slow path</em> and reported it as the spatial index result.</p>
+
+    <p><strong>Bug 2: The "fast path" was O(k&times;N).</strong> The original code queried the spatial index for a list of
+    candidate command IDs, then called <code>engine.findItemAt()</code> on the full prepared scene for each
+    candidate. <code>findItemAt()</code> performs its own linear scan. The result was k linear scans instead of
+    one &mdash; strictly worse than the original O(N) for k &gt; 1.</p>
+
+    <p>The fix, committed as <code>accc7a0</code>, resolved both:</p>
+
+    <ol>
+      <li>Split <code>buildCacheAndIndex()</code> into independent <code>buildPathCache()</code> and <code>buildSpatialIndex()</code>
+      methods, each guarded by their own flag.</li>
+
+      <li>Changed the hit-test fast path to build a <em>filtered</em> <code>PreparedScene</code> from candidates and
+      call <code>findItemAt()</code> once on that subset &mdash; achieving true O(k).</li>
+    </ol>
+
+    <pre><code><span class="cmt">// Before (O(k*N)):</span>
+<span class="kw">val</span> candidates = spatialIndex!!.<span class="fn">query</span>(x, y)
+<span class="kw">for</span> (commandId <span class="kw">in</span> candidates.<span class="fn">asReversed</span>()) {
+    <span class="kw">val</span> filtered = <span class="type">PreparedScene</span>(<span class="fn">listOf</span>(commandIdMap[commandId]!!), ...)
+    <span class="kw">val</span> hit = engine.<span class="fn">findItemAt</span>(currentPreparedScene!!, x, y, ...)
+    <span class="cmt">// searched the full scene for each candidate</span>
+}
+
+<span class="cmt">// After (O(k)):</span>
+<span class="kw">val</span> candidates = spatialIndex!!.<span class="fn">query</span>(x, y)
+<span class="kw">val</span> filteredScene = <span class="type">PreparedScene</span>(
+    candidates.<span class="fn">mapNotNull</span> { commandIdMap[it] },
+    cachedWidth, cachedHeight
+)
+<span class="kw">val</span> hit = engine.<span class="fn">findItemAt</span>(filteredScene, x, y, ...)</code></pre>
+
+    <p>The commit also introduced <code>commandIdMap</code> and <code>commandToNodeMap</code> &mdash; <code>HashMap&lt;String, RenderCommand&gt;</code>
+    and <code>HashMap&lt;String, IsometricNode&gt;</code> respectively &mdash; to replace the <code>find { }</code> linear scans that
+    were previously used to resolve command IDs to nodes after a hit test. These maps are rebuilt
+    whenever the cache is rebuilt, which happens at most once per mutation cycle.</p>
+
+    <h3>Why SI showed near-zero GC improvement</h3>
+
+    <p>The spatial index branch added essentially no GC improvement (+7% vs baseline in the all-scenario
+    average, within noise). The reason is structural: the SI optimisation targets hit-test time, not
+    <code>projectScene()</code> time. The two largest allocation sites &mdash; the <code>mapNotNull</code> intermediate list in
+    <code>projectScene()</code> and the sort comparator lambdas in <code>DepthSorter.sort()</code> &mdash; are untouched by SI.
+    And the index itself allocates during every rebuild: the <code>HashMap</code> and bucket lists are
+    reconstructed from scratch on each cache miss. For scenes that miss the cache on every frame
+    (N&ge;50, mutationRate&ge;10%), the index rebuild overhead roughly equals whatever allocation savings
+    come from faster hit testing.</p>
+
+    <p>SI's value is purely a latency win: it drives hit-test time from 102 ms to 30 ms at N=200
+    continuous, which matters enormously for interactivity but does not show up in GC numbers.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 5: Path Caching &mdash; The Draw Phase's Hidden Cost</h2>
+
+    <h3>What <code>toComposePath()</code> does on every frame</h3>
+
+    <p>The draw phase iterates <code>PreparedScene.commands</code> and for each command calls <code>drawPath()</code> on the
+    Compose <code>DrawScope</code>. Compose's <code>DrawScope.drawPath()</code> takes an <code>androidx.compose.ui.graphics.Path</code>
+    object. The engine stores paths as its own <code>io.github.jayteealao.isometric.Path</code> type (a list of
+    3D <code>Point</code> objects). The conversion happens at draw time:</p>
+
+    <pre><code><span class="cmt">// Inside IsometricRenderer.draw(), for each command:</span>
+drawScope.<span class="fn">drawPath</span>(command.<span class="fn">toComposePath</span>(), color)</code></pre>
+
+    <p><code>toComposePath()</code> allocates a new <code>android.graphics.Path</code> object, moves to the first projected
+    point, adds lines to the remaining points, and closes the polygon. For a 600-face N=200 scene,
+    this is 600 <code>Path</code> allocations per draw call &mdash; roughly 3 allocations per face (the <code>Path</code> object,
+    the internal <code>PathData</code> backing array, and the coordinate array).</p>
+
+    <p>This is not the most expensive thing the renderer does, but it is entirely unnecessary for frames
+    where the scene geometry has not changed. The projected screen coordinates of a face are fixed
+    until the cache is invalidated.</p>
+
+    <h3>The path cache design</h3>
+
+    <p>When <code>enablePathCaching = true</code>, the renderer maintains a <code>List&lt;SceneCache.CachedPath&gt;</code> that is
+    rebuilt whenever <code>SceneCache.rebuild()</code> runs:</p>
+
+    <pre><code><span class="kw">private fun</span> <span class="fn">buildPathCache</span>(scene: <span class="type">PreparedScene</span>) {
+    cachedPaths = scene.commands.<span class="fn">map</span> { command <span class="op">-&gt;</span>
+        <span class="type">CachedPath</span>(
+            path = command.<span class="fn">toComposePath</span>(),
+            fillColor = command.color.<span class="fn">toComposeColor</span>(),
+            commandId = command.commandId
+        )
+    }
+}</code></pre>
+
+    <p>On frames where the prepared-scene cache is valid, the draw loop uses the pre-converted paths
+    directly. On frames where the cache is invalid (a mutation occurred), the path cache is rebuilt
+    as part of the same rebuild operation. The net effect is that <code>toComposePath()</code> is called at most
+    once per face per mutation event, not once per face per draw frame.</p>
+
+    <p>The PC benchmark showed this was primarily a draw-time and GC win, not a prepare-time win.
+    Draw times dropped dramatically at all scene sizes &mdash; the path conversion was a meaningful fraction
+    of draw cost. But GC showed nearly zero improvement at the all-scenario average (+2% vs baseline),
+    because path allocation is small relative to the <code>projectScene()</code> intermediate lists that BPS
+    and PSC eliminate. Path caching pays the most when the draw phase is the bottleneck, which only
+    happens when the prepare phase has already been heavily optimised &mdash; exactly the position we are in
+    with BPS active.</p>
+
+    <h3>The allocation picture</h3>
+
+    <p>The three-way breakdown of where allocations come from in the baseline:</p>
+
+    <table>
+      <thead>
+        <tr><th>Site</th><th>Mechanism</th><th>Eliminated by</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>projectScene()</code> sort lambdas</td><td>Comparator allocations in <code>DepthSorter.sort()</code></td><td>BPS</td></tr>
+        <tr><td><code>projectScene()</code> intermediate lists</td><td><code>mapNotNull { TransformedItem }</code>, <code>map { Point2D }</code></td><td>PSC (on hit frames)</td></tr>
+        <tr><td><code>toComposePath()</code> per draw</td><td>New <code>Path</code> per face per frame</td><td>PC</td></tr>
+        <tr><td><code>ForEach</code> recomposition</td><td>Compose slot table updates</td><td>None (mutation-driven, irreducible)</td></tr>
+      </tbody>
+    </table>
+
+    <p>The ForEach/Compose recomposition allocations are the irreducible floor: every mutation causes a
+    recomposition of the affected slots, which the Compose runtime handles through its slot table
+    machinery. No engine-level optimisation can reduce this cost; it is the price of using Compose
+    as the scene description layer.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 6: Native Canvas &mdash; Bypassing the Compose Drawing Abstraction</h2>
+
+    <h3>What the Compose DrawScope costs</h3>
+
+    <p>When <code>IsometricRenderer.draw()</code> calls <code>drawScope.drawPath(path, color)</code>, execution goes through
+    several layers: <code>DrawScope</code> &rarr; <code>DrawContext</code> &rarr; <code>Canvas</code> &rarr; <code>android.graphics.Canvas</code>. Each layer
+    adds indirection. The <code>Paint</code> object must be constructed and configured. The Compose graphics
+    abstraction maintains internal state for blending, transform, and clipping that must be checked
+    even when not used.</p>
+
+    <p>The native canvas rendering path bypasses this entirely by holding a reference to the underlying
+    <code>android.graphics.Canvas</code> and calling <code>drawPath()</code> directly with a pre-configured <code>Paint</code>. The
+    Compose <code>fillPaint</code> and <code>strokePaint</code> are now <code>lazy</code> properties:</p>
+
+    <pre><code><span class="kw">private val</span> fillPaint <span class="kw">by</span> <span class="fn">lazy</span> {
+    <span class="type">Paint</span>().<span class="fn">apply</span> {
+        style = <span class="type">Paint</span>.<span class="type">Style</span>.<span class="prop">FILL</span>
+        isAntiAlias = <span class="kw">true</span>
+    }
+}</code></pre>
+
+    <p>The <code>lazy</code> was not just an optimisation; it was a correctness fix. <code>Paint()</code> calls into the
+    Android graphics native library. Constructing a <code>Paint</code> at field initialisation time caused
+    <code>UnsatisfiedLinkError</code> in JVM unit tests that did not load the Android native libraries. Making
+    the construction lazy deferred it to the first actual draw call, which only happens on Android.</p>
+
+    <h3>Why native canvas was left out of the combined run</h3>
+
+    <p>The native canvas benchmark showed a small regression at N=10&ndash;100 (~4&ndash;8% slower) and a marginal
+    improvement at N=200. This is counterintuitive but explainable: the Compose <code>DrawScope</code>
+    abstraction has been heavily optimised by Google for exactly the use case of drawing many paths
+    with solid fills. The <code>drawPath</code> overhead it adds is smaller than expected, and the <code>Paint</code> object
+    reuse that native canvas enables is also something Compose does internally.</p>
+
+    <p>More importantly, native canvas is Android-specific. The isometric engine is designed to be
+    platform-agnostic &mdash; the <code>isometric-core</code> module has no Android dependency, and the <code>isometric-compose</code>
+    module's dependency on <code>android.graphics.Canvas</code> is already a compromise. Deepening that
+    dependency for a marginal speedup that regresses half the workloads was not justified. Native
+    canvas remains behind a flag for callers who need it for specific use cases (very large N=200+
+    scenes with dense overlap) and want to accept the Android-only constraint.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 7: The Combined Run &mdash; Non-Linear Combination Effects</h2>
+
+    <h3>What "all flags on" actually means</h3>
+
+    <p>The combined run (<code>20260319-173754-baseline-perf</code>) enabled BPS, PSC, SI, and PC simultaneously
+    with native canvas off. It ran on a Galaxy Z Fold 6 (SM-F956B, Android 14) &mdash; a flagship device
+    with a 120Hz display, meaning the effective 60fps target is 8.33ms per frame.</p>
+
+    <p>The headline result across all 24 scenarios: average frame time dropped from <strong>56.23 ms to
+    20.51 ms</strong> (&minus;64%, 2.74&times; speedup). GC invocations dropped by the same proportion. The worst-case
+    scenario &mdash; s200_m50_continuous, 200 items, 50% mutation rate, touch every other frame &mdash; went from
+    <strong>225.54 ms to 42.82 ms</strong> (&minus;81%, 5.27&times; speedup).</p>
+
+    <p>17 of 24 scenarios moved into the "WIN" category (&gt;10% improvement). The 7 neutral scenarios are
+    all N=10, where frame time was already at the 8.34ms vsync floor in the baseline. There were
+    zero regressions.</p>
+
+    <h3>Why the combination beats the sum of parts</h3>
+
+    <p>Individual branch results for N=200 average frame time:</p>
+
+    <table>
+      <thead>
+        <tr><th>Optimisation</th><th>N=200 avg frame</th><th>vs baseline</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Baseline (all off)</td><td>146.6 ms</td><td>&mdash;</td></tr>
+        <tr><td>BPS only</td><td>50.5 ms</td><td>&minus;66%</td></tr>
+        <tr><td>PSC only</td><td>97.7 ms</td><td>&minus;33%</td></tr>
+        <tr><td>SI only</td><td>~122 ms*</td><td>&minus;17%</td></tr>
+        <tr><td>PC only</td><td>125.7 ms</td><td>&minus;14%</td></tr>
+        <tr><td><strong>Combined</strong></td><td><strong>40.7 ms</strong></td><td><strong>&minus;72%</strong></td></tr>
+      </tbody>
+    </table>
+
+    <p>*SI N=200 partial run (23 scenarios)</p>
+
+    <p>The combined result (40.7 ms) is better than BPS alone (50.5 ms) by a further 24%. This is the
+    PSC contribution on top of BPS: with a 50% cache hit rate in CONTINUOUS scenarios, every other
+    frame is nearly free &mdash; it skips the entire <code>projectScene()</code> call. BPS reduces the cost of the
+    <em>slow path</em>; PSC eliminates it entirely on half the frames.</p>
+
+    <p>For NONE and OCCASIONAL scenarios (no hit testing, low cache hit rates), the combined run tracks
+    closely with BPS alone at N=200 (within 1&ndash;8%). PSC contributes little because there are
+    essentially no cache hits in a 50%-mutation-rate scene with 200 items.</p>
+
+    <h3>Frame time by scene size</h3>
+
+    <p>The 60fps line (8.33ms on a 120Hz display) is the practical threshold:</p>
+
+    <table>
+      <thead>
+        <tr><th>N</th><th>Baseline avg</th><th>Combined avg</th><th>At 60fps?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>10</td><td>8.34 ms</td><td>8.34 ms</td><td>Yes (was already there)</td></tr>
+        <tr><td>50</td><td>15.80 ms</td><td>8.79 ms</td><td>Yes (BPS crossed the line)</td></tr>
+        <tr><td>100</td><td>54.20 ms</td><td>24.17 ms</td><td>No (still below 60fps, ~40fps)</td></tr>
+        <tr><td>200</td><td>146.57 ms</td><td>40.74 ms</td><td>No (~24fps, but vastly better)</td></tr>
+      </tbody>
+    </table>
+
+    <p>The 60fps boundary moved from N&lt;10 to approximately N&le;50 with all optimisations active. N=100 is
+    now in the 40fps zone &mdash; usable for non-interactive scenes on high-refresh displays, but still
+    below the 60fps floor for interactive use. Crossing that line for N=100 will require either a
+    different algorithmic approach to the sort (see Part 8) or moving sort work off the main thread.</p>
+
+    <h3>GC pressure at N=200: 3&times; reduction</h3>
+
+    <p>At N=200, the GC invocation rate per frame dropped from 20.6 to 6.9 (&minus;67%). The distribution of
+    credit across optimisations:</p>
+
+    <ul>
+      <li><strong>BPS</strong> accounts for most of the reduction at all sizes &mdash; eliminating O(N&sup2;) sort comparator
+      lambdas is the dominant allocation site.</li>
+      <li><strong>PSC</strong> provides additional reduction proportional to the cache hit rate &mdash; on cache-hit frames,
+      <code>projectScene()</code> does not run, so all its allocations are avoided.</li>
+      <li><strong>SI and PC</strong> contribute near-zero GC improvement &mdash; they eliminate hit-test traversal and path
+      conversion allocations, which are small relative to <code>projectScene()</code>.</li>
+    </ul>
+
+    <p>The allocated-MB numbers (per-iteration heap snapshots) show higher variance and should be
+    interpreted with caution. A snapshot of live heap at the moment of measurement is sensitive to
+    when the last GC cycle ran, not just to steady-state allocation rate. The GC invocation count &mdash;
+    which counts how many times the runtime decided the allocation rate had exceeded its threshold &mdash;
+    is the more stable signal.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Part 8: What Remains Open</h2>
+
+    <h3>The N=100 gap</h3>
+
+    <p>The most important unresolved performance problem is N=100. The combined run achieves ~24ms per
+    frame at N=100 &mdash; better than baseline by 2.24&times;, but still outside the 60fps window for
+    interactive use. The primary cost is <code>projectScene()</code> on cache-miss frames: even with BPS, the
+    sort over 300 faces (100 items &times; 3 faces) involves significant work.</p>
+
+    <p>The two most likely paths forward are:</p>
+
+    <p><strong>Move the sort off the main thread.</strong> <code>projectScene()</code> is pure computation with no Compose
+    dependency. It could run on a <code>CoroutineDispatcher.Default</code> thread while the Compose draw phase
+    uses the previous frame's <code>PreparedScene</code>. This is a double-buffering approach: the scene
+    preparation for frame N happens concurrently with the draw of frame N-1. The complexity cost is
+    significant &mdash; you need synchronisation, a versioning protocol, and careful handling of the
+    transition frame &mdash; but the latency benefit is clear.</p>
+
+    <p><strong>GPU depth sorting.</strong> The <code>docs/internal/plans/2026-03-18-webgpu-roadmap.md</code> plan describes using
+    WebGPU compute shaders for the depth sort. A GPU radix sort over projected depth values runs in
+    microseconds for thousands of items. The depth ambiguity cases (where topological sort is
+    required) are rare in practice &mdash; most faces have unambiguous ordering based on depth alone &mdash; and
+    could be handled by a CPU fallback for the ambiguous subset. This is the Phase 1 objective of
+    the WebGPU workstream.</p>
+
+    <h3>The cache hit rate ceiling</h3>
+
+    <p>The prepared-scene cache provides diminishing returns as mutation rate increases. At N=50,
+    mutationRate=50%, the cache hit rate is 0% &mdash; every frame has at least one mutation. Improving
+    cache utility for high-churn scenes would require per-item caching (re-project only the items
+    that changed), which requires solving the sort problem for the changed items. This is a
+    meaningful engineering investment and was deprioritised in favour of the broader algorithmic
+    improvements.</p>
+
+    <h3>The spatial index at scale</h3>
+
+    <p>The spatial index currently shows near-zero benefit in the benchmarks because the hit-test
+    scenarios simulate simple taps (point queries), and the O(N) brute-force scan is fast enough for
+    the frame budgets we measured. For drag operations &mdash; where a hit test fires on every motion event
+    &mdash; or for scenes with dense overlap where k is large, the spatial index would show clearer wins.
+    The fix to the O(k&times;N) bug means the fast path is now genuinely O(k), and the deduplication work
+    has been done; the gains simply did not materialise in this specific scenario matrix.</p>
+
+    <h3>Native canvas revisited</h3>
+
+    <p>The native canvas path underperformed expectations because Compose's <code>DrawScope.drawPath</code> is
+    already heavily optimised for filled polygon drawing. The opportunity may be larger for <em>stroke</em>
+    drawing or for scenes where the <code>DrawScope</code> batch-flush behaviour creates overhead. This was not
+    tested in the current matrix. A targeted investigation with profiling (rather than benchmarking)
+    might reveal specific draw call patterns where bypassing <code>DrawScope</code> is worth the API compromise.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Reflection: What the Process Revealed</h2>
+
+    <h3>Measure first, always</h3>
+
+    <p>The cache bug found by the self-test is the clearest argument for building a measurement harness
+    before writing a single optimisation. Without the 0% cache hit rate, the PSC code would have
+    appeared to run &mdash; no crash, no obviously wrong output &mdash; and the benchmarks would have been
+    measuring BenchmarkScreen's recomposition cost instead of the renderer's cache behaviour.
+    The self-test turned a latent correctness bug into an immediate, actionable failure.</p>
+
+    <h3>The O(N&sup2;) problem was the right first target</h3>
+
+    <p>BPS's dominance in both frame-time improvement (&minus;66% at N=200) and GC reduction (&minus;55% at all
+    sizes) confirms that the sort was the correct first target. This is a general principle: when a
+    pipeline has a stage that is algorithmically super-linear, fix the algorithm before tuning the
+    implementation. All the constant-factor improvements (path caching, native canvas) contribute
+    modest gains on top of a fast sort, but would have been invisible on top of an O(N&sup2;) bottleneck.</p>
+
+    <h3>Single-flag isolation revealed unexpected interactions</h3>
+
+    <p>Running each flag independently before combining them revealed that SI and PC, despite being
+    sound optimisations, contribute nearly nothing to GC metrics. This was not obvious before
+    measurement. SI and PC became visibly valuable only after BPS reduced the preparation cost to a
+    level where draw-phase and hit-test costs began to dominate the frame budget. This is a general
+    pattern in layered performance work: early optimisations reveal the shape of the next problem.</p>
+  </section>
+
+  <hr>
+
+  <p class="teaser">Next: <a href="performance-deep-dive-part2.html">Part 2</a> covers two correctness and performance fixes to the depth sorter: coplanar face tie-breaking (eliminating z-fighting on tile grids) and replacing the O(V&sup2;) topological sort with Kahn's O(V+E) algorithm.</p>
+
+  <nav class="series-nav" aria-label="Series navigation">
+    <span class="nav-current">Part 1: Measuring Before Optimising</span>
+    <a href="performance-deep-dive-part2.html">Part 2: Coplanar Faces &amp; Topological Sort &rarr;</a>
+  </nav>
+
+</article>
+
+</body>
+</html>

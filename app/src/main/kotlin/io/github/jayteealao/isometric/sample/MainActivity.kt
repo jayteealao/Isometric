@@ -52,6 +52,11 @@ class MainActivity : ComponentActivity() {
                     onClick = { onSelect(Intent(this@MainActivity, RuntimeApiActivity::class.java)) }
                 )
                 SampleCard(
+                    title = "WebGPU Sort",
+                    description = "Canvas frontend with ComputeBackend.WebGpu depth sorting on dense overlapping scenes",
+                    onClick = { onSelect(Intent(this@MainActivity, WebGpuSampleActivity::class.java)) }
+                )
+                SampleCard(
                     title = "Interaction API",
                     description = "Per-node interaction: onClick, onLongClick, alpha transparency, stable nodeId, testTag",
                     onClick = { onSelect(Intent(this@MainActivity, InteractionSamplesActivity::class.java)) }

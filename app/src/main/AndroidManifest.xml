@@ -21,6 +21,9 @@
         <activity android:name=".RuntimeApiActivity"
             android:label="Runtime API"
             android:exported="true" />
+        <activity android:name=".WebGpuSampleActivity"
+            android:label="WebGPU Sort Samples"
+            android:exported="true" />
         <activity android:name=".InteractionSamplesActivity"
             android:label="Interaction API"
             android:exported="true" />

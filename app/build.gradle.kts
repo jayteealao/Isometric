@@ -44,6 +44,7 @@ dependencies {
     // New modularized dependencies
     implementation(project(":isometric-android-view"))  // For View-based samples
     implementation(project(":isometric-compose"))       // For Compose samples
+    implementation(project(":isometric-webgpu"))        // For WebGPU compute backend samples
 
     // Android
     implementation(libs.appcompat)

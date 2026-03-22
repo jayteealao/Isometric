@@ -17,10 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
@@ -31,6 +34,19 @@ import kotlinx.coroutines.withContext
 
 /** Duration in milliseconds before a press is considered a long press. */
 private const val LONG_PRESS_TIMEOUT_MS = 500L
+
+internal data class AsyncPrepareInputs(
+    val renderOptions: io.github.jayteealao.isometric.RenderOptions,
+    val lightDirection: io.github.jayteealao.isometric.Vector,
+    val computeBackend: io.github.jayteealao.isometric.ComputeBackend,
+)
+
+internal data class AsyncPrepareRequest(
+    val sceneVersion: Long,
+    val canvasWidth: Int,
+    val canvasHeight: Int,
+    val inputs: AsyncPrepareInputs,
+)
 
 /**
  * Snapshot of the actual runtime flag configuration applied to the renderer.
@@ -287,24 +303,52 @@ fun IsometricScene(
     // must be stable across recompositions regardless of config changes.
     val isAsyncCompute = config.computeBackend.isAsync && config.computeBackend is SortingComputeBackend
     val asyncPreparedScene = remember { mutableStateOf<PreparedScene?>(null) }
+    val asyncPrepareInputs = remember(
+        config.renderOptions,
+        config.lightDirection,
+        config.computeBackend,
+    ) {
+        AsyncPrepareInputs(
+            renderOptions = config.renderOptions,
+            lightDirection = config.lightDirection,
+            computeBackend = config.computeBackend,
+        )
+    }
 
     // Async compute path — runs prepareAsync() on Dispatchers.Default when dirty.
     // Only activates for SortingComputeBackend. The CPU path is untouched.
+    // Requests are conflated so animated scenes do not cancel in-flight GPU work
+    // every frame and destroy buffers while the device is still using them.
     if (isAsyncCompute) {
         val computeBackend = config.computeBackend as SortingComputeBackend
-        LaunchedEffect(sceneVersion, canvasWidth, canvasHeight) {
-            if (canvasWidth <= 0 || canvasHeight <= 0) return@LaunchedEffect
-            withContext(Dispatchers.Default) {
-                renderer.prepareAsync(
-                    rootNode = rootNode,
-                    context = renderContext,
-                    width = canvasWidth,
-                    height = canvasHeight,
-                    computeBackend = computeBackend,
+        LaunchedEffect(renderer, computeBackend, asyncPrepareInputs) {
+            snapshotFlow {
+                AsyncPrepareRequest(
+                    sceneVersion = sceneVersion,
+                    canvasWidth = canvasWidth,
+                    canvasHeight = canvasHeight,
+                    inputs = asyncPrepareInputs,
                 )
             }
-            // Publish to state on the main thread (LaunchedEffect returns to main).
-            asyncPreparedScene.value = renderer.currentPreparedScene
+                .filter { request -> request.canvasWidth > 0 && request.canvasHeight > 0 }
+                .conflate()
+                .collect { request ->
+                    withContext(Dispatchers.Default) {
+                        renderer.prepareAsync(
+                            rootNode = rootNode,
+                            context = RenderContext(
+                                width = request.canvasWidth,
+                                height = request.canvasHeight,
+                                renderOptions = request.inputs.renderOptions,
+                                lightDirection = request.inputs.lightDirection,
+                            ),
+                            width = request.canvasWidth,
+                            height = request.canvasHeight,
+                            computeBackend = computeBackend,
+                        )
+                    }
+                    asyncPreparedScene.value = renderer.currentPreparedScene
+                }
         }
     }
 

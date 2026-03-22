@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Deep-Dive Part 2: Coplanar Faces and Topological Sort</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    background: #fafafa;
+    color: #1a1a1a;
+    line-height: 1.7;
+    font-size: 17px;
+  }
+
+  .series-banner {
+    background: #eef4ff;
+    border-bottom: 2px solid #2563eb;
+    padding: 0.6rem 1.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+    color: #1e40af;
+  }
+  .series-banner a {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .series-banner strong {
+    font-weight: 600;
+  }
+
+  article {
+    max-width: 48rem;
+    margin: 0 auto;
+    background: #fff;
+    padding: 2.5rem 2rem;
+    border: 1px solid #e5e7eb;
+    border-top: none;
+  }
+
+  @media (max-width: 52rem) {
+    article { padding: 1.5rem 1rem; }
+  }
+
+  header { margin-bottom: 2rem; }
+
+  h1 {
+    color: #2563eb;
+    font-size: 1.75rem;
+    line-height: 1.3;
+    margin-bottom: 1rem;
+  }
+
+  h2 {
+    color: #2563eb;
+    font-size: 1.35rem;
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.3rem;
+  }
+
+  h3 {
+    color: #2563eb;
+    font-size: 1.1rem;
+    margin-top: 1.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  p { margin-bottom: 1rem; }
+
+  a { color: #2563eb; }
+
+  blockquote {
+    border-left: 4px solid #2563eb;
+    background: #f0f4ff;
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.97rem;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 2rem 0;
+  }
+
+  pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 6px;
+    padding: 1.1rem 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0 1.25rem;
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+  pre code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    background: #f1f3f5;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+
+  /* Syntax highlighting classes */
+  .kw { color: #c678dd; }        /* keywords */
+  .str { color: #98c379; }       /* strings */
+  .cmt { color: #5c6370; font-style: italic; }  /* comments */
+  .num { color: #d19a66; }       /* numbers */
+  .fn { color: #61afef; }        /* function calls */
+  .type { color: #e5c07b; }      /* types */
+
+  ol, ul {
+    margin: 0.75rem 0 1rem 1.5rem;
+  }
+  li { margin-bottom: 0.35rem; }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  nav.series-nav {
+    margin: 2rem 0 0;
+    padding: 1rem 0 0;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.93rem;
+  }
+  nav.series-nav a {
+    color: #2563eb;
+    text-decoration: none;
+  }
+  nav.series-nav a:hover {
+    text-decoration: underline;
+  }
+  nav.series-nav .disabled {
+    color: #9ca3af;
+  }
+</style>
+</head>
+<body>
+
+<div class="series-banner">
+  <strong>Performance Deep-Dive Series</strong> &mdash; Part 2 of 2 &nbsp;|&nbsp;
+  <a href="performance-deep-dive-part1.html">Part 1: Measuring Before Optimising</a>
+</div>
+
+<article>
+<header>
+<h1>Performance Engineering on an Android Isometric Engine &mdash; Part 2: Coplanar Faces and Topological Sort</h1>
+</header>
+
+<blockquote>
+<p><strong>Series overview.</strong> This is the second instalment of a record of performance and correctness work
+on the Isometric Kotlin library. Part 1 covered the benchmark harness, the prepared-scene cache,
+broad-phase sort, spatial index, path caching, and the combined run. Part 2 addresses a correctness
+bug in the depth sorter &mdash; coplanar face ordering &mdash; and replaces the topological sort implementation
+with Kahn's algorithm. The benchmark run that follows will measure the impact.</p>
+</blockquote>
+
+<hr>
+
+<section>
+<h2>The problem: z-fighting on tile grids</h2>
+
+<p>The <code>TileGrid</code> composable lays out a grid of <code>Prism</code> shapes at integer positions. A 6x6 grid of
+default <code>Prism()</code> (1x1x1 cubes) places prisms at (0,0,0), (1,0,0), (2,0,0), ..., (5,5,0).
+Adjacent prisms share a boundary plane: the right face of the prism at (0,0,0) is coplanar with
+the left face of the prism at (1,0,0). They occupy the exact same plane at x=1.</p>
+
+<p>Visually, this produces dark triangular gaps and missing faces &mdash; the classic "z-fighting" artifact.
+But unlike GPU z-fighting (which comes from depth-buffer precision limits), this z-fighting comes
+from the depth sorter's inability to order coplanar faces.</p>
+
+<p>The workaround was to shrink each prism:</p>
+
+<pre><code><span class="type">Shape</span>(
+    geometry = <span class="type">Prism</span>(width = <span class="num">0.9</span>, depth = <span class="num">0.9</span>, height = <span class="num">0.3</span>),
+    ...
+)</code></pre>
+
+<p>This left a 0.1-unit gap between adjacent tiles, ensuring no shared boundary planes. The faces
+were no longer coplanar, so the depth sorter could order them normally. But the visual result was
+a grid with visible seams &mdash; not a rendering bug per se, but a design compromise forced by a
+limitation in the sort.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>Why coplanar faces break the sort</h2>
+
+<h3>How <code>closerThan</code> works</h3>
+
+<p>The depth comparison between two faces uses <code>Path.closerThan(pathA, observer)</code>. This function
+answers: "is this path closer to the observer than pathA?"</p>
+
+<p>The implementation works by counting vertices of each path that are on the observer's side of the
+other path's plane. For two paths A and B:</p>
+
+<ol>
+<li>Count how many vertices of B are on the same side as the observer relative to A's plane.</li>
+<li>Count how many vertices of A are on the same side as the observer relative to B's plane.</li>
+<li>Return the difference.</li>
+</ol>
+
+<p>A positive result means "this path is closer" (draw it later). A negative result means "this path
+is farther" (draw it first). A zero result means neither path is definitively closer &mdash; the faces
+are coplanar, or the geometry is ambiguous.</p>
+
+<h3>The zero case</h3>
+
+<p>When <code>closerThan</code> returns 0, the old code did nothing:</p>
+
+<pre><code><span class="kw">val</span> cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
+<span class="kw">if</span> (cmpPath &lt; <span class="num">0</span>) {
+    drawBefore[i].add(j)
+} <span class="kw">else</span> <span class="kw">if</span> (cmpPath &gt; <span class="num">0</span>) {
+    drawBefore[j].add(i)
+}
+<span class="cmt">// cmpPath == 0 → no edge added</span></code></pre>
+
+<p>No dependency edge means the topological sort has no constraint between these two faces. They can
+be emitted in any order. For non-overlapping faces, this is fine &mdash; if two faces don't overlap on
+screen, their draw order doesn't matter. But <code>checkDepthDependency</code> is only called for faces that
+<em>do</em> overlap on screen (that's the intersection check at the top of the function). Two coplanar
+adjacent faces share a boundary edge, which means their projected polygons <em>do</em> overlap at that
+edge. The sort needs to pick an order, and the old code picked none.</p>
+
+<p>The consequence is frame-dependent: the order depends on whatever the topological sort's tie-breaking
+behaviour happens to be, which depends on the order items appear in the dependency graph,
+which depends on the broad-phase grid iteration order, which depends on hash map bucket ordering.
+On some frames, the order is correct. On others, a closer face is drawn first and a farther face
+paints over it, producing a dark gap where the closer face's colour should be visible.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>The fix: coplanar tie-breaking</h2>
+
+<h3>Requirements for the tie-breaker</h3>
+
+<p>A valid tie-breaking function for a dependency graph must satisfy two properties:</p>
+
+<ol>
+<li><strong>Antisymmetric:</strong> <code>tieBreaker(A, B) == -tieBreaker(B, A)</code>. If A should be drawn before B,
+then B should not also be drawn before A.</li>
+<li><strong>Transitive:</strong> If A is before B and B is before C, then A must be before C. Transitivity
+prevents the tie-breaker from introducing cycles into the dependency graph, which would defeat
+the topological sort.</li>
+</ol>
+
+<p>A simple comparator on a scalar value satisfies both properties. The depth value
+(<code>x + y - 2z</code>, averaged over vertices) is the natural candidate &mdash; it is the same metric the
+engine already uses for initial ordering, and it is a single scalar comparison.</p>
+
+<h3>The three-level comparison</h3>
+
+<pre><code><span class="kw">private</span> <span class="kw">fun</span> <span class="fn">coplanarTieBreaker</span>(pathA: <span class="type">Path</span>, pathB: <span class="type">Path</span>): <span class="type">Int</span> {
+    <span class="cmt">// Level 1: average depth</span>
+    <span class="kw">val</span> depthDiff = pathA.depth - pathB.depth
+    <span class="kw">if</span> (depthDiff &gt; <span class="num">1e-9</span>) <span class="kw">return</span> -<span class="num">1</span>   <span class="cmt">// A farther → A before B</span>
+    <span class="kw">if</span> (depthDiff &lt; -<span class="num">1e-9</span>) <span class="kw">return</span> <span class="num">1</span>
+
+    <span class="cmt">// Level 2: first vertex, lexicographic (x, y, z)</span>
+    <span class="kw">val</span> a0 = pathA.points[<span class="num">0</span>]
+    <span class="kw">val</span> b0 = pathB.points[<span class="num">0</span>]
+    <span class="kw">val</span> dx = a0.x - b0.x
+    <span class="kw">if</span> (dx &gt; <span class="num">1e-9</span>) <span class="kw">return</span> -<span class="num">1</span>
+    <span class="kw">if</span> (dx &lt; -<span class="num">1e-9</span>) <span class="kw">return</span> <span class="num">1</span>
+    <span class="kw">val</span> dy = a0.y - b0.y
+    <span class="kw">if</span> (dy &gt; <span class="num">1e-9</span>) <span class="kw">return</span> -<span class="num">1</span>
+    <span class="kw">if</span> (dy &lt; -<span class="num">1e-9</span>) <span class="kw">return</span> <span class="num">1</span>
+    <span class="kw">val</span> dz = a0.z - b0.z
+    <span class="kw">if</span> (dz &gt; <span class="num">1e-9</span>) <span class="kw">return</span> -<span class="num">1</span>
+    <span class="kw">if</span> (dz &lt; -<span class="num">1e-9</span>) <span class="kw">return</span> <span class="num">1</span>
+
+    <span class="cmt">// Level 3: truly identical paths — either order is visually identical</span>
+    <span class="kw">return</span> <span class="num">1</span>
+}</code></pre>
+
+<p><strong>Level 1</strong> resolves the vast majority of coplanar face pairs. Two faces on the same boundary
+plane (e.g., the right face of prism (0,0,0) and the left face of prism (1,0,0)) are coplanar
+but have different centroids, so their depth values differ. The face with higher depth is farther
+from the viewer and should be drawn first.</p>
+
+<p><strong>Level 2</strong> handles the degenerate case where two coplanar faces have the same average depth. This
+can happen when two faces share a centroid but differ in vertex arrangement &mdash; geometrically unusual
+but not impossible in pathological scenes. Lexicographic comparison on the first vertex provides a
+stable tie-break.</p>
+
+<p><strong>Level 3</strong> is the absolute fallback: if two paths are vertex-identical (same points in the same
+order), they produce the same visual output in either order. Returning a constant ensures the
+function always picks a side, which guarantees a dependency edge is always added. This prevents
+the "no edge, arbitrary order" problem that caused the z-fighting.</p>
+
+<h3>The epsilon choice</h3>
+
+<p>The epsilon <code>1e-9</code> matches the threshold used in <code>Path.countCloserThan()</code>:</p>
+
+<pre><code><span class="kw">if</span> (observerPosition * pPosition &gt;= <span class="num">0.000000001</span>) {
+    result++
+}</code></pre>
+
+<p>Using the same epsilon across the pipeline is important. If <code>closerThan</code> considers two faces
+"equal" (returns 0) using one epsilon, and the tie-breaker then uses a tighter epsilon that
+considers them "different" in an inconsistent direction, the overall ordering could be wrong.
+Consistent thresholds ensure that the boundary between "definitively ordered" and "needs
+tie-breaking" is the same everywhere.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>Replacing the topological sort</h2>
+
+<h3>Why the old sort was O(V<sup>2</sup>)</h3>
+
+<p>The old topological sort used a repeated-scan approach:</p>
+
+<pre><code><span class="kw">while</span> (drawThisTurn) {
+    drawThisTurn = <span class="kw">false</span>
+    <span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span> until length) {
+        <span class="kw">if</span> (!drawn[i]) {
+            <span class="kw">val</span> canDraw = drawBefore[i].all { drawn[it] }
+            <span class="kw">if</span> (canDraw) {
+                sortedItems.add(items[i])
+                drawn[i] = <span class="kw">true</span>
+                drawThisTurn = <span class="kw">true</span>
+            }
+        }
+    }
+}</code></pre>
+
+<p>On each round, every undrawn item is checked: "have all my dependencies been drawn?" If yes, draw
+it. Repeat until no progress is made. In the worst case &mdash; a linear chain where item 0 depends on
+item 1, which depends on item 2, etc. &mdash; each round draws exactly one item, and each round scans
+all remaining items. This is V rounds times V items: O(V<sup>2</sup>).</p>
+
+<p>For the benchmark scenario (200 items, 3 faces each, 600 total), the sort is over 600 items. The
+old approach could require up to 600 rounds of 600 checks = 360,000 operations in the worst
+case. In practice, the dependency graph is wide (many items have zero or few dependencies), so the
+average case is better than worst case. But the improvement is hard to predict, and the worst
+case is reachable for certain scene configurations.</p>
+
+<h3>Kahn's algorithm: O(V+E)</h3>
+
+<p>Kahn's algorithm maintains an explicit in-degree count for each node and a queue of nodes with
+zero in-degree. Instead of scanning all nodes to find ready ones, it processes only nodes that are
+known to be ready:</p>
+
+<pre><code><span class="cmt">// Build in-degree and reverse adjacency</span>
+<span class="kw">val</span> inDegree = <span class="type">IntArray</span>(length) { drawBefore[it].size }
+<span class="kw">val</span> dependents = <span class="type">List</span>(length) { mutableListOf&lt;<span class="type">Int</span>&gt;() }
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span> until length) {
+    <span class="kw">for</span> (j <span class="kw">in</span> drawBefore[i]) {
+        dependents[j].add(i)
+    }
+}
+
+<span class="cmt">// Seed queue</span>
+<span class="kw">val</span> queue = <span class="type">ArrayDeque</span>&lt;<span class="type">Int</span>&gt;()
+<span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span> until length) {
+    <span class="kw">if</span> (inDegree[i] == <span class="num">0</span>) queue.addLast(i)
+}
+
+<span class="cmt">// Process</span>
+<span class="kw">while</span> (queue.isNotEmpty()) {
+    <span class="kw">val</span> node = queue.removeFirst()
+    sortedItems.add(items[node])
+    <span class="kw">for</span> (dep <span class="kw">in</span> dependents[node]) {
+        inDegree[dep]--
+        <span class="kw">if</span> (inDegree[dep] == <span class="num">0</span>) queue.addLast(dep)
+    }
+}</code></pre>
+
+<p>Each node is enqueued exactly once and dequeued exactly once. Each edge is traversed exactly once
+(when decrementing in-degrees). Total work: O(V + E), where E is the number of dependency edges.</p>
+
+<h3>The data structures</h3>
+
+<p><strong><code>inDegree: IntArray(length)</code></strong> &mdash; the number of unsatisfied dependencies for each item.
+Initialised from <code>drawBefore[i].size</code>. When this reaches zero, the item is ready to draw.</p>
+
+<p><strong><code>dependents: List&lt;MutableList&lt;Int&gt;&gt;</code></strong> &mdash; reverse adjacency. If item i must be drawn before item
+j (i.e., <code>j in drawBefore[i]</code>), then <code>dependents[j]</code> contains <code>i</code>. This reversal is necessary
+because Kahn's algorithm processes nodes in topological order: when a node is drawn, it needs to
+know which <em>other</em> nodes were waiting on it.</p>
+
+<p><strong><code>queue: ArrayDeque&lt;Int&gt;</code></strong> &mdash; standard BFS queue. Seeded with all zero-in-degree nodes in index
+order. The "in index order" part is important for determinism: if two items have no dependencies,
+the one with the lower index is drawn first. This matches the old sort's behaviour (it iterated
+<code>0 until length</code> on each round) and ensures that scenes with no depth ambiguity produce identical
+output.</p>
+
+<h3>Cycle handling</h3>
+
+<p>The old sort handled cycles implicitly: after the <code>while</code> loop exhausted, any undrawn items (those
+trapped in a dependency cycle where no item has all dependencies satisfied) were appended in index
+order. Kahn's algorithm handles cycles the same way &mdash; items with <code>inDegree[i] &gt; 0</code> after the
+queue is exhausted are part of a cycle and are appended as a fallback:</p>
+
+<pre><code><span class="kw">for</span> (i <span class="kw">in</span> <span class="num">0</span> until length) {
+    <span class="kw">if</span> (inDegree[i] &gt; <span class="num">0</span>) {
+        sortedItems.add(items[i])
+    }
+}</code></pre>
+
+<p>Cycles in the dependency graph represent genuinely ambiguous ordering &mdash; three faces where A
+occludes B, B occludes C, and C occludes A. No correct order exists. The fallback ensures all
+items appear in the output (no faces are lost), which is the same guarantee the old sort provided.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>Why these changes interact</h2>
+
+<p>The coplanar tie-breaker and the Kahn's algorithm replacement are independent fixes that address
+different symptoms of the same root cause, but they reinforce each other in an important way.</p>
+
+<p><strong>Without the tie-breaker, Kahn's algorithm would still produce arbitrary order for coplanar
+faces.</strong> The tie-breaker adds the missing edges. Kahn's algorithm consumes those edges and
+produces the correct order &mdash; faster than the old sort would have.</p>
+
+<p><strong>Without Kahn's, the tie-breaker would still fix coplanar ordering &mdash; but at O(V<sup>2</sup>) cost.</strong> The
+tie-breaker adds more edges to the dependency graph (every coplanar pair now has an edge), which
+means more dependencies per item, which means more rounds in the old sort before items become
+drawable. Kahn's algorithm handles the denser graph in the same O(V+E) time.</p>
+
+<p>The density increase from the tie-breaker is bounded. In a tile grid, each tile has at most 4
+adjacent tiles (the cardinal neighbours). Each shared boundary contributes at most 2 coplanar
+face pairs (left/right or top/bottom). For a 10x10 grid with 100 tiles and 600 faces, the
+tie-breaker adds roughly 360 extra edges &mdash; a modest increase over the existing edge count from
+non-coplanar depth comparisons. Kahn's algorithm handles this without measurable overhead.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>The test strategy</h2>
+
+<h3>What the tests verify</h3>
+
+<p>Four tests cover the fix:</p>
+
+<p><strong>Deterministic order for coplanar adjacent prisms.</strong> Two prisms at (0,0,0) and (1,0,0) share a
+boundary at x=1. The test projects the scene twice with independent engine instances and asserts
+identical command order. Before the fix, this test would fail intermittently (order depended on
+hash map iteration, which is JVM-version-dependent). After the fix, the tie-breaker produces the
+same edge regardless of iteration order, so the topological sort is deterministic.</p>
+
+<p><strong>Face count and uniqueness for a 3x3 grid.</strong> Nine 1x1x1 prisms, no shrinking. Asserts 54 faces
+(9 prisms times 6 faces with <code>NoCulling</code>) and all unique command IDs. This is the direct
+regression test for the z-fighting bug: if any face were lost or duplicated due to a sort error,
+the count or uniqueness assertion would fail.</p>
+
+<p><strong>Broad-phase parity for coplanar grids.</strong> The coplanar grid scenario with and without
+<code>enableBroadPhaseSort</code>. Asserts identical command ID order. This verifies that the broad-phase
+grid does not miss any coplanar pairs &mdash; if the grid bucketed two coplanar faces into different
+cells (because their bounding boxes barely miss the cell boundary), the broad-phase run would
+lack the tie-breaker edge and produce a different order.</p>
+
+<p><strong>Cycle fallback completeness.</strong> Three overlapping prisms at staggered heights. Even if the
+geometry creates circular dependencies, all 18 faces (3 prisms times 6) must appear in the output.
+This tests Kahn's cycle fallback &mdash; the <code>inDegree[i] &gt; 0</code> append loop must not lose items.</p>
+
+<h3>What the tests do not verify</h3>
+
+<p>The tests do not verify <em>visual correctness</em> &mdash; that the draw order produces a visually correct
+image. Visual correctness is a property of the depth comparison function (<code>closerThan</code>), not the
+sort algorithm. The sort is correct if it respects all dependency edges, which the deterministic-order
+test verifies indirectly (same edges in, same order out). Visual correctness requires a
+screenshot comparison or manual inspection, which the <code>TileGrid</code> sample provides.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>Reverting the workaround</h2>
+
+<p>With the tie-breaker in place, the TileGrid example reverts from:</p>
+
+<pre><code>geometry = <span class="type">Prism</span>(width = <span class="num">0.9</span>, depth = <span class="num">0.9</span>, height = <span class="num">0.3</span>)</code></pre>
+
+<p>to:</p>
+
+<pre><code>geometry = <span class="type">Prism</span>()</code></pre>
+
+<p>The default <code>Prism()</code> produces a 1x1x1 cube. Adjacent cubes share boundary planes. The
+tie-breaker ensures deterministic ordering of those coplanar faces. The visual result is a
+seamless tile grid with no gaps between tiles.</p>
+
+<p>This revert is the clearest signal that the fix works: the workaround was the only thing
+preventing coplanar boundaries, and removing it exercises the exact code path the fix addresses.
+If the depth sorter still had the coplanar bug, the TileGrid tab would show the original
+z-fighting artifacts.</p>
+</section>
+
+<hr>
+
+<section>
+<h2>What to measure next</h2>
+
+<p>The fix changes two things that affect performance:</p>
+
+<ol>
+<li><strong>More dependency edges.</strong> The tie-breaker adds an edge for every coplanar face pair that
+overlaps on screen. This increases the E in O(V+E). For tile grids, the increase is
+proportional to the grid perimeter (interior faces are culled in production; boundary faces
+are the ones that overlap neighbours). The question is whether this additional edge count
+measurably affects frame time.</li>
+<li><strong>Different sort algorithm.</strong> Kahn's O(V+E) replaces the old O(V<sup>2</sup>) worst-case scan. For
+scenes where the dependency graph is deep (long chains), Kahn's should be strictly faster.
+For scenes where the graph is wide (few dependencies per item), the old scan's average case
+was already near O(V), and Kahn's adds the overhead of building the reverse adjacency and
+in-degree arrays. The question is whether the overhead matters for small scenes (N=10) and
+whether the improvement matters for large scenes (N=200).</li>
+</ol>
+
+<p>The benchmark run should cover the existing 24-scenario matrix with the new code to establish
+whether the changes are performance-neutral (the goal &mdash; correctness fix, not optimisation) or
+whether they shift the frame-time distribution.</p>
+</section>
+
+<hr>
+
+<p><em>Next: The benchmark run will provide before/after numbers for the Kahn's + tie-breaker change
+across the full scenario matrix, establishing whether the correctness fix has measurable
+performance impact.</em></p>
+
+<nav class="series-nav">
+  <a href="performance-deep-dive-part1.html">&larr; Part 1: Measuring Before Optimising</a>
+  <span class="disabled">End of series</span>
+</nav>
+
+</article>
+
+</body>
+</html>

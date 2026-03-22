@@ -206,11 +206,12 @@ isometric-physics-compose/
       ├── PhysicsScene.kt             # Entry point composable
       ├── PhysicsShape.kt             # PhysicsScope.PhysicsShape composable
       ├── PhysicsGroup.kt             # PhysicsScope.PhysicsGroup composable
-      ├── PhysicsShapeNode.kt         # Extends IsometricNode
-      ├── PhysicsGroupNode.kt         # Extends GroupNode
+      ├── PhysicsShapeNode.kt         # Extends ShapeNode (open); overrides buildLocalContext()
+      ├── PhysicsGroupNode.kt         # Extends GroupNode (open); overrides buildLocalContext()
       ├── PhysicsScope.kt             # PhysicsScope : IsometricScope
-      ├── AndroidPhysicsThread.kt     # Choreographer-based
-      ├── PhysicsLoop.kt
+      ├── PhysicsLoop.kt              # PhysicsLoop interface + VsyncPhysicsLoop + BackgroundPhysicsLoop
+      ├── BodyIdUtils.kt              # rememberBodyId() shared helper
+      ├── NodeExtensions.kt           # IsometricNode.physicsBody() bridge extension
       ├── BodyConfigDsl.kt
       ├── PhysicsRaycastUtils.kt
       ├── PhysicsEventFlow.kt         # Flow adapters wrapping core callbacks
@@ -372,11 +373,157 @@ LaunchedEffect(rootNode) { currentOnRootNodeReady?.invoke(rootNode) }
 
 Note: the `DisposableEffect` pattern is NOT appropriate here. `LaunchedEffect` is correct for one-shot callbacks that don't require cleanup. `DisposableEffect` would force a meaningless `onDispose { }` and signals to readers that cleanup is happening when it isn't.
 
+#### 0.4 `IsometricNode` — `buildLocalContext()` extension point
+
+Add an open template-method hook to `IsometricNode` that decouples context construction from command emission. Make `ShapeNode` and `GroupNode` `open` so the physics module can subclass them without copying `renderTo()`.
+
+**File**: `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt`
+
+```kotlin
+abstract class IsometricNode {
+    // ... all existing fields unchanged ...
+
+    /**
+     * Builds the effective [RenderContext] for this node's rendering pass.
+     *
+     * The default implementation applies any [renderOptions] override and then
+     * accumulates the node's stored [position]/[rotation]/[scale] transforms
+     * via [RenderContext.withTransform].
+     *
+     * Override in subclasses that source their transform from something other
+     * than the stored node fields — for example, the physics module overrides
+     * this to read [RigidBody.interpolatedPosition] instead.
+     *
+     * @param parent The context inherited from the parent node.
+     * @return A context ready to be passed into [RenderContext.applyTransformsToShape]
+     *   or [RenderContext.applyTransformsToPath].
+     */
+    open fun buildLocalContext(parent: RenderContext): RenderContext {
+        val effective = if (renderOptions != null)
+            parent.withRenderOptions(renderOptions!!) else parent
+        return effective.withTransform(position, rotation, scale, rotationOrigin, scaleOrigin)
+    }
+}
+```
+
+`ShapeNode`, `GroupNode` become `open class` and each calls `buildLocalContext()` instead of constructing the context inline:
+
+```kotlin
+open class ShapeNode(var shape: Shape, var color: IsoColor) : IsometricNode() {
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
+        val localContext = buildLocalContext(context)   // ← single hook call replaces inline guard + withTransform
+        val transformedShape = localContext.applyTransformsToShape(shape)
+        for (path in transformedShape.paths) {
+            output.add(RenderCommand(
+                commandId = "${nodeId}_${path.hashCode()}",
+                points = emptyList(),
+                color = color,
+                originalPath = path,
+                originalShape = transformedShape,
+                ownerNodeId = nodeId
+            ))
+        }
+    }
+}
+
+open class GroupNode : IsometricNode() {
+    internal override val children = mutableListOf<IsometricNode>()
+
+    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
+        if (!isVisible) return
+        val childContext = buildLocalContext(context)   // ← same hook; physics overrides this
+        for (child in childrenSnapshot) {
+            child.renderTo(output, childContext)
+        }
+    }
+}
+```
+
+**Why `open` and not `internal`**: `ShapeNode` and `GroupNode` are already visible to downstream modules through composable factories. Making them `open` widens what dependants can *do* without widening the visible API surface. `PathNode` and `BatchNode` are not opened — the physics module has no reason to extend them.
+
+**`buildLocalContext()` is `open`, not `abstract`**: Existing subclasses (`PathNode`, `BatchNode`, `CustomRenderNode`) inherit the default behaviour for free; no existing code requires changes.
+
+**Module boundary for physics transform**: `withPhysicsTransform()` cannot be a method on `RenderContext` because `isometric-compose` cannot depend on `isometric-physics-core` without creating a circular dependency. It must be an extension function defined in `isometric-physics-compose`:
+
+```kotlin
+// isometric-physics-compose — no circular dependency
+internal fun RenderContext.withPhysicsTransform(body: RigidBody): RenderContext {
+    // Quaternion orientation requires projecting vertices directly rather than
+    // using withTransform(rotation: Double) which only handles Z-axis rotation.
+    // See PhysicsShapeNode KDoc for the full transform pipeline.
+    return withTransform(
+        position = body.interpolatedPosition.toPoint(),
+        rotation = body.interpolatedOrientation.toYawDegrees(),  // projected Z-equivalent
+        scale    = 1.0,
+        rotationOrigin = null,
+        scaleOrigin    = null
+    )
+}
+```
+
+**Open ambiguity — full 3D orientation**: The existing `RenderContext.withTransform(rotation: Double)` is a single Z-axis angle. Physics bodies have full quaternion orientation. For Phase 4b, project the quaternion yaw as the isometric rotation angle (valid for typical gameplay on flat ground). Full 3D orientation baked into vertex positions is a post-Phase-4b concern — track as a separate plan item.
+
+#### 0.5 `AdvancedSceneConfig` — `withRootNodeCallback()` method
+
+The field-forwarding blob in `PhysicsScene` (`combinedConfig = AdvancedSceneConfig(renderOptions = config.renderOptions, ...)`) silently drops any field added to `AdvancedSceneConfig` in future workstreams. Move the forwarding obligation into `AdvancedSceneConfig` itself where it is compiler-enforced.
+
+**File**: `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/AdvancedSceneConfig.kt`
+
+Add after the existing `equals`/`hashCode`/`toString` block:
+
+```kotlin
+/**
+ * Returns a copy of this config with [onRootNodeReady] replaced by [callback].
+ * If this config already has an [onRootNodeReady] callback, both are called —
+ * the existing callback first, then [callback].
+ *
+ * Used by [PhysicsScene] to inject its root-node wiring without requiring
+ * manual forwarding of all other fields. Any PR adding a new field to
+ * [AdvancedSceneConfig] that omits it here will fail to compile.
+ *
+ * Internal — not part of the public API surface.
+ */
+internal fun withRootNodeCallback(callback: (GroupNode) -> Unit): AdvancedSceneConfig {
+    val existing = onRootNodeReady
+    return AdvancedSceneConfig(
+        renderOptions        = renderOptions,
+        lightDirection       = lightDirection,
+        defaultColor         = defaultColor,
+        colorPalette         = colorPalette,
+        strokeStyle          = strokeStyle,
+        gestures             = gestures,
+        useNativeCanvas      = useNativeCanvas,
+        cameraState          = cameraState,
+        engine               = engine,
+        enablePathCaching    = enablePathCaching,
+        enableSpatialIndex   = enableSpatialIndex,
+        spatialIndexCellSize = spatialIndexCellSize,
+        forceRebuild         = forceRebuild,
+        frameVersion         = frameVersion,
+        onHitTestReady       = onHitTestReady,
+        onFlagsReady         = onFlagsReady,
+        onRenderError        = onRenderError,
+        onEngineReady        = onEngineReady,
+        onRendererReady      = onRendererReady,
+        onBeforeDraw         = onBeforeDraw,
+        onAfterDraw          = onAfterDraw,
+        onPreparedSceneReady = onPreparedSceneReady,
+        onRootNodeReady      = if (existing != null) { node -> existing(node); callback(node) }
+                               else callback
+    )
+}
+```
+
+**Maintenance contract**: the field list lives in one place — inside `AdvancedSceneConfig`. Adding a field without updating `withRootNodeCallback()` is a compile error. `PhysicsScene` never needs touching when `AdvancedSceneConfig` grows.
+
 ### Phase 0 complete when
 
 - `Vector.ZERO` is accessible in `isometric-core`
 - `Octahedron.xyScale` and `Octahedron.zScale` are accessible
 - `AdvancedSceneConfig.onRootNodeReady` exists and fires with a non-null `GroupNode`
+- `IsometricNode.buildLocalContext()` is `open`; `ShapeNode` and `GroupNode` are `open class`
+- `AdvancedSceneConfig.withRootNodeCallback()` compiles and all its fields match the primary constructor
 - All existing tests in `isometric-core` and `isometric-compose` continue to pass
 
 ---
@@ -1136,59 +1283,67 @@ internal class PhysicsScopeImpl(val world: PhysicsWorld) : PhysicsScope
 
 ### 4b.3 `PhysicsShapeNode` and `PhysicsGroupNode`
 
-**`PhysicsShapeNode.kt`** — extends `IsometricNode` directly; overrides `renderTo` to read position from the physics body
+Both nodes use the `buildLocalContext()` hook added in Phase 0.4. They extend `ShapeNode` and `GroupNode` (now `open class`) respectively and override **only the context-construction step** — the entire `renderTo()` body, including path iteration and `RenderCommand` construction, is inherited unchanged.
+
+**`PhysicsShapeNode.kt`**
 
 ```kotlin
 package io.github.jayteealao.isometric.physics.compose
 
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.IsoColor
-import io.github.jayteealao.isometric.compose.runtime.IsometricNode
-import io.github.jayteealao.isometric.compose.runtime.RenderCommand
 import io.github.jayteealao.isometric.compose.runtime.RenderContext
+import io.github.jayteealao.isometric.compose.runtime.ShapeNode
 import io.github.jayteealao.isometric.physics.core.RigidBody
 
 /**
- * An [IsometricNode] backed by a physics [RigidBody].
+ * A [ShapeNode] whose transform is driven by a physics [RigidBody].
  *
- * Overrides [renderTo] to read position and orientation from
- * [body.interpolatedPosition] and [body.interpolatedOrientation]
- * rather than the node's stored transform. The node's stored position
- * is the *initial* spawn position — physics takes over immediately.
+ * Overrides [buildLocalContext] to read [body.interpolatedPosition] and
+ * [body.interpolatedOrientation] instead of the node's stored position/rotation/scale
+ * fields. The full path-iteration and [RenderCommand] construction logic is inherited
+ * from [ShapeNode.renderTo] — no duplication.
+ *
+ * The node's stored [position] field is the *spawn* position only; physics takes
+ * over the transform immediately on first step.
+ *
+ * **3D orientation note**: [withPhysicsTransform] projects the quaternion yaw as
+ * the isometric rotation angle. Full vertex-level 3D orientation is post-Phase-4b.
  */
 internal class PhysicsShapeNode(
-    var shape: Shape,
-    var color: IsoColor,
+    shape: Shape,
+    color: IsoColor,
     val body: RigidBody
-) : IsometricNode() {
+) : ShapeNode(shape, color) {
 
-    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
-        if (!isVisible) return
-        // Apply physics body's interpolated transform, then delegate to engine
-        val physicsContext = context.withPhysicsTransform(body)
-        // ... render shape paths using physicsContext ...
-    }
+    override fun buildLocalContext(parent: RenderContext): RenderContext =
+        parent.withPhysicsTransform(body)
 }
 ```
 
-**`PhysicsGroupNode.kt`** — extends `GroupNode`; children are physics-driven
+**`PhysicsGroupNode.kt`**
 
 ```kotlin
 package io.github.jayteealao.isometric.physics.compose
 
 import io.github.jayteealao.isometric.compose.runtime.GroupNode
+import io.github.jayteealao.isometric.compose.runtime.RenderContext
 import io.github.jayteealao.isometric.physics.core.RigidBody
 
+/**
+ * A [GroupNode] whose transform is driven by a physics [RigidBody].
+ *
+ * Overrides [buildLocalContext] only. Child rendering and dirty propagation
+ * are inherited from [GroupNode.renderTo] unchanged.
+ */
 internal class PhysicsGroupNode(val body: RigidBody) : GroupNode() {
-    override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
-        if (!isVisible) return
-        val physicsContext = context.withPhysicsTransform(body)
-        for (child in childrenSnapshot) {
-            child.renderTo(output, physicsContext)
-        }
-    }
+
+    override fun buildLocalContext(parent: RenderContext): RenderContext =
+        parent.withPhysicsTransform(body)
 }
 ```
+
+`withPhysicsTransform` is a package-internal extension function defined in `isometric-physics-compose` (see Phase 0.4 for module boundary rationale).
 
 ### 4b.4 `AndroidPhysicsThread`
 
@@ -1230,6 +1385,28 @@ internal class AndroidPhysicsThread(private val world: PhysicsWorld) {
 ```
 
 The thread is wired via `DisposableEffect` in `PhysicsScene` — not `SideEffect`.
+
+**`PhysicsLoop` — formalise the threading abstraction**
+
+`AndroidPhysicsThread` and `PhysicsThread` (core/JVM) are two implementations of the same concept. Formalise this as an internal interface so the upgrade from main-thread to background-thread is a one-line swap in `PhysicsScene` with no public API changes:
+
+```kotlin
+// PhysicsLoop.kt — package-internal in isometric-physics-compose
+internal interface PhysicsLoop {
+    fun start()
+    fun stop()
+}
+
+// Current implementation — main thread via Choreographer
+internal class VsyncPhysicsLoop(world: PhysicsWorld) : PhysicsLoop { ... }
+
+// Future implementation — background ScheduledExecutorService (Phase 9 upgrade path)
+internal class BackgroundPhysicsLoop(world: PhysicsWorld) : PhysicsLoop { ... }
+```
+
+`PhysicsScene` constructs `val physicsThread: PhysicsLoop = remember(world) { VsyncPhysicsLoop(world) }`. When Phase 9 profiling shows the main-thread model saturating, swap the constructor — `PhysicsScene.kt` is the only file that changes. Add `BackgroundPhysicsLoop` to the file layout in the module structure section.
+
+The `AtomicReference<RenderSnapshot>` in `RigidBody` is already the correct synchronisation primitive for the background-thread model — it was designed with this upgrade in mind.
 
 ### 4b.5 CompositionLocals
 
@@ -1280,19 +1457,21 @@ import io.github.jayteealao.isometric.physics.core.PhysicsWorld
  * automatically. Standard scene composables ([Shape], [Group], [ForEach]) are also
  * available for non-physics rendering.
  *
+ * The [world] parameter defaults to a remembered [PhysicsWorld] with default
+ * [PhysicsConfig]. To customise gravity, timestep, or solver iterations, pass
+ * `world = rememberPhysicsWorld(PhysicsConfig(...))` explicitly.
+ *
  * @param modifier Modifier for sizing and layout
  * @param config Rendering configuration (lighting, gestures, stroke style, etc.)
- * @param physicsConfig Physics simulation parameters (gravity, timestep, iterations)
- * @param world Physics world instance. Use [rememberPhysicsWorld] to create one with
- *   automatic lifecycle management. Defaults to a remembered instance.
+ * @param world Physics world. Defaults to [rememberPhysicsWorld]. Pass an explicit
+ *   [rememberPhysicsWorld] call with a [PhysicsConfig] to customise simulation parameters.
  * @param content Scene content lambda — receives [PhysicsScope]
  */
 @Composable
 fun PhysicsScene(
     modifier: Modifier = Modifier,
     config: SceneConfig = SceneConfig(),
-    physicsConfig: PhysicsConfig = PhysicsConfig(),
-    world: PhysicsWorld = rememberPhysicsWorld(physicsConfig),
+    world: PhysicsWorld = rememberPhysicsWorld(),
     content: @Composable PhysicsScope.() -> Unit
 ) {
     // Remember a stable engine instance. Without this, AdvancedSceneConfig's default
@@ -1314,7 +1493,6 @@ fun PhysicsScene(
             useNativeCanvas = config.useNativeCanvas,
             cameraState = config.cameraState
         ),
-        physicsConfig = physicsConfig,
         world = world,
         content = content
     )
@@ -1324,13 +1502,12 @@ fun PhysicsScene(
  * Advanced [PhysicsScene] overload with full renderer and engine access.
  *
  * Use when benchmark hooks, custom engine instances, or render pipeline access
- * are needed alongside physics. The [AdvancedSceneConfig.onRootNodeReady] callback
- * is used internally by [PhysicsScene] — if you also need the root node, capture
- * it in a separate `onRootNodeReady` and chain both calls.
+ * are needed alongside physics. Any existing [AdvancedSceneConfig.onRootNodeReady]
+ * callback is chained — it fires before the physics wiring, so both callers receive
+ * the root node without interference.
  *
  * @param modifier Modifier for sizing and layout
  * @param config Advanced rendering configuration
- * @param physicsConfig Physics simulation parameters
  * @param world Physics world instance
  * @param content Scene content lambda — receives [PhysicsScope]
  */
@@ -1338,8 +1515,7 @@ fun PhysicsScene(
 fun PhysicsScene(
     modifier: Modifier = Modifier,
     config: AdvancedSceneConfig,
-    physicsConfig: PhysicsConfig = PhysicsConfig(),
-    world: PhysicsWorld = rememberPhysicsWorld(physicsConfig),
+    world: PhysicsWorld = rememberPhysicsWorld(),
     content: @Composable PhysicsScope.() -> Unit
 ) {
     val physicsScope = remember(world) { PhysicsScopeImpl(world) }
@@ -1352,50 +1528,18 @@ fun PhysicsScene(
         onDispose { physicsThread.stop() }
     }
 
-    // Use rememberUpdatedState for the caller's onRootNodeReady so that the chained
-    // callback always invokes the latest version even if the lambda reference changes.
-    // AdvancedSceneConfig.equals() excludes callbacks, so remember(config, world) would
-    // not rebuild combinedConfig when only the callback changes — without this guard,
-    // the chain would capture a stale reference.
-    val currentCallerOnRootNodeReady by rememberUpdatedState(config.onRootNodeReady)
-
-    // Build an AdvancedSceneConfig that adds our root node callback on top of the
-    // caller's config. onRootNodeReady is chained so callers who also need the root
-    // node receive it without interference.
+    // Build a combined config that injects the physics root-node callback via
+    // withRootNodeCallback(). The field-forwarding obligation lives inside
+    // AdvancedSceneConfig — any new field added there will produce a compile
+    // error in withRootNodeCallback() if not forwarded. PhysicsScene itself
+    // never needs updating when AdvancedSceneConfig grows.
     val combinedConfig = remember(config, world) {
-        AdvancedSceneConfig(
-            renderOptions        = config.renderOptions,
-            lightDirection       = config.lightDirection,
-            defaultColor         = config.defaultColor,
-            colorPalette         = config.colorPalette,
-            strokeStyle          = config.strokeStyle,
-            gestures             = config.gestures,
-            useNativeCanvas      = config.useNativeCanvas,
-            cameraState          = config.cameraState,
-            engine               = config.engine,
-            enablePathCaching    = config.enablePathCaching,
-            enableSpatialIndex   = config.enableSpatialIndex,
-            spatialIndexCellSize = config.spatialIndexCellSize,
-            forceRebuild         = config.forceRebuild,
-            frameVersion         = config.frameVersion,
-            onHitTestReady       = config.onHitTestReady,
-            onFlagsReady         = config.onFlagsReady,
-            onRenderError        = config.onRenderError,
-            onEngineReady        = config.onEngineReady,
-            onRendererReady      = config.onRendererReady,
-            onBeforeDraw         = config.onBeforeDraw,
-            onAfterDraw          = config.onAfterDraw,
-            onPreparedSceneReady = config.onPreparedSceneReady,
-            onRootNodeReady = { rootNode ->
-                // Wire scene invalidation: after each physics step, mark the root node
-                // dirty so the Canvas redraws. PhysicsShapeNode.renderTo reads
-                // body.interpolatedPosition directly (pull model) — no explicit position
-                // sync needed. The dirty mark is the only push needed.
-                world.onStepComplete = { rootNode.markDirty() }
-                // Read the State holder at dispatch time — never stale
-                currentCallerOnRootNodeReady.value?.invoke(rootNode)
-            }
-        )
+        config.withRootNodeCallback { rootNode ->
+            // Pull model: PhysicsShapeNode.buildLocalContext() reads
+            // body.interpolatedPosition at draw time. The only push required
+            // is marking the root dirty so the Canvas redraws each physics step.
+            world.onStepComplete = { rootNode.markDirty() }
+        }
     }
 
     CompositionLocalProvider(LocalPhysicsWorld provides world) {
@@ -1407,8 +1551,11 @@ fun PhysicsScene(
 
 /**
  * Creates and remembers a [PhysicsWorld] for the lifecycle of the composition.
- * The world is paused when the composable leaves the tree and destroyed when
- * the remembered state is cleared.
+ *
+ * Pass a [PhysicsConfig] to customise gravity, fixed timestep, or solver iterations:
+ * ```kotlin
+ * PhysicsScene(world = rememberPhysicsWorld(PhysicsConfig(gravity = Vector(0.0, 0.0, -5.0))))
+ * ```
  */
 @Composable
 fun rememberPhysicsWorld(config: PhysicsConfig = PhysicsConfig()): PhysicsWorld {
@@ -1418,9 +1565,7 @@ fun rememberPhysicsWorld(config: PhysicsConfig = PhysicsConfig()): PhysicsWorld 
 
 **Why `DisposableEffect` for the physics thread**: `SideEffect` would restart the thread on every recomposition. `DisposableEffect(physicsThread)` starts it once when the composable enters the tree and stops it when it leaves — the correct lifecycle for a background loop.
 
-**Why `remember(config, world) { AdvancedSceneConfig(...) }`**: `AdvancedSceneConfig` is not cheap to allocate (13+ fields). The `remember` with `config` and `world` as keys ensures it is recreated only when physics or scene config actually changes.
-
-**Evolution risk — `AdvancedSceneConfig` field forwarding**: `combinedConfig` explicitly copies all fields from the caller's `AdvancedSceneConfig`. When `AdvancedSceneConfig` gains new fields in future workstreams, `PhysicsScene` must be updated to forward them or those fields are silently dropped. This is a known maintenance obligation. Any PR touching `AdvancedSceneConfig` must include a review of `PhysicsScene.kt`.
+**Why `physicsConfig` was removed from `PhysicsScene`**: The previous signature had `physicsConfig: PhysicsConfig = PhysicsConfig()` as a parameter whose only effect was as the default argument to `world`. If a caller passed both `physicsConfig = ...` and an explicit `world = ...`, the `physicsConfig` was silently ignored — an §6 invalid-state smell. Removing it means world creation is always explicit via `rememberPhysicsWorld(config)`, and `PhysicsScene` deals exclusively with a world instance rather than world construction. The hero scenario remains one line: `PhysicsScene { ... }`.
 
 ### 4b.7 `PhysicsShape` and `PhysicsGroup`
 
@@ -1460,23 +1605,23 @@ import io.github.jayteealao.isometric.physics.core.BodyConfig
  * [RigidBody.setPosition] or apply forces via [rememberPhysicsBody].
  *
  * @param geometry Shape to render and simulate
+ * @param color Fill color. Defaults to [LocalDefaultColor]
+ * @param position Initial spawn position in world space. Default [Point.ORIGIN]
+ * @param visible Whether to render this shape
  * @param body Physics body configuration (type, material, collider, etc.)
  * @param id Optional unique identifier. Required only if [rememberPhysicsBody] is
  *   needed for imperative access. Null = anonymous body — stable across recompositions
  *   but not addressable by name.
- * @param color Fill color. Defaults to [LocalDefaultColor]
- * @param position Initial spawn position in world space. Default [Point.ORIGIN]
- * @param visible Whether to render this shape
  */
 @IsometricComposable
 @Composable
 fun PhysicsScope.PhysicsShape(
     geometry: Shape,
-    body: BodyConfig = BodyConfig(),
-    id: String? = null,
     color: IsoColor = LocalDefaultColor.current,
     position: Point = Point.ORIGIN,
-    visible: Boolean = true
+    visible: Boolean = true,
+    body: BodyConfig = BodyConfig(),
+    id: String? = null
 ) {
     val world = LocalPhysicsWorld.current
 
@@ -1500,11 +1645,40 @@ fun PhysicsScope.PhysicsShape(
         onDispose { world.removeBody(resolvedId) }
     }
 
-    // The PhysicsShapeNode reads body.interpolatedPosition at render time —
-    // no explicit position update needed in the composable.
-    // ... ReusableComposeNode<PhysicsShapeNode, IsometricApplier> ...
+    // PhysicsShapeNode inherits ShapeNode.renderTo() and overrides buildLocalContext()
+    // to read body.interpolatedPosition — no explicit position update needed here.
+    val physicsBody = world.getBody(resolvedId) ?: return
+    ReusableComposeNode<PhysicsShapeNode, IsometricApplier>(
+        factory = { PhysicsShapeNode(geometry, color, physicsBody) },
+        update = {
+            // position/rotation/scale intentionally absent — physics drives these.
+            set(geometry) { this.shape = it; markDirty() }
+            set(color)    { this.color = it; markDirty() }
+            set(visible)  { this.isVisible = it; markDirty() }
+        }
+    )
 }
 ```
+
+Note the reduced `set()` block count compared to `Shape`: `position`, `rotation`, `scale`, `rotationOrigin`, `scaleOrigin` are intentionally absent. Physics drives those fields. Their absence is a deliberate API signal, not an oversight.
+
+**Shared helper — `rememberBodyId()`**
+
+Both `PhysicsShape` and `PhysicsGroup` use the anonymous-body UUID pattern. Extract it once:
+
+```kotlin
+// BodyIdUtils.kt — package-internal
+/**
+ * Returns [id] if non-null, otherwise generates a UUID that is stable for the
+ * lifetime of this composable instance. Anonymous bodies are not addressable
+ * via [rememberPhysicsBody] — the stable id is invisible externally.
+ */
+@Composable
+internal fun rememberBodyId(id: String?): String =
+    remember { id ?: "physics_anon_${java.util.UUID.randomUUID()}" }
+```
+
+Both composables then call `val resolvedId = rememberBodyId(id)` instead of inlining the UUID logic.
 
 **`PhysicsGroup.kt`** — follows the same `Group` pattern; children are transformed relative to the physics body's orientation
 
@@ -1512,23 +1686,42 @@ fun PhysicsScope.PhysicsShape(
 @IsometricComposable
 @Composable
 fun PhysicsScope.PhysicsGroup(
-    body: BodyConfig = BodyConfig(),
-    id: String? = null,   // null = anonymous; same semantics as PhysicsShape
     position: Point = Point.ORIGIN,
     visible: Boolean = true,
+    body: BodyConfig = BodyConfig(),
+    id: String? = null,
     content: @Composable PhysicsScope.() -> Unit
-)
+) {
+    val world = LocalPhysicsWorld.current
+    val resolvedId = rememberBodyId(id)
+
+    DisposableEffect(resolvedId) {
+        world.addBody(resolvedId, config = body)
+        world.getBody(resolvedId)?.setPosition(Vector(position.x, position.y, position.z))
+        onDispose { world.removeBody(resolvedId) }
+    }
+
+    val physicsBody = world.getBody(resolvedId) ?: return
+    ReusableComposeNode<PhysicsGroupNode, IsometricApplier>(
+        factory = { PhysicsGroupNode(physicsBody) },
+        update = {
+            set(visible) { this.isVisible = it; markDirty() }
+        },
+        content = { PhysicsScopeImpl(world).content() }
+    )
+}
 ```
 
-### 4b.8 `rememberPhysicsBody`
+### 4b.8 `rememberPhysicsBody` and body access
 
-Provides imperative access to a body for force application outside the composable tree (e.g., in gesture callbacks or `LaunchedEffect` blocks):
+#### 4b.8.1 `rememberPhysicsBody` — string-keyed lookup
+
+Provides imperative access to a named body for force application outside the composable tree (e.g., in gesture callbacks or `LaunchedEffect` blocks):
 
 ```kotlin
 package io.github.jayteealao.isometric.physics.compose
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import io.github.jayteealao.isometric.physics.core.RigidBody
 
 /**
@@ -1564,6 +1757,85 @@ fun rememberPhysicsBody(id: String): RigidBody? {
     return world.getBody(id)
 }
 ```
+
+#### 4b.8.2 `physicsBody()` — node-to-body bridge for tap handlers
+
+`GestureConfig.onTap` delivers `TapEvent(x, y, node: IsometricNode?)`. When the tapped node is a `PhysicsShapeNode` or `PhysicsGroupNode`, callers typically want the backing `RigidBody` directly. A cast-based lookup inside user code is both verbose and coupled to internal type names. Provide a package-internal extension that hides the cast:
+
+```kotlin
+// NodeExtensions.kt — in isometric-physics-compose
+import io.github.jayteealao.isometric.compose.runtime.IsometricNode
+import io.github.jayteealao.isometric.physics.core.RigidBody
+
+/**
+ * Returns the [RigidBody] backing this node if it is a [PhysicsShapeNode] or
+ * [PhysicsGroupNode], null otherwise. Safe to call on any node including
+ * non-physics nodes.
+ */
+fun IsometricNode.physicsBody(): RigidBody? = when (this) {
+    is PhysicsShapeNode -> body
+    is PhysicsGroupNode -> body
+    else -> null
+}
+```
+
+Hero scenario for physics tap handling:
+
+```kotlin
+GestureConfig(
+    onTap = { event ->
+        event.node?.physicsBody()?.applyImpulse(Vector(0.0, 0.0, 3.0))
+    }
+)
+```
+
+This is the idiomatic Kotlin approach: an extension function on a type from another module, defined in the module that knows about both types. No new types, no new parameters on `GestureConfig`, no casting in user code.
+
+**Module boundary**: `physicsBody()` is defined in `isometric-physics-compose` — it is the only module that knows both `IsometricNode` (from `isometric-compose`) and `PhysicsShapeNode`/`PhysicsGroupNode` (from itself). It cannot be defined in `isometric-compose` without creating a circular dependency.
+
+#### 4b.8.3 `PhysicsBodyHandle` — v2 upgrade path
+
+`rememberPhysicsBody` has a null-until-composed window: the body is null if called before the corresponding `PhysicsShape` has completed its first `DisposableEffect`. The HashMap lookup is also unidiomatic for callers who want a stable, non-string reference.
+
+A v2 `PhysicsBodyHandle` eliminates both issues:
+
+```kotlin
+// v2 API — not in scope for Phase 4b
+@Composable
+fun rememberPhysicsHandle(): PhysicsBodyHandle = remember { PhysicsBodyHandle() }
+
+class PhysicsBodyHandle internal constructor() {
+    @Volatile var body: RigidBody? = null
+        internal set
+}
+
+// PhysicsShape accepts an optional handle:
+fun PhysicsScope.PhysicsShape(
+    ...,
+    handle: PhysicsBodyHandle? = null,   // ← new optional param
+    ...
+) {
+    DisposableEffect(resolvedId) {
+        world.addBody(resolvedId, ...)
+        handle?.body = world.getBody(resolvedId)
+        onDispose { world.removeBody(resolvedId); handle?.body = null }
+    }
+}
+```
+
+Call site:
+
+```kotlin
+val ballHandle = rememberPhysicsHandle()
+PhysicsShape(geometry = Prism(), handle = ballHandle)
+GestureConfig(
+    onTap = { ballHandle.body?.applyImpulse(Vector(0.0, 0.0, 3.0)) }
+)
+```
+
+No string key. No null-until-composed ambiguity (callers know it's nullable until the effect fires; the pattern is explicit). `rememberPhysicsBody(id)` stays as an alternative for callers whose data model already has a stable string id.
+
+**Not in scope for Phase 4b** — `rememberPhysicsBody` is sufficient for v1. Track as a Phase 6 addition alongside the body lifecycle API.
 
 ### 4b.9 `PhysicsEventFlow`
 
@@ -1673,13 +1945,10 @@ Per guideline §1, the first successful path must be achievable in a few lines:
 ```kotlin
 @Composable
 fun BouncingBoxes() {
-    val world = rememberPhysicsWorld()
-
     PhysicsScene(modifier = Modifier.fillMaxSize()) {
         Ground()
         repeat(5) { i ->
             PhysicsShape(
-                id = "box_$i",
                 geometry = Prism(),
                 color = IsoColor.BLUE,
                 position = Point(i.toDouble(), 0.0, 3.0 + i * 0.5)
@@ -1689,7 +1958,9 @@ fun BouncingBoxes() {
 }
 ```
 
-Five meaningful lines. No `BodyConfig`, no `PhysicsConfig`, no gesture setup required. This is the test for the Layer 1 path.
+Four meaningful lines. No `BodyConfig`, no explicit `world`, no gesture setup required. This is the test for the Layer 1 path.
+
+Note the removed `id` — anonymous bodies are sufficient for the hero scenario. Named ids are only needed when `rememberPhysicsBody` or `physicsBody()` tap routing is required.
 
 ---
 
@@ -1721,19 +1992,20 @@ All in `io.github.jayteealao.isometric.physics.joints`. No API surface changes f
 
 **`PhysicsDebugOverlay.kt`** — uses `AdvancedSceneConfig.onAfterDraw` to draw physics debug info on top of the rendered scene without a separate composable layer. This escape hatch already exists in `AdvancedSceneConfig`.
 
+Add `debugConfig` to both `PhysicsScene` overloads (aligned with the signatures from Phase 4b.6 — note `physicsConfig` was removed from those signatures):
+
 ```kotlin
 @Composable
 fun PhysicsScene(
     modifier: Modifier = Modifier,
     config: SceneConfig = SceneConfig(),
-    physicsConfig: PhysicsConfig = PhysicsConfig(),
-    world: PhysicsWorld = rememberPhysicsWorld(physicsConfig),
+    world: PhysicsWorld = rememberPhysicsWorld(),
     debugConfig: PhysicsDebugConfig = PhysicsDebugConfig.Disabled,  // NEW in Phase 7
     content: @Composable PhysicsScope.() -> Unit
 )
 ```
 
-`PhysicsDebugConfig.Disabled` is the default — zero overhead when not debugging.
+`PhysicsDebugConfig.Disabled` is the default — zero overhead when not debugging. When enabled, `PhysicsScene` chains a debug draw function into `AdvancedSceneConfig.onAfterDraw` via `withRootNodeCallback`'s sibling method `withAfterDrawCallback()` — the same compiler-enforced pattern as `withRootNodeCallback()`. Add `withAfterDrawCallback()` to `AdvancedSceneConfig` in Phase 7 following the identical pattern established in Phase 0.5.
 
 ---
 
@@ -1769,7 +2041,7 @@ Uses `isometric-physics-benchmark` module. Extends existing `isometric-benchmark
 
 | Phase | Goal | Key deliverable | New modules |
 |-------|------|-----------------|-------------|
-| 0 | Core prerequisites | `Vector.ZERO`, `Octahedron.xyScale`, `onRootNodeReady` | None |
+| 0 | Core prerequisites | `Vector.ZERO`, `Octahedron.xyScale`, `onRootNodeReady`, `buildLocalContext()` hook, `open ShapeNode/GroupNode`, `withRootNodeCallback()` | None |
 | 1 | Math + rigid body | `PhysicsWorld`, `RigidBody`, background thread, `TestPhysicsWorld` | `isometric-physics-core` |
 | 2 | Collision detection | `BroadPhase`, `GjkDetector`, `ContactManifold`, debug dump | — |
 | 3 | Collision response | `SequentialImpulseSolver`, islands, sleep | — |

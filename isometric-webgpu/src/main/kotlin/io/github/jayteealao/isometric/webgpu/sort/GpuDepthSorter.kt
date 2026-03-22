@@ -24,205 +24,150 @@ import io.github.jayteealao.isometric.webgpu.GpuContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.ceil
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
- * GPU-accelerated radix sort for depth keys.
+ * GPU-accelerated depth-key sort using a ping-pong bitonic network.
  *
- * Performs a 4-pass (8 bits/pass) radix sort on IEEE 754 float depth keys, producing
- * back-to-front sorted indices. Falls back to CPU sorting for small arrays (< [GPU_SORT_THRESHOLD]).
+ * The implementation intentionally avoids [androidx.webgpu.GPUQueue.writeBuffer] because that
+ * JNI path has proven unstable on some devices. All CPU→GPU transfers use mapped staging buffers
+ * and explicit copy commands instead.
  *
- * ## Pipeline
- *
- * For each of the 4 passes (bitShift = 0, 8, 16, 24):
- * 1. Zero the histogram buffer
- * 2. Dispatch [RadixSortShader.COUNT_ENTRY_POINT] — count per-bucket occurrences
- * 3. Read back histogram, compute CPU-side exclusive prefix sum, re-upload
- * 4. Dispatch [RadixSortShader.SCATTER_ENTRY_POINT] — scatter keys to sorted positions
- * 5. Swap ping-pong buffers
- *
- * After 4 passes, read back the `originalIndex` field from sorted keys.
+ * All Dawn API calls are confined to the GPU thread via [GpuContext.withGpu] to prevent
+ * data races between GPU work and the processEvents polling loop.
  *
  * @param ctx The GPU context providing device, queue, and event polling.
+ * @param onProgress Reports coarse milestones for sample/debug surfaces.
  */
-class GpuDepthSorter(private val ctx: GpuContext) {
-
-    private val shaderModule: GPUShaderModule by lazy {
-        ctx.device.createShaderModule(
-            GPUShaderModuleDescriptor(
-                shaderSourceWGSL = GPUShaderSourceWGSL(code = RadixSortShader.WGSL)
-            )
-        )
-    }
-
-    private var countPipeline: GPUComputePipeline? = null
-    private var scatterPipeline: GPUComputePipeline? = null
+class GpuDepthSorter(
+    private val ctx: GpuContext,
+    private val onProgress: (String, Int?) -> Unit = { _, _ -> },
+) {
+    private var shaderModule: GPUShaderModule? = null
+    private var sortPipeline: GPUComputePipeline? = null
     private var bindGroupLayout: GPUBindGroupLayout? = null
 
     /**
-     * Sort depth keys on the GPU and return back-to-front indices.
+     * Sort depth keys and return back-to-front indices.
      *
      * @param depthKeys One float depth key per face. Higher = further from viewer.
      * @return Indices into [depthKeys] in back-to-front (drawn-first) order.
      */
     suspend fun sortByDepthKeys(depthKeys: FloatArray): IntArray {
-        if (depthKeys.size < GPU_SORT_THRESHOLD) {
-            return cpuFallbackSort(depthKeys)
-        }
+        require(depthKeys.isNotEmpty()) { "depthKeys must not be empty" }
 
-        ensurePipelinesBuilt()
+        return withContext(NonCancellable) {
+            ctx.checkHealthy()
 
-        val count = depthKeys.size
-        val keyByteSize = (count * SORT_KEY_BYTES).toLong()
+            val count = depthKeys.size
+            val paddedCount = nextPowerOfTwo(count)
+            val sortBufferSize = (paddedCount * SORT_KEY_BYTES).toLong()
+            onProgress("Packing $count depth keys", count)
 
-        // Prepare input data: interleave depth + originalIndex
-        val inputBuffer = ByteBuffer.allocateDirect(count * SORT_KEY_BYTES)
-            .order(ByteOrder.nativeOrder())
-        for (i in depthKeys.indices) {
-            inputBuffer.putFloat(depthKeys[i])
-            inputBuffer.putInt(i)
-        }
-        inputBuffer.rewind()
+            val packedKeys = packSortKeys(depthKeys, paddedCount)
 
-        // Create GPU buffers — ping-pong pair + histogram + params + readback
-        val gpuBufferA = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.Storage or BufferUsage.CopyDst or BufferUsage.CopySrc,
-                size = keyByteSize,
-            )
-        )
-        val gpuBufferB = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.Storage or BufferUsage.CopyDst or BufferUsage.CopySrc,
-                size = keyByteSize,
-            )
-        )
-        val histogramByteSize = (RADIX * 4).toLong()
-        val histogramBuffer = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.Storage or BufferUsage.CopyDst or BufferUsage.CopySrc,
-                size = histogramByteSize,
-            )
-        )
-        val paramsBuffer = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.Uniform or BufferUsage.CopyDst,
-                size = 8L,
-            )
-        )
-        val histogramReadback = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.MapRead or BufferUsage.CopyDst,
-                size = histogramByteSize,
-            )
-        )
-        val resultReadback = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.MapRead or BufferUsage.CopyDst,
-                size = keyByteSize,
-            )
-        )
+            // All Dawn API calls run on the dedicated GPU thread.
+            ctx.withGpu {
+                ensurePipelineBuilt()
 
-        // Upload input keys to buffer A
-        ctx.queue.writeBuffer(gpuBufferA, 0L, inputBuffer)
+                val primaryBuffer = ctx.device.createBuffer(
+                    GPUBufferDescriptor(
+                        usage = BufferUsage.Storage or BufferUsage.CopyDst or BufferUsage.CopySrc,
+                        size = sortBufferSize,
+                    )
+                )
+                val scratchBuffer = ctx.device.createBuffer(
+                    GPUBufferDescriptor(
+                        usage = BufferUsage.Storage or BufferUsage.CopyDst or BufferUsage.CopySrc,
+                        size = sortBufferSize,
+                    )
+                )
+                val paramsBuffer = ctx.device.createBuffer(
+                    GPUBufferDescriptor(
+                        usage = BufferUsage.Uniform or BufferUsage.CopyDst,
+                        size = PARAMS_BYTES.toLong(),
+                    )
+                )
+                val resultReadback = ctx.device.createBuffer(
+                    GPUBufferDescriptor(
+                        usage = BufferUsage.MapRead or BufferUsage.CopyDst,
+                        size = sortBufferSize,
+                    )
+                )
 
-        val workgroupCount = ceil(count.toFloat() / RadixSortShader.WORKGROUP_SIZE).toInt()
+                try {
+                    uploadBufferContents(
+                        destination = primaryBuffer,
+                        data = packedKeys,
+                        size = sortBufferSize,
+                        detail = "Uploaded $count depth keys",
+                        count = count,
+                    )
 
-        // Four passes: bitShift = 0, 8, 16, 24
-        var currentIn = gpuBufferA
-        var currentOut = gpuBufferB
+                    val workgroupCount =
+                        ceil(paddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
+                    var inputBuffer = primaryBuffer
+                    var outputBuffer = scratchBuffer
 
-        for (pass in 0 until 4) {
-            val bitShift = pass * 8
+                    var k = 2
+                    while (k <= paddedCount) {
+                        var j = k / 2
+                        while (j > 0) {
+                            ctx.checkHealthy()
+                            val paramsData = createParamsBuffer(j, k, paddedCount)
+                            val stageBindGroup = createBindGroup(inputBuffer, outputBuffer, paramsBuffer)
+                            submitStage(
+                                bindGroup = stageBindGroup,
+                                paramsData = paramsData,
+                                paramsBuffer = paramsBuffer,
+                                workgroupCount = workgroupCount,
+                            )
 
-            // 1. Zero histogram buffer
-            val zeroData = ByteBuffer.allocateDirect(RADIX * 4)
-                .order(ByteOrder.nativeOrder())
-            ctx.queue.writeBuffer(histogramBuffer, 0L, zeroData)
+                            val swap = inputBuffer
+                            inputBuffer = outputBuffer
+                            outputBuffer = swap
+                            j /= 2
+                        }
+                        k *= 2
+                    }
 
-            // 2. Upload params
-            val paramsData = ByteBuffer.allocateDirect(8)
-                .order(ByteOrder.nativeOrder())
-            paramsData.putInt(count)
-            paramsData.putInt(bitShift)
-            paramsData.rewind()
-            ctx.queue.writeBuffer(paramsBuffer, 0L, paramsData)
+                    onProgress("Completed compute passes for $count depth keys", count)
+                    ctx.queue.onSubmittedWorkDone()
 
-            // 3. Dispatch count pass
-            val countBindGroup = createBindGroup(currentIn, currentOut, histogramBuffer, paramsBuffer)
-            val encoder1 = ctx.device.createCommandEncoder()
-            val computePass1 = encoder1.beginComputePass()
-            computePass1.setPipeline(countPipeline!!)
-            computePass1.setBindGroup(0, countBindGroup)
-            computePass1.dispatchWorkgroups(workgroupCount)
-            computePass1.end()
-            encoder1.copyBufferToBuffer(histogramBuffer, 0L, histogramReadback, 0L, histogramByteSize)
-            ctx.queue.submit(arrayOf(encoder1.finish()))
+                    val readbackEncoder = ctx.device.createCommandEncoder()
+                    readbackEncoder.copyBufferToBuffer(inputBuffer, 0L, resultReadback, 0L, sortBufferSize)
+                    ctx.queue.submit(arrayOf(readbackEncoder.finish()))
 
-            // 4. CPU prefix sum on histogram
-            histogramReadback.mapAndAwait(MapMode.Read, 0L, histogramByteSize)
-            val histogramData = histogramReadback.getConstMappedRange(0L, histogramByteSize)
-            val histogramInts = IntArray(RADIX)
-            histogramData.asIntBuffer().get(histogramInts)
-            histogramReadback.unmap()
+                    onProgress("Copied GPU results for $count depth keys", count)
+                    ctx.queue.onSubmittedWorkDone()
 
-            // Exclusive prefix sum
-            val prefixSums = IntArray(RADIX)
-            var sum = 0
-            for (i in 0 until RADIX) {
-                prefixSums[i] = sum
-                sum += histogramInts[i]
+                    resultReadback.mapAndAwait(MapMode.Read, 0L, sortBufferSize)
+                    val resultData = resultReadback.getConstMappedRange(0L, sortBufferSize)
+                    val sortedIndices = extractSortedIndices(resultData, count, paddedCount)
+                    resultReadback.unmap()
+                    onProgress("Completed sort for $count depth keys", count)
+                    sortedIndices
+                } finally {
+                    primaryBuffer.destroy()
+                    scratchBuffer.destroy()
+                    paramsBuffer.destroy()
+                    resultReadback.destroy()
+                }
             }
-
-            // Upload prefix-summed histogram back
-            val prefixData = ByteBuffer.allocateDirect(RADIX * 4)
-                .order(ByteOrder.nativeOrder())
-            prefixData.asIntBuffer().put(prefixSums)
-            prefixData.rewind()
-            ctx.queue.writeBuffer(histogramBuffer, 0L, prefixData)
-
-            // 5. Dispatch scatter pass
-            val scatterBindGroup = createBindGroup(currentIn, currentOut, histogramBuffer, paramsBuffer)
-            val encoder2 = ctx.device.createCommandEncoder()
-            val computePass2 = encoder2.beginComputePass()
-            computePass2.setPipeline(scatterPipeline!!)
-            computePass2.setBindGroup(0, scatterBindGroup)
-            computePass2.dispatchWorkgroups(workgroupCount)
-            computePass2.end()
-            ctx.queue.submit(arrayOf(encoder2.finish()))
-
-            // 6. Swap ping-pong
-            val temp = currentIn
-            currentIn = currentOut
-            currentOut = temp
         }
-
-        // Read back sorted indices from currentIn (result of last pass)
-        val finalEncoder = ctx.device.createCommandEncoder()
-        finalEncoder.copyBufferToBuffer(currentIn, 0L, resultReadback, 0L, keyByteSize)
-        ctx.queue.submit(arrayOf(finalEncoder.finish()))
-
-        resultReadback.mapAndAwait(MapMode.Read, 0L, keyByteSize)
-        val resultData = resultReadback.getConstMappedRange(0L, keyByteSize)
-        val sortedIndices = IntArray(count)
-        for (i in 0 until count) {
-            resultData.position(i * SORT_KEY_BYTES + 4) // skip depth float, read originalIndex
-            sortedIndices[i] = resultData.getInt()
-        }
-        resultReadback.unmap()
-
-        // Cleanup GPU buffers
-        gpuBufferA.destroy()
-        gpuBufferB.destroy()
-        histogramBuffer.destroy()
-        paramsBuffer.destroy()
-        histogramReadback.destroy()
-        resultReadback.destroy()
-
-        return sortedIndices
     }
 
-    private fun ensurePipelinesBuilt() {
-        if (countPipeline != null) return
+    private suspend fun ensurePipelineBuilt() {
+        if (sortPipeline != null) return
+
+        if (shaderModule == null) {
+            shaderModule = ctx.device.createShaderModule(
+                GPUShaderModuleDescriptor(
+                    shaderSourceWGSL = GPUShaderSourceWGSL(code = GPUBitonicSortShader.WGSL)
+                )
+            )
+        }
 
         val layout = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(
@@ -240,11 +185,6 @@ class GpuDepthSorter(private val ctx: GpuContext) {
                     GPUBindGroupLayoutEntry(
                         binding = 2,
                         visibility = ShaderStage.Compute,
-                        buffer = GPUBufferBindingLayout(type = BufferBindingType.Storage),
-                    ),
-                    GPUBindGroupLayoutEntry(
-                        binding = 3,
-                        visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.Uniform),
                     ),
                 )
@@ -258,58 +198,169 @@ class GpuDepthSorter(private val ctx: GpuContext) {
             )
         )
 
-        countPipeline = ctx.device.createComputePipeline(
+        sortPipeline = ctx.device.createComputePipelineAndAwait(
             GPUComputePipelineDescriptor(
                 compute = GPUComputeState(
-                    module = shaderModule,
-                    entryPoint = RadixSortShader.COUNT_ENTRY_POINT,
+                    module = shaderModule!!,
+                    entryPoint = GPUBitonicSortShader.SORT_ENTRY_POINT,
                 ),
                 layout = pipelineLayout,
+            )
+        )
+        onProgress("Pipeline ready", null)
+    }
+
+    private suspend fun submitStage(
+        bindGroup: GPUBindGroup,
+        paramsData: ByteBuffer,
+        paramsBuffer: GPUBuffer,
+        workgroupCount: Int,
+    ) {
+        val paramsUpload = createMappedUploadBuffer(PARAMS_BYTES.toLong())
+        try {
+            writeToMappedBuffer(paramsUpload, paramsData, PARAMS_BYTES.toLong())
+            val encoder = ctx.device.createCommandEncoder()
+            encoder.copyBufferToBuffer(paramsUpload, 0L, paramsBuffer, 0L, PARAMS_BYTES.toLong())
+            val computePass = encoder.beginComputePass()
+            computePass.setPipeline(sortPipeline!!)
+            computePass.setBindGroup(0, bindGroup)
+            computePass.dispatchWorkgroups(workgroupCount)
+            computePass.end()
+            ctx.queue.submit(arrayOf(encoder.finish()))
+        } finally {
+            paramsUpload.destroy()
+        }
+    }
+
+    private suspend fun uploadBufferContents(
+        destination: GPUBuffer,
+        data: ByteBuffer,
+        size: Long,
+        detail: String,
+        count: Int,
+    ) {
+        val uploadBuffer = createMappedUploadBuffer(size)
+        try {
+            writeToMappedBuffer(uploadBuffer, data, size)
+            val encoder = ctx.device.createCommandEncoder()
+            encoder.copyBufferToBuffer(uploadBuffer, 0L, destination, 0L, size)
+            ctx.queue.submit(arrayOf(encoder.finish()))
+            ctx.queue.onSubmittedWorkDone()
+            onProgress(detail, count)
+        } finally {
+            uploadBuffer.destroy()
+        }
+    }
+
+    private fun createMappedUploadBuffer(size: Long): GPUBuffer =
+        ctx.device.createBuffer(
+            GPUBufferDescriptor(
+                usage = BufferUsage.CopySrc,
+                size = size,
+                mappedAtCreation = true,
             )
         )
 
-        scatterPipeline = ctx.device.createComputePipeline(
-            GPUComputePipelineDescriptor(
-                compute = GPUComputeState(
-                    module = shaderModule,
-                    entryPoint = RadixSortShader.SCATTER_ENTRY_POINT,
-                ),
-                layout = pipelineLayout,
-            )
-        )
+    private fun writeToMappedBuffer(
+        buffer: GPUBuffer,
+        data: ByteBuffer,
+        size: Long,
+    ) {
+        val target = buffer.getMappedRange(0L, size).order(ByteOrder.nativeOrder())
+        val source = data.duplicate().order(ByteOrder.nativeOrder())
+        source.rewind()
+        target.put(source)
+        target.rewind()
+        buffer.unmap()
     }
 
     private fun createBindGroup(
-        keysIn: GPUBuffer,
-        keysOut: GPUBuffer,
-        histogram: GPUBuffer,
-        params: GPUBuffer,
+        inputBuffer: GPUBuffer,
+        outputBuffer: GPUBuffer,
+        paramsBuffer: GPUBuffer,
     ): GPUBindGroup {
         return ctx.device.createBindGroup(
             GPUBindGroupDescriptor(
                 layout = bindGroupLayout!!,
                 entries = arrayOf(
-                    GPUBindGroupEntry(binding = 0, buffer = keysIn),
-                    GPUBindGroupEntry(binding = 1, buffer = keysOut),
-                    GPUBindGroupEntry(binding = 2, buffer = histogram),
-                    GPUBindGroupEntry(binding = 3, buffer = params),
+                    GPUBindGroupEntry(binding = 0, buffer = inputBuffer),
+                    GPUBindGroupEntry(binding = 1, buffer = outputBuffer),
+                    GPUBindGroupEntry(binding = 2, buffer = paramsBuffer),
                 )
             )
         )
     }
 
     companion object {
-        /** Below this count, CPU sort is faster than GPU dispatch overhead. */
-        const val GPU_SORT_THRESHOLD = 64
+        private const val SORT_KEY_BYTES = 16
+        private const val ORIGINAL_INDEX_OFFSET = 4
+        private const val PARAMS_BYTES = 16
+        private const val SENTINEL_INDEX = -1
 
-        private const val RADIX = 256
-        private const val SORT_KEY_BYTES = 8 // f32 depth + u32 originalIndex
+        internal fun packSortKeys(depthKeys: FloatArray, paddedCount: Int): ByteBuffer {
+            require(paddedCount >= depthKeys.size) {
+                "paddedCount=$paddedCount must be >= depthKeys.size=${depthKeys.size}"
+            }
 
-        /**
-         * CPU fallback sort — descending by depth key (back-to-front).
-         * Used when GPU is unavailable or array is too small.
-         */
-        fun cpuFallbackSort(keys: FloatArray): IntArray =
-            keys.indices.sortedByDescending { keys[it] }.toIntArray()
+            val inputData = ByteBuffer.allocateDirect(paddedCount * SORT_KEY_BYTES)
+                .order(ByteOrder.nativeOrder())
+            for (i in depthKeys.indices) {
+                inputData.putFloat(depthKeys[i])
+                inputData.putInt(i)
+                inputData.putInt(0)
+                inputData.putInt(0)
+            }
+            for (i in depthKeys.size until paddedCount) {
+                inputData.putFloat(Float.NEGATIVE_INFINITY)
+                inputData.putInt(SENTINEL_INDEX)
+                inputData.putInt(0)
+                inputData.putInt(0)
+            }
+            inputData.rewind()
+            return inputData
+        }
+
+        internal fun extractSortedIndices(
+            resultData: ByteBuffer,
+            count: Int,
+            paddedCount: Int,
+        ): IntArray {
+            val sortedIndices = IntArray(count)
+            var outIndex = 0
+            for (i in 0 until paddedCount) {
+                resultData.position(i * SORT_KEY_BYTES + ORIGINAL_INDEX_OFFSET)
+                val originalIndex = resultData.getInt()
+                if (originalIndex != SENTINEL_INDEX) {
+                    check(outIndex < count) {
+                        "GPU sort produced more than $count indices"
+                    }
+                    sortedIndices[outIndex++] = originalIndex
+                }
+            }
+            check(outIndex == count) {
+                "GPU sort produced $outIndex indices for $count depth keys"
+            }
+            return sortedIndices
+        }
+
+        internal fun createParamsBuffer(j: Int, k: Int, paddedCount: Int): ByteBuffer =
+            ByteBuffer.allocateDirect(PARAMS_BYTES)
+                .order(ByteOrder.nativeOrder())
+                .apply {
+                    putInt(j)
+                    putInt(k)
+                    putInt(paddedCount)
+                    putInt(0)
+                    rewind()
+                }
+
+        internal fun nextPowerOfTwo(value: Int): Int {
+            require(value > 0) { "value must be positive, got $value" }
+            var result = 1
+            while (result < value) {
+                result = result shl 1
+            }
+            return result
+        }
     }
 }
