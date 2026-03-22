@@ -18,6 +18,7 @@ import androidx.webgpu.GPUPipelineLayoutDescriptor
 import androidx.webgpu.GPUShaderModule
 import androidx.webgpu.GPUShaderModuleDescriptor
 import androidx.webgpu.GPUShaderSourceWGSL
+import androidx.webgpu.GPURequestCallback
 import androidx.webgpu.MapMode
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
@@ -38,21 +39,22 @@ import kotlinx.coroutines.withContext
  *
  * Cached per paddedCount:
  * - Sort buffers (primary, scratch, readback)
- * - Upload staging buffer (re-mapped each frame via `mapAndAwait`)
  * - Packed params uniform buffer (immutable for a given paddedCount)
  * - Bind groups (reference cached buffers, deterministic ping-pong pattern)
- * - CPU-side ByteBuffer for packing sort keys (rewritten in-place each frame)
+ * - CPU-side ByteBuffers for packing sort keys and readback data
  *
  * Per-frame allocations are limited to:
- * - 1 command encoder + 1 command buffer (unavoidable)
- * - N compute pass objects (lightweight, one per bitonic stage)
+ * - 1 command encoder + 1 command buffer (explicitly closed after use)
+ * - N compute pass objects (explicitly closed after each stage)
+ * - 1 CompletableDeferred per async callback (lightweight, no JNI cost)
  *
  * All bitonic stages are encoded into a **single command buffer** and submitted with
  * one `queue.submit()`. Only one `onSubmittedWorkDone()` sync point per sort.
  *
- * The implementation intentionally avoids [androidx.webgpu.GPUQueue.writeBuffer] because
- * that JNI path has proven unstable on some devices. All CPU→GPU transfers use mapped
- * staging buffers and explicit copy commands instead.
+ * CPU→GPU uploads use [androidx.webgpu.GPUQueue.writeBuffer] directly. GPU→CPU
+ * readback uses [GPUBuffer.readMappedRange] with a reusable ByteBuffer. Both
+ * approaches avoid the per-frame [GPUBuffer.mapAndAwait] callback that leaks
+ * JNI global refs in the Dawn binding layer.
  *
  * All Dawn API calls are confined to the GPU thread via [GpuContext.withGpu] to prevent
  * data races between GPU work and the processEvents polling loop.
@@ -74,15 +76,27 @@ class GpuDepthSorter(
     private var primaryBuffer: GPUBuffer? = null
     private var scratchBuffer: GPUBuffer? = null
     private var resultReadback: GPUBuffer? = null
-    private var uploadBuffer: GPUBuffer? = null
     private var paramsBuffer: GPUBuffer? = null
     private var cachedBindGroups: Array<GPUBindGroup>? = null
 
     /** Reusable CPU-side ByteBuffer for packing sort keys. Avoids allocateDirect per frame. */
     private var cachedPackedKeysBuffer: ByteBuffer? = null
 
-    /** True after the first use — subsequent uses require mapAndAwait to re-map. */
-    private var uploadBufferNeedsRemap = false
+    /** Reusable CPU-side ByteBuffer for readback data. Avoids getConstMappedRange per frame. */
+    private var cachedReadbackDataBuffer: ByteBuffer? = null
+
+    /**
+     * Reusable callback objects for async Dawn operations.
+     *
+     * The Dawn JNI bindings create JNI global refs to callback and executor objects
+     * passed to mapAsync/onSubmittedWorkDone. These global refs are never released,
+     * causing ~14 MB/s Dalvik heap growth when using awaitGPURequest (which creates
+     * a fresh anonymous callback each frame). By reusing singleton callback objects,
+     * all JNI global refs point to the same Java objects, bounding the leak.
+     */
+    private val reusableExecutor = java.util.concurrent.Executor(Runnable::run)
+    private val reusableWorkDoneCallback = ReusableUnitCallback()
+    private val reusableMapCallback = ReusableUnitCallback()
 
     /**
      * Sort depth keys and return back-to-front indices.
@@ -109,18 +123,13 @@ class GpuDepthSorter(
                 ensurePipelineBuilt()
                 ensureBuffers(paddedCount, sortBufferSize)
 
-                // Re-map the upload staging buffer if needed (first use is already mapped).
-                if (uploadBufferNeedsRemap) {
-                    uploadBuffer!!.mapAndAwait(MapMode.Write, 0L, sortBufferSize)
-                }
-
-                // Write packed keys into the mapped staging buffer.
-                val target = uploadBuffer!!.getMappedRange(0L, sortBufferSize)
-                    .order(ByteOrder.nativeOrder())
+                // Upload packed keys via queue.writeBuffer — a synchronous CPU→GPU
+                // copy that avoids the mapAsync callback leak entirely.
+                // Previous approach used mapAndAwait + getMappedRange + unmap, but
+                // mapAsync's JNI callback global refs are never released by Dawn,
+                // causing ~14 MB/s Dalvik heap growth at 60fps.
                 packedKeys.rewind()
-                target.put(packedKeys)
-                uploadBuffer!!.unmap()
-                uploadBufferNeedsRemap = true
+                ctx.queue.writeBuffer(primaryBuffer!!, 0L, packedKeys)
 
                 val workgroupCount =
                     ceil(paddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
@@ -129,29 +138,24 @@ class GpuDepthSorter(
 
                 ctx.checkHealthy()
 
-                // Encode everything — upload, all compute passes, readback — in one
-                // command buffer. Compute passes within a command buffer have implicit
-                // barriers, so the ping-pong reads correctly see prior writes.
+                // Encode all compute passes in one command buffer.
                 val encoder = ctx.device.createCommandEncoder()
 
-                // Copy input data from staging to primary sort buffer.
-                encoder.copyBufferToBuffer(
-                    uploadBuffer!!, 0L, primaryBuffer!!, 0L, sortBufferSize
-                )
-
                 // Encode all bitonic sort stages using cached bind groups.
+                // Each compute pass encoder wraps a native Dawn handle via JNI.
+                // Explicitly close() after end() to release the native handle
+                // immediately rather than waiting for GC finalization, which
+                // can't keep up at 60fps (~45 passes/frame = ~2700 handles/sec).
                 for (idx in bindGroups.indices) {
                     val pass = encoder.beginComputePass()
                     pass.setPipeline(sortPipeline!!)
                     pass.setBindGroup(0, bindGroups[idx])
                     pass.dispatchWorkgroups(workgroupCount)
                     pass.end()
+                    pass.close()
                 }
 
                 // The final result is in primary or scratch depending on stage count parity.
-                // Bind groups are pre-built with the correct ping-pong order, so the last
-                // output is the input of a hypothetical next stage. For even stage count,
-                // that's primaryBuffer; for odd, it's scratchBuffer.
                 val finalOutputBuffer = if (bindGroups.size % 2 == 0) {
                     primaryBuffer!!
                 } else {
@@ -164,16 +168,24 @@ class GpuDepthSorter(
                 )
 
                 // Single submit for the entire sort operation.
-                ctx.queue.submit(arrayOf(encoder.finish()))
+                // Close the command buffer and encoder immediately after submit.
+                val commandBuffer = encoder.finish()
+                ctx.queue.submit(arrayOf(commandBuffer))
+                commandBuffer.close()
+                encoder.close()
                 onProgress("Submitted sort for $count depth keys", count)
 
-                // Single sync point — wait for all GPU work to complete.
-                ctx.queue.onSubmittedWorkDone()
+                // Wait for GPU work and map readback buffer using reusable callbacks
+                // to avoid JNI global ref leak from awaitGPURequest/mapAndAwait.
+                awaitSubmittedWorkDone()
+                awaitBufferMap(resultReadback!!, MapMode.Read, 0L, sortBufferSize)
 
-                // Map and read results.
-                resultReadback!!.mapAndAwait(MapMode.Read, 0L, sortBufferSize)
-                val resultData = resultReadback!!.getConstMappedRange(0L, sortBufferSize)
-                val sortedIndices = extractSortedIndices(resultData, count, paddedCount)
+                // Read results using readMappedRange into a reusable ByteBuffer
+                // to avoid per-frame DirectByteBuffer creation from getConstMappedRange.
+                val readbackData = ensureReadbackDataBuffer(paddedCount)
+                resultReadback!!.readMappedRange(0L, readbackData)
+                readbackData.rewind()
+                val sortedIndices = extractSortedIndices(readbackData, count, paddedCount)
                 resultReadback!!.unmap()
                 onProgress("Completed sort for $count depth keys", count)
                 sortedIndices
@@ -189,17 +201,73 @@ class GpuDepthSorter(
         primaryBuffer?.destroy()
         scratchBuffer?.destroy()
         resultReadback?.destroy()
-        uploadBuffer?.destroy()
         paramsBuffer?.destroy()
         primaryBuffer = null
         scratchBuffer = null
         resultReadback = null
-        uploadBuffer = null
         paramsBuffer = null
         cachedBindGroups = null
         cachedPackedKeysBuffer = null
+        cachedReadbackDataBuffer = null
         cachedPaddedCount = 0
-        uploadBufferNeedsRemap = false
+    }
+
+    /**
+     * Reusable callback for GPURequestCallback<Unit>. A single instance is passed
+     * to mapAsync/onSubmittedWorkDone every frame. The JNI global ref always points
+     * to the same object, preventing the per-frame leak.
+     *
+     * Uses a CompletableDeferred as a one-shot signal, replaced each call via [prepare].
+     */
+    private class ReusableUnitCallback : GPURequestCallback<Unit> {
+        @Volatile
+        private var deferred: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+
+        fun prepare(): kotlinx.coroutines.CompletableDeferred<Unit> {
+            val d = kotlinx.coroutines.CompletableDeferred<Unit>()
+            deferred = d
+            return d
+        }
+
+        override fun onResult(result: Unit) {
+            deferred?.complete(Unit)
+        }
+
+        override fun onError(exception: Exception) {
+            deferred?.completeExceptionally(exception)
+        }
+    }
+
+    /**
+     * Await GPU submitted work done using the reusable callback to avoid JNI leak.
+     */
+    private suspend fun awaitSubmittedWorkDone() {
+        val signal = reusableWorkDoneCallback.prepare()
+        ctx.queue.onSubmittedWorkDone(reusableExecutor, reusableWorkDoneCallback)
+        signal.await()
+    }
+
+    /**
+     * Await buffer mapping using the reusable callback to avoid JNI leak.
+     */
+    private suspend fun awaitBufferMap(
+        buffer: GPUBuffer, @MapMode mode: Int, offset: Long, size: Long
+    ) {
+        val signal = reusableMapCallback.prepare()
+        buffer.mapAsync(mode, offset, size, reusableExecutor, reusableMapCallback)
+        signal.await()
+    }
+
+    private fun ensureReadbackDataBuffer(paddedCount: Int): ByteBuffer {
+        val needed = paddedCount * SORT_KEY_BYTES
+        val existing = cachedReadbackDataBuffer
+        if (existing != null && existing.capacity() >= needed) {
+            existing.clear()
+            return existing
+        }
+        val buf = ByteBuffer.allocateDirect(needed).order(ByteOrder.nativeOrder())
+        cachedReadbackDataBuffer = buf
+        return buf
     }
 
     private fun ensurePackedKeysBuffer(paddedCount: Int): ByteBuffer {
@@ -221,7 +289,6 @@ class GpuDepthSorter(
         primaryBuffer?.destroy()
         scratchBuffer?.destroy()
         resultReadback?.destroy()
-        uploadBuffer?.destroy()
         paramsBuffer?.destroy()
 
         primaryBuffer = ctx.device.createBuffer(
@@ -242,14 +309,6 @@ class GpuDepthSorter(
                 size = sortBufferSize,
             )
         )
-        uploadBuffer = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.MapWrite or BufferUsage.CopySrc,
-                size = sortBufferSize,
-                mappedAtCreation = true,
-            )
-        )
-        uploadBufferNeedsRemap = false
 
         // Build the immutable params buffer and bind groups for this paddedCount.
         val stages = buildBitonicStages(paddedCount)

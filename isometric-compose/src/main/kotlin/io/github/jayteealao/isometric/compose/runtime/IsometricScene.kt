@@ -8,6 +8,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCompositionContext
@@ -298,11 +299,16 @@ fun IsometricScene(
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
 
-    // Async prepared scene state for GPU compute path.
+    // Async prepared scene for GPU compute path.
     // Called unconditionally to satisfy Compose's rules of hooks — remember count
     // must be stable across recompositions regardless of config changes.
     val isAsyncCompute = config.computeBackend.isAsync && config.computeBackend is SortingComputeBackend
-    val asyncPreparedScene = remember { mutableStateOf<PreparedScene?>(null) }
+    // Version counter triggers Canvas invalidation without storing PreparedScene
+    // in Compose's snapshot state. Storing PreparedScene in mutableStateOf caused
+    // the snapshot system to retain old scene values (and their entire RenderCommand
+    // + DoubleArray object graphs) during concurrent snapshot reads, preventing GC
+    // and causing ~8 MB/s heap growth → OOM in animated scenes.
+    val asyncSceneVersion = remember { mutableIntStateOf(0) }
     val asyncPrepareInputs = remember(
         config.renderOptions,
         config.lightDirection,
@@ -362,7 +368,10 @@ fun IsometricScene(
                             skipHitTest = skipHitTest,
                         )
                     }
-                    asyncPreparedScene.value = renderer.currentPreparedScene
+                    // Bump version to trigger Canvas invalidation. The Canvas reads
+                    // the scene directly from renderer.currentPreparedScene (not from
+                    // Compose state) to avoid snapshot system retention of old scenes.
+                    asyncSceneVersion.intValue++
                 }
         }
     }
@@ -532,10 +541,10 @@ fun IsometricScene(
     ) {
         // Switch state subscription based on compute backend.
         if (isAsyncCompute) {
-            // GPU path: subscribe to asyncPreparedScene state changes.
-            // The Canvas redraws when the LaunchedEffect publishes a new snapshot.
+            // GPU path: subscribe to version counter changes.
+            // The Canvas redraws when the LaunchedEffect bumps the version.
             @Suppress("UNUSED_EXPRESSION")
-            asyncPreparedScene.value
+            asyncSceneVersion.intValue
         } else {
             // CPU path: subscribe to sceneVersion — unchanged from current behavior.
             @Suppress("UNUSED_EXPRESSION")
@@ -574,8 +583,9 @@ fun IsometricScene(
             config.onBeforeDraw?.invoke(this)
 
             if (isAsyncCompute) {
-                // GPU compute path: render from the async-prepared scene snapshot.
-                val scene = asyncPreparedScene.value
+                // GPU compute path: read scene directly from renderer cache.
+                // NOT from Compose state — avoids snapshot retention of old scenes.
+                val scene = renderer.currentPreparedScene
                 if (scene != null) {
                     with(renderer) {
                         if (config.useNativeCanvas) {

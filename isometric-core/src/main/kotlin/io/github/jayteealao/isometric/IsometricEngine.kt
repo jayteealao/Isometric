@@ -251,6 +251,7 @@ class IsometricEngine @JvmOverloads constructor(
     // LaunchedEffect's coroutine context), so no synchronization is needed.
     private var cachedDepthKeys: FloatArray? = null
     private var cachedTransformedItems: ArrayList<DepthSorter.TransformedItem>? = null
+    private var cachedSortedItems: ArrayList<DepthSorter.TransformedItem>? = null
 
     override suspend fun projectSceneAsync(
         width: Int,
@@ -299,17 +300,22 @@ class IsometricEngine @JvmOverloads constructor(
             // GPU radix sort — returns back-to-front indices
             val sortedIndices = computeBackend.sortByDepthKeys(depthKeys)
 
-            // Reorder by GPU-sorted indices into a pre-sized list
-            ArrayList<DepthSorter.TransformedItem>(count).also { list ->
-                for (idx in sortedIndices) {
-                    list.add(transformedItems[idx])
-                }
+            // Reorder by GPU-sorted indices, reusing the list (F2.3).
+            val sorted = cachedSortedItems
+                ?: ArrayList<DepthSorter.TransformedItem>(count).also { cachedSortedItems = it }
+            sorted.clear()
+            sorted.ensureCapacity(count)
+            for (idx in sortedIndices) {
+                sorted.add(transformedItems[idx])
             }
+            sorted
         } else {
             transformedItems
         }
 
-        // Convert to render commands with a pre-sized list
+        // Convert to render commands. This list is stored inside PreparedScene
+        // and read by the Canvas on a later frame, so it cannot be reused — the
+        // previous scene still holds a reference to it.
         val commands = ArrayList<RenderCommand>(sortedItems.size)
         for (transformedItem in sortedItems) {
             commands.add(

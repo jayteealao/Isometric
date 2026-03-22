@@ -52,6 +52,9 @@ internal class SceneCache(
     private var cachedPrepareInputs: PrepareInputs? = null
     private var cachedProjectionVersion: Long = -1L
 
+    /** Reusable list for collecting render commands from the node tree (F1.1). */
+    private var reusableCommandList: ArrayList<RenderCommand>? = null
+
     /**
      * Check whether the cache is stale and needs a rebuild.
      */
@@ -89,13 +92,16 @@ internal class SceneCache(
     ): PreparedScene? {
         return try {
             // Collect all render commands from the tree FIRST (may throw).
-            val commands = mutableListOf<RenderCommand>()
+            // Reuse the backing list to avoid per-frame ArrayList allocation (F1.1).
+            val commands = reusableCommandList
+                ?: ArrayList<RenderCommand>().also { reusableCommandList = it }
+            commands.clear()
             rootNode.renderTo(commands, context)
 
             // --- Point of no return: commit changes ---
             engine.clear()
 
-            commands.forEach { command ->
+            for (command in commands) {
                 engine.add(
                     path = command.originalPath,
                     color = command.color,
@@ -149,18 +155,20 @@ internal class SceneCache(
         onRenderError: ((String, Throwable) -> Unit)?
     ): PreparedScene? {
         return try {
-            val commands = mutableListOf<RenderCommand>()
+            // Reuse the backing list to avoid per-frame ArrayList allocation (F1.1).
+            val commands = reusableCommandList
+                ?: ArrayList<RenderCommand>().also { reusableCommandList = it }
+            commands.clear()
             rootNode.renderTo(commands, context)
 
-            // Release old scene before building the new one so GC can reclaim
-            // old-gen objects (Point2D, TransformedItem, RenderCommand) while the
-            // new scene is being constructed. The Canvas still holds its own
-            // reference via asyncPreparedScene so drawing is unaffected.
+            // Keep currentPreparedScene alive during the build — the Canvas reads
+            // it directly (not via Compose state) and may draw concurrently while
+            // this method runs on Dispatchers.Default. The old scene is replaced
+            // atomically at line 190 after the new scene is fully constructed.
             cachedPaths = null
-            currentPreparedScene = null
 
             engine.clear()
-            commands.forEach { command ->
+            for (command in commands) {
                 engine.add(
                     path = command.originalPath,
                     color = command.color,
@@ -207,6 +215,7 @@ internal class SceneCache(
         cachedPaths = null
         cachedPrepareInputs = null
         cachedProjectionVersion = -1L
+        reusableCommandList = null
     }
 
     private fun buildPathCache(scene: PreparedScene) {

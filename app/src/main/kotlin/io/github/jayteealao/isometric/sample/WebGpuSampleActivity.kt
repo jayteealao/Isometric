@@ -83,25 +83,31 @@ private fun WebGpuSamplesScreen() {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Smoke") }
+                text = { Text("Animated Towers") }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("Dense Grid") }
+                text = { Text("CPU Animated") }
             )
             Tab(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
-                text = { Text("Animated Towers") }
+                text = { Text("Smoke") }
+            )
+            Tab(
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 },
+                text = { Text("Dense Grid") }
             )
         }
 
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
-                0 -> WebGpuSmokeSample()
-                1 -> WebGpuDenseGridSample()
-                2 -> WebGpuAnimatedTowersSample()
+                0 -> WebGpuAnimatedTowersSample()
+                1 -> CpuAnimatedTowersSample()
+                2 -> WebGpuSmokeSample()
+                3 -> WebGpuDenseGridSample()
             }
         }
     }
@@ -284,6 +290,73 @@ private fun WebGpuDenseGridSample() {
         ),
         phase = 0.0,
     )
+}
+
+@Composable
+private fun CpuAnimatedTowersSample() {
+    val phase = rememberPhaseAnimation(speedRadiansPerSecond = 3.4)
+
+    CpuGridScene(
+        stage = SmokeStage(
+            name = "CPU Animated",
+            gridWidth = 7,
+            gridHeight = 7,
+            spacing = 1.15,
+            animated = true,
+        ),
+        phase = phase,
+    )
+}
+
+@Composable
+private fun CpuGridScene(
+    stage: SmokeStage,
+    phase: Double,
+) {
+    IsometricScene(
+        modifier = Modifier.fillMaxSize(),
+        config = SceneConfig(
+            renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+            computeBackend = ComputeBackend.Cpu,
+            useNativeCanvas = false,
+            gestures = GestureConfig.Disabled,
+        )
+    ) {
+        ForEach((0 until stage.gridWidth).toList()) { x ->
+            ForEach((0 until stage.gridHeight).toList()) { y ->
+                val centerOffsetX = x - stage.gridWidth / 2.0
+                val centerOffsetY = y - stage.gridHeight / 2.0
+                val wave = sin(phase + x * 0.55 + y * 0.45)
+                val baseHeight = 0.7 + (wave + 1.0) * 1.2
+                val towerX = centerOffsetX * stage.spacing
+                val towerY = centerOffsetY * stage.spacing
+
+                Shape(
+                    geometry = Prism(
+                        position = Point(towerX, towerY, 0.0),
+                        width = 1.0,
+                        depth = 1.0,
+                        height = baseHeight
+                    ),
+                    color = IsoColor(
+                        clampRgb(60.0 + x * 14.0),
+                        clampRgb(80.0 + y * 16.0),
+                        clampRgb(220.0 - y * 9.0)
+                    )
+                )
+
+                Shape(
+                    geometry = Prism(
+                        position = Point(towerX + 0.16, towerY + 0.16, baseHeight),
+                        width = 0.68,
+                        depth = 0.68,
+                        height = 0.22
+                    ),
+                    color = IsoColor(245.0, 245.0, 255.0)
+                )
+            }
+        }
+    }
 }
 
 @Composable

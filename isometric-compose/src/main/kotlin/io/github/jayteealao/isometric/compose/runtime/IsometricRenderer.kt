@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
 import io.github.jayteealao.isometric.SortingComputeBackend
+import io.github.jayteealao.isometric.compose.fillComposePath
 import io.github.jayteealao.isometric.compose.toComposeColor
 import io.github.jayteealao.isometric.compose.toComposePath
 
@@ -83,6 +84,16 @@ class IsometricRenderer(
     private val cache = SceneCache(engine, enablePathCaching)
     private val hitTestResolver = HitTestResolver(engine, enableSpatialIndex, spatialIndexCellSize)
     private val nativeRenderer = NativeSceneRenderer()
+
+    /**
+     * Pool of reusable Compose [androidx.compose.ui.graphics.Path] objects for the draw path.
+     *
+     * Each Compose Path wraps a native Skia SkPath (~200+ bytes managed + native allocation).
+     * Creating and finalizing ~280 Path objects per frame at 55+ fps overwhelms the GC,
+     * causing continuous heap growth and eventual OOM. The pool eliminates this by resetting
+     * and refilling existing Path objects via [fillComposePath] instead of allocating new ones.
+     */
+    private val pathPool = ArrayList<androidx.compose.ui.graphics.Path>()
 
     internal val currentPreparedScene: PreparedScene? get() = cache.currentPreparedScene
 
@@ -214,6 +225,7 @@ class IsometricRenderer(
     fun clearCache() {
         cache.clearCache()
         hitTestResolver.clearIndices()
+        pathPool.clear()
     }
 
     /**
@@ -369,9 +381,20 @@ class IsometricRenderer(
         strokeComposeColor: Color?,
         strokeDrawStyle: Stroke?
     ) {
-        scene.commands.forEach { command ->
+        val commands = scene.commands
+
+        // Grow the path pool to match the command count. Paths are never
+        // removed — only new slots are added when the scene grows. This
+        // eliminates ~280 Path() allocations per frame after the first.
+        while (pathPool.size < commands.size) {
+            pathPool.add(androidx.compose.ui.graphics.Path())
+        }
+
+        for (i in commands.indices) {
+            val command = commands[i]
             try {
-                val path = command.toComposePath()
+                val path = pathPool[i]
+                command.fillComposePath(path)
                 val color = command.color.toComposeColor()
 
                 when (strokeStyle) {
