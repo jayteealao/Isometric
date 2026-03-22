@@ -37,6 +37,16 @@ internal class IsometricProjection(
     }
 
     /**
+     * Project a 3D point directly into a flat [DoubleArray] at [offset].
+     * Writes x at `dest[offset]` and y at `dest[offset + 1]`.
+     * Avoids Point2D object allocation in the hot rendering path.
+     */
+    fun translatePointInto(point: Point, originX: Double, originY: Double, dest: DoubleArray, offset: Int) {
+        dest[offset] = originX + point.x * transformation[0][0] + point.y * transformation[1][0]
+        dest[offset + 1] = originY - point.x * transformation[0][1] - point.y * transformation[1][1] - (point.z * scale)
+    }
+
+    /**
      * Unproject a 2D screen point back to 3D world coordinates on a given Z plane.
      *
      * Inverts the [translatePoint] transformation by solving the 2x2 linear system
@@ -85,32 +95,32 @@ internal class IsometricProjection(
     }
 
     /**
-     * Back-face culling test.
+     * Back-face culling test on flat packed points [x0, y0, x1, y1, ...].
      * Returns true if the path should be culled (is facing away from the viewer).
      */
-    fun cullPath(transformedPoints: List<Point2D>): Boolean {
-        if (transformedPoints.size < 3) return false
+    fun cullPath(pts: DoubleArray): Boolean {
+        if (pts.size < 6) return false // need at least 3 vertices (6 doubles)
 
-        val a = transformedPoints[0].x * transformedPoints[1].y
-        val b = transformedPoints[1].x * transformedPoints[2].y
-        val c = transformedPoints[2].x * transformedPoints[0].y
+        val x0 = pts[0]; val y0 = pts[1]
+        val x1 = pts[2]; val y1 = pts[3]
+        val x2 = pts[4]; val y2 = pts[5]
 
-        val d = transformedPoints[1].x * transformedPoints[0].y
-        val e = transformedPoints[2].x * transformedPoints[1].y
-        val f = transformedPoints[0].x * transformedPoints[2].y
-
-        val z = a + b + c - d - e - f
+        val z = x0 * y1 + x1 * y2 + x2 * y0 - x1 * y0 - x2 * y1 - x0 * y2
         return z > 0
     }
 
     /**
-     * Check if any point of the item is within the drawing bounds.
+     * Check if any point in the flat packed array is within the drawing bounds.
      */
-    fun itemInDrawingBounds(transformedPoints: List<Point2D>, width: Int, height: Int): Boolean {
-        for (point in transformedPoints) {
-            if (point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height) {
+    fun itemInDrawingBounds(pts: DoubleArray, width: Int, height: Int): Boolean {
+        var i = 0
+        while (i < pts.size) {
+            val x = pts[i]
+            val y = pts[i + 1]
+            if (x >= 0 && x <= width && y >= 0 && y <= height) {
                 return true
             }
+            i += 2
         }
         return false
     }

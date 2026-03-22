@@ -18,18 +18,23 @@ internal data class ShapeBounds(
  * Returns null if the command has no points or contains NaN coordinates.
  */
 internal fun RenderCommand.getBounds(): ShapeBounds? {
-    if (points.isEmpty()) return null
+    val pts = points
+    if (pts.isEmpty()) return null
 
     var minX = Double.POSITIVE_INFINITY
     var minY = Double.POSITIVE_INFINITY
     var maxX = Double.NEGATIVE_INFINITY
     var maxY = Double.NEGATIVE_INFINITY
 
-    points.forEach { point ->
-        minX = min(minX, point.x)
-        minY = min(minY, point.y)
-        maxX = max(maxX, point.x)
-        maxY = max(maxY, point.y)
+    var i = 0
+    while (i < pts.size) {
+        val x = pts[i]
+        val y = pts[i + 1]
+        minX = min(minX, x)
+        minY = min(minY, y)
+        maxX = max(maxX, x)
+        maxY = max(maxY, y)
+        i += 2
     }
 
     if (minX.isNaN() || minY.isNaN() || maxX.isNaN() || maxY.isNaN()) {

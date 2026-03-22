@@ -315,12 +315,26 @@ fun IsometricScene(
         )
     }
 
-    // Async compute path — runs prepareAsync() on Dispatchers.Default when dirty.
+    // Whether gesture/hit-test handling is active — computed once, used by both
+    // the async compute path (to skip hit-test index rebuilds) and the Canvas.
+    val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
+
+    // Async compute path — prepares scenes with GPU depth sorting.
     // Only activates for SortingComputeBackend. The CPU path is untouched.
     // Requests are conflated so animated scenes do not cancel in-flight GPU work
     // every frame and destroy buffers while the device is still using them.
+    //
+    // Run scene preparation off the UI thread: projection/culling still does
+    // meaningful CPU work before the GPU sort, and keeping that work on the
+    // main thread caused visible stutter in animated WebGPU samples.
+    //
+    // The memory fixes that matter remain in place:
+    // - hit-test index rebuilds are skipped when gestures are disabled
+    // - SceneCache releases the old prepared scene before constructing the new one
+    // - core projection uses reusable buffers and packed DoubleArray points
     if (isAsyncCompute) {
         val computeBackend = config.computeBackend as SortingComputeBackend
+        val skipHitTest = !gesturesActive
         LaunchedEffect(renderer, computeBackend, asyncPrepareInputs) {
             snapshotFlow {
                 AsyncPrepareRequest(
@@ -345,6 +359,7 @@ fun IsometricScene(
                             width = request.canvasWidth,
                             height = request.canvasHeight,
                             computeBackend = computeBackend,
+                            skipHitTest = skipHitTest,
                         )
                     }
                     asyncPreparedScene.value = renderer.currentPreparedScene
@@ -355,7 +370,6 @@ fun IsometricScene(
     // Render to canvas with gesture handling.
     // Pointer input is installed when gestures are explicitly enabled OR when a
     // CameraState is provided (for default drag-to-pan behavior).
-    val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
     Canvas(
         modifier = modifier
             .then(

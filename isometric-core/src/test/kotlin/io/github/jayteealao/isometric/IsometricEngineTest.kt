@@ -63,8 +63,11 @@ class IsometricEngineTest {
 
         // Use the center of a rendered face's projected points as hit coordinate
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val pts = cmd.points
+        var sx = 0.0; var sy = 0.0; var i = 0
+        while (i < pts.size) { sx += pts[i]; sy += pts[i + 1]; i += 2 }
+        val avgX = sx / cmd.pointCount
+        val avgY = sy / cmd.pointCount
         val hit = engine.findItemAt(scene, avgX, avgY, order = HitOrder.FRONT_TO_BACK)
         assertNotNull(hit)
 
@@ -75,11 +78,7 @@ class IsometricEngineTest {
 
     @Test
     fun `findItemAt honors hit order`() {
-        val overlappingPoints = listOf(
-            Point2D(100.0, 100.0),
-            Point2D(140.0, 100.0),
-            Point2D(120.0, 140.0)
-        )
+        val overlappingPoints = doubleArrayOf(100.0, 100.0, 140.0, 100.0, 120.0, 140.0)
         val scene = PreparedScene(
             commands = listOf(
                 RenderCommand("back", overlappingPoints, IsoColor.BLUE, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null),
@@ -100,7 +99,7 @@ class IsometricEngineTest {
             commands = listOf(
                 RenderCommand(
                     "triangle",
-                    listOf(Point2D(100.0, 100.0), Point2D(140.0, 100.0), Point2D(120.0, 140.0)),
+                    doubleArrayOf(100.0, 100.0, 140.0, 100.0, 120.0, 140.0),
                     IsoColor.BLUE,
                     Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)),
                     null

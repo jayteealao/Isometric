@@ -51,14 +51,26 @@ class WebGpuComputeBackend : SortingComputeBackend {
     private val _status = MutableStateFlow(StatusSnapshot(Status.Uninitialized))
     val status: StateFlow<StatusSnapshot> = _status.asStateFlow()
 
+    /** Tracks the last reported depth key count to avoid redundant StateFlow emissions. */
+    private var lastReportedCount: Int? = null
+
     private fun invalidateContext() {
+        gpuSorter?.destroyCachedBuffers()
         gpuContext?.destroy()
         gpuContext = null
         gpuSorter = null
         initAttempted = false
+        lastReportedCount = null
     }
 
+    /**
+     * Emit a status update only when the depth key count changes.
+     * Avoids flooding the StateFlow (and triggering UI recomposition) on every frame
+     * during animated scenes where the count is stable.
+     */
     private fun reportReady(detail: String, depthKeyCount: Int? = null) {
+        if (depthKeyCount != null && depthKeyCount == lastReportedCount) return
+        lastReportedCount = depthKeyCount
         _status.value = StatusSnapshot(
             status = Status.Ready,
             detail = detail,

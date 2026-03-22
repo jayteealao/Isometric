@@ -4,6 +4,7 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Vector
 import io.github.jayteealao.isometric.shapes.Prism
@@ -13,6 +14,18 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+
+private fun RenderCommand.avgX(): Double {
+    var sum = 0.0; var i = 0
+    while (i < points.size) { sum += points[i]; i += 2 }
+    return sum / pointCount
+}
+
+private fun RenderCommand.avgY(): Double {
+    var sum = 0.0; var i = 1
+    while (i < points.size) { sum += points[i]; i += 2 }
+    return sum / pointCount
+}
 
 class IsometricRendererTest {
 
@@ -203,8 +216,8 @@ class IsometricRendererTest {
     ): Pair<Double, Double>? {
         val cmd = scene.commands.firstOrNull { it.ownerNodeId == nodeId }
             ?: return null
-        val cx = cmd.points.map { it.x }.average()
-        val cy = cmd.points.map { it.y }.average()
+        val cx = cmd.avgX()
+        val cy = cmd.avgY()
         return cx to cy
     }
 
@@ -222,8 +235,8 @@ class IsometricRendererTest {
         assertTrue("Scene should have commands", scene.commands.isNotEmpty())
 
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest should find item when spatial index is enabled without path caching", hit)
@@ -239,8 +252,8 @@ class IsometricRendererTest {
 
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest fast path should find item at shape center", hit)
@@ -256,8 +269,8 @@ class IsometricRendererTest {
 
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, 800, 600)
         assertNotNull("hitTest slow path should find item at shape center", hit)
@@ -320,10 +333,13 @@ class IsometricRendererTest {
         slowRenderer.rebuildCache(root, defaultContext, 800, 600)
 
         val command = fastRenderer.currentPreparedScene!!.commands.first()
-        val leftMostPoint = command.points.minBy { it.x }
-        val boundaryX = kotlin.math.floor(leftMostPoint.x / cellSize) * cellSize
+        // Find the leftmost point in the flat packed DoubleArray
+        val cmdPts = command.points
+        var leftX = Double.POSITIVE_INFINITY; var leftY = 0.0
+        var k = 0; while (k < cmdPts.size) { if (cmdPts[k] < leftX) { leftX = cmdPts[k]; leftY = cmdPts[k + 1] }; k += 2 }
+        val boundaryX = kotlin.math.floor(leftX / cellSize) * cellSize
         val testX = boundaryX - 1.0
-        val testY = leftMostPoint.y
+        val testY = leftY
 
         val fastHit = fastRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
         val slowHit = slowRenderer.hitTest(root, testX, testY, defaultContext, 800, 600)
@@ -398,8 +414,11 @@ class IsometricRendererTest {
         slowRenderer.rebuildCache(root, defaultContext, 800, 600)
 
         val command = fastRenderer.currentPreparedScene!!.commands.first()
-        val centerX = command.points.map { it.x }.average()
-        val centerY = command.points.map { it.y }.average()
+        val pts = command.points
+        var sumX = 0.0; var sumY = 0.0
+        var i = 0; while (i < pts.size) { sumX += pts[i]; sumY += pts[i + 1]; i += 2 }
+        val centerX = sumX / command.pointCount
+        val centerY = sumY / command.pointCount
 
         val fastHit = fastRenderer.hitTest(root, centerX, centerY, defaultContext, 800, 600)
         val slowHit = slowRenderer.hitTest(root, centerX, centerY, defaultContext, 800, 600)
@@ -499,8 +518,11 @@ class IsometricRendererTest {
         assertTrue("Culling-enabled scene should still produce commands", scene.commands.isNotEmpty())
 
         val command = scene.commands.first()
-        val x = command.points.map { it.x }.average()
-        val y = command.points.map { it.y }.average()
+        val pts2 = command.points
+        var sx = 0.0; var sy = 0.0
+        var j = 0; while (j < pts2.size) { sx += pts2[j]; sy += pts2[j + 1]; j += 2 }
+        val x = sx / command.pointCount
+        val y = sy / command.pointCount
 
         val fastHit = fastRenderer.hitTest(root, x, y, cullingContext, 800, 600)
         val slowHit = slowRenderer.hitTest(root, x, y, cullingContext, 800, 600)
@@ -536,8 +558,8 @@ class IsometricRendererTest {
         // Grab a hittable centroid before invalidation
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         renderer.clearCache()
         assertNull("invalidate should clear prepared scene", renderer.currentPreparedScene)
@@ -558,8 +580,8 @@ class IsometricRendererTest {
         renderer.rebuildCache(root, defaultContext, 800, 600)
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         // Mark dirty — simulates a node tree mutation
         root.markDirty()
@@ -579,8 +601,8 @@ class IsometricRendererTest {
         renderer.rebuildCache(root, defaultContext, 800, 600)
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         // Change renderOptions — cache becomes stale
         val changedContext = defaultContext.copy(renderOptions = RenderOptions.Default)
@@ -604,8 +626,8 @@ class IsometricRendererTest {
         renderer.rebuildCache(root, contextA, 800, 600)
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         // Change light direction — cache becomes stale
         val contextB = contextA.copy(lightDirection = dirB)
@@ -624,8 +646,8 @@ class IsometricRendererTest {
         probeRenderer.rebuildCache(root, defaultContext, 800, 600)
         val scene = probeRenderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         // Fresh renderer — no prior rebuildCache or render()
         root.markDirty()
@@ -662,8 +684,8 @@ class IsometricRendererTest {
         // Verify hit testing actually works at the new size by computing a fresh centroid
         val scene = renderer.currentPreparedScene!!
         val cmd = scene.commands.first()
-        val avgX = cmd.points.map { it.x }.average()
-        val avgY = cmd.points.map { it.y }.average()
+        val avgX = cmd.avgX()
+        val avgY = cmd.avgY()
 
         val hit = renderer.hitTest(root, avgX, avgY, defaultContext, newWidth, newHeight)
         assertNotNull("hitTest should find shape at centroid after viewport resize", hit)
@@ -704,7 +726,7 @@ class IsometricRendererTest {
             probeRenderer.rebuildCache(root, defaultContext, 800, 600)
             val scene = probeRenderer.currentPreparedScene!!
             val cmd = scene.commands.first()
-            return cmd.points.map { it.x }.average() to cmd.points.map { it.y }.average()
+            return cmd.avgX() to cmd.avgY()
         }
 
         val (testX, testY) = commandCentroid()

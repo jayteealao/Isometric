@@ -112,7 +112,7 @@ class WS6EscapeHatchesTest {
             listOf(
                 RenderCommand(
                     commandId = "custom_triangle",
-                    points = emptyList(),
+                    points = DoubleArray(0),
                     color = IsoColor.RED,
                     originalPath = testPath,
                     originalShape = null,
@@ -134,7 +134,7 @@ class WS6EscapeHatchesTest {
             listOf(
                 RenderCommand(
                     commandId = "should_not_appear",
-                    points = emptyList(),
+                    points = DoubleArray(0),
                     color = IsoColor.BLUE,
                     originalPath = Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)),
                     originalShape = null,
@@ -194,8 +194,8 @@ class WS6EscapeHatchesTest {
 
         val node = CustomRenderNode { _, _ ->
             listOf(
-                RenderCommand("cmd1", emptyList(), IsoColor.RED, testPath1, null, null),
-                RenderCommand("cmd2", emptyList(), IsoColor.BLUE, testPath2, null, null)
+                RenderCommand("cmd1", DoubleArray(0), IsoColor.RED, testPath1, null, null),
+                RenderCommand("cmd2", DoubleArray(0), IsoColor.BLUE, testPath2, null, null)
             )
         }
 

@@ -36,6 +36,20 @@ object IntersectionUtils {
         return false
     }
 
+    fun isPointCloseToPoly(poly: DoubleArray, x: Double, y: Double, radius: Double): Boolean {
+        if (poly.size < 4) return false
+        val radiusSquared = radius * radius
+        var i = 0
+        while (i < poly.size) {
+            val j = if (i + 2 < poly.size) i + 2 else 0
+            if (distanceToSegmentSquared(x, y, poly[i], poly[i + 1], poly[j], poly[j + 1]) < radiusSquared) {
+                return true
+            }
+            i += 2
+        }
+        return false
+    }
+
     /**
      * Tests whether the point ([x], [y]) is inside the polygon [poly] using the
      * ray-casting algorithm.
@@ -55,6 +69,27 @@ object IntersectionUtils {
                 c = !c
             }
             j = i
+        }
+        return c
+    }
+
+    fun isPointInPoly(poly: DoubleArray, x: Double, y: Double): Boolean {
+        if (poly.size < 6) return false
+        var c = false
+        var j = poly.size - 2
+        var i = 0
+        while (i < poly.size) {
+            val xi = poly[i]
+            val yi = poly[i + 1]
+            val xj = poly[j]
+            val yj = poly[j + 1]
+            if (((yi <= y && y < yj) || (yj <= y && y < yi)) &&
+                (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+            ) {
+                c = !c
+            }
+            j = i
+            i += 2
         }
         return c
     }
@@ -168,6 +203,147 @@ object IntersectionUtils {
         return false
     }
 
+    fun hasIntersection(pointsA: DoubleArray, pointsB: DoubleArray): Boolean {
+        if (pointsA.size < 2 || pointsB.size < 2) return false
+
+        var aminX = pointsA[0]
+        var aminY = pointsA[1]
+        var amaxX = aminX
+        var amaxY = aminY
+        var bminX = pointsB[0]
+        var bminY = pointsB[1]
+        var bmaxX = bminX
+        var bmaxY = bminY
+
+        var i = 0
+        while (i < pointsA.size) {
+            val x = pointsA[i]
+            val y = pointsA[i + 1]
+            aminX = min(aminX, x)
+            aminY = min(aminY, y)
+            amaxX = max(amaxX, x)
+            amaxY = max(amaxY, y)
+            i += 2
+        }
+
+        i = 0
+        while (i < pointsB.size) {
+            val x = pointsB[i]
+            val y = pointsB[i + 1]
+            bminX = min(bminX, x)
+            bminY = min(bminY, y)
+            bmaxX = max(bmaxX, x)
+            bmaxY = max(bmaxY, y)
+            i += 2
+        }
+
+        if (!(((aminX <= bminX && bminX <= amaxX) || (bminX <= aminX && aminX <= bmaxX)) &&
+                    ((aminY <= bminY && bminY <= amaxY) || (bminY <= aminY && aminY <= bmaxY)))
+        ) {
+            return false
+        }
+
+        val lengthA = pointsA.size / 2
+        val lengthB = pointsB.size / 2
+
+        val deltaAX = DoubleArray(lengthA)
+        val deltaAY = DoubleArray(lengthA)
+        val rA = DoubleArray(lengthA)
+        for (index in 0 until lengthA) {
+            val current = index * 2
+            val next = if (index + 1 < lengthA) current + 2 else 0
+            val x0 = pointsA[current]
+            val y0 = pointsA[current + 1]
+            val x1 = pointsA[next]
+            val y1 = pointsA[next + 1]
+            deltaAX[index] = x1 - x0
+            deltaAY[index] = y1 - y0
+            rA[index] = deltaAX[index] * y0 - deltaAY[index] * x0
+        }
+
+        val deltaBX = DoubleArray(lengthB)
+        val deltaBY = DoubleArray(lengthB)
+        val rB = DoubleArray(lengthB)
+        for (index in 0 until lengthB) {
+            val current = index * 2
+            val next = if (index + 1 < lengthB) current + 2 else 0
+            val x0 = pointsB[current]
+            val y0 = pointsB[current + 1]
+            val x1 = pointsB[next]
+            val y1 = pointsB[next + 1]
+            deltaBX[index] = x1 - x0
+            deltaBY[index] = y1 - y0
+            rB[index] = deltaBX[index] * y0 - deltaBY[index] * x0
+        }
+
+        for (a in 0 until lengthA) {
+            val a0 = a * 2
+            val a1 = if (a + 1 < lengthA) a0 + 2 else 0
+            for (b in 0 until lengthB) {
+                val b0 = b * 2
+                val b1 = if (b + 1 < lengthB) b0 + 2 else 0
+                if (deltaAX[a] * deltaBY[b] != deltaAY[a] * deltaBX[b]) {
+                    val side1a = deltaAY[a] * pointsB[b0] - deltaAX[a] * pointsB[b0 + 1] + rA[a]
+                    val side1b = deltaAY[a] * pointsB[b1] - deltaAX[a] * pointsB[b1 + 1] + rA[a]
+                    val side2a = deltaBY[b] * pointsA[a0] - deltaBX[b] * pointsA[a0 + 1] + rB[b]
+                    val side2b = deltaBY[b] * pointsA[a1] - deltaBX[b] * pointsA[a1 + 1] + rB[b]
+
+                    if (side1a * side1b < -0.000000001 && side2a * side2b < -0.000000001) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        i = 0
+        while (i < pointsA.size) {
+            if (isPointInPoly(pointsB, pointsA[i], pointsA[i + 1])) {
+                return true
+            }
+            i += 2
+        }
+
+        i = 0
+        while (i < pointsB.size) {
+            if (isPointInPoly(pointsA, pointsB[i], pointsB[i + 1])) {
+                return true
+            }
+            i += 2
+        }
+
+        return false
+    }
+
     private fun min(a: Double, b: Double) = if (a < b) a else b
     private fun max(a: Double, b: Double) = if (a > b) a else b
+
+    private fun distanceToSegmentSquared(
+        px: Double,
+        py: Double,
+        vx: Double,
+        vy: Double,
+        wx: Double,
+        wy: Double
+    ): Double {
+        val dx = wx - vx
+        val dy = wy - vy
+        val l2 = dx * dx + dy * dy
+        if (l2 == 0.0) {
+            val qx = px - vx
+            val qy = py - vy
+            return qx * qx + qy * qy
+        }
+
+        val t = ((px - vx) * dx + (py - vy) * dy) / l2
+        val clampedT = when {
+            t < 0.0 -> 0.0
+            t > 1.0 -> 1.0
+            else -> t
+        }
+        val projX = vx + clampedT * dx
+        val projY = vy + clampedT * dy
+        val distX = px - projX
+        val distY = py - projY
+        return distX * distX + distY * distY
+    }
 }

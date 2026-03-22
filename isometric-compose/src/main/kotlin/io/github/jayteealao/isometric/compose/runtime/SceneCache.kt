@@ -152,6 +152,13 @@ internal class SceneCache(
             val commands = mutableListOf<RenderCommand>()
             rootNode.renderTo(commands, context)
 
+            // Release old scene before building the new one so GC can reclaim
+            // old-gen objects (Point2D, TransformedItem, RenderCommand) while the
+            // new scene is being constructed. The Canvas still holds its own
+            // reference via asyncPreparedScene so drawing is unaffected.
+            cachedPaths = null
+            currentPreparedScene = null
+
             engine.clear()
             commands.forEach { command ->
                 engine.add(

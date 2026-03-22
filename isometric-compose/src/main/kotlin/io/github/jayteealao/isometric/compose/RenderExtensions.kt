@@ -11,11 +11,14 @@ import io.github.jayteealao.isometric.RenderCommand
  */
 fun RenderCommand.toComposePath(): Path {
     return Path().apply {
-        if (points.isEmpty()) return@apply
+        val pts = points
+        if (pts.isEmpty()) return@apply
 
-        moveTo(points[0].x.toFloat(), points[0].y.toFloat())
-        for (i in 1 until points.size) {
-            lineTo(points[i].x.toFloat(), points[i].y.toFloat())
+        moveTo(pts[0].toFloat(), pts[1].toFloat())
+        var i = 2
+        while (i < pts.size) {
+            lineTo(pts[i].toFloat(), pts[i + 1].toFloat())
+            i += 2
         }
         close()
     }

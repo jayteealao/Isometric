@@ -155,9 +155,14 @@ fun HierarchySample() {
     var groupRotation by remember { mutableStateOf(0.0) }
 
     LaunchedEffect(Unit) {
+        var lastFrameNanos = 0L
         while (true) {
-            withFrameNanos {
-                groupRotation += PI / 180
+            withFrameNanos { frameTimeNanos ->
+                if (lastFrameNanos != 0L) {
+                    val deltaSeconds = (frameTimeNanos - lastFrameNanos) / 1_000_000_000.0
+                    groupRotation += deltaSeconds * PI
+                }
+                lastFrameNanos = frameTimeNanos
             }
         }
     }
@@ -219,10 +224,15 @@ fun AnimationSample() {
     var wave by remember { mutableStateOf(0.0) }
 
     LaunchedEffect(Unit) {
+        var lastFrameNanos = 0L
         while (true) {
-            withFrameNanos {
-                angle += PI / 90
-                wave += PI / 60
+            withFrameNanos { frameTimeNanos ->
+                if (lastFrameNanos != 0L) {
+                    val deltaSeconds = (frameTimeNanos - lastFrameNanos) / 1_000_000_000.0
+                    angle += deltaSeconds * (2 * PI / 3)
+                    wave += deltaSeconds * PI
+                }
+                lastFrameNanos = frameTimeNanos
             }
         }
     }
@@ -423,9 +433,14 @@ fun PerformanceSample() {
     var wave by remember { mutableStateOf(0.0) }
 
     LaunchedEffect(animationEnabled) {
+        var lastFrameNanos = 0L
         while (animationEnabled) {
-            withFrameNanos {
-                wave += PI / 30
+            withFrameNanos { frameTimeNanos ->
+                if (lastFrameNanos != 0L) {
+                    val deltaSeconds = (frameTimeNanos - lastFrameNanos) / 1_000_000_000.0
+                    wave += deltaSeconds * 2 * PI
+                }
+                lastFrameNanos = frameTimeNanos
             }
         }
     }

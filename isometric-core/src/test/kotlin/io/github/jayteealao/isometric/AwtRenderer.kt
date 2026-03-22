@@ -67,12 +67,15 @@ object AwtRenderer {
         // Draw each render command (polygon fill + stroke to eliminate seams)
         val stroke = BasicStroke(1f)
         for (command in scene.commands) {
-            if (command.points.isEmpty()) continue
+            val pts = command.points
+            if (pts.isEmpty()) continue
 
             val path = Path2D.Double()
-            path.moveTo(command.points[0].x, command.points[0].y)
-            for (i in 1 until command.points.size) {
-                path.lineTo(command.points[i].x, command.points[i].y)
+            path.moveTo(pts[0], pts[1])
+            var pi = 2
+            while (pi < pts.size) {
+                path.lineTo(pts[pi], pts[pi + 1])
+                pi += 2
             }
             path.closePath()
 
@@ -111,11 +114,14 @@ object AwtRenderer {
         var maxY = Double.MIN_VALUE
 
         for (command in scene.commands) {
-            for (p in command.points) {
-                if (p.x < minX) minX = p.x
-                if (p.x > maxX) maxX = p.x
-                if (p.y < minY) minY = p.y
-                if (p.y > maxY) maxY = p.y
+            val pts = command.points
+            var i = 0
+            while (i < pts.size) {
+                if (pts[i] < minX) minX = pts[i]
+                if (pts[i] > maxX) maxX = pts[i]
+                if (pts[i + 1] < minY) minY = pts[i + 1]
+                if (pts[i + 1] > maxY) maxY = pts[i + 1]
+                i += 2
             }
         }
 

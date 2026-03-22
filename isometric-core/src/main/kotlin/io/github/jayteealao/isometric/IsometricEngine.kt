@@ -246,6 +246,12 @@ class IsometricEngine @JvmOverloads constructor(
      * delegates to [SortingComputeBackend.sortByDepthKeys] for GPU radix sort, then reorders
      * the transformed items by the returned indices.
      */
+    // Reusable buffers for projectSceneAsync to reduce per-frame allocations.
+    // These are only accessed from the main thread (the async pipeline runs on
+    // LaunchedEffect's coroutine context), so no synchronization is needed.
+    private var cachedDepthKeys: FloatArray? = null
+    private var cachedTransformedItems: ArrayList<DepthSorter.TransformedItem>? = null
+
     override suspend fun projectSceneAsync(
         width: Int,
         height: Int,
@@ -257,38 +263,64 @@ class IsometricEngine @JvmOverloads constructor(
         val originX = width / 2.0
         val originY = height * 0.9
 
-        // Transform all items to 2D screen space (same as synchronous path)
-        val transformedItems = sceneGraph.items.mapNotNull { item ->
-            projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
+        // Transform all items to 2D screen space, reusing the list to avoid
+        // allocating a new ArrayList every frame.
+        val items = sceneGraph.items
+        val transformedItems = cachedTransformedItems
+            ?: ArrayList<DepthSorter.TransformedItem>(items.size).also { cachedTransformedItems = it }
+        transformedItems.clear()
+        transformedItems.ensureCapacity(items.size)
+        for (item in items) {
+            val transformed = projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
+            if (transformed != null) {
+                transformedItems.add(transformed)
+            }
         }
 
         // Sort by depth if enabled (same guard as synchronous path)
         val sortedItems = if (renderOptions.enableDepthSorting) {
-            // Extract depth keys for GPU sort
-            val depthKeys = FloatArray(transformedItems.size) { i ->
-                val item = transformedItems[i].item
-                val avgDepth = item.path.points.sumOf { pt -> pt.x + pt.y - 2 * pt.z } / item.path.points.size
-                avgDepth.toFloat()
+            // Extract depth keys for GPU sort, reusing the FloatArray when the
+            // count is unchanged (typical for animated scenes with a fixed model).
+            val count = transformedItems.size
+            var depthKeys = cachedDepthKeys
+            if (depthKeys == null || depthKeys.size != count) {
+                depthKeys = FloatArray(count)
+                cachedDepthKeys = depthKeys
+            }
+            for (i in 0 until count) {
+                val pts = transformedItems[i].item.path.points
+                var sum = 0.0
+                for (pt in pts) {
+                    sum += pt.x + pt.y - 2 * pt.z
+                }
+                depthKeys[i] = (sum / pts.size).toFloat()
             }
 
             // GPU radix sort — returns back-to-front indices
             val sortedIndices = computeBackend.sortByDepthKeys(depthKeys)
 
-            // Reorder by GPU-sorted indices
-            sortedIndices.map { transformedItems[it] }
+            // Reorder by GPU-sorted indices into a pre-sized list
+            ArrayList<DepthSorter.TransformedItem>(count).also { list ->
+                for (idx in sortedIndices) {
+                    list.add(transformedItems[idx])
+                }
+            }
         } else {
             transformedItems
         }
 
-        // Convert to render commands (same as synchronous path)
-        val commands = sortedItems.map { transformedItem ->
-            RenderCommand(
-                commandId = transformedItem.item.id,
-                points = transformedItem.transformedPoints,
-                color = transformedItem.litColor,
-                originalPath = transformedItem.item.path,
-                originalShape = transformedItem.item.originalShape,
-                ownerNodeId = transformedItem.item.ownerNodeId
+        // Convert to render commands with a pre-sized list
+        val commands = ArrayList<RenderCommand>(sortedItems.size)
+        for (transformedItem in sortedItems) {
+            commands.add(
+                RenderCommand(
+                    commandId = transformedItem.item.id,
+                    points = transformedItem.transformedPoints,
+                    color = transformedItem.litColor,
+                    originalPath = transformedItem.item.path,
+                    originalShape = transformedItem.item.originalShape,
+                    ownerNodeId = transformedItem.item.ownerNodeId
+                )
             )
         }
 
@@ -304,8 +336,12 @@ class IsometricEngine @JvmOverloads constructor(
         width: Int,
         height: Int
     ): DepthSorter.TransformedItem? {
-        val screenPoints = item.path.points.map { point ->
-            projection.translatePoint(point, originX, originY)
+        // Project all vertices into a flat DoubleArray [x0, y0, x1, y1, ...]
+        // to avoid per-vertex Point2D object allocation.
+        val points = item.path.points
+        val screenPoints = DoubleArray(points.size * 2)
+        for (i in points.indices) {
+            projection.translatePointInto(points[i], originX, originY, screenPoints, i * 2)
         }
 
         if (renderOptions.enableBackfaceCulling && projection.cullPath(screenPoints)) {

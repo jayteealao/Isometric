@@ -31,9 +31,7 @@ internal object HitTester {
         }
 
         for (command in commandsList) {
-            // Use projected points directly — they are already in correct winding order
-            val points = command.points.map { Point(it.x, it.y, 0.0) }
-
+            val points = command.points
             val isInside = if (touchRadius > 0.0) {
                 IntersectionUtils.isPointCloseToPoly(
                     points, x, y, touchRadius

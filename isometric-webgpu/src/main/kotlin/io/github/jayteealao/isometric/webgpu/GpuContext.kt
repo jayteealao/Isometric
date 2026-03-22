@@ -66,7 +66,7 @@ class GpuContext private constructor(
     private val lastFailure: AtomicReference<Throwable?>,
 ) {
     companion object {
-        private const val POLLING_DELAY_MS = 100L
+        private const val POLLING_DELAY_MS = 2L
         private const val GPU_THREAD_NAME = "WebGPU-Thread"
 
         /**

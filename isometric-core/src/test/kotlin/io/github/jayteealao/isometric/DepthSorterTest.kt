@@ -26,9 +26,8 @@ class DepthSorterTest {
         // Command order should be identical between both projections
         assertEquals(scene1.commands.size, scene2.commands.size)
         for (i in scene1.commands.indices) {
-            assertEquals(
-                scene1.commands[i].points,
-                scene2.commands[i].points,
+            assertTrue(
+                scene1.commands[i].points.contentEquals(scene2.commands[i].points),
                 "Command $i should have identical projected points"
             )
         }

@@ -43,8 +43,8 @@ import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Prism
-import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
 import io.github.jayteealao.isometric.webgpu.WebGpu
+import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.max

@@ -177,7 +177,7 @@ class MultiShapeNode(
                 output.add(
                     io.github.jayteealao.isometric.RenderCommand(
                         commandId = "${nodeId}_${shape.hashCode()}_${path.hashCode()}",
-                        points = emptyList(),
+                        points = DoubleArray(0),
                         color = color,
                         originalPath = path,
                         originalShape = transformedShape,

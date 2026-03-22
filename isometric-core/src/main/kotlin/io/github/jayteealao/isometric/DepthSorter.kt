@@ -12,9 +12,26 @@ internal object DepthSorter {
 
     internal data class TransformedItem(
         val item: SceneGraph.SceneItem,
-        val transformedPoints: List<Point2D>,
+        /** Flat packed screen points: [x0, y0, x1, y1, ...] */
+        val transformedPoints: DoubleArray,
         val litColor: IsoColor
-    )
+    ) {
+        /** Number of 2D vertices. */
+        val pointCount: Int get() = transformedPoints.size / 2
+
+        override fun equals(other: Any?): Boolean =
+            other is TransformedItem &&
+                item == other.item &&
+                transformedPoints.contentEquals(other.transformedPoints) &&
+                litColor == other.litColor
+
+        override fun hashCode(): Int {
+            var result = item.hashCode()
+            result = 31 * result + transformedPoints.contentHashCode()
+            result = 31 * result + litColor.hashCode()
+            return result
+        }
+    }
 
     /**
      * Sort items by depth using intersection-based comparison and topological sort.
@@ -130,11 +147,7 @@ internal object DepthSorter {
         observer: Point
     ) {
         // Check if 2D projections intersect
-        if (IntersectionUtils.hasIntersection(
-                itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
-                itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
-            )
-        ) {
+        if (IntersectionUtils.hasIntersection(itemA.transformedPoints, itemB.transformedPoints)) {
             // Use 3D depth comparison
             val cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
             if (cmpPath < 0) {
@@ -212,11 +225,16 @@ internal object DepthSorter {
         var maxX = Double.NEGATIVE_INFINITY
         var maxY = Double.NEGATIVE_INFINITY
 
-        for (point in transformedPoints) {
-            minX = minOf(minX, point.x)
-            minY = minOf(minY, point.y)
-            maxX = maxOf(maxX, point.x)
-            maxY = maxOf(maxY, point.y)
+        val pts = transformedPoints
+        var i = 0
+        while (i < pts.size) {
+            val x = pts[i]
+            val y = pts[i + 1]
+            minX = minOf(minX, x)
+            minY = minOf(minY, y)
+            maxX = maxOf(maxX, x)
+            maxY = maxOf(maxY, y)
+            i += 2
         }
 
         return ItemBounds(minX, minY, maxX, maxY)

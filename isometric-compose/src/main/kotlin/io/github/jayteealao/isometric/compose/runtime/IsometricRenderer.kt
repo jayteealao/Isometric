@@ -242,6 +242,7 @@ class IsometricRenderer(
         width: Int,
         height: Int,
         computeBackend: SortingComputeBackend,
+        skipHitTest: Boolean = false,
     ) {
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return
@@ -251,7 +252,7 @@ class IsometricRenderer(
             benchmarkHooks?.onCacheMiss()
             benchmarkHooks?.onPrepareStart()
             val scene = cache.rebuildAsync(rootNode, context, width, height, computeBackend, onRenderError)
-            if (scene != null) {
+            if (scene != null && !skipHitTest) {
                 hitTestResolver.rebuildIndices(rootNode, scene)
             }
             benchmarkHooks?.onPrepareEnd()

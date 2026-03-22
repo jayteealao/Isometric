@@ -242,7 +242,7 @@ class ShapeNode(
             output.add(
                 RenderCommand(
                     commandId = "${nodeId}_${path.hashCode()}",
-                    points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
+                    points = DoubleArray(0), // Template — engine.projectScene() produces new commands with projected points
                     color = effectiveColor,
                     originalPath = path,
                     originalShape = transformedShape,
@@ -283,7 +283,7 @@ class PathNode(
         output.add(
             RenderCommand(
                 commandId = nodeId,
-                points = emptyList(), // Template — engine.projectScene() produces new commands with projected points
+                points = DoubleArray(0), // Template — engine.projectScene() produces new commands with projected points
                 color = effectiveColor,
                 originalPath = transformedPath,
                 originalShape = null,
@@ -328,7 +328,7 @@ class BatchNode(
                 output.add(
                     RenderCommand(
                         commandId = "${nodeId}_${index}_${path.hashCode()}",
-                        points = emptyList(),
+                        points = DoubleArray(0),
                         color = effectiveColor,
                         originalPath = path,
                         originalShape = transformedShape,
