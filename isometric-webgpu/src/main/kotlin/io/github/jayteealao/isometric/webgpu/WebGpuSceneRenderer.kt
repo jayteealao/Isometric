@@ -29,6 +29,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
 
 internal class WebGpuSceneRenderer : AutoCloseable {
     companion object {
@@ -57,6 +58,8 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         surfaceWidth: Int,
         surfaceHeight: Int,
         preparedScene: State<PreparedScene?>,
+        renderContextWidth: State<Int>,
+        renderContextHeight: State<Int>,
     ) {
         try {
             ensureInitialized(
@@ -66,6 +69,23 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             )
 
             while (currentCoroutineContext().isActive) {
+                // F3: Reconfigure the surface if the viewport dimensions changed since
+                // the last configure call. This handles window/fold resize without
+                // waiting for AndroidExternalSurface to destroy and recreate.
+                val ctxWidth = renderContextWidth.value
+                val ctxHeight = renderContextHeight.value
+                if (ctxWidth > 0 && ctxHeight > 0 &&
+                    (ctxWidth != currentWidth || ctxHeight != currentHeight)) {
+                    val ctx = gpuContext
+                    if (ctx != null) {
+                        ctx.withGpu {
+                            gpuSurface?.unconfigure()
+                            configureSurface(ctxWidth, ctxHeight)
+                        }
+                        Log.d(TAG, "Surface reconfigured to ${currentWidth}x${currentHeight}")
+                    }
+                }
+
                 val scene = preparedScene.value
                 if (scene !== lastScene) {
                     uploadScene(scene)
@@ -87,12 +107,11 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     ) {
         if (gpuContext != null && gpuSurface != null && renderPipeline != null && vertexBuffer != null) return
 
-        // Reuse the compute backend's GpuContext when available to avoid creating a second
-        // Dawn device/thread on the same process. Both backends share the same GPU thread.
-        // awaitContextForSharing() suspends until compute init succeeds or fails, so we
-        // don't race with a concurrent GpuContext.create() call from the compute side.
+        // F2: Use getContextIfReady() (opportunistic, no-trigger) instead of
+        // awaitContextForSharing() to avoid forcing compute backend GPU init when the user
+        // has CPU compute selected. Only reuse a context that already exists.
         val sharedContext = (WebGpuComputeBackendHolder.instance as? WebGpuComputeBackend)
-            ?.awaitContextForSharing()
+            ?.getContextIfReady()
 
         val context: GpuContext
         if (sharedContext != null) {
@@ -279,15 +298,25 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         configureSurface(currentWidth, currentHeight)
     }
 
+    // F1: All Dawn API calls (unconfigure, close on surfaces/pipelines/buffers) must run on
+    // the dedicated GPU thread. cleanup() is called from the finally block of renderLoop(),
+    // which runs on Dispatchers.Default. We dispatch the Dawn teardown work to the GPU thread
+    // via runBlocking(gpuDispatcher) — the same pattern used by GpuContext.destroy().
     private fun cleanup() {
-        gpuSurface?.unconfigure()
-        renderPipeline?.close()
-        vertexBuffer?.close()
-        gpuSurface?.close()
-        // Only destroy if we own the context. When shared with WebGpuComputeBackend,
-        // the compute backend owns the lifecycle and will destroy it.
-        if (ownsContext) {
-            gpuContext?.destroy()
+        val ctx = gpuContext
+        if (ctx != null) {
+            val dispatcher = ctx.gpuDispatcher
+            runBlocking(dispatcher) {
+                gpuSurface?.unconfigure()
+                renderPipeline?.close()
+                vertexBuffer?.close()
+                gpuSurface?.close()
+            }
+            // Only destroy if we own the context. When shared with WebGpuComputeBackend,
+            // the compute backend owns the lifecycle and will destroy it.
+            if (ownsContext) {
+                ctx.destroy()
+            }
         }
         renderPipeline = null
         vertexBuffer = null

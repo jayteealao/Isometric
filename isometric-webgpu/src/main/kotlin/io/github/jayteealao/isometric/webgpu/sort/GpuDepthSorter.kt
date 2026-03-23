@@ -14,6 +14,7 @@ import androidx.webgpu.GPUBufferDescriptor
 import androidx.webgpu.GPUComputePipeline
 import androidx.webgpu.GPUComputePipelineDescriptor
 import androidx.webgpu.GPUComputeState
+import androidx.webgpu.GPUPipelineLayout
 import androidx.webgpu.GPUPipelineLayoutDescriptor
 import androidx.webgpu.GPUShaderModule
 import androidx.webgpu.GPUShaderModuleDescriptor
@@ -69,6 +70,8 @@ class GpuDepthSorter(
     private var shaderModule: GPUShaderModule? = null
     private var sortPipeline: GPUComputePipeline? = null
     private var bindGroupLayout: GPUBindGroupLayout? = null
+    // F4: stored so it can be closed when the sorter is discarded
+    private var pipelineLayout: GPUPipelineLayout? = null
 
     // ── Cached GPU resources (recreated only when paddedCount changes) ──
 
@@ -194,8 +197,12 @@ class GpuDepthSorter(
     }
 
     /**
-     * Release cached GPU buffers. Called when the sorter is being discarded
+     * Release all cached GPU resources. Called when the sorter is being discarded
      * or the GPU context is being invalidated.
+     *
+     * F5: explicitly close all AutoCloseable JNI wrappers — shaderModule, sortPipeline,
+     * bindGroupLayout, pipelineLayout, and cachedBindGroups — so Dawn native handles are
+     * released immediately rather than waiting for GC finalization.
      */
     fun destroyCachedBuffers() {
         primaryBuffer?.destroy()
@@ -206,10 +213,21 @@ class GpuDepthSorter(
         scratchBuffer = null
         resultReadback = null
         paramsBuffer = null
+        cachedBindGroups?.forEach { it.close() }
         cachedBindGroups = null
         cachedPackedKeysBuffer = null
         cachedReadbackDataBuffer = null
         cachedPaddedCount = 0
+
+        // F4+F5: close pipeline-tier objects — created once, must be closed on discard.
+        sortPipeline?.close()
+        sortPipeline = null
+        pipelineLayout?.close()
+        pipelineLayout = null
+        bindGroupLayout?.close()
+        bindGroupLayout = null
+        shaderModule?.close()
+        shaderModule = null
     }
 
     /**
@@ -352,7 +370,7 @@ class GpuDepthSorter(
         )
         bindGroupLayout = layout
 
-        val pipelineLayout = ctx.device.createPipelineLayout(
+        pipelineLayout = ctx.device.createPipelineLayout(
             GPUPipelineLayoutDescriptor(
                 bindGroupLayouts = arrayOf(layout)
             )
