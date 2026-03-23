@@ -27,7 +27,6 @@ import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuVertexBuffer
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 
@@ -60,7 +59,6 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         preparedScene: State<PreparedScene?>,
         renderContextWidth: State<Int>,
         renderContextHeight: State<Int>,
-        frameDelayMs: Long = 16L,
     ) {
         try {
             ensureInitialized(
@@ -94,7 +92,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 }
 
                 drawFrame(androidSurface)
-                delay(frameDelayMs)
+                // No explicit delay — PresentMode.Fifo provides vsync back-pressure:
+                // Dawn's surface.present() (via vkQueuePresentKHR) blocks the GPU thread
+                // until SurfaceFlinger consumes the buffer at the next vsync boundary.
+                // An additional delay() here would double-count the frame interval and cap
+                // a 120 Hz display at 60 fps. Frame rate hinting is handled via
+                // Surface.setFrameRate() in WebGpuRenderBackend to keep LTPO panels active.
             }
         } finally {
             cleanup()

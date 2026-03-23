@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.webgpu
 
 import android.content.Context
 import android.os.Build
+import android.view.Surface
 import android.view.WindowManager
 import androidx.compose.foundation.AndroidExternalSurface
 import androidx.compose.runtime.Composable
@@ -38,16 +39,28 @@ internal class WebGpuRenderBackend : RenderBackend {
         contextWidth.intValue = renderContext.width
         contextHeight.intValue = renderContext.height
 
-        // G4: Compute frame delay from the display refresh rate so the render loop paces
-        // correctly on 90 Hz / 120 Hz devices instead of always targeting 60 fps.
-        // Results: 60 Hz → 16 ms, 90 Hz → 11 ms, 120 Hz → 8 ms.
-        // Uses WindowManager.defaultDisplay (deprecated API 30 but available since API 1)
-        // as the fallback for minSdk 24; on API 30+ we use context.display directly.
+        // G4: Read display refresh rate to use as a Surface.setFrameRate hint.
+        // Frame pacing is provided by PresentMode.Fifo in Dawn: surface.present()
+        // (mapped to vkQueuePresentKHR) blocks the GPU thread at each vsync boundary —
+        // no additional delay() is needed or correct. The setFrameRate hint tells
+        // SurfaceFlinger to maintain the target Hz for this surface, preventing LTPO
+        // power-saving from dropping the refresh rate (e.g. Galaxy Z Fold 6 inner panel
+        // dropping from 120 Hz to 60 Hz when no touch events are detected).
         val context = LocalContext.current
-        val frameDelayMs = remember(context) { context.displayFrameDelayMs() }
+        val displayRefreshHz = remember(context) { context.displayRefreshRateHz() }
 
         AndroidExternalSurface(modifier = modifier) {
             onSurface { surface, width, height ->
+                // Signal preferred frame rate to the compositor. API 30+ only.
+                // FRAME_RATE_COMPATIBILITY_DEFAULT: general rendering, not a fixed source.
+                // CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS: avoid a visible display mode switch.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    @Suppress("NewApi")
+                    surface.setFrameRate(
+                        displayRefreshHz,
+                        Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                    )
+                }
                 withContext(Dispatchers.Default) {
                     renderer.renderLoop(
                         androidSurface = surface,
@@ -56,7 +69,6 @@ internal class WebGpuRenderBackend : RenderBackend {
                         preparedScene = currentPreparedScene,
                         renderContextWidth = contextWidth,
                         renderContextHeight = contextHeight,
-                        frameDelayMs = frameDelayMs,
                     )
                 }
             }
@@ -67,18 +79,21 @@ internal class WebGpuRenderBackend : RenderBackend {
 }
 
 /**
- * Returns the target frame delay in milliseconds based on the display's refresh rate.
+ * Returns the display's current refresh rate in Hz.
  *
- * Clamps to [8, 32] ms (125 Hz – 31.25 Hz) to guard against exotic reported rates.
- * Falls back to 16 ms if the refresh rate cannot be determined.
+ * Used as the argument to [Surface.setFrameRate] to signal the compositor to maintain
+ * the target rate for this surface. Falls back to 60 Hz if the rate cannot be determined.
+ *
+ * Note: this is a snapshot at composition time. For LTPO devices where the system may
+ * dynamically vary refresh rate, [DisplayManager.DisplayListener] could be used to
+ * track changes — deferred to Phase 3 if profiling reveals it is needed.
  */
 @Suppress("DEPRECATION") // WindowManager.defaultDisplay deprecated at API 30; context.display added at API 30
-private fun Context.displayFrameDelayMs(): Long {
-    val refreshRate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+private fun Context.displayRefreshRateHz(): Float {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         display?.refreshRate ?: 60f
     } else {
         (getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
             ?.defaultDisplay?.refreshRate ?: 60f
     }
-    return (1_000f / refreshRate).toLong().coerceIn(8L, 32L)
 }
