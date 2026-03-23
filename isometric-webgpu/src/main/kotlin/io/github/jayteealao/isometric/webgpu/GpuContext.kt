@@ -81,7 +81,9 @@ class GpuContext private constructor(
          *
          * @throws Exception if adapter or device creation fails (e.g. no Vulkan support)
          */
-        suspend fun create(): GpuContext {
+        suspend fun create(
+            requestAdapterOptionsFactory: ((GPUInstance) -> GPURequestAdapterOptions)? = null,
+        ): GpuContext {
             // Must be called before any androidx.webgpu call.
             initLibrary()
 
@@ -104,12 +106,13 @@ class GpuContext private constructor(
 
                     val instance = GPU.createInstance()
 
-                    val adapter = instance.requestAdapter(
-                        GPURequestAdapterOptions(
+                    val adapterOptions = requestAdapterOptionsFactory?.invoke(instance)
+                        ?: GPURequestAdapterOptions(
                             powerPreference = PowerPreference.HighPerformance,
                             backendType = BackendType.Vulkan
                         )
-                    )
+
+                    val adapter = instance.requestAdapter(adapterOptions)
 
                     val device = adapter.requestDevice(
                         GPUDeviceDescriptor(

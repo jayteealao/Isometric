@@ -1,6 +1,8 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
@@ -8,6 +10,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -30,6 +34,7 @@ import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
 import io.github.jayteealao.isometric.SortingComputeBackend
+import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -324,6 +329,18 @@ fun IsometricScene(
     // Whether gesture/hit-test handling is active — computed once, used by both
     // the async compute path (to skip hit-test index rebuilds) and the Canvas.
     val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
+    val isCanvasBackend = config.renderBackend == RenderBackend.Canvas
+    val backendSceneVersion = remember { mutableIntStateOf(0) }
+    val backendPreparedSceneState = remember(renderer) {
+        object : State<PreparedScene?> {
+            override val value: PreparedScene?
+                get() {
+                    @Suppress("UNUSED_EXPRESSION")
+                    backendSceneVersion.intValue
+                    return renderer.currentPreparedScene
+                }
+        }
+    }
 
     // Async compute path — prepares scenes with GPU depth sorting.
     // Only activates for SortingComputeBackend. The CPU path is untouched.
@@ -338,7 +355,7 @@ fun IsometricScene(
     // - hit-test index rebuilds are skipped when gestures are disabled
     // - SceneCache releases the old prepared scene before constructing the new one
     // - core projection uses reusable buffers and packed DoubleArray points
-    if (isAsyncCompute) {
+    if (isAsyncCompute && isCanvasBackend) {
         val computeBackend = config.computeBackend as SortingComputeBackend
         val skipHitTest = !gesturesActive
         LaunchedEffect(renderer, computeBackend, asyncPrepareInputs) {
@@ -376,169 +393,198 @@ fun IsometricScene(
         }
     }
 
-    // Render to canvas with gesture handling.
-    // Pointer input is installed when gestures are explicitly enabled OR when a
-    // CameraState is provided (for default drag-to-pan behavior).
-    Canvas(
-        modifier = modifier
-            .then(
-                if (gesturesActive) {
-                    Modifier.pointerInput(gesturesActive) {
-                        // Capture coroutine scope for long-press detection.
-                        // pointerInput's lambda is a suspend PointerInputScope.() -> Unit,
-                        // so we wrap with coroutineScope to get a scope for launching.
-                        coroutineScope {
-                        val longPressScope: CoroutineScope = this
-                        awaitPointerEventScope {
-                            var isDragging = false
-                            var dragStartPos: Offset? = null
-                            var longPressJob: Job? = null
+    if (!isCanvasBackend) {
+        val skipHitTest = !gesturesActive
+        LaunchedEffect(renderer, config.computeBackend, asyncPrepareInputs, isCanvasBackend) {
+            snapshotFlow {
+                AsyncPrepareRequest(
+                    sceneVersion = sceneVersion,
+                    canvasWidth = canvasWidth,
+                    canvasHeight = canvasHeight,
+                    inputs = asyncPrepareInputs,
+                )
+            }
+                .filter { request -> request.canvasWidth > 0 && request.canvasHeight > 0 }
+                .conflate()
+                .collect { request ->
+                    withContext(Dispatchers.Default) {
+                        val context = RenderContext(
+                            width = request.canvasWidth,
+                            height = request.canvasHeight,
+                            renderOptions = request.inputs.renderOptions,
+                            lightDirection = request.inputs.lightDirection,
+                        )
+                        val backend = request.inputs.computeBackend
+                        if (backend is SortingComputeBackend) {
+                            renderer.prepareAsync(
+                                rootNode = rootNode,
+                                context = context,
+                                width = request.canvasWidth,
+                                height = request.canvasHeight,
+                                computeBackend = backend,
+                                skipHitTest = skipHitTest,
+                            )
+                        } else {
+                            renderer.prepareScene(
+                                rootNode = rootNode,
+                                context = context,
+                                width = request.canvasWidth,
+                                height = request.canvasHeight,
+                                skipHitTest = skipHitTest,
+                            )
+                        }
+                    }
+                    backendSceneVersion.intValue++
+                }
+        }
+    }
 
-                            while (true) {
-                                val event = awaitPointerEvent()
+    val gestureLayerModifier = if (gesturesActive) {
+        Modifier.pointerInput(gesturesActive) {
+            coroutineScope {
+                val longPressScope: CoroutineScope = this
+                awaitPointerEventScope {
+                    var isDragging = false
+                    var dragStartPos: Offset? = null
+                    var longPressJob: Job? = null
 
-                                when (event.type) {
-                                    PointerEventType.Press -> {
-                                        val position = event.changes.first().position
-                                        dragStartPos = position
-                                        isDragging = false
+                    while (true) {
+                        val event = awaitPointerEvent()
 
-                                        // Start long-press detection coroutine
-                                        longPressJob?.cancel()
-                                        longPressJob = longPressScope.launch {
-                                            delay(LONG_PRESS_TIMEOUT_MS)
-                                            val pressPos = dragStartPos ?: return@launch
+                        when (event.type) {
+                            PointerEventType.Press -> {
+                                val position = event.changes.first().position
+                                dragStartPos = position
+                                isDragging = false
 
-                                            // Inverse-transform for camera-aware hit testing
-                                            val camera = currentCameraState
-                                            val hitX: Double
-                                            val hitY: Double
-                                            if (camera != null) {
-                                                val cx = currentCanvasWidth / 2.0
-                                                val cy = currentCanvasHeight / 2.0
-                                                hitX = (pressPos.x.toDouble() - cx - camera.panX) / camera.zoom + cx
-                                                hitY = (pressPos.y.toDouble() - cy - camera.panY) / camera.zoom + cy
-                                            } else {
-                                                hitX = pressPos.x.toDouble()
-                                                hitY = pressPos.y.toDouble()
-                                            }
+                                longPressJob?.cancel()
+                                longPressJob = longPressScope.launch {
+                                    delay(LONG_PRESS_TIMEOUT_MS)
+                                    val pressPos = dragStartPos ?: return@launch
 
-                                            val hitNode = renderer.hitTest(
-                                                rootNode = rootNode,
-                                                x = hitX,
-                                                y = hitY,
-                                                context = currentRenderContext,
-                                                width = currentCanvasWidth,
-                                                height = currentCanvasHeight
-                                            )
-                                            hitNode?.onLongClick?.invoke()
-
-                                            // Suppress tap on release after long press fires
-                                            isDragging = true
-                                        }
+                                    val camera = currentCameraState
+                                    val hitX: Double
+                                    val hitY: Double
+                                    if (camera != null) {
+                                        val cx = currentCanvasWidth / 2.0
+                                        val cy = currentCanvasHeight / 2.0
+                                        hitX = (pressPos.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+                                        hitY = (pressPos.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+                                    } else {
+                                        hitX = pressPos.x.toDouble()
+                                        hitY = pressPos.y.toDouble()
                                     }
 
-                                    PointerEventType.Move -> {
-                                        val position = event.changes.first().position
-                                        val start = dragStartPos
+                                    val hitNode = renderer.hitTest(
+                                        rootNode = rootNode,
+                                        x = hitX,
+                                        y = hitY,
+                                        context = currentRenderContext,
+                                        width = currentCanvasWidth,
+                                        height = currentCanvasHeight
+                                    )
+                                    hitNode?.onLongClick?.invoke()
+                                    isDragging = true
+                                }
+                            }
 
-                                        if (start != null) {
-                                            val delta = position - start
+                            PointerEventType.Move -> {
+                                val position = event.changes.first().position
+                                val start = dragStartPos
 
-                                            // If moved more than threshold, it's a drag
-                                            if (!isDragging && delta.getDistance() > currentGestures.dragThreshold) {
-                                                isDragging = true
-                                                longPressJob?.cancel()
-                                                currentGestures.onDragStart?.invoke(
-                                                    DragEvent(start.x.toDouble(), start.y.toDouble())
-                                                )
-                                            }
+                                if (start != null) {
+                                    val delta = position - start
 
-                                            if (isDragging) {
-                                                val dragEvent = DragEvent(delta.x.toDouble(), delta.y.toDouble())
-                                                val onDrag = currentGestures.onDrag
-                                                if (onDrag != null) {
-                                                    onDrag.invoke(dragEvent)
-                                                } else {
-                                                    // C2: Default drag→pan when cameraState is active
-                                                    currentCameraState?.pan(dragEvent.x, dragEvent.y)
-                                                }
-                                                dragStartPos = position
-                                                event.changes.forEach { it.consume() }
-                                            }
-                                        }
+                                    if (!isDragging && delta.getDistance() > currentGestures.dragThreshold) {
+                                        isDragging = true
+                                        longPressJob?.cancel()
+                                        currentGestures.onDragStart?.invoke(
+                                            DragEvent(start.x.toDouble(), start.y.toDouble())
+                                        )
                                     }
 
-                                    PointerEventType.Release -> {
-                                        longPressJob?.cancel()
-                                        val position = event.changes.first().position
-
-                                        if (isDragging) {
-                                            currentGestures.onDragEnd?.invoke()
+                                    if (isDragging) {
+                                        val dragEvent = DragEvent(delta.x.toDouble(), delta.y.toDouble())
+                                        val onDrag = currentGestures.onDrag
+                                        if (onDrag != null) {
+                                            onDrag.invoke(dragEvent)
                                         } else {
-                                            // S8: Inverse-transform pointer coordinates when camera
-                                            // is active, so hit testing uses engine-space coords.
-                                            val camera = currentCameraState
-                                            val hitX: Double
-                                            val hitY: Double
-                                            if (camera != null) {
-                                                val cx = currentCanvasWidth / 2.0
-                                                val cy = currentCanvasHeight / 2.0
-                                                hitX = (position.x.toDouble() - cx - camera.panX) / camera.zoom + cx
-                                                hitY = (position.y.toDouble() - cy - camera.panY) / camera.zoom + cy
-                                            } else {
-                                                hitX = position.x.toDouble()
-                                                hitY = position.y.toDouble()
-                                            }
-
-                                            val hitNode = renderer.hitTest(
-                                                rootNode = rootNode,
-                                                x = hitX,
-                                                y = hitY,
-                                                context = currentRenderContext,
-                                                width = currentCanvasWidth,
-                                                height = currentCanvasHeight
-                                            )
-                                            currentGestures.onTap?.invoke(
-                                                TapEvent(
-                                                    x = position.x.toDouble(),
-                                                    y = position.y.toDouble(),
-                                                    node = hitNode
-                                                )
-                                            )
-
-                                            // Dispatch per-node onClick after scene-level onTap
-                                            hitNode?.onClick?.invoke()
-
-                                            // Route to any registered TileGrid tap handlers.
-                                            // Uses hitX/hitY (camera-corrected) so screenToTile
-                                            // receives engine-space coordinates, matching the
-                                            // coordinate space that screenToWorld expects.
-                                            val isometricEngine = currentIsometricEngine
-                                            if (tileGestureHub.hasHandlers && isometricEngine != null) {
-                                                tileGestureHub.dispatch(
-                                                    tapX = hitX,
-                                                    tapY = hitY,
-                                                    viewportWidth = currentCanvasWidth,
-                                                    viewportHeight = currentCanvasHeight,
-                                                    engine = isometricEngine
-                                                )
-                                            }
+                                            currentCameraState?.pan(dragEvent.x, dragEvent.y)
                                         }
-
-                                        isDragging = false
-                                        dragStartPos = null
+                                        dragStartPos = position
+                                        event.changes.forEach { it.consume() }
                                     }
                                 }
                             }
+
+                            PointerEventType.Release -> {
+                                longPressJob?.cancel()
+                                val position = event.changes.first().position
+
+                                if (isDragging) {
+                                    currentGestures.onDragEnd?.invoke()
+                                } else {
+                                    val camera = currentCameraState
+                                    val hitX: Double
+                                    val hitY: Double
+                                    if (camera != null) {
+                                        val cx = currentCanvasWidth / 2.0
+                                        val cy = currentCanvasHeight / 2.0
+                                        hitX = (position.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+                                        hitY = (position.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+                                    } else {
+                                        hitX = position.x.toDouble()
+                                        hitY = position.y.toDouble()
+                                    }
+
+                                    val hitNode = renderer.hitTest(
+                                        rootNode = rootNode,
+                                        x = hitX,
+                                        y = hitY,
+                                        context = currentRenderContext,
+                                        width = currentCanvasWidth,
+                                        height = currentCanvasHeight
+                                    )
+                                    currentGestures.onTap?.invoke(
+                                        TapEvent(
+                                            x = position.x.toDouble(),
+                                            y = position.y.toDouble(),
+                                            node = hitNode
+                                        )
+                                    )
+                                    hitNode?.onClick?.invoke()
+
+                                    val isometricEngine = currentIsometricEngine
+                                    if (tileGestureHub.hasHandlers && isometricEngine != null) {
+                                        tileGestureHub.dispatch(
+                                            tapX = hitX,
+                                            tapY = hitY,
+                                            viewportWidth = currentCanvasWidth,
+                                            viewportHeight = currentCanvasHeight,
+                                            engine = isometricEngine
+                                        )
+                                    }
+                                }
+
+                                isDragging = false
+                                dragStartPos = null
+                            }
                         }
-                        } // coroutineScope
                     }
-                } else {
-                    Modifier
                 }
-            )
-    ) {
+            }
+        }
+    } else {
+        Modifier
+    }
+
+    // Render to canvas with gesture handling.
+    // Pointer input is installed when gestures are explicitly enabled OR when a
+    // CameraState is provided (for default drag-to-pan behavior).
+    if (isCanvasBackend) {
+        Canvas(
+            modifier = modifier.then(gestureLayerModifier)
+        ) {
         // Switch state subscription based on compute backend.
         if (isAsyncCompute) {
             // GPU path: subscribe to version counter changes.
@@ -616,6 +662,27 @@ fun IsometricScene(
 
             // Hook: after draw
             config.onAfterDraw?.invoke(this)
+        }
+        }
+    } else {
+        Box(
+            modifier = modifier
+                .onSizeChanged {
+                    canvasWidth = it.width
+                    canvasHeight = it.height
+                }
+        ) {
+            config.renderBackend.Surface(
+                preparedScene = backendPreparedSceneState,
+                renderContext = renderContext,
+                modifier = Modifier.fillMaxSize(),
+                strokeStyle = config.strokeStyle,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(gestureLayerModifier)
+            )
         }
     }
 }

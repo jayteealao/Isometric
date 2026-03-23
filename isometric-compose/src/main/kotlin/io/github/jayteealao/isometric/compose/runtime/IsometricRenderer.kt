@@ -274,6 +274,38 @@ class IsometricRenderer(
     }
 
     /**
+     * Prepare a scene without drawing it.
+     *
+     * Used by non-canvas render backends that still consume the CPU-side
+     * [PreparedScene] representation.
+     */
+    fun prepareScene(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int,
+        skipHitTest: Boolean = false,
+    ): PreparedScene? {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+        if (width <= 0 || height <= 0) return null
+        if (forceRebuild) clearCache()
+
+        if (cache.needsUpdate(rootNode, context, width, height)) {
+            benchmarkHooks?.onCacheMiss()
+            benchmarkHooks?.onPrepareStart()
+            val scene = cache.rebuild(rootNode, context, width, height, onRenderError)
+            if (scene != null && !skipHitTest) {
+                hitTestResolver.rebuildIndices(rootNode, scene)
+            }
+            benchmarkHooks?.onPrepareEnd()
+            return scene
+        }
+
+        benchmarkHooks?.onCacheHit()
+        return cache.currentPreparedScene
+    }
+
+    /**
      * Draw a pre-built scene without running the prepare step.
      *
      * Used by the GPU compute path: the `LaunchedEffect` prepares the scene via [prepareAsync],

@@ -54,6 +54,25 @@ class WebGpuComputeBackend : SortingComputeBackend {
     /** Tracks the last reported depth key count to avoid redundant StateFlow emissions. */
     private var lastReportedCount: Int? = null
 
+    /**
+     * Returns the live [GpuContext] if initialization has already succeeded, or null.
+     * Used by [WebGpuSceneRenderer] to share the same device/thread when both backends
+     * are active, avoiding a second Dawn device on the same process.
+     * Callers must NOT destroy the returned context — ownership stays with this backend.
+     */
+    internal fun getContextIfReady(): GpuContext? = gpuContext
+
+    /**
+     * Awaits GPU initialization and returns the shared [GpuContext], or null if init fails.
+     * Used by [WebGpuSceneRenderer] to borrow this context rather than creating a second
+     * Dawn device. Safe to call concurrently — protected by [initMutex].
+     * Callers must NOT destroy the returned context.
+     */
+    internal suspend fun awaitContextForSharing(): GpuContext? {
+        ensureContext() // blocks until ready or failed
+        return gpuContext
+    }
+
     private fun invalidateContext() {
         gpuSorter?.destroyCachedBuffers()
         gpuContext?.destroy()

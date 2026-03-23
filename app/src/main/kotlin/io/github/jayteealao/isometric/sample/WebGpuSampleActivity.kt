@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
@@ -41,12 +41,12 @@ import io.github.jayteealao.isometric.compose.runtime.GestureConfig
 import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
+import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.webgpu.WebGpu
 import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
 import kotlinx.coroutines.delay
-import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
@@ -88,26 +88,20 @@ private fun WebGpuSamplesScreen() {
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
-                text = { Text("CPU Animated") }
+                text = { Text("Smoke") }
             )
             Tab(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
-                text = { Text("Smoke") }
-            )
-            Tab(
-                selected = selectedTab == 3,
-                onClick = { selectedTab = 3 },
                 text = { Text("Dense Grid") }
             )
         }
 
         Box(modifier = Modifier.weight(1f)) {
             when (selectedTab) {
-                0 -> WebGpuAnimatedTowersSample()
-                1 -> CpuAnimatedTowersSample()
-                2 -> WebGpuSmokeSample()
-                3 -> WebGpuDenseGridSample()
+                0 -> AnimatedTowersBackendSample()
+                1 -> WebGpuSmokeSample()
+                2 -> WebGpuDenseGridSample()
             }
         }
     }
@@ -124,10 +118,6 @@ private fun WebGpuExplainerCard(
         WebGpuComputeBackend.Status.Ready -> Color(0xFF2E7D32)
         WebGpuComputeBackend.Status.Failed -> Color(0xFFC62828)
     }
-    val statusDetail = when (backendStatus.status) {
-        WebGpuComputeBackend.Status.Ready -> "GPU sort active"
-        else -> backendStatus.detail ?: "Waiting for activity"
-    }
     val depthKeyLabel = backendStatus.depthKeyCount?.toString() ?: "n/a"
 
     LaunchedEffect(backendStatus) {
@@ -140,60 +130,22 @@ private fun WebGpuExplainerCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .heightIn(min = 212.dp),
-        elevation = 4.dp
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        elevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Text(
-                text = "WebGPU Compute Sort Sample",
-                style = MaterialTheme.typography.h6
+                text = "WebGPU",
+                style = MaterialTheme.typography.subtitle1
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Frontend: Compose Canvas",
-                style = MaterialTheme.typography.body2
-            )
-            Text(
-                text = "Compute backend: ComputeBackend.WebGpu",
-                style = MaterialTheme.typography.body2
-            )
-            Text(
-                text = "Purpose: prove the current Canvas renderer can use WebGPU depth sorting without the WS12 renderer.",
-                style = MaterialTheme.typography.body2,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "Backend status: ${backendStatus.status}",
-                style = MaterialTheme.typography.body2,
-                color = statusColor,
-            )
-            Text(
-                text = "Detail: $statusDetail",
-                style = MaterialTheme.typography.body2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = "Depth-key count: $depthKeyLabel",
-                style = MaterialTheme.typography.body2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatusPill(label = "Canvas", color = Color(0xFF1565C0))
-                StatusPill(label = "WebGPU Sort", color = Color(0xFF2E7D32))
-                StatusPill(label = "No Native Canvas", color = Color(0xFF6A1B9A))
-                StatusPill(
-                    label = backendStatus.status.name,
-                    color = statusColor,
-                )
-            }
+            Spacer(modifier = Modifier.weight(1f))
+            StatusPill(label = backendStatus.status.name, color = statusColor)
+            StatusPill(label = "keys $depthKeyLabel", color = Color(0xFF455A64))
         }
     }
 }
@@ -293,18 +245,116 @@ private fun WebGpuDenseGridSample() {
 }
 
 @Composable
-private fun CpuAnimatedTowersSample() {
+private fun AnimatedTowersBackendSample() {
+    var computeSelection by remember { mutableStateOf(ComputeBackend.Cpu) }
+    var useWebGpuRenderBackend by remember { mutableStateOf(false) }
     val phase = rememberPhaseAnimation(speedRadiansPerSecond = 3.4)
+    val renderBackend = if (useWebGpuRenderBackend) RenderBackend.WebGpu else RenderBackend.Canvas
 
-    CpuGridScene(
-        stage = SmokeStage(
-            name = "CPU Animated",
-            gridWidth = 7,
-            gridHeight = 7,
-            spacing = 1.15,
-            animated = true,
-        ),
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            elevation = 2.dp
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = "Animated Towers", style = MaterialTheme.typography.subtitle1)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Render backend",
+                    style = MaterialTheme.typography.caption
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TogglePill(
+                        label = "Canvas",
+                        selected = !useWebGpuRenderBackend,
+                        onClick = { useWebGpuRenderBackend = false }
+                    )
+                    TogglePill(
+                        label = "WebGPU",
+                        selected = useWebGpuRenderBackend,
+                        onClick = { useWebGpuRenderBackend = true }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Compute backend",
+                    style = MaterialTheme.typography.caption
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TogglePill(
+                        label = "CPU",
+                        selected = computeSelection == ComputeBackend.Cpu,
+                        onClick = { computeSelection = ComputeBackend.Cpu }
+                    )
+                    TogglePill(
+                        label = "WebGPU",
+                        selected = computeSelection != ComputeBackend.Cpu,
+                        onClick = { computeSelection = ComputeBackend.WebGpu }
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Current: ${renderBackend.toString()} + ${computeSelection.toString()}",
+                    style = MaterialTheme.typography.body2
+                )
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            AnimatedTowersScene(
+                phase = phase,
+                renderBackend = renderBackend,
+                computeBackend = computeSelection,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TogglePill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        backgroundColor = if (selected) MaterialTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent,
+        elevation = 0.dp,
+        modifier = Modifier
+            .padding(top = 2.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            color = if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
+            style = MaterialTheme.typography.body2,
+        )
+    }
+}
+
+@Composable
+private fun AnimatedTowersScene(
+    phase: Double,
+    renderBackend: RenderBackend,
+    computeBackend: ComputeBackend,
+) {
+    val stage = SmokeStage(
+        name = "Animated",
+        gridWidth = 7,
+        gridHeight = 7,
+        spacing = 1.15,
+        animated = true,
+    )
+
+    WebGpuGridScene(
+        stage = stage,
         phase = phase,
+        includeCylinder = false,
+        renderBackend = renderBackend,
+        computeBackend = computeBackend,
     )
 }
 
@@ -313,66 +363,11 @@ private fun CpuGridScene(
     stage: SmokeStage,
     phase: Double,
 ) {
-    IsometricScene(
-        modifier = Modifier.fillMaxSize(),
-        config = SceneConfig(
-            renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-            computeBackend = ComputeBackend.Cpu,
-            useNativeCanvas = false,
-            gestures = GestureConfig.Disabled,
-        )
-    ) {
-        ForEach((0 until stage.gridWidth).toList()) { x ->
-            ForEach((0 until stage.gridHeight).toList()) { y ->
-                val centerOffsetX = x - stage.gridWidth / 2.0
-                val centerOffsetY = y - stage.gridHeight / 2.0
-                val wave = sin(phase + x * 0.55 + y * 0.45)
-                val baseHeight = 0.7 + (wave + 1.0) * 1.2
-                val towerX = centerOffsetX * stage.spacing
-                val towerY = centerOffsetY * stage.spacing
-
-                Shape(
-                    geometry = Prism(
-                        position = Point(towerX, towerY, 0.0),
-                        width = 1.0,
-                        depth = 1.0,
-                        height = baseHeight
-                    ),
-                    color = IsoColor(
-                        clampRgb(60.0 + x * 14.0),
-                        clampRgb(80.0 + y * 16.0),
-                        clampRgb(220.0 - y * 9.0)
-                    )
-                )
-
-                Shape(
-                    geometry = Prism(
-                        position = Point(towerX + 0.16, towerY + 0.16, baseHeight),
-                        width = 0.68,
-                        depth = 0.68,
-                        height = 0.22
-                    ),
-                    color = IsoColor(245.0, 245.0, 255.0)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WebGpuAnimatedTowersSample() {
-    val phase = rememberPhaseAnimation(speedRadiansPerSecond = 3.4)
-
     WebGpuGridScene(
-        stage = SmokeStage(
-            name = "Animated",
-            gridWidth = 7,
-            gridHeight = 7,
-            spacing = 1.15,
-            animated = true,
-        ),
+        stage = stage,
         phase = phase,
-        includeCylinder = false,
+        renderBackend = RenderBackend.Canvas,
+        computeBackend = ComputeBackend.Cpu,
     )
 }
 
@@ -381,12 +376,15 @@ private fun WebGpuGridScene(
     stage: SmokeStage,
     phase: Double,
     includeCylinder: Boolean = true,
+    renderBackend: RenderBackend = RenderBackend.Canvas,
+    computeBackend: ComputeBackend = ComputeBackend.WebGpu,
 ) {
     IsometricScene(
         modifier = Modifier.fillMaxSize(),
         config = SceneConfig(
             renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-            computeBackend = ComputeBackend.WebGpu,
+            renderBackend = renderBackend,
+            computeBackend = computeBackend,
             useNativeCanvas = false,
             gestures = GestureConfig.Disabled,
         )

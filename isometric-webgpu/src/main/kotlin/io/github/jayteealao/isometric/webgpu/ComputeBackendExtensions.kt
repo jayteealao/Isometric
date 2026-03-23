@@ -19,6 +19,7 @@ import io.github.jayteealao.isometric.SortingComputeBackend
 val ComputeBackend.Companion.WebGpu: SortingComputeBackend
     get() = WebGpuComputeBackendHolder.instance
 
-private object WebGpuComputeBackendHolder {
+// internal so WebGpuSceneRenderer can access the singleton for context sharing
+internal object WebGpuComputeBackendHolder {
     val instance: SortingComputeBackend = WebGpuComputeBackend()
 }

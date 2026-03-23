@@ -1,0 +1,305 @@
+package io.github.jayteealao.isometric.webgpu
+
+import android.util.Log
+import android.view.Surface
+import androidx.compose.runtime.State
+import androidx.webgpu.BackendType
+import androidx.webgpu.CompositeAlphaMode
+import androidx.webgpu.GPUBuffer
+import androidx.webgpu.GPUColor
+import androidx.webgpu.GPURequestAdapterOptions
+import androidx.webgpu.GPURenderPassColorAttachment
+import androidx.webgpu.GPURenderPassDescriptor
+import androidx.webgpu.GPUSurface
+import androidx.webgpu.GPUSurfaceConfiguration
+import androidx.webgpu.GPUSurfaceDescriptor
+import androidx.webgpu.GPUSurfaceSourceAndroidNativeWindow
+import androidx.webgpu.LoadOp
+import androidx.webgpu.PresentMode
+import androidx.webgpu.PowerPreference
+import androidx.webgpu.StoreOp
+import androidx.webgpu.SurfaceGetCurrentTextureStatus
+import androidx.webgpu.TextureFormat
+import androidx.webgpu.TextureUsage
+import androidx.webgpu.helper.Util.windowFromSurface
+import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
+import io.github.jayteealao.isometric.webgpu.pipeline.GpuVertexBuffer
+import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
+internal class WebGpuSceneRenderer : AutoCloseable {
+    companion object {
+        private const val TAG = "WebGpuSceneRenderer"
+    }
+
+    private val triangulator = RenderCommandTriangulator()
+
+    private var gpuContext: GpuContext? = null
+    // false when the context was borrowed from WebGpuComputeBackend — we must not destroy it.
+    private var ownsContext: Boolean = true
+    private var gpuSurface: GPUSurface? = null
+    private var renderPipeline: GpuRenderPipeline? = null
+    private var vertexBuffer: GpuVertexBuffer? = null
+    private var uploadedVertexBuffer: GPUBuffer? = null
+    private var surfaceFormat: Int = TextureFormat.Undefined
+    private var presentMode: Int = PresentMode.Fifo
+    private var alphaMode: Int = CompositeAlphaMode.Auto
+    private var currentWidth: Int = 1
+    private var currentHeight: Int = 1
+    private var lastScene: PreparedScene? = null
+    private var currentVertexCount: Int = 0
+
+    suspend fun renderLoop(
+        androidSurface: Surface,
+        surfaceWidth: Int,
+        surfaceHeight: Int,
+        preparedScene: State<PreparedScene?>,
+    ) {
+        try {
+            ensureInitialized(
+                androidSurface = androidSurface,
+                width = surfaceWidth,
+                height = surfaceHeight,
+            )
+
+            while (currentCoroutineContext().isActive) {
+                val scene = preparedScene.value
+                if (scene !== lastScene) {
+                    uploadScene(scene)
+                    lastScene = scene
+                }
+
+                drawFrame(androidSurface)
+                delay(16L)
+            }
+        } finally {
+            cleanup()
+        }
+    }
+
+    private suspend fun ensureInitialized(
+        androidSurface: Surface,
+        width: Int,
+        height: Int,
+    ) {
+        if (gpuContext != null && gpuSurface != null && renderPipeline != null && vertexBuffer != null) return
+
+        // Reuse the compute backend's GpuContext when available to avoid creating a second
+        // Dawn device/thread on the same process. Both backends share the same GPU thread.
+        // awaitContextForSharing() suspends until compute init succeeds or fails, so we
+        // don't race with a concurrent GpuContext.create() call from the compute side.
+        val sharedContext = (WebGpuComputeBackendHolder.instance as? WebGpuComputeBackend)
+            ?.awaitContextForSharing()
+
+        val context: GpuContext
+        if (sharedContext != null) {
+            context = sharedContext
+            ownsContext = false
+            val surface = context.withGpu {
+                context.instance.createSurface(
+                    GPUSurfaceDescriptor(
+                        label = "IsometricSurface",
+                        surfaceSourceAndroidNativeWindow =
+                            GPUSurfaceSourceAndroidNativeWindow(windowFromSurface(androidSurface))
+                    )
+                )
+            }
+            gpuSurface = surface
+            Log.d(TAG, "Reusing compute GpuContext for render surface")
+        } else {
+            var createdSurface: GPUSurface? = null
+            context = GpuContext.create { instance ->
+                createdSurface = instance.createSurface(
+                    GPUSurfaceDescriptor(
+                        label = "IsometricSurface",
+                        surfaceSourceAndroidNativeWindow =
+                            GPUSurfaceSourceAndroidNativeWindow(windowFromSurface(androidSurface))
+                    )
+                )
+                GPURequestAdapterOptions(
+                    powerPreference = PowerPreference.HighPerformance,
+                    backendType = BackendType.Vulkan,
+                    compatibleSurface = createdSurface,
+                )
+            }
+            ownsContext = true
+            gpuSurface = checkNotNull(createdSurface)
+        }
+
+        gpuContext = context
+
+        context.withGpu {
+            configureSurface(width, height)
+            renderPipeline = GpuRenderPipeline(context.device, surfaceFormat)
+            vertexBuffer = GpuVertexBuffer(context.device, context.queue)
+        }
+
+        Log.d(TAG, "Initialized surface ${currentWidth}x${currentHeight} format=$surfaceFormat owned=$ownsContext")
+    }
+
+    private suspend fun configureSurface(width: Int, height: Int) {
+        val ctx = checkNotNull(gpuContext)
+        val surface = checkNotNull(gpuSurface)
+        val capabilities = surface.getCapabilities(ctx.adapter)
+
+        require(capabilities.formats.isNotEmpty()) { "No supported surface formats returned" }
+        require((capabilities.usages and TextureUsage.RenderAttachment) != 0) {
+            "Surface does not support RenderAttachment usage"
+        }
+
+        surfaceFormat = when {
+            capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
+            capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
+            else -> capabilities.formats.first()
+        }
+        presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
+            PresentMode.Fifo
+        } else {
+            capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
+        }
+        alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
+            CompositeAlphaMode.Auto
+        } else {
+            capabilities.alphaModes.firstOrNull() ?: CompositeAlphaMode.Auto
+        }
+
+        currentWidth = width.coerceAtLeast(1)
+        currentHeight = height.coerceAtLeast(1)
+
+        surface.configure(
+            GPUSurfaceConfiguration(
+                device = ctx.device,
+                width = currentWidth,
+                height = currentHeight,
+                format = surfaceFormat,
+                usage = TextureUsage.RenderAttachment,
+                alphaMode = alphaMode,
+                presentMode = presentMode,
+            )
+        )
+    }
+
+    private suspend fun uploadScene(scene: PreparedScene?) {
+        currentVertexCount = 0
+        uploadedVertexBuffer = null
+
+        if (scene == null) return
+
+        val packed = triangulator.pack(scene)
+        currentVertexCount = packed.vertexCount
+        Log.d(TAG, "Uploading scene: commands=${scene.commands.size} vertices=$currentVertexCount scene=${scene.width}x${scene.height}")
+        if (currentVertexCount == 0) return
+
+        val ctx = checkNotNull(gpuContext)
+        ctx.withGpu {
+            uploadedVertexBuffer = vertexBuffer!!.upload(packed.buffer)
+        }
+    }
+
+    private suspend fun drawFrame(androidSurface: Surface) {
+        val ctx = checkNotNull(gpuContext)
+        val surface = checkNotNull(gpuSurface)
+        val pipeline = checkNotNull(renderPipeline)
+
+        ctx.withGpu {
+            ctx.checkHealthy()
+
+            val surfaceTexture = surface.getCurrentTexture()
+            when (surfaceTexture.status) {
+                SurfaceGetCurrentTextureStatus.SuccessOptimal,
+                SurfaceGetCurrentTextureStatus.SuccessSuboptimal -> {
+                    val textureView = surfaceTexture.texture.createView()
+                    val encoder = ctx.device.createCommandEncoder()
+                    val pass = encoder.beginRenderPass(
+                        GPURenderPassDescriptor(
+                            colorAttachments = arrayOf(
+                                GPURenderPassColorAttachment(
+                                    clearValue = GPUColor(0.0, 0.0, 0.0, 0.0),
+                                    view = textureView,
+                                    loadOp = LoadOp.Clear,
+                                    storeOp = StoreOp.Store,
+                                )
+                            )
+                        )
+                    )
+
+                    pass.setPipeline(pipeline.pipeline)
+                    val gpuVertexBuffer = uploadedVertexBuffer
+                    if (currentVertexCount > 0 && gpuVertexBuffer != null) {
+                        pass.setVertexBuffer(0, gpuVertexBuffer)
+                        pass.draw(currentVertexCount)
+                    }
+                    pass.end()
+                    pass.close()
+
+                    val commandBuffer = encoder.finish()
+                    ctx.queue.submit(arrayOf(commandBuffer))
+                    commandBuffer.close()
+                    encoder.close()
+                    surface.present()
+
+                    textureView.close()
+                    surfaceTexture.texture.close()
+
+                    if (surfaceTexture.status == SurfaceGetCurrentTextureStatus.SuccessSuboptimal) {
+                        reconfigureSurface()
+                    }
+                }
+                SurfaceGetCurrentTextureStatus.Outdated -> reconfigureSurface()
+                SurfaceGetCurrentTextureStatus.Lost -> recreateSurface(androidSurface)
+                SurfaceGetCurrentTextureStatus.Timeout -> Unit
+                SurfaceGetCurrentTextureStatus.Error -> {
+                    Log.e(TAG, "surface.getCurrentTexture() returned Error")
+                    throw IllegalStateException("Surface getCurrentTexture returned Error")
+                }
+            }
+        }
+    }
+
+    private suspend fun reconfigureSurface() {
+        val surface = gpuSurface ?: return
+        surface.unconfigure()
+        configureSurface(currentWidth, currentHeight)
+    }
+
+    private suspend fun recreateSurface(androidSurface: Surface) {
+        val ctx = checkNotNull(gpuContext)
+        gpuSurface?.unconfigure()
+        gpuSurface?.close()
+        gpuSurface = ctx.instance.createSurface(
+            GPUSurfaceDescriptor(
+                label = "IsometricSurface",
+                surfaceSourceAndroidNativeWindow =
+                    GPUSurfaceSourceAndroidNativeWindow(windowFromSurface(androidSurface))
+            )
+        )
+        configureSurface(currentWidth, currentHeight)
+    }
+
+    private fun cleanup() {
+        gpuSurface?.unconfigure()
+        renderPipeline?.close()
+        vertexBuffer?.close()
+        gpuSurface?.close()
+        // Only destroy if we own the context. When shared with WebGpuComputeBackend,
+        // the compute backend owns the lifecycle and will destroy it.
+        if (ownsContext) {
+            gpuContext?.destroy()
+        }
+        renderPipeline = null
+        vertexBuffer = null
+        uploadedVertexBuffer = null
+        gpuSurface = null
+        gpuContext = null
+        ownsContext = true
+        lastScene = null
+        currentVertexCount = 0
+    }
+
+    override fun close() {
+        cleanup()
+    }
+}
