@@ -60,6 +60,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         preparedScene: State<PreparedScene?>,
         renderContextWidth: State<Int>,
         renderContextHeight: State<Int>,
+        frameDelayMs: Long = 16L,
     ) {
         try {
             ensureInitialized(
@@ -93,7 +94,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 }
 
                 drawFrame(androidSurface)
-                delay(16L)
+                delay(frameDelayMs)
             }
         } finally {
             cleanup()
@@ -159,30 +160,38 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         Log.d(TAG, "Initialized surface ${currentWidth}x${currentHeight} format=$surfaceFormat owned=$ownsContext")
     }
 
+    // G2: Capabilities (format, presentMode, alphaMode) are stable for the lifetime of a
+    // GPUSurface — they don't change between resizes. Only query getCapabilities() on the
+    // first configure; on subsequent resizes just reconfigure with the cached values.
+    // surfaceFormat == TextureFormat.Undefined signals "not yet queried".
+    // recreateSurface() resets surfaceFormat to Undefined to force a re-query for the new surface.
     private suspend fun configureSurface(width: Int, height: Int) {
         val ctx = checkNotNull(gpuContext)
         val surface = checkNotNull(gpuSurface)
-        val capabilities = surface.getCapabilities(ctx.adapter)
 
-        require(capabilities.formats.isNotEmpty()) { "No supported surface formats returned" }
-        require((capabilities.usages and TextureUsage.RenderAttachment) != 0) {
-            "Surface does not support RenderAttachment usage"
-        }
+        if (surfaceFormat == TextureFormat.Undefined) {
+            val capabilities = surface.getCapabilities(ctx.adapter)
 
-        surfaceFormat = when {
-            capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
-            capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
-            else -> capabilities.formats.first()
-        }
-        presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
-            PresentMode.Fifo
-        } else {
-            capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
-        }
-        alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
-            CompositeAlphaMode.Auto
-        } else {
-            capabilities.alphaModes.firstOrNull() ?: CompositeAlphaMode.Auto
+            require(capabilities.formats.isNotEmpty()) { "No supported surface formats returned" }
+            require((capabilities.usages and TextureUsage.RenderAttachment) != 0) {
+                "Surface does not support RenderAttachment usage"
+            }
+
+            surfaceFormat = when {
+                capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
+                capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
+                else -> capabilities.formats.first()
+            }
+            presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
+                PresentMode.Fifo
+            } else {
+                capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
+            }
+            alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
+                CompositeAlphaMode.Auto
+            } else {
+                capabilities.alphaModes.firstOrNull() ?: CompositeAlphaMode.Auto
+            }
         }
 
         currentWidth = width.coerceAtLeast(1)
@@ -295,6 +304,8 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     GPUSurfaceSourceAndroidNativeWindow(windowFromSurface(androidSurface))
             )
         )
+        // G2: reset so configureSurface() re-queries capabilities for the new surface object.
+        surfaceFormat = TextureFormat.Undefined
         configureSurface(currentWidth, currentHeight)
     }
 
@@ -302,15 +313,23 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     // the dedicated GPU thread. cleanup() is called from the finally block of renderLoop(),
     // which runs on Dispatchers.Default. We dispatch the Dawn teardown work to the GPU thread
     // via runBlocking(gpuDispatcher) — the same pattern used by GpuContext.destroy().
+    //
+    // G1: Guarded with try/catch — if the shared context was already destroyed externally
+    // (e.g. WebGpuComputeBackend device-lost → invalidateContext() → ctx.destroy() shuts
+    // down the dispatcher), runBlocking throws RejectedExecutionException. The GPU device
+    // is already gone in that case; log and proceed to null out all fields.
     private fun cleanup() {
         val ctx = gpuContext
         if (ctx != null) {
-            val dispatcher = ctx.gpuDispatcher
-            runBlocking(dispatcher) {
-                gpuSurface?.unconfigure()
-                renderPipeline?.close()
-                vertexBuffer?.close()
-                gpuSurface?.close()
+            try {
+                runBlocking(ctx.gpuDispatcher) {
+                    gpuSurface?.unconfigure()
+                    renderPipeline?.close()
+                    vertexBuffer?.close()
+                    gpuSurface?.close()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "cleanup: GPU teardown skipped — context already destroyed", e)
             }
             // Only destroy if we own the context. When shared with WebGpuComputeBackend,
             // the compute backend owns the lifecycle and will destroy it.

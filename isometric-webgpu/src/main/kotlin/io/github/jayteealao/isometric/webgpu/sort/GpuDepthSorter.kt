@@ -304,10 +304,14 @@ class GpuDepthSorter(
         if (cachedPaddedCount == paddedCount) return
 
         // Destroy old buffers (except pipeline which is size-independent).
+        // G3: also close old bind group JNI wrappers — they reference the old buffers and
+        // accumulate unclosed until destroyCachedBuffers() is eventually called otherwise.
         primaryBuffer?.destroy()
         scratchBuffer?.destroy()
         resultReadback?.destroy()
         paramsBuffer?.destroy()
+        cachedBindGroups?.forEach { it.close() }
+        cachedBindGroups = null
 
         primaryBuffer = ctx.device.createBuffer(
             GPUBufferDescriptor(
