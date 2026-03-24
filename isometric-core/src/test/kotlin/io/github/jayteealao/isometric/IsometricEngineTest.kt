@@ -85,7 +85,9 @@ class IsometricEngineTest {
                 RenderCommand("front", overlappingPoints, IsoColor.RED, Path(Point.ORIGIN, Point(1.0, 0.0, 0.0), Point(0.0, 1.0, 0.0)), null)
             ),
             width = 800,
-            height = 600
+            height = 600,
+            projectionParams = ProjectionParams(1.0, 0.5, -1.0, 0.5, 20.0, 0.5, IsoColor.WHITE),
+            lightDirection = Vector(1.0, 1.0, 1.0),
         )
 
         val engine = IsometricEngine()
@@ -106,7 +108,9 @@ class IsometricEngineTest {
                 )
             ),
             width = 800,
-            height = 600
+            height = 600,
+            projectionParams = ProjectionParams(1.0, 0.5, -1.0, 0.5, 20.0, 0.5, IsoColor.WHITE),
+            lightDirection = Vector(1.0, 1.0, 1.0),
         )
 
         val engine = IsometricEngine()

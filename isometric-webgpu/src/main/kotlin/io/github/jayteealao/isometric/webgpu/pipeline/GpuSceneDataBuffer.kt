@@ -58,6 +58,15 @@ internal class GpuSceneDataBuffer(
         private set
 
     /**
+     * Current face capacity of the GPU buffer.
+     *
+     * Always ≥ [faceCount]. Grows geometrically; always a power of two ≥ [INITIAL_CAPACITY_FACES].
+     * [GpuFullPipeline] passes this to [GpuTransformPipeline.ensureBuffers] so the
+     * `TransformedFace` output buffer is large enough to hold all projected faces.
+     */
+    val capacity: Int get() = capacityFaces
+
+    /**
      * The underlying [GPUBuffer], available after the first successful [upload].
      *
      * Bind this as `@binding(0) var<storage, read> scene: array<FaceData>` in the

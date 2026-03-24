@@ -273,7 +273,8 @@ class IsometricEngineProjectionTest {
             override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?) {}
             override fun clear() {}
             override fun projectScene(width: Int, height: Int, renderOptions: RenderOptions, lightDirection: Vector): PreparedScene =
-                PreparedScene(emptyList(), width, height)
+                PreparedScene(emptyList(), width, height,
+                    ProjectionParams(1.0, 0.5, -1.0, 0.5, 20.0, 0.5, IsoColor.WHITE), lightDirection)
             override fun findItemAt(preparedScene: PreparedScene, x: Double, y: Double, order: HitOrder, touchRadius: Double): RenderCommand? = null
         }
         assertEquals(0L, projector.projectionVersion)

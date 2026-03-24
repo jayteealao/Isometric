@@ -233,7 +233,7 @@ class IsometricEngine @JvmOverloads constructor(
             )
         }
 
-        return PreparedScene(commands, width, height)
+        return PreparedScene(commands, width, height, projectionParams, lightDirection)
     }
 
     /**
@@ -345,7 +345,7 @@ class IsometricEngine @JvmOverloads constructor(
             )
         }
 
-        return PreparedScene(commands, width, height)
+        return PreparedScene(commands, width, height, projectionParams, lightDirection)
     }
 
     private fun projectAndCull(

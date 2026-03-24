@@ -16,7 +16,7 @@ package io.github.jayteealao.isometric.webgpu.shader
  * ```wgsl
  * @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>
  * @group(0) @binding(1) var<storage, read_write>  sortKeys:     array<SortKey>
- * @group(0) @binding(2) var<storage, read>        visibleCount: u32
+ * @group(0) @binding(2) var<storage, read>        visibleCount: array<u32>
  * @group(0) @binding(3) var<uniform>              params:       PackParams
  * ```
  *
@@ -80,7 +80,9 @@ internal object PackSortKeysShader {
 
         @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>;
         @group(0) @binding(1) var<storage, read_write>  sortKeys:     array<SortKey>;
-        @group(0) @binding(2) var<storage, read>        visibleCount: u32;
+        // WGSL storage buffers cannot hold a raw scalar — wrap in array<u32> and
+        // read element [0] to access the single visibleCount value written by M3.
+        @group(0) @binding(2) var<storage, read>        visibleCount: array<u32>;
         @group(0) @binding(3) var<uniform>              params:       PackParams;
 
         @compute @workgroup_size(256)
@@ -88,7 +90,7 @@ internal object PackSortKeysShader {
             let i = gid.x;
             if (i >= params.paddedCount) { return; }
 
-            if (i < visibleCount) {
+            if (i < visibleCount[0]) {
                 // Real visible face: depth key from M3, slot index as originalIndex so
                 // M5 can fetch transformed[originalIndex] in back-to-front order.
                 sortKeys[i] = SortKey(transformed[i].depthKey, i, 0u, 0u);
@@ -96,7 +98,12 @@ internal object PackSortKeysShader {
                 // Sentinel: Float.NEGATIVE_INFINITY = 0xFF800000 in IEEE 754.
                 // Descending sort places these at the end; M5 skips them via
                 // the sentinel check (originalIndex == 0xFFFFFFFF).
-                sortKeys[i] = SortKey(bitcast<f32>(0xFF800000u), 0xFFFFFFFFu, 0u, 0u);
+                //
+                // Use a var (mutable) to prevent Tint from constant-folding
+                // bitcast<f32>(0xFF800000u) to -inf, which Tint rejects in
+                // constant expressions.
+                var sentinelBits: u32 = 0xFF800000u;
+                sortKeys[i] = SortKey(bitcast<f32>(sentinelBits), 0xFFFFFFFFu, 0u, 0u);
             }
         }
     """.trimIndent()

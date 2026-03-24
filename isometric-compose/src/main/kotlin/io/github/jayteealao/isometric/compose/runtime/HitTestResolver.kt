@@ -99,7 +99,9 @@ internal class HitTestResolver(
         val filteredScene = PreparedScene(
             commands = candidateCommands,
             width = preparedScene.width,
-            height = preparedScene.height
+            height = preparedScene.height,
+            projectionParams = preparedScene.projectionParams,
+            lightDirection = preparedScene.lightDirection,
         )
 
         val hit = engine.findItemAt(

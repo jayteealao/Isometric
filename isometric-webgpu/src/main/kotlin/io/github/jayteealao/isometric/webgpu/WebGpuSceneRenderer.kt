@@ -4,7 +4,6 @@ import android.util.Log
 import android.view.Surface
 import androidx.compose.runtime.State
 import androidx.webgpu.CompositeAlphaMode
-import androidx.webgpu.GPUBuffer
 import androidx.webgpu.GPUColor
 import androidx.webgpu.GPURenderPassColorAttachment
 import androidx.webgpu.GPURenderPassDescriptor
@@ -20,9 +19,8 @@ import androidx.webgpu.TextureFormat
 import androidx.webgpu.TextureUsage
 import androidx.webgpu.helper.Util.windowFromSurface
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.webgpu.pipeline.GpuFullPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
-import io.github.jayteealao.isometric.webgpu.pipeline.GpuVertexBuffer
-import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -34,15 +32,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         private const val TAG = "WebGpuSceneRenderer"
     }
 
-    private val triangulator = RenderCommandTriangulator()
-
     private var gpuContext: GpuContext? = null
     // false when the context was borrowed from WebGpuComputeBackend — we must not destroy it.
     private var ownsContext: Boolean = true
     private var gpuSurface: GPUSurface? = null
     private var renderPipeline: GpuRenderPipeline? = null
-    private var vertexBuffer: GpuVertexBuffer? = null
-    private var uploadedVertexBuffer: GPUBuffer? = null
+    private var fullPipeline: GpuFullPipeline? = null
     private var surfaceFormat: Int = TextureFormat.Undefined
     private var presentMode: Int = PresentMode.Fifo
     private var alphaMode: Int = CompositeAlphaMode.Auto
@@ -53,7 +48,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     // native handle that Dawn never initialised, which causes a Scudo double-free (SIGABRT).
     private var surfaceConfigured: Boolean = false
     private var lastScene: PreparedScene? = null
-    private var currentVertexCount: Int = 0
+    // Track last uploaded viewport so we re-upload uniforms and bind groups when the
+    // surface is reconfigured while the scene remains unchanged.
+    private var lastUploadWidth: Int = 0
+    private var lastUploadHeight: Int = 0
 
     suspend fun renderLoop(
         androidSurface: Surface,
@@ -104,7 +102,11 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 // cancelled the render loop intentionally (Activity exit, recompose).
                 try {
                     val scene = preparedScene.value
-                    if (scene !== lastScene) {
+                    // Re-upload when scene changes OR when viewport was reconfigured since
+                    // the last upload (uniforms and emit bind group include viewport dims).
+                    val viewportChanged = currentWidth != lastUploadWidth ||
+                        currentHeight != lastUploadHeight
+                    if (scene !== lastScene || viewportChanged) {
                         uploadScene(scene)
                         lastScene = scene
                     }
@@ -132,7 +134,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         width: Int,
         height: Int,
     ) {
-        if (gpuContext != null && gpuSurface != null && renderPipeline != null && vertexBuffer != null) return
+        if (gpuContext != null && gpuSurface != null && renderPipeline != null && fullPipeline != null) return
 
         // F2: Use getContextIfReady() (opportunistic, no-trigger) instead of
         // awaitContextForSharing() to avoid forcing compute backend GPU init when the user
@@ -178,7 +180,9 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         context.withGpu {
             configureSurface(width, height)
             renderPipeline = GpuRenderPipeline(context.device, surfaceFormat)
-            vertexBuffer = GpuVertexBuffer(context.device, context.queue)
+            val gp = GpuFullPipeline(context)
+            gp.ensurePipelines()
+            fullPipeline = gp
         }
 
         Log.d(TAG, "Initialized surface ${currentWidth}x${currentHeight} format=$surfaceFormat owned=$ownsContext")
@@ -252,19 +256,18 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     }
 
     private suspend fun uploadScene(scene: PreparedScene?) {
-        currentVertexCount = 0
-        uploadedVertexBuffer = null
+        // Snapshot dimensions before the withGpu suspension point so that lastUpload*
+        // and the upload call itself always see the same width/height values.
+        val w = currentWidth
+        val h = currentHeight
+        lastUploadWidth  = w
+        lastUploadHeight = h
 
-        if (scene == null) return
-
-        val packed = triangulator.pack(scene)
-        currentVertexCount = packed.vertexCount
-        Log.d(TAG, "Uploading scene: commands=${scene.commands.size} vertices=$currentVertexCount scene=${scene.width}x${scene.height}")
-        if (currentVertexCount == 0) return
+        if (scene == null || scene.commands.isEmpty()) return
 
         val ctx = checkNotNull(gpuContext)
         ctx.withGpu {
-            uploadedVertexBuffer = vertexBuffer!!.upload(packed.buffer)
+            fullPipeline!!.upload(scene, w, h)
         }
     }
 
@@ -284,6 +287,17 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 SurfaceGetCurrentTextureStatus.SuccessSuboptimal -> {
                     val textureView = surfaceTexture.texture.createView()
                     val encoder = ctx.device.createCommandEncoder()
+
+                    // Encode compute passes (M3→M4→M5) before the render pass.
+                    // The compute results (vertex buffer + indirect args) are consumed by
+                    // the render pass in the same command buffer. WebGPU guarantees
+                    // ordering within a single queue.submit call.
+                    val gp = fullPipeline
+                    val shouldDraw = gp != null && gp.hasScene
+                    if (shouldDraw) {
+                        gp!!.dispatch(encoder)
+                    }
+
                     val pass = encoder.beginRenderPass(
                         GPURenderPassDescriptor(
                             colorAttachments = arrayOf(
@@ -298,10 +312,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     )
 
                     pass.setPipeline(pipeline.pipeline)
-                    val gpuVertexBuffer = uploadedVertexBuffer
-                    if (currentVertexCount > 0 && gpuVertexBuffer != null) {
-                        pass.setVertexBuffer(0, gpuVertexBuffer)
-                        pass.draw(currentVertexCount)
+                    if (shouldDraw) {
+                        // Vertex buffer written by M5a; vertex count written by M5b.
+                        // drawIndirect reads the vertex count from indirectArgsBuffer without
+                        // any CPU readback — the count stays entirely on the GPU.
+                        pass.setVertexBuffer(0, gp!!.vertexBuffer)
+                        pass.drawIndirect(gp.indirectArgsBuffer, 0L)
                     }
                     pass.end()
                     pass.close()
@@ -391,7 +407,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     // wgpuSurfaceRelease, which correctly decrements the refcount and frees
                     // native resources without touching the already-destroyed VkSurface.
                     renderPipeline?.close()
-                    vertexBuffer?.close()
+                    fullPipeline?.close()
                     gpuSurface?.close()
                 }
             } catch (e: Exception) {
@@ -400,7 +416,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 // Each close() is guarded individually — one failure must not block the others.
                 try { gpuSurface?.close() } catch (_: Exception) {}
                 try { renderPipeline?.close() } catch (_: Exception) {}
-                try { vertexBuffer?.close() } catch (_: Exception) {}
+                try { fullPipeline?.close() } catch (_: Exception) {}
             }
             // Only destroy if we own the context. When shared with WebGpuComputeBackend,
             // the compute backend owns the lifecycle and will destroy it.
@@ -408,15 +424,15 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 ctx.destroy()
             }
         }
-        renderPipeline = null
-        vertexBuffer = null
-        uploadedVertexBuffer = null
-        gpuSurface = null
-        gpuContext = null
-        ownsContext = true
+        renderPipeline    = null
+        fullPipeline      = null
+        gpuSurface        = null
+        gpuContext        = null
+        ownsContext       = true
         surfaceConfigured = false
-        lastScene = null
-        currentVertexCount = 0
+        lastScene         = null
+        lastUploadWidth   = 0
+        lastUploadHeight  = 0
     }
 
     override fun close() {
