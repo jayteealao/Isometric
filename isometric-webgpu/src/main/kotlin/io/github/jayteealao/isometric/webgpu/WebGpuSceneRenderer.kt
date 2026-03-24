@@ -3,11 +3,9 @@ package io.github.jayteealao.isometric.webgpu
 import android.util.Log
 import android.view.Surface
 import androidx.compose.runtime.State
-import androidx.webgpu.BackendType
 import androidx.webgpu.CompositeAlphaMode
 import androidx.webgpu.GPUBuffer
 import androidx.webgpu.GPUColor
-import androidx.webgpu.GPURequestAdapterOptions
 import androidx.webgpu.GPURenderPassColorAttachment
 import androidx.webgpu.GPURenderPassDescriptor
 import androidx.webgpu.GPUSurface
@@ -16,7 +14,6 @@ import androidx.webgpu.GPUSurfaceDescriptor
 import androidx.webgpu.GPUSurfaceSourceAndroidNativeWindow
 import androidx.webgpu.LoadOp
 import androidx.webgpu.PresentMode
-import androidx.webgpu.PowerPreference
 import androidx.webgpu.StoreOp
 import androidx.webgpu.SurfaceGetCurrentTextureStatus
 import androidx.webgpu.TextureFormat
@@ -26,7 +23,9 @@ import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuVertexBuffer
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 
@@ -49,6 +48,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     private var alphaMode: Int = CompositeAlphaMode.Auto
     private var currentWidth: Int = 1
     private var currentHeight: Int = 1
+    // H1: Track whether surface.configure() has completed successfully. cleanup() must not
+    // call unconfigure() on a surface that was never configured — doing so passes a
+    // native handle that Dawn never initialised, which causes a Scudo double-free (SIGABRT).
+    private var surfaceConfigured: Boolean = false
     private var lastScene: PreparedScene? = null
     private var currentVertexCount: Int = 0
 
@@ -71,33 +74,53 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 // F3: Reconfigure the surface if the viewport dimensions changed since
                 // the last configure call. This handles window/fold resize without
                 // waiting for AndroidExternalSurface to destroy and recreate.
+                // Reconfigure failures (e.g. getCapabilities on a degraded surface)
+                // break the loop instead of escaping to the Compose scope and crashing.
                 val ctxWidth = renderContextWidth.value
                 val ctxHeight = renderContextHeight.value
                 if (ctxWidth > 0 && ctxHeight > 0 &&
                     (ctxWidth != currentWidth || ctxHeight != currentHeight)) {
                     val ctx = gpuContext
                     if (ctx != null) {
-                        ctx.withGpu {
-                            gpuSurface?.unconfigure()
-                            configureSurface(ctxWidth, ctxHeight)
+                        try {
+                            ctx.withGpu {
+                                reconfigureSurface(ctxWidth, ctxHeight)
+                            }
+                            Log.d(TAG, "Surface reconfigured to ${currentWidth}x${currentHeight}")
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w(TAG, "renderLoop: surface reconfigure failed, stopping: ${e.message}")
+                            break
                         }
-                        Log.d(TAG, "Surface reconfigured to ${currentWidth}x${currentHeight}")
                     }
                 }
 
-                val scene = preparedScene.value
-                if (scene !== lastScene) {
-                    uploadScene(scene)
-                    lastScene = scene
+                // G3: uploadScene (queue.writeBuffer) and drawFrame (surface.present,
+                // checkHealthy) both propagate unrecoverable GPU errors as exceptions.
+                // Catch them together so cleanup() still runs and the render coroutine
+                // exits gracefully rather than crashing the Compose coroutine scope.
+                // CancellationException is always re-thrown — it means the caller
+                // cancelled the render loop intentionally (Activity exit, recompose).
+                try {
+                    val scene = preparedScene.value
+                    if (scene !== lastScene) {
+                        uploadScene(scene)
+                        lastScene = scene
+                    }
+                    drawFrame(androidSurface)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "renderLoop: GPU error, stopping render loop: ${e.message}")
+                    break
                 }
-
-                drawFrame(androidSurface)
-                // No explicit delay — PresentMode.Fifo provides vsync back-pressure:
-                // Dawn's surface.present() (via vkQueuePresentKHR) blocks the GPU thread
-                // until SurfaceFlinger consumes the buffer at the next vsync boundary.
-                // An additional delay() here would double-count the frame interval and cap
-                // a 120 Hz display at 60 fps. Frame rate hinting is handled via
-                // Surface.setFrameRate() in WebGpuRenderBackend to keep LTPO panels active.
+                // G2: Check cancellation after each frame. withContext(gpuDispatcher) inside
+                // drawFrame already yields the calling-dispatcher thread for the duration of
+                // the GPU work, so there is no need to re-queue via yield(). ensureActive()
+                // throws CancellationException immediately if the scope has been cancelled
+                // without the overhead of a full scheduler round-trip.
+                currentCoroutineContext().ensureActive()
             }
         } finally {
             cleanup()
@@ -133,23 +156,21 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             gpuSurface = surface
             Log.d(TAG, "Reusing compute GpuContext for render surface")
         } else {
-            var createdSurface: GPUSurface? = null
-            context = GpuContext.create { instance ->
-                createdSurface = instance.createSurface(
+            // G1: Use createForSurface() to guarantee the selected adapter is compatible
+            // with the render surface. The surface is created inside the factory so the
+            // GPUInstance is available when GPUSurface is constructed.
+            val (newContext, surface) = GpuContext.createForSurface { instance ->
+                instance.createSurface(
                     GPUSurfaceDescriptor(
                         label = "IsometricSurface",
                         surfaceSourceAndroidNativeWindow =
                             GPUSurfaceSourceAndroidNativeWindow(windowFromSurface(androidSurface))
                     )
                 )
-                GPURequestAdapterOptions(
-                    powerPreference = PowerPreference.HighPerformance,
-                    backendType = BackendType.Vulkan,
-                    compatibleSurface = createdSurface,
-                )
             }
+            context = newContext
             ownsContext = true
-            gpuSurface = checkNotNull(createdSurface)
+            gpuSurface = surface
         }
 
         gpuContext = context
@@ -173,33 +194,49 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         val surface = checkNotNull(gpuSurface)
 
         if (surfaceFormat == TextureFormat.Undefined) {
-            val capabilities = surface.getCapabilities(ctx.adapter)
+            // getCapabilities() can fail when the adapter was requested without
+            // compatibleSurface (e.g. when reusing the compute-only GpuContext via
+            // getContextIfReady()). Fall back to universally-supported safe defaults so
+            // the surface can still be configured for rendering.
+            try {
+                val capabilities = surface.getCapabilities(ctx.adapter)
 
-            require(capabilities.formats.isNotEmpty()) { "No supported surface formats returned" }
-            require((capabilities.usages and TextureUsage.RenderAttachment) != 0) {
-                "Surface does not support RenderAttachment usage"
-            }
+                require(capabilities.formats.isNotEmpty()) { "No supported surface formats returned" }
+                require((capabilities.usages and TextureUsage.RenderAttachment) != 0) {
+                    "Surface does not support RenderAttachment usage"
+                }
 
-            surfaceFormat = when {
-                capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
-                capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
-                else -> capabilities.formats.first()
-            }
-            presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
-                PresentMode.Fifo
-            } else {
-                capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
-            }
-            alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
-                CompositeAlphaMode.Auto
-            } else {
-                capabilities.alphaModes.firstOrNull() ?: CompositeAlphaMode.Auto
+                surfaceFormat = when {
+                    capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
+                    capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
+                    else -> capabilities.formats.first()
+                }
+                presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
+                    PresentMode.Fifo
+                } else {
+                    capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
+                }
+                alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
+                    CompositeAlphaMode.Auto
+                } else {
+                    capabilities.alphaModes.firstOrNull() ?: CompositeAlphaMode.Auto
+                }
+            } catch (e: Exception) {
+                // Shared-context case: the adapter has no surface compatibility contract.
+                // BGRA8Unorm + Fifo + Auto are universally supported on Android Vulkan.
+                Log.w(TAG, "getCapabilities failed — using safe defaults (${e.message})")
+                surfaceFormat = TextureFormat.BGRA8Unorm
+                presentMode = PresentMode.Fifo
+                alphaMode = CompositeAlphaMode.Auto
             }
         }
 
         currentWidth = width.coerceAtLeast(1)
         currentHeight = height.coerceAtLeast(1)
 
+        // H1: Reset before configure so any exception leaves surfaceConfigured = false,
+        // preventing cleanup() from calling unconfigure() on a half-initialised surface.
+        surfaceConfigured = false
         surface.configure(
             GPUSurfaceConfiguration(
                 device = ctx.device,
@@ -211,6 +248,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 presentMode = presentMode,
             )
         )
+        surfaceConfigured = true
     }
 
     private suspend fun uploadScene(scene: PreparedScene?) {
@@ -236,6 +274,8 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         val pipeline = checkNotNull(renderPipeline)
 
         ctx.withGpu {
+            // G3: checkHealthy() rethrows any stored device-lost or uncaptured-error
+            // failure. Let it propagate — renderLoop() catches and breaks.
             ctx.checkHealthy()
 
             val surfaceTexture = surface.getCurrentTexture()
@@ -270,6 +310,11 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     ctx.queue.submit(arrayOf(commandBuffer))
                     commandBuffer.close()
                     encoder.close()
+
+                    // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
+                    // the Vulkan surface is invalidated before the render loop is cancelled;
+                    // present() then fires the device-lost callback synchronously and throws
+                    // IllegalStateException. Let it propagate — renderLoop() catches and breaks.
                     surface.present()
 
                     textureView.close()
@@ -290,15 +335,20 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         }
     }
 
-    private suspend fun reconfigureSurface() {
+    // H1: width/height default to the cached values so callers that don't need a resize
+    // (e.g. Outdated/SuccessSuboptimal from drawFrame) can use the no-arg form, while the
+    // renderLoop resize path passes the new dimensions without duplicating the guard logic.
+    private suspend fun reconfigureSurface(width: Int = currentWidth, height: Int = currentHeight) {
         val surface = gpuSurface ?: return
-        surface.unconfigure()
-        configureSurface(currentWidth, currentHeight)
+        // H1: Only unconfigure if we successfully configured before.
+        if (surfaceConfigured) surface.unconfigure()
+        configureSurface(width, height)
     }
 
     private suspend fun recreateSurface(androidSurface: Surface) {
         val ctx = checkNotNull(gpuContext)
-        gpuSurface?.unconfigure()
+        // H1: Only unconfigure if we successfully configured before.
+        if (surfaceConfigured) gpuSurface?.unconfigure()
         gpuSurface?.close()
         gpuSurface = ctx.instance.createSurface(
             GPUSurfaceDescriptor(
@@ -309,6 +359,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         )
         // G2: reset so configureSurface() re-queries capabilities for the new surface object.
         surfaceFormat = TextureFormat.Undefined
+        // Let exceptions propagate — if the ANativeWindow is already gone (Activity teardown,
+        // device reset) configureSurface() will throw. The exception propagates through
+        // drawFrame() to renderLoop()'s inner catch, which breaks the loop cleanly instead
+        // of spinning recreateSurface() every frame while the window is permanently gone.
         configureSurface(currentWidth, currentHeight)
     }
 
@@ -326,13 +380,27 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         if (ctx != null) {
             try {
                 runBlocking(ctx.gpuDispatcher) {
-                    gpuSurface?.unconfigure()
+                    // H1: Do NOT call gpuSurface?.unconfigure() here. cleanup() is called
+                    // during Activity teardown, at which point the ANativeWindow / VkSurface
+                    // backing the GPUSurface may already be destroyed by SurfaceFlinger.
+                    // Calling unconfigure() on a surface whose Vulkan swap chain is gone causes
+                    // a Scudo double-free (SIGABRT) inside libwebgpu_c_bundled.so.
+                    // unconfigure() is only needed before *reconfiguring* the same surface
+                    // (see reconfigureSurface / recreateSurface — both called while the window
+                    // is still alive). On teardown, close() alone releases the Dawn handle via
+                    // wgpuSurfaceRelease, which correctly decrements the refcount and frees
+                    // native resources without touching the already-destroyed VkSurface.
                     renderPipeline?.close()
                     vertexBuffer?.close()
                     gpuSurface?.close()
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "cleanup: GPU teardown skipped — context already destroyed", e)
+                // Best-effort JNI handle release even when the GPU thread is gone.
+                // Each close() is guarded individually — one failure must not block the others.
+                try { gpuSurface?.close() } catch (_: Exception) {}
+                try { renderPipeline?.close() } catch (_: Exception) {}
+                try { vertexBuffer?.close() } catch (_: Exception) {}
             }
             // Only destroy if we own the context. When shared with WebGpuComputeBackend,
             // the compute backend owns the lifecycle and will destroy it.
@@ -346,6 +414,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         gpuSurface = null
         gpuContext = null
         ownsContext = true
+        surfaceConfigured = false
         lastScene = null
         currentVertexCount = 0
     }
