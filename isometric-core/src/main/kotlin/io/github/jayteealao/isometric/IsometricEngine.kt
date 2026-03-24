@@ -99,8 +99,23 @@ class IsometricEngine @JvmOverloads constructor(
     private val sceneGraph = SceneGraph()
     private var projection = IsometricProjection(angle, scale, colorDifference, lightColor)
 
+    /**
+     * Current projection and lighting parameters for this engine instance.
+     *
+     * Updated atomically alongside [projectionVersion] whenever [angle] or [scale] changes.
+     * GPU backends should re-upload their uniform buffer whenever [projectionVersion] ticks.
+     *
+     * @see ProjectionParams
+     */
+    @Volatile
+    var projectionParams: ProjectionParams = projection.toProjectionParams(colorDifference, lightColor)
+        private set
+
     private fun rebuildProjection() {
         projection = IsometricProjection(this.angle, this.scale, colorDifference, lightColor)
+        // Read matrix coefficients from the newly built projection rather than recomputing
+        // cos/sin — the values are already stored in IsometricProjection.transformation.
+        projectionParams = projection.toProjectionParams(colorDifference, lightColor)
         projectionVersion++
     }
 

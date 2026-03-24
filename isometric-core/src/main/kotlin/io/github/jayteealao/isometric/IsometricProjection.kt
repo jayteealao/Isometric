@@ -110,6 +110,23 @@ internal class IsometricProjection(
     }
 
     /**
+     * Extract the projection matrix coefficients and lighting config as a [ProjectionParams]
+     * snapshot, reading directly from the already-computed [transformation] array.
+     *
+     * Avoids recomputing `cos`/`sin` in the caller — the matrix was computed at construction.
+     */
+    internal fun toProjectionParams(colorDifference: Double, lightColor: IsoColor): ProjectionParams =
+        ProjectionParams(
+            t00 = transformation[0][0],
+            t01 = transformation[0][1],
+            t10 = transformation[1][0],
+            t11 = transformation[1][1],
+            scale = scale,
+            colorDifference = colorDifference,
+            lightColor = lightColor,
+        )
+
+    /**
      * Check if any point in the flat packed array is within the drawing bounds.
      */
     fun itemInDrawingBounds(pts: DoubleArray, width: Int, height: Int): Boolean {
