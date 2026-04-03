@@ -1,7 +1,7 @@
 package io.github.jayteealao.isometric.webgpu.shader
 
 /**
- * WGSL compute shader for the fused Transform + Cull + Light + Compact pass.
+ * WGSL compute shader for the fused Transform + Cull + Light pass.
  *
  * One GPU thread per face. Each invocation:
  * 1. Projects all 3D vertices to 2D screen space via the isometric projection matrix.
@@ -9,12 +9,25 @@ package io.github.jayteealao.isometric.webgpu.shader
  * 3. Frustum culls: discards faces whose AABB lies entirely outside the viewport.
  * 4. Computes a depth sort key (`x + y − 2z` averaged over 3D vertices).
  * 5. Computes diffuse lighting using the pre-computed face normal from [FaceData].
- * 6. Writes the result to a compacted output array via [atomicAdd] on `visibleCount`.
+ * 6. **Always** writes the result to `transformed[i]` (thread's own index) with
+ *    `visible = 1u` if the face passed culling, `visible = 0u` otherwise.
+ *
+ * ## Why no atomicAdd compaction?
+ *
+ * The original design used `let slot = atomicAdd(&visibleCount, 1u); transformed[slot] = result`
+ * to compact visible faces. This scatter write — combined with M5's scatter read via sort-key
+ * `originalIndex` — triggers an Adreno 750 GPU hang (TDR / `VK_ERROR_DEVICE_LOST`) because the
+ * Adreno driver does not correctly honour compute→compute memory barriers within a single
+ * `VkCommandBuffer` when both passes access the same buffer via non-sequential addresses.
+ *
+ * Writing to `transformed[i]` (each thread writes its own slot) is sequential and safe.
+ * The `visible` field replaces `_p3` so downstream passes can filter culled entries without
+ * an atomic counter. No struct size change — `TRANSFORMED_FACE_BYTES` remains 96.
  *
  * ## Struct layouts
  *
  * All structs must be kept in sync with their Kotlin counterparts:
- * - `FaceData` ← [SceneDataPacker] / [SceneDataLayout] (128 bytes, stride 128)
+ * - `FaceData` ← [SceneDataPacker] / [SceneDataLayout] (144 bytes, stride 144)
  * - `TransformedFace` ← [SceneDataLayout.TRANSFORMED_FACE_BYTES] (96 bytes, stride 96)
  * - `SceneUniforms` ← [GpuSceneUniforms] (96 bytes, 6 × vec4)
  *
@@ -44,7 +57,6 @@ package io.github.jayteealao.isometric.webgpu.shader
  * @group(0) @binding(0) var<storage, read>       scene        : array<FaceData>
  * @group(0) @binding(1) var<storage, read_write>  transformed  : array<TransformedFace>
  * @group(0) @binding(2) var<uniform>              uniforms     : SceneUniforms
- * @group(0) @binding(3) var<storage, read_write>  visibleCount : atomic<u32>
  * ```
  */
 internal object TransformCullLightShader {
@@ -61,39 +73,44 @@ internal object TransformCullLightShader {
 
     val WGSL: String = """
         // ── FaceData ──────────────────────────────────────────────────────────────
-        // 128 bytes per face.  Matches SceneDataPacker byte-for-byte.
+        // 144 bytes per face.  Matches SceneDataPacker byte-for-byte.
         //
         //  offset  size  field
         //    0-15   16   v0 (vec3<f32>) + _p0 (f32 pad)
         //   16-31   16   v1 + _p1
         //   32-47   16   v2 + _p2
-        //   48-63   16   v3 + vertexCount (u32 in v3's pad slot)
-        //   64-79   16   baseColor (vec4<f32>, RGBA in [0,1])
-        //   80-91   12   normal (vec3<f32>, pre-normalised)
-        //   92-95    4   textureIndex (u32; 0xFFFFFFFF = no texture)
-        //   96-99    4   faceIndex (u32)
-        //  100-127   28  padding (7 × u32)  → struct stride = 128
+        //   48-63   16   v3 + _p3
+        //   64-79   16   v4 + _p4
+        //   80-95   16   v5 + vertexCount (u32 in v5's pad slot)
+        //   96-111  16   baseColor (vec4<f32>, RGBA in [0,1])
+        //  112-123  12   normal (vec3<f32>, pre-normalised)
+        //  124-127   4   textureIndex (u32; 0xFFFFFFFF = no texture)
+        //  128-131   4   faceIndex (u32)
+        //  132-143  12   padding (3 × u32)  → struct stride = 144
         struct FaceData {
             v0: vec3<f32>,  _p0: f32,
             v1: vec3<f32>,  _p1: f32,
             v2: vec3<f32>,  _p2: f32,
-            v3: vec3<f32>,  vertexCount: u32,
+            v3: vec3<f32>,  _p3: f32,
+            v4: vec3<f32>,  _p4: f32,
+            v5: vec3<f32>,  vertexCount: u32,
             baseColor:   vec4<f32>,
             normal:      vec3<f32>,
             textureIndex: u32,
             faceIndex:   u32,
-            _f0: u32, _f1: u32, _f2: u32, _f3: u32, _f4: u32, _f5: u32, _f6: u32,
+            _f0: u32, _f1: u32, _f2: u32,
         }
 
         // ── TransformedFace ───────────────────────────────────────────────────────
         // 96 bytes per face.  Matches SceneDataLayout.TRANSFORMED_FACE_BYTES.
         //
         //  offset  size  field
-        //    0-47   48   s0–s5 (6 × vec2<f32>; only s0–s3 populated for 4-vertex faces)
+        //    0-47   48   s0–s5 (6 × vec2<f32>)
         //   48-63   16   vertexCount + _p0–_p2 (4 × u32)
         //                └─ _p0–_p2 are explicit padding so litColor lands at 64 (16-align)
         //   64-79   16   litColor (vec4<f32>, RGBA in [0,1])
-        //   80-95   16   depthKey (f32) + faceIndex (u32) + _p3–_p4 (2 × u32)
+        //   80-95   16   depthKey (f32) + faceIndex (u32) + visible (u32) + _p4 (u32)
+        //                └─ visible: 1 = passed cull tests, 0 = back-faced or frustum-culled
         struct TransformedFace {
             s0: vec2<f32>,
             s1: vec2<f32>,
@@ -108,7 +125,7 @@ internal object TransformCullLightShader {
             litColor: vec4<f32>,
             depthKey:  f32,
             faceIndex: u32,
-            _p3: u32,
+            visible:   u32,
             _p4: u32,
         }
 
@@ -130,10 +147,9 @@ internal object TransformCullLightShader {
             viewport:        vec4<u32>,
         }
 
-        @group(0) @binding(0) var<storage, read>       scene:        array<FaceData>;
-        @group(0) @binding(1) var<storage, read_write>  transformed:  array<TransformedFace>;
-        @group(0) @binding(2) var<uniform>              uniforms:     SceneUniforms;
-        @group(0) @binding(3) var<storage, read_write>  visibleCount: atomic<u32>;
+        @group(0) @binding(0) var<storage, read>       scene:       array<FaceData>;
+        @group(0) @binding(1) var<storage, read_write>  transformed: array<TransformedFace>;
+        @group(0) @binding(2) var<uniform>              uniforms:    SceneUniforms;
 
         // Isometric 3D→2D projection.  Matches IsometricProjection.translatePointInto:
         //   screenX = originX + x * t00 + y * t10
@@ -163,17 +179,19 @@ internal object TransformCullLightShader {
             let s2 = projectPoint(face.v2);
             // v3 is only valid when vc >= 4; select avoids projecting a zero-vector
             let s3 = select(vec2<f32>(0.0), projectPoint(face.v3), vc >= 4u);
+            let s4 = select(vec2<f32>(0.0), projectPoint(face.v4), vc >= 5u);
+            let s5 = select(vec2<f32>(0.0), projectPoint(face.v5), vc >= 6u);
 
             // ── 2. Back-face cull ─────────────────────────────────────────────
             // Signed area of the first triangle (s0, s1, s2) in screen space.
-            // Matches IsometricProjection.cullPath: area > 0 → back-facing → discard.
+            // Matches IsometricProjection.cullPath: area > 0 → back-facing → cull.
             let area = s0.x * s1.y + s1.x * s2.y + s2.x * s0.y
                      - s1.x * s0.y - s2.x * s1.y - s0.x * s2.y;
-            if (area > 0.0) { return; }
+            let backFaced = area > 0.0;
 
             // ── 3. Frustum cull (AABB vs viewport) ───────────────────────────
             // Matches IsometricProjection.itemInDrawingBounds: any vertex in bounds
-            // → keep.  Inverted here: if AABB entirely outside → discard.
+            // → keep.  Inverted here: if AABB entirely outside → cull.
             let vw = f32(uniforms.viewport.x);
             let vh = f32(uniforms.viewport.y);
 
@@ -185,7 +203,17 @@ internal object TransformCullLightShader {
                 minX = min(minX, s3.x); maxX = max(maxX, s3.x);
                 minY = min(minY, s3.y); maxY = max(maxY, s3.y);
             }
-            if (maxX < 0.0 || minX > vw || maxY < 0.0 || minY > vh) { return; }
+            if (vc >= 5u) {
+                minX = min(minX, s4.x); maxX = max(maxX, s4.x);
+                minY = min(minY, s4.y); maxY = max(maxY, s4.y);
+            }
+            if (vc >= 6u) {
+                minX = min(minX, s5.x); maxX = max(maxX, s5.x);
+                minY = min(minY, s5.y); maxY = max(maxY, s5.y);
+            }
+            let frustumCulled = maxX < 0.0 || minX > vw || maxY < 0.0 || minY > vh;
+
+            let culled = backFaced || frustumCulled;
 
             // ── 4. Depth sort key ─────────────────────────────────────────────
             // Centroid of (x + y − 2z) over all 3D vertices.
@@ -194,7 +222,9 @@ internal object TransformCullLightShader {
             let d1 = face.v1.x + face.v1.y - 2.0 * face.v1.z;
             let d2 = face.v2.x + face.v2.y - 2.0 * face.v2.z;
             let d3 = select(0.0, face.v3.x + face.v3.y - 2.0 * face.v3.z, vc >= 4u);
-            let depthKey = (d0 + d1 + d2 + d3) / f32(vc);
+            let d4 = select(0.0, face.v4.x + face.v4.y - 2.0 * face.v4.z, vc >= 5u);
+            let d5 = select(0.0, face.v5.x + face.v5.y - 2.0 * face.v5.z, vc >= 6u);
+            let depthKey = (d0 + d1 + d2 + d3 + d4 + d5) / f32(vc);
 
             // ── 5. Diffuse lighting ───────────────────────────────────────────
             // Normal is pre-computed and normalised by SceneDataPacker — no GPU
@@ -208,28 +238,27 @@ internal object TransformCullLightShader {
                                    vec3<f32>(0.0), vec3<f32>(1.0));
             let litColor   = vec4<f32>(litRgb, face.baseColor.a);
 
-            // ── 6. Atomic compaction ──────────────────────────────────────────
-            // Surviving faces are written contiguously from index 0.
-            // Slot is the face's position in the compacted output array.
-            let slot = atomicAdd(&visibleCount, 1u);
-
+            // ── 6. Sequential write ───────────────────────────────────────────
+            // Always write to transformed[i] (this thread's own slot) to avoid
+            // scatter writes that trigger the Adreno compute→compute barrier bug.
+            // The visible flag lets downstream passes filter culled entries.
             var result: TransformedFace;
-            result.s0         = s0;
-            result.s1         = s1;
-            result.s2         = s2;
-            result.s3         = s3;
-            result.s4         = vec2<f32>(0.0);
-            result.s5         = vec2<f32>(0.0);
+            result.s0          = s0;
+            result.s1          = s1;
+            result.s2          = s2;
+            result.s3          = s3;
+            result.s4          = s4;
+            result.s5          = s5;
             result.vertexCount = vc;
-            result._p0        = 0u;
-            result._p1        = 0u;
-            result._p2        = 0u;
-            result.litColor   = litColor;
-            result.depthKey   = depthKey;
-            result.faceIndex  = face.faceIndex;
-            result._p3        = 0u;
-            result._p4        = 0u;
-            transformed[slot] = result;
+            result._p0         = 0u;
+            result._p1         = 0u;
+            result._p2         = 0u;
+            result.litColor    = litColor;
+            result.depthKey    = depthKey;
+            result.faceIndex   = face.faceIndex;
+            result.visible     = select(0u, 1u, !culled);
+            result._p4         = 0u;
+            transformed[i]     = result;
         }
     """.trimIndent()
 }

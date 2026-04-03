@@ -34,10 +34,14 @@ import kotlin.math.ceil
  * face into a 16-byte [SortKey] tuple consumable by [GpuBitonicSort]:
  *
  * ```
- * sortKeys[i] = SortKey(depth = transformed[i].depthKey, originalIndex = i)
+ * if (i < faceCount && transformed[i].visible != 0u) {
+ *     sortKeys[i] = SortKey(depth = transformed[i].depthKey, originalIndex = i)
+ * } else {
+ *     sortKeys[i] = sentinel   // sorts to end, skipped by M5
+ * }
  * ```
  *
- * Invisible padding entries (`i ≥ visibleCount`) receive sentinel values
+ * Culled, out-of-range, and padding entries receive sentinel values
  * (`Float.NEGATIVE_INFINITY`, `0xFFFFFFFF`) so they sort to the end of the
  * descending-depth bitonic sort and are skipped by the M5 triangulate-emit pass.
  *
@@ -50,7 +54,7 @@ import kotlin.math.ceil
  * sort.ensurePipeline()    // must come first — provides sort.primaryBuffer
  * sort.ensureBuffers(paddedCount)
  * packer.ensurePipeline()
- * packer.ensureBuffers(paddedCount, transformedBuf, visibleCountBuf, sort.primaryBuffer)
+ * packer.ensureBuffers(paddedCount, faceCount, transformedBuf, sort.primaryBuffer)
  *
  * // Per frame (inside a single command encoder):
  * packer.dispatch(encoder, paddedCount)   // pack into sort.primaryBuffer
@@ -61,10 +65,9 @@ import kotlin.math.ceil
  * ## Bind group layout
  *
  * ```wgsl
- * @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>
- * @group(0) @binding(1) var<storage, read_write>  sortKeys:     array<SortKey>
- * @group(0) @binding(2) var<storage, read>        visibleCount: array<u32>
- * @group(0) @binding(3) var<uniform>              params:       PackParams
+ * @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>
+ * @group(0) @binding(1) var<storage, read_write>  sortKeys:    array<SortKey>
+ * @group(0) @binding(2) var<uniform>              params:      PackParams
  * ```
  *
  * ## Lifetime
@@ -101,8 +104,8 @@ internal class GpuSortKeyPacker(
 
     /** Last inputs used to build the bind group — detected changes trigger a rebuild. */
     private var lastPaddedCount: Int = 0
+    private var lastFaceCount: Int = 0
     private var lastTransformedBuffer: GPUBuffer? = null
-    private var lastVisibleCountBuffer: GPUBuffer? = null
     private var lastSortKeyOutputBuffer: GPUBuffer? = null
 
     // ── Pipeline init ────────────────────────────────────────────────────────
@@ -137,15 +140,9 @@ internal class GpuSortKeyPacker(
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.Storage),
                     ),
-                    // binding 2 — visibleCount u32 (read-only; 4-byte storage buffer)
+                    // binding 2 — PackParams uniform (paddedCount, faceCount)
                     GPUBindGroupLayoutEntry(
                         binding = 2,
-                        visibility = ShaderStage.Compute,
-                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
-                    ),
-                    // binding 3 — PackParams uniform (paddedCount)
-                    GPUBindGroupLayoutEntry(
-                        binding = 3,
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.Uniform),
                     ),
@@ -173,41 +170,44 @@ internal class GpuSortKeyPacker(
     // ── Buffer management ────────────────────────────────────────────────────
 
     /**
-     * Ensure the bind group references the current buffers and [paddedCount].
+     * Ensure the bind group references the current buffers, [paddedCount], and [faceCount].
      *
      * Rebuilds the params uniform buffer and bind group whenever any of the following
-     * change: [paddedCount], [transformedBuffer], [visibleCountBuffer], or
-     * [sortKeyOutputBuffer]. No-op if nothing changed.
+     * change: [paddedCount], [faceCount], [transformedBuffer], or [sortKeyOutputBuffer].
+     * No-op if nothing changed.
      *
      * Must be called after [GpuBitonicSort.ensureBuffers] (which allocates
      * [sortKeyOutputBuffer] = [GpuBitonicSort.primaryBuffer]).
      *
-     * @param paddedCount         Power-of-2 sort array size (`nextPowerOfTwo(sceneCapacity)`).
+     * @param paddedCount         Power-of-2 sort array size (`nextPowerOfTwo(faceCount)`).
+     * @param faceCount           Actual scene face count (bounds-check for `transformed[]`).
      * @param transformedBuffer   M3 `TransformedFace` output buffer.
-     * @param visibleCountBuffer  M3 4-byte `atomic<u32>` counter (read here as plain `u32`).
      * @param sortKeyOutputBuffer [GpuBitonicSort.primaryBuffer] — receives the packed keys.
      */
     fun ensureBuffers(
         paddedCount: Int,
+        faceCount: Int,
         transformedBuffer: GPUBuffer,
-        visibleCountBuffer: GPUBuffer,
         sortKeyOutputBuffer: GPUBuffer,
     ) {
         val same = paddedCount == lastPaddedCount &&
+            faceCount            == lastFaceCount &&
             transformedBuffer    === lastTransformedBuffer &&
-            visibleCountBuffer   === lastVisibleCountBuffer &&
             sortKeyOutputBuffer  === lastSortKeyOutputBuffer
         if (same) return
 
         // Release stale resources before allocating new ones.
+        // Note: close() only (no destroy()) — the previous frame's GPU commands may still
+        // reference these buffers. Dawn's internal ref-counting keeps the underlying GPU
+        // memory alive until all pending commands complete; destroy() would mark the buffer
+        // as "dead" to Dawn's validation layer while it is still in-flight.
         bindGroup?.close()
         bindGroup = null
-        paramsBuffer?.destroy()
         paramsBuffer?.close()
         paramsBuffer = null
 
         // Params buffer: 16 bytes, mapped at creation — zero-copy, no CopyDst needed.
-        // Content: [paddedCount, 0, 0, 0] — only the first u32 is used by the shader.
+        // Content: [paddedCount, faceCount, 0, 0].
         paramsBuffer = ctx.device.createBuffer(
             GPUBufferDescriptor(
                 usage = BufferUsage.Uniform,
@@ -218,7 +218,7 @@ internal class GpuSortKeyPacker(
             buf.setLabel("IsometricPackSortParams")
             val mapped = buf.getMappedRange(0L, PARAMS_BUFFER_SIZE).order(ByteOrder.nativeOrder())
             mapped.putInt(paddedCount)  // paddedCount
-            mapped.putInt(0)            // pad
+            mapped.putInt(faceCount)    // faceCount
             mapped.putInt(0)            // pad
             mapped.putInt(0)            // pad
             buf.unmap()
@@ -232,18 +232,17 @@ internal class GpuSortKeyPacker(
                 entries = arrayOf(
                     GPUBindGroupEntry(binding = 0, buffer = transformedBuffer),
                     GPUBindGroupEntry(binding = 1, buffer = sortKeyOutputBuffer),
-                    GPUBindGroupEntry(binding = 2, buffer = visibleCountBuffer),
-                    GPUBindGroupEntry(binding = 3, buffer = paramsBuffer!!),
+                    GPUBindGroupEntry(binding = 2, buffer = paramsBuffer!!),
                 )
             )
         )
 
-        lastPaddedCount           = paddedCount
-        lastTransformedBuffer     = transformedBuffer
-        lastVisibleCountBuffer    = visibleCountBuffer
-        lastSortKeyOutputBuffer   = sortKeyOutputBuffer
+        lastPaddedCount         = paddedCount
+        lastFaceCount           = faceCount
+        lastTransformedBuffer   = transformedBuffer
+        lastSortKeyOutputBuffer = sortKeyOutputBuffer
 
-        Log.d(TAG, "Buffers ready: paddedCount=$paddedCount")
+        Log.d(TAG, "Buffers ready: paddedCount=$paddedCount faceCount=$faceCount")
     }
 
     // ── Per-frame dispatch ───────────────────────────────────────────────────
@@ -284,7 +283,6 @@ internal class GpuSortKeyPacker(
         // Per-capacity resources
         bindGroup?.close()
         bindGroup = null
-        paramsBuffer?.destroy()
         paramsBuffer?.close()
         paramsBuffer = null
 
@@ -299,8 +297,8 @@ internal class GpuSortKeyPacker(
         shaderModule = null
 
         lastTransformedBuffer   = null
-        lastVisibleCountBuffer  = null
         lastSortKeyOutputBuffer = null
         lastPaddedCount         = 0
+        lastFaceCount           = 0
     }
 }

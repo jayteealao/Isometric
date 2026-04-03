@@ -167,7 +167,6 @@ internal class GpuSceneUniforms(
     }
 
     override fun close() {
-        gpuBuffer?.destroy()
         gpuBuffer?.close()
         gpuBuffer = null
     }

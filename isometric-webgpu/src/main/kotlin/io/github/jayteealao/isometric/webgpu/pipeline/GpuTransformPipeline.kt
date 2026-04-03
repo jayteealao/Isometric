@@ -24,17 +24,14 @@ import androidx.webgpu.GPUShaderSourceWGSL
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.shader.TransformCullLightShader
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlin.math.ceil
 
 /**
- * GPU compute pipeline for the fused Transform + Cull + Light + Compact pass.
+ * GPU compute pipeline for the fused Transform + Cull + Light pass.
  *
  * Manages the lifecycle of:
  * - The WGSL compute pipeline (created once from [TransformCullLightShader])
  * - The `TransformedFace` output storage buffer (recreated when scene capacity grows)
- * - The `visibleCount` atomic counter buffer (created once; 4 bytes)
  * - The bind group (rebuilt whenever any referenced buffer changes)
  *
  * ## Usage
@@ -45,17 +42,15 @@ import kotlin.math.ceil
  * // Inside ctx.withGpu { ... } after scene + uniforms buffers are ready:
  * pipeline.ensurePipeline()
  * pipeline.ensureBuffers(sceneCapacity, sceneBuffer, uniformsBuffer)
- * pipeline.resetVisibleCount()           // zero the atomic counter
  * pipeline.dispatch(encoder, faceCount)  // encode the compute pass
  * ```
  *
  * ## Bind group layout
  *
  * ```wgsl
- * @group(0) @binding(0) var<storage, read>       scene:        array<FaceData>
- * @group(0) @binding(1) var<storage, read_write>  transformed:  array<TransformedFace>
- * @group(0) @binding(2) var<uniform>              uniforms:     SceneUniforms
- * @group(0) @binding(3) var<storage, read_write>  visibleCount: atomic<u32>
+ * @group(0) @binding(0) var<storage, read>       scene:       array<FaceData>
+ * @group(0) @binding(1) var<storage, read_write>  transformed: array<TransformedFace>
+ * @group(0) @binding(2) var<uniform>              uniforms:    SceneUniforms
  * ```
  *
  * ## Lifetime
@@ -70,9 +65,6 @@ internal class GpuTransformPipeline(
 
     companion object {
         private const val TAG = "GpuTransformPipeline"
-
-        /** Size of the `visibleCount` atomic buffer in bytes (single `u32`). */
-        private const val VISIBLE_COUNT_BYTES = 4L
     }
 
     // ── Pipeline objects (created once) ─────────────────────────────────────
@@ -82,38 +74,13 @@ internal class GpuTransformPipeline(
     private var pipelineLayout: GPUPipelineLayout? = null
     private var computePipeline: GPUComputePipeline? = null
 
-    // ── Atomic counter (created once; always 4 bytes) ────────────────────────
-
-    /**
-     * GPU buffer holding the `atomic<u32>` visible-face counter.
-     *
-     * Written by the transform shader via `atomicAdd`. Read by downstream
-     * passes (M4 sort key packer) as a plain `u32`.
-     *
-     * Usage: `Storage | CopyDst`.
-     * - `Storage` for shader read_write access.
-     * - `CopyDst` for `queue.writeBuffer` zeroing before each dispatch.
-     */
-    private var visibleCountBuf: GPUBuffer? = ctx.device.createBuffer(
-        GPUBufferDescriptor(
-            usage = BufferUsage.Storage or BufferUsage.CopyDst,
-            size = VISIBLE_COUNT_BYTES,
-        )
-    ).also {
-        it.setLabel("IsometricVisibleCount")
-        Log.d(TAG, "Allocated visibleCount buffer: $VISIBLE_COUNT_BYTES bytes")
-    }
-
-    /** The `visibleCount` buffer. Valid until [close] is called. */
-    val visibleCountBuffer: GPUBuffer
-        get() = checkNotNull(visibleCountBuf) { "GpuTransformPipeline already closed" }
-
     // ── Per-capacity resources (recreated when scene buffer grows) ───────────
 
     /**
      * Output `TransformedFace` storage buffer.
      *
-     * Written by the transform shader via atomic compaction.
+     * Written sequentially by the transform shader: `transformed[i] = result`.
+     * Each entry's `visible` field indicates whether the face passed cull tests.
      * Read by the M4 sort-key packer as `var<storage, read>`.
      *
      * Sized to [cachedCapacity] × [SceneDataLayout.TRANSFORMED_FACE_BYTES].
@@ -136,12 +103,6 @@ internal class GpuTransformPipeline(
         get() = checkNotNull(transformedBuf) {
             "GpuTransformPipeline: transformedBuffer not allocated — call ensureBuffers first"
         }
-
-    // ── CPU staging ──────────────────────────────────────────────────────────
-
-    /** Reusable 4-byte zero buffer for [resetVisibleCount]. */
-    private val zeroBuffer: ByteBuffer =
-        ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder())
 
     // ── Pipeline init ────────────────────────────────────────────────────────
 
@@ -183,12 +144,6 @@ internal class GpuTransformPipeline(
                         binding = 2,
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.Uniform),
-                    ),
-                    // binding 3 — visibleCount atomic<u32> (read-write)
-                    GPUBindGroupLayoutEntry(
-                        binding = 3,
-                        visibility = ShaderStage.Compute,
-                        buffer = GPUBufferBindingLayout(type = BufferBindingType.Storage),
                     ),
                 )
             )
@@ -239,7 +194,11 @@ internal class GpuTransformPipeline(
         if (sameCapacity && sameScene && sameUniforms) return
 
         // Release old resources before allocating new ones.
-        transformedBuf?.destroy()
+        // Note: close() only (no destroy()) — the previous frame's GPU commands may still
+        // reference these buffers. Dawn's internal ref-counting keeps the underlying GPU
+        // memory alive until all pending commands complete; destroy() would incorrectly mark
+        // the buffer as "dead" to Dawn's validation layer while it is still in-flight.
+        transformedBuf?.close()
         transformedBuf = null
         bindGroup?.close()
         bindGroup = null
@@ -261,7 +220,6 @@ internal class GpuTransformPipeline(
                     GPUBindGroupEntry(binding = 0, buffer = sceneBuffer),
                     GPUBindGroupEntry(binding = 1, buffer = transformedBuf!!),
                     GPUBindGroupEntry(binding = 2, buffer = uniformsBuffer),
-                    GPUBindGroupEntry(binding = 3, buffer = visibleCountBuf!!),
                 )
             )
         )
@@ -273,21 +231,7 @@ internal class GpuTransformPipeline(
         Log.d(TAG, "Buffers ready: capacity=$capacity, transformedSize=$transformedSize bytes")
     }
 
-    // ── Per-frame operations ─────────────────────────────────────────────────
-
-    /**
-     * Zero the [visibleCountBuffer] via `queue.writeBuffer`.
-     *
-     * Must be called before [dispatch] on every frame to reset the atomic counter
-     * to 0. `queue.writeBuffer` is ordered before any subsequent `queue.submit` on
-     * the same queue, so calling this before encoding the command buffer is safe.
-     *
-     * Must be called from the GPU thread (inside `ctx.withGpu { ... }`).
-     */
-    fun resetVisibleCount() {
-        zeroBuffer.rewind()
-        ctx.queue.writeBuffer(visibleCountBuf!!, 0L, zeroBuffer)
-    }
+    // ── Per-frame dispatch ───────────────────────────────────────────────────
 
     /**
      * Encode the transform + cull + light compute dispatch into [encoder].
@@ -296,14 +240,16 @@ internal class GpuTransformPipeline(
      * checks its thread index against `uniforms.viewport.z` (faceCount) so any
      * over-dispatch threads are harmless no-ops.
      *
+     * Each thread writes its result to `transformed[i]` (its own sequential slot)
+     * with `visible = 1u` if the face passed all cull tests, `visible = 0u` otherwise.
+     * No atomic counter is used — this is safe on Adreno and all other Vulkan drivers.
+     *
      * The compute pass encoder is closed immediately after [end] to release
      * the JNI wrapper (see `docs/internal/GPU_OBJECT_LIFETIME.md`).
      *
      * Preconditions:
      * - [ensurePipeline] has returned successfully.
      * - [ensureBuffers] has been called with the current scene buffer and capacity.
-     * - [resetVisibleCount] has been called on this frame (or the caller has zeroed
-     *   `visibleCountBuffer` by another means).
      * - [faceCount] matches the value uploaded to `uniforms.viewport.z` so the
      *   shader correctly bounds-checks its invocation index.
      *
@@ -334,14 +280,8 @@ internal class GpuTransformPipeline(
         // Per-capacity resources
         bindGroup?.close()
         bindGroup = null
-        transformedBuf?.destroy()
         transformedBuf?.close()
         transformedBuf = null
-
-        // Persistent atomic counter
-        visibleCountBuf?.destroy()
-        visibleCountBuf?.close()
-        visibleCountBuf = null
 
         // Pipeline objects
         computePipeline?.close()

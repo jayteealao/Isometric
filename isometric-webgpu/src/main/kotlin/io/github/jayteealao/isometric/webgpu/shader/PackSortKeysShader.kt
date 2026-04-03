@@ -5,19 +5,19 @@ package io.github.jayteealao.isometric.webgpu.shader
  * consumable by [GPUBitonicSortShader].
  *
  * One GPU thread per entry in the padded sort key array:
- * - Threads `i < visibleCount`: copy `transformed[i].depthKey` and use `i` as
- *   `originalIndex` (the compacted-buffer slot, used by M5 to fetch the face).
- * - Threads `visibleCount ≤ i < paddedCount`: write a sentinel
- *   (`Float.NEGATIVE_INFINITY`, `0xFFFFFFFF`) so padding entries sort to the
- *   end of the descending-depth sort and are skipped by M5.
+ * - Threads where `i < params.faceCount && transformed[i].visible != 0u`: copy
+ *   `transformed[i].depthKey` and use `i` as `originalIndex` (the slot index,
+ *   used by M5 to fetch the face from `transformed[originalIndex]`).
+ * - All other threads (culled, out-of-range, or padding): write a sentinel
+ *   (`Float.NEGATIVE_INFINITY`, `0xFFFFFFFF`) so they sort to the end of the
+ *   descending-depth bitonic sort and are skipped by M5.
  *
  * ## Bindings
  *
  * ```wgsl
- * @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>
- * @group(0) @binding(1) var<storage, read_write>  sortKeys:     array<SortKey>
- * @group(0) @binding(2) var<storage, read>        visibleCount: array<u32>
- * @group(0) @binding(3) var<uniform>              params:       PackParams
+ * @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>
+ * @group(0) @binding(1) var<storage, read_write>  sortKeys:    array<SortKey>
+ * @group(0) @binding(2) var<uniform>              params:      PackParams
  * ```
  *
  * ## Struct compatibility
@@ -44,7 +44,8 @@ internal object PackSortKeysShader {
         //   64-79   16   litColor (vec4<f32>)
         //   80-83    4   depthKey (f32)   ← extracted here
         //   84-87    4   faceIndex (u32)
-        //   88-95    8   _p3, _p4 (2 × u32)
+        //   88-91    4   visible (u32)    ← 1 = passed cull, 0 = culled
+        //   92-95    4   _p4 (u32)
         struct TransformedFace {
             s0: vec2<f32>,
             s1: vec2<f32>,
@@ -59,7 +60,7 @@ internal object PackSortKeysShader {
             litColor: vec4<f32>,
             depthKey:  f32,
             faceIndex: u32,
-            _p3: u32,
+            visible:   u32,
             _p4: u32,
         }
 
@@ -73,24 +74,25 @@ internal object PackSortKeysShader {
         }
 
         // ── PackParams ────────────────────────────────────────────────────────────
-        // paddedCount: the power-of-2 size of the sort key array (computed by Kotlin).
+        // paddedCount: power-of-2 sort array size.
+        // faceCount:   actual scene face count (bounds-check for transformed[]).
         struct PackParams {
             paddedCount: u32,
+            faceCount:   u32,
+            pad0:        u32,
+            pad1:        u32,
         }
 
-        @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>;
-        @group(0) @binding(1) var<storage, read_write>  sortKeys:     array<SortKey>;
-        // WGSL storage buffers cannot hold a raw scalar — wrap in array<u32> and
-        // read element [0] to access the single visibleCount value written by M3.
-        @group(0) @binding(2) var<storage, read>        visibleCount: array<u32>;
-        @group(0) @binding(3) var<uniform>              params:       PackParams;
+        @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>;
+        @group(0) @binding(1) var<storage, read_write>  sortKeys:    array<SortKey>;
+        @group(0) @binding(2) var<uniform>              params:      PackParams;
 
         @compute @workgroup_size(256)
         fn packSortKeys(@builtin(global_invocation_id) gid: vec3<u32>) {
             let i = gid.x;
             if (i >= params.paddedCount) { return; }
 
-            if (i < visibleCount[0]) {
+            if (i < params.faceCount && transformed[i].visible != 0u) {
                 // Real visible face: depth key from M3, slot index as originalIndex so
                 // M5 can fetch transformed[originalIndex] in back-to-front order.
                 sortKeys[i] = SortKey(transformed[i].depthKey, i, 0u, 0u);

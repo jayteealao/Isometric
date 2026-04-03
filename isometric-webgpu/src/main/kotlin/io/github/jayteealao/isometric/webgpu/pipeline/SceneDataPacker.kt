@@ -11,7 +11,7 @@ import kotlin.math.sqrt
  * These values must match the WGSL struct definitions in `transform_cull_light.wgsl` exactly.
  * Any change here requires a matching change to the shader.
  *
- * ## FaceData memory layout (128 bytes per face)
+ * ## FaceData memory layout (144 bytes per face)
  *
  * ```
  *  offset  size  field
@@ -22,18 +22,22 @@ import kotlin.math.sqrt
  *   32      12   v2.xyz
  *   44       4   _p2
  *   48      12   v3.xyz
- *   60       4   vertexCount (u32 — packed into v3's padding slot)
- *   64      16   baseColor   (vec4<f32>, RGBA in [0,1])
- *   80      12   normal      (vec3<f32>)
- *   92       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
- *   96       4   faceIndex   (u32)
- *  100      12   _padding    (vec3<u32>)
- * 112  →   128   (padded to 128 for 16-byte storage-buffer alignment)
+ *   60       4   _p3
+ *   64      12   v4.xyz
+ *   76       4   _p4
+ *   80      12   v5.xyz
+ *   92       4   vertexCount (u32 — packed into v5's padding slot)
+ *   96      16   baseColor   (vec4<f32>, RGBA in [0,1])
+ *  112      12   normal      (vec3<f32>)
+ *  124       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
+ *  128       4   faceIndex   (u32)
+ *  132      12   _padding    (vec3<u32>)
+ * 144  →   144   (already aligned for storage-buffer layout)
  * ```
  */
 internal object SceneDataLayout {
     /** Bytes per FaceData struct in the GPU scene-data storage buffer. */
-    const val FACE_DATA_BYTES = 128
+    const val FACE_DATA_BYTES = 144
 
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
     const val TRANSFORMED_FACE_BYTES = 96
@@ -91,11 +95,11 @@ internal object SceneDataPacker {
 
         for ((index, cmd) in commands.withIndex()) {
             val pts3d = cmd.originalPath.points
-            val n = pts3d.size.coerceAtMost(4)
+            val n = pts3d.size.coerceAtMost(6)
 
-            // v0–v3: vec3<f32> each, padded to 16 bytes (vec4 alignment).
-            // v3's padding slot is repurposed for vertexCount.
-            for (i in 0 until 4) {
+            // v0–v5: vec3<f32> each, padded to 16 bytes (vec4 alignment).
+            // v5's padding slot is repurposed for vertexCount.
+            for (i in 0 until 6) {
                 if (i < n) {
                     val pt = pts3d[i]
                     buffer.putFloat(pt.x.toFloat())
@@ -106,10 +110,10 @@ internal object SceneDataPacker {
                     buffer.putFloat(0f)
                     buffer.putFloat(0f)
                 }
-                if (i < 3) {
-                    buffer.putFloat(0f)    // _p0 / _p1 / _p2 — alignment padding
+                if (i < 5) {
+                    buffer.putFloat(0f)    // _p0…_p4 — alignment padding
                 } else {
-                    buffer.putInt(n)       // vertexCount packed into v3's padding slot
+                    buffer.putInt(n)       // vertexCount packed into v5's padding slot
                 }
             }
 

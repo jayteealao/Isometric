@@ -5,8 +5,10 @@ import androidx.webgpu.GPUBuffer
 import androidx.webgpu.GPUCommandEncoder
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
+import java.nio.ByteOrder
 
 /**
  * Orchestrates the full GPU compute pipeline for the M3→M4→M5 pass sequence.
@@ -55,6 +57,21 @@ internal class GpuFullPipeline(
 
     companion object {
         private const val TAG = "GpuFullPipeline"
+
+        /**
+         * Diagnostic: when true, skip M3 (transform) in [dispatchIndividualSubmits].
+         * Use with [DEBUG_SKIP_M5] to bisect which atomicAdd stage causes TDR.
+         * - Both true → only packer+sort run (confirmed stable)
+         * - Only M3 true → run packer+sort+M5 (tests if M5 atomicAdd is the cause)
+         * - Only M5 true → run M3+packer+sort (tests if M3 atomicAdd is the cause)
+         */
+        private const val DEBUG_SKIP_M3 = false
+
+        /**
+         * Diagnostic: when true, skip M5 (triangulate-emit + indirect-args) in
+         * [dispatchIndividualSubmits]. See [DEBUG_SKIP_M3].
+         */
+        private const val DEBUG_SKIP_M5 = false
     }
 
     // ── Sub-pipeline components ───────────────────────────────────────────────
@@ -65,6 +82,15 @@ internal class GpuFullPipeline(
     private val sort       = GpuBitonicSort(ctx)
     private val packer     = GpuSortKeyPacker(ctx)
     private val emit       = GpuTriangulateEmitPipeline(ctx)
+
+    // ── Reusable indirect-args staging buffer ─────────────────────────────────
+
+    /**
+     * Pre-allocated 16-byte CPU buffer for writing [GpuTriangulateEmitPipeline.indirectArgsBuffer].
+     * Layout: `{ vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }`.
+     */
+    private val indirectArgsStagingBuf =
+        java.nio.ByteBuffer.allocateDirect(16).order(ByteOrder.nativeOrder())
 
     // ── Per-frame dispatch state (cached from last upload) ────────────────────
 
@@ -149,8 +175,11 @@ internal class GpuFullPipeline(
         // Upload 3D geometry (uses RenderCommand.originalPath.points).
         sceneData.upload(scene.commands)
         val faceCount = sceneData.faceCount
+        if (faceCount == 0) {
+            clearScene()
+            return
+        }
         lastFaceCount = faceCount
-        if (faceCount == 0) return
 
         // Upload projection + lighting uniforms. queue.writeBuffer is ordered before
         // the next queue.submit so M3 sees the updated values in the same frame.
@@ -179,13 +208,12 @@ internal class GpuFullPipeline(
             uniformsBuffer = uniforms.buffer,
         )
         packer.ensureBuffers(
-            paddedCount        = paddedCount,
-            transformedBuffer  = transform.transformedBuffer,
-            visibleCountBuffer = transform.visibleCountBuffer,
+            paddedCount         = paddedCount,
+            faceCount           = faceCount,
+            transformedBuffer   = transform.transformedBuffer,
             sortKeyOutputBuffer = sort.primaryBuffer,
         )
         emit.ensureBuffers(
-            faceCapacity      = capacity,
             paddedCount       = paddedCount,
             viewportWidth     = viewportWidth,
             viewportHeight    = viewportHeight,
@@ -193,6 +221,37 @@ internal class GpuFullPipeline(
             sortedKeysBuffer  = sort.resultBuffer,
         )
 
+        // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
+        // With fixed-stride M5, the vertex count is always paddedCount × MAX_VERTICES_PER_FACE.
+        // queue.writeBuffer is ordered before the next queue.submit so the render pass sees
+        // the correct value even though the compute submit comes after this call.
+        val totalVertexCount = paddedCount * TriangulateEmitShader.MAX_VERTICES_PER_FACE
+        indirectArgsStagingBuf.rewind()
+        indirectArgsStagingBuf.putInt(totalVertexCount)
+        indirectArgsStagingBuf.putInt(1)   // instanceCount
+        indirectArgsStagingBuf.putInt(0)   // firstVertex
+        indirectArgsStagingBuf.putInt(0)   // firstInstance
+        indirectArgsStagingBuf.rewind()
+        ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
+    }
+
+    /**
+     * Reset draw-visible state so subsequent render passes cannot draw stale geometry.
+     *
+     * This is used when the scene becomes empty/null. We do not need to clear every backing
+     * GPU buffer; clearing indirect args and resetting the cached counts is sufficient to make
+     * both the compute dispatch and the render draw path inert.
+     */
+    fun clearScene() {
+        lastFaceCount = 0
+        lastPaddedCount = 0
+        indirectArgsStagingBuf.rewind()
+        indirectArgsStagingBuf.putInt(0)
+        indirectArgsStagingBuf.putInt(1)
+        indirectArgsStagingBuf.putInt(0)
+        indirectArgsStagingBuf.putInt(0)
+        indirectArgsStagingBuf.rewind()
+        ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
     }
 
     // ── Per-frame dispatch ────────────────────────────────────────────────────
@@ -205,8 +264,7 @@ internal class GpuFullPipeline(
      * 1. M3 — Transform + Cull + Light (`GpuTransformPipeline.dispatch`)
      * 2. M4a — Pack sort keys (`GpuSortKeyPacker.dispatch`)
      * 3. M4b — Bitonic sort (`GpuBitonicSort.dispatch`)
-     * 4. M5a — Triangulate + Emit (`GpuTriangulateEmitPipeline.dispatch`, sub-pass 1)
-     * 5. M5b — Write indirect args (`GpuTriangulateEmitPipeline.dispatch`, sub-pass 2)
+     * 4. M5 — Triangulate + Emit (`GpuTriangulateEmitPipeline.dispatch`; fixed-stride, no atomics)
      *
      * After the encoder is submitted, [vertexBuffer] and [indirectArgsBuffer] are ready
      * for use in the render pass.
@@ -219,11 +277,6 @@ internal class GpuFullPipeline(
         val faceCount = lastFaceCount
         require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
 
-        // Reset atomic counters before encoding. queue.writeBuffer is ordered before
-        // the subsequent queue.submit, ensuring M3 and M5 start with counters at zero.
-        transform.resetVisibleCount()
-        emit.resetVertexCursor()
-
         // M3: Transform + Cull + Light — one thread per face.
         transform.dispatch(encoder, faceCount)
 
@@ -233,8 +286,53 @@ internal class GpuFullPipeline(
         // M4b: Bitonic sort — all stages in one encoder.
         sort.dispatch(encoder)
 
-        // M5a + M5b: Triangulate+Emit + WriteIndirectArgs — two sub-passes.
+        // M5: Triangulate+Emit — fixed-stride, no atomicAdd, no separate indirect-args pass.
         emit.dispatch(encoder)
+    }
+
+    /**
+     * Diagnostic: submit each compute stage group as a separate [GPUQueue.submit] call.
+     *
+     * Submits in order:
+     * 1. M3 — Transform + Cull + Light (one submit)
+     * 2. M4a — Pack sort keys (one submit)
+     * 3. M4b — Bitonic sort stages, **one submit per stage** via [GpuBitonicSort.dispatchIndividually]
+     * 4. M5 — Triangulate+Emit (one submit; fixed-stride, no atomics)
+     *
+     * Dawn serialises submits on the same queue with Vulkan timeline semaphores, so each
+     * stage is guaranteed to see the writes from all prior stages. This bypasses the Adreno
+     * driver bug where compute→compute barriers inside a single VkCommandBuffer are broken.
+     *
+     * If this resolves the `VK_ERROR_DEVICE_LOST` TDR that [dispatch] triggers, the root
+     * cause is the Adreno compute-barrier bug (compute→compute within one command buffer).
+     *
+     * Must be called from the GPU thread (`ctx.withGpu { ... }`).
+     */
+    fun dispatchIndividualSubmits() {
+        val faceCount = lastFaceCount
+        require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
+
+
+        var submitIndex = 0
+        fun submitStage(label: String, block: (GPUCommandEncoder) -> Unit) {
+            val idx = ++submitIndex
+            Log.d(TAG, "dispatchIndividualSubmits: submit #$idx ($label) — before")
+            val enc = ctx.device.createCommandEncoder()
+            block(enc)
+            val buf = enc.finish()
+            ctx.queue.submit(arrayOf(buf))
+            buf.close()
+            enc.close()
+            Log.d(TAG, "dispatchIndividualSubmits: submit #$idx ($label) — after")
+        }
+
+        if (!DEBUG_SKIP_M3) submitStage("M3-transform") { transform.dispatch(it, faceCount) }
+        submitStage("M4a-packer")   { packer.dispatch(it, lastPaddedCount) }
+        Log.d(TAG, "dispatchIndividualSubmits: entering M4b sort (${sort.stageCount} stages)")
+        sort.dispatchIndividually()
+        Log.d(TAG, "dispatchIndividualSubmits: M4b sort done")
+        if (!DEBUG_SKIP_M5) submitStage("M5-emit")      { emit.dispatch(it) }
+        Log.d(TAG, "dispatchIndividualSubmits: all ${submitIndex + sort.stageCount} submits done")
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────

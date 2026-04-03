@@ -11,17 +11,35 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *
  * ## Algorithm
  *
- * 1. Each thread reads `sortedKeys[i]`. Sentinel entries (`originalIndex == 0xFFFFFFFF`)
- *    are skipped; they sort to the tail and carry no real face data.
- * 2. The thread fetches `transformed[originalIndex]` — the [TransformedFace] written
- *    by M3 with screen-space 2D coordinates (`s0`–`s5`) and pre-computed `litColor`.
- * 3. `atomicAdd(&vertexCursor, triCount * 3)` reserves a contiguous slice of the
- *    vertex buffer for this face's triangles. The slice is thread-private; no other
- *    thread writes to the same range.
+ * 1. Each thread reads `sortedKeys[i]`. Threads are assigned a **fixed stride** slot
+ *    in the vertex buffer: `base = i * MAX_VERTICES_PER_FACE`.
+ * 2. Sentinel entries (`originalIndex == 0xFFFFFFFF`) and culled faces write
+ *    [MAX_VERTICES_PER_FACE] = 12 degenerate (zero-area) vertices so the render pass
+ *    draws the full `paddedCount × MAX_VERTICES_PER_FACE` vertex range without gaps.
+ * 3. Visible entries fetch `transformed[originalIndex]`, fan-triangulate `triCount = vc−2`
+ *    triangles into the slot, and fill the remaining `12 − triCount×3` vertex positions
+ *    with degenerate vertices.
  * 4. Fan triangulation: pivot = `s0`; triangles = `(s0, s_{t+1}, s_{t+2})` for
  *    `t` in `0..triCount-1`.
  * 5. Screen-space to NDC: `ndcX = (sx / viewportWidth) * 2 - 1`,
  *    `ndcY = 1 - (sy / viewportHeight) * 2`. Matches [RenderCommandTriangulator] exactly.
+ *
+ * ## Why fixed stride (no atomicAdd)?
+ *
+ * `atomicAdd(&vertexCursor, vertCount)` with ~290 concurrent threads contending on a
+ * single GPU-side atomic causes a GPU watchdog (TDR) on Adreno 750 (Snapdragon 8 Gen 3),
+ * resulting in `VK_ERROR_DEVICE_LOST`. The fixed-stride approach eliminates all atomics
+ * from M5 — each thread writes to a deterministic, non-overlapping range.
+ *
+ * The draw call always submits `paddedCount × MAX_VERTICES_PER_FACE` vertices.
+ * Degenerate triangles (three vertices at the same position) produce no visible pixels
+ * and are discarded by the rasterizer at negligible cost.
+ *
+ * ## Why fully unrolled (no loop, no array)?
+ *
+ * The final emit path is kept fully unrolled up to the current face cap (6 vertices → 4
+ * triangles). This avoids driver-sensitive dynamic indexing in WGSL and keeps the emitted
+ * triangle fan deterministic and easy to validate.
  *
  * ## Vertex buffer layout
  *
@@ -41,11 +59,10 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * ## Bindings
  *
  * ```wgsl
- * @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>
- * @group(0) @binding(1) var<storage, read>        sortedKeys:   array<SortKey>
- * @group(0) @binding(2) var<storage, read_write>  vertices:     array<u32>
- * @group(0) @binding(3) var<storage, read_write>  vertexCursor: atomic<u32>
- * @group(0) @binding(4) var<uniform>              params:       EmitUniforms
+ * @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>
+ * @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>
+ * @group(0) @binding(2) var<storage, read_write>  vertices:    array<u32>
+ * @group(0) @binding(3) var<uniform>              params:      EmitUniforms
  * ```
  *
  * ## Struct compatibility
@@ -87,7 +104,8 @@ internal object TriangulateEmitShader {
         //   64-79   16   litColor (vec4<f32>)
         //   80-83    4   depthKey (f32)
         //   84-87    4   faceIndex (u32)
-        //   88-95    8   _p3, _p4 (2 × u32)
+        //   88-91    4   visible (u32)   ← 1 = passed cull, 0 = culled; not read here
+        //   92-95    4   _p4 (u32)
         struct TransformedFace {
             s0: vec2<f32>,
             s1: vec2<f32>,
@@ -102,7 +120,7 @@ internal object TriangulateEmitShader {
             litColor: vec4<f32>,
             depthKey:  f32,
             faceIndex: u32,
-            _p3: u32,
+            visible:   u32,
             _p4: u32,
         }
 
@@ -124,23 +142,21 @@ internal object TriangulateEmitShader {
             _pad:           u32,
         }
 
-        @group(0) @binding(0) var<storage, read>       transformed:  array<TransformedFace>;
-        @group(0) @binding(1) var<storage, read>        sortedKeys:   array<SortKey>;
+        // Read transformed data as a flat vec4<f32> array. TransformedFace is 96 bytes = 6 ×
+        // vec4<f32>, so the layout is:
+        // TransformedFace is 96 bytes = 6 × vec4<f32>, so:
+        //   raw[i*6+0] = (s0.x, s0.y, s1.x, s1.y)
+        //   raw[i*6+1] = (s2.x, s2.y, s3.x, s3.y)
+        //   raw[i*6+2] = (s4.x, s4.y, s5.x, s5.y)
+        //   raw[i*6+3] = (bitcast vertexCount, _p0, _p1, _p2)
+        //   raw[i*6+4] = litColor (r, g, b, a)
+        //   raw[i*6+5] = (depthKey, bitcast faceIndex, bitcast visible, _p4)
+        @group(0) @binding(0) var<storage, read>       transformedRaw: array<vec4<f32>>;
+        @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>;
         // Flat u32 array: 8 u32 per vertex (32 bytes), written via bitcast<u32>(f32) to
         // preserve the render pipeline's vertex layout without WGSL struct-alignment gaps.
-        @group(0) @binding(2) var<storage, read_write>  vertices:     array<u32>;
-        @group(0) @binding(3) var<storage, read_write>  vertexCursor: atomic<u32>;
-        @group(0) @binding(4) var<uniform>              params:       EmitUniforms;
-
-        // Returns screen-space point at [idx] from a TransformedFace (idx in 0..5).
-        fn getScreenPoint(face: TransformedFace, idx: u32) -> vec2<f32> {
-            if (idx == 0u) { return face.s0; }
-            if (idx == 1u) { return face.s1; }
-            if (idx == 2u) { return face.s2; }
-            if (idx == 3u) { return face.s3; }
-            if (idx == 4u) { return face.s4; }
-            return face.s5;
-        }
+        @group(0) @binding(2) var<storage, read_write>  vertices:    array<u32>;
+        @group(0) @binding(3) var<uniform>              params:      EmitUniforms;
 
         // Writes one vertex at flat u32 offset [base] (base must be a multiple of 8).
         // Vertex layout (32 bytes, 8 × u32, matches GpuRenderPipeline vertex attributes):
@@ -163,52 +179,84 @@ internal object TriangulateEmitShader {
             let i = gid.x;
             if (i >= params.paddedCount) { return; }
 
+            // Fixed-stride slot: each sort entry owns exactly MAX_VERTICES_PER_FACE=12
+            // vertex positions.  No atomicAdd — no contention, no Adreno TDR.
+            let base = i * 12u;
             let key = sortedKeys[i];
-            // Sentinel entries (originalIndex == 0xFFFFFFFF) were written by the M4 packer
-            // for power-of-two padding.  After descending-depth sort they land at the tail;
-            // each thread checks independently because threads are not ordered.
-            if (key.originalIndex == 0xFFFFFFFFu) { return; }
+            if (key.originalIndex == 0xFFFFFFFFu) {
+                for (var j = 0u; j < 12u; j++) {
+                    writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                }
+                return;
+            }
 
-            let face = transformed[key.originalIndex];
-            let vc = face.vertexCount;
-            if (vc < 3u) { return; }
-
-            let triCount  = vc - 2u;
-            let vertCount = triCount * 3u;
-
-            // Atomically reserve a contiguous vertex slice for this face.
-            // baseVertex is the index of the first reserved vertex (not the u32 offset).
-            let baseVertex = atomicAdd(&vertexCursor, vertCount);
-
+            let ri = key.originalIndex * 6u;
             let wF = f32(params.viewportWidth);
             let hF = f32(params.viewportHeight);
 
-            // Fan triangulation: (s0, s_{t+1}, s_{t+2}) for t in 0..triCount-1.
-            // Convert pivot (s0) to NDC once; inner vertices inside the loop.
-            // NDC: x = (sx / width) * 2 - 1,  y = 1 - (sy / height) * 2.
-            // Matches RenderCommandTriangulator.toNdcX/toNdcY exactly.
-            let p0  = face.s0;
-            let nx0 = (p0.x / wF) * 2.0 - 1.0;
-            let ny0 = 1.0 - (p0.y / hF) * 2.0;
+            let v01 = transformedRaw[ri + 0u];  // (s0.x, s0.y, s1.x, s1.y)
+            let v23 = transformedRaw[ri + 1u];  // (s2.x, s2.y, s3.x, s3.y)
+            let v45 = transformedRaw[ri + 2u];  // (s4.x, s4.y, s5.x, s5.y)
+            let metaVec = transformedRaw[ri + 3u];
+            let clr = transformedRaw[ri + 4u];  // litColor
+            let tail = transformedRaw[ri + 5u];
 
-            let r = face.litColor.r;
-            let g = face.litColor.g;
-            let b = face.litColor.b;
-            let a = face.litColor.a;
+            let vertexCount = bitcast<u32>(metaVec.x);
+            let visible = bitcast<u32>(tail.z);
+            if (visible == 0u || vertexCount < 3u) {
+                for (var j = 0u; j < 12u; j++) {
+                    writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                }
+                return;
+            }
 
-            for (var t = 0u; t < triCount; t++) {
-                let p1  = getScreenPoint(face, t + 1u);
-                let p2  = getScreenPoint(face, t + 2u);
-                let nx1 = (p1.x / wF) * 2.0 - 1.0;
-                let ny1 = 1.0 - (p1.y / hF) * 2.0;
-                let nx2 = (p2.x / wF) * 2.0 - 1.0;
-                let ny2 = 1.0 - (p2.y / hF) * 2.0;
+            // Clear the slot first, then overwrite only the real triangles.
+            for (var j = 0u; j < 12u; j++) {
+                writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            }
 
-                // Each vertex occupies 8 u32 slots (32 bytes).
-                let vi = (baseVertex + t * 3u) * 8u;
-                writeVertex(vi,        nx0, ny0, r, g, b, a);
-                writeVertex(vi + 8u,   nx1, ny1, r, g, b, a);
-                writeVertex(vi + 16u,  nx2, ny2, r, g, b, a);
+            let nx0 = (v01.x / wF) * 2.0 - 1.0;
+            let ny0 = 1.0 - (v01.y / hF) * 2.0;
+            let nx1 = (v01.z / wF) * 2.0 - 1.0;
+            let ny1 = 1.0 - (v01.w / hF) * 2.0;
+            let nx2 = (v23.x / wF) * 2.0 - 1.0;
+            let ny2 = 1.0 - (v23.y / hF) * 2.0;
+            let nx3 = (v23.z / wF) * 2.0 - 1.0;
+            let ny3 = 1.0 - (v23.w / hF) * 2.0;
+            let nx4 = (v45.x / wF) * 2.0 - 1.0;
+            let ny4 = 1.0 - (v45.y / hF) * 2.0;
+            let nx5 = (v45.z / wF) * 2.0 - 1.0;
+            let ny5 = 1.0 - (v45.w / hF) * 2.0;
+
+            let r = clr.x;
+            let g = clr.y;
+            let b = clr.z;
+            let a = clr.w;
+
+            // Triangle 0: (s0, s1, s2)
+            writeVertex((base + 0u) * 8u, nx0, ny0, r, g, b, a);
+            writeVertex((base + 1u) * 8u, nx1, ny1, r, g, b, a);
+            writeVertex((base + 2u) * 8u, nx2, ny2, r, g, b, a);
+
+            // Triangle 1: (s0, s2, s3)
+            if (vertexCount >= 4u) {
+                writeVertex((base + 3u) * 8u, nx0, ny0, r, g, b, a);
+                writeVertex((base + 4u) * 8u, nx2, ny2, r, g, b, a);
+                writeVertex((base + 5u) * 8u, nx3, ny3, r, g, b, a);
+            }
+
+            // Triangle 2: (s0, s3, s4)
+            if (vertexCount >= 5u) {
+                writeVertex((base + 6u) * 8u, nx0, ny0, r, g, b, a);
+                writeVertex((base + 7u) * 8u, nx3, ny3, r, g, b, a);
+                writeVertex((base + 8u) * 8u, nx4, ny4, r, g, b, a);
+            }
+
+            // Triangle 3: (s0, s4, s5)
+            if (vertexCount >= 6u) {
+                writeVertex((base + 9u) * 8u, nx0, ny0, r, g, b, a);
+                writeVertex((base + 10u) * 8u, nx4, ny4, r, g, b, a);
+                writeVertex((base + 11u) * 8u, nx5, ny5, r, g, b, a);
             }
         }
     """.trimIndent()

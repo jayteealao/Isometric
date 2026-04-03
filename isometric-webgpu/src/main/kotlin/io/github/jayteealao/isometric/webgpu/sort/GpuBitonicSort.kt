@@ -96,6 +96,9 @@ internal class GpuBitonicSort(
      *
      * Valid after [ensureBuffers] has been called.
      */
+    /** Number of bitonic sort stages for the current [cachedPaddedCount]. 0 before [ensureBuffers]. */
+    val stageCount: Int get() = cachedBindGroups?.size ?: 0
+
     val primaryBuffer: GPUBuffer
         get() = checkNotNull(primaryBuf) {
             "GpuBitonicSort: primaryBuffer not allocated — call ensureBuffers first"
@@ -201,15 +204,16 @@ internal class GpuBitonicSort(
         if (paddedCount == cachedPaddedCount) return
 
         // Release old per-capacity resources before allocating new ones.
+        // Note: close() only (no destroy()) — the previous frame's GPU commands may still
+        // reference these buffers. Dawn's internal ref-counting keeps the underlying GPU
+        // memory alive until all pending commands complete; destroy() would mark the buffer
+        // as "dead" to Dawn's validation layer while it is still in-flight.
         cachedBindGroups?.forEach { it.close() }
         cachedBindGroups = null
-        primaryBuf?.destroy()
         primaryBuf?.close()
         primaryBuf = null
-        scratchBuf?.destroy()
         scratchBuf?.close()
         scratchBuf = null
-        paramsBuffer?.destroy()
         paramsBuffer?.close()
         paramsBuffer = null
 
@@ -286,19 +290,56 @@ internal class GpuBitonicSort(
         }
     }
 
+    /**
+     * Diagnostic: dispatch each sort stage in its own [GPUQueue.submit] call.
+     *
+     * On Adreno, compute→compute barriers within a single VkCommandBuffer may not be
+     * honoured, causing subsequent stages to read stale data from the previous stage.
+     * This can trigger the GPU watchdog (TDR, 2-second default) and produce
+     * `VK_ERROR_DEVICE_LOST`. Submitting each stage individually forces Dawn to insert
+     * a Vulkan timeline semaphore between every pair of consecutive sort stages,
+     * guaranteeing visibility of writes before the next stage's reads.
+     *
+     * Use this instead of [dispatch] when [dispatch] causes `VK_ERROR_DEVICE_LOST`.
+     * If this resolves the crash, the root cause is the Adreno compute-barrier bug.
+     *
+     * Must be called from the GPU thread (`ctx.withGpu { ... }`).
+     */
+    fun dispatchIndividually() {
+        val pipeline = checkNotNull(sortPipeline) { "Pipeline not ready — call ensurePipeline first" }
+        val bindGroups = checkNotNull(cachedBindGroups) {
+            "Bind groups not ready — call ensureBuffers first"
+        }
+        val workgroupCount =
+            ceil(cachedPaddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
+
+        for ((stageIdx, bg) in bindGroups.withIndex()) {
+            Log.d(TAG, "dispatchIndividually: stage $stageIdx/${bindGroups.size} — before submit")
+            val enc = ctx.device.createCommandEncoder()
+            val pass = enc.beginComputePass()
+            pass.setPipeline(pipeline)
+            pass.setBindGroup(0, bg)
+            pass.dispatchWorkgroups(workgroupCount)
+            pass.end()
+            pass.close()
+            val buf = enc.finish()
+            ctx.queue.submit(arrayOf(buf))
+            buf.close()
+            enc.close()
+            Log.d(TAG, "dispatchIndividually: stage $stageIdx/${bindGroups.size} — after submit")
+        }
+    }
+
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun close() {
         // Per-capacity resources
         cachedBindGroups?.forEach { it.close() }
         cachedBindGroups = null
-        primaryBuf?.destroy()
         primaryBuf?.close()
         primaryBuf = null
-        scratchBuf?.destroy()
         scratchBuf?.close()
         scratchBuf = null
-        paramsBuffer?.destroy()
         paramsBuffer?.close()
         paramsBuffer = null
 

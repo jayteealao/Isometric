@@ -107,7 +107,10 @@ internal class GpuSceneDataBuffer(
         val newCapacity = maxOf(requiredFaces, maxOf(INITIAL_CAPACITY_FACES, capacityFaces * 2))
 
         // Grow GPU buffer.
-        gpuBuffer?.destroy()
+        // close() only (no destroy()) — the previous frame's queue.writeBuffer or compute
+        // shader may still reference the old buffer. Dawn's ref-counting keeps the underlying
+        // GPU memory alive until all pending commands complete; destroy() would mark the
+        // buffer as "dead" to Dawn's validation layer while it is still in-flight.
         gpuBuffer?.close()
         capacityFaces = newCapacity
         val byteSize = capacityFaces.toLong() * SceneDataLayout.FACE_DATA_BYTES
@@ -129,7 +132,6 @@ internal class GpuSceneDataBuffer(
     }
 
     override fun close() {
-        gpuBuffer?.destroy()
         gpuBuffer?.close()
         gpuBuffer = null
         capacityFaces = 0
