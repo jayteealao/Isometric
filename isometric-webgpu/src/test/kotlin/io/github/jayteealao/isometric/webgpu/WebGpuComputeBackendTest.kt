@@ -1,20 +1,12 @@
 package io.github.jayteealao.isometric.webgpu
 
-import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.assertSame
 
 class WebGpuComputeBackendTest {
-
-    @Test
-    fun `WebGpuComputeBackend is async`() {
-        val backend = WebGpuComputeBackend()
-        assertTrue(backend.isAsync)
-    }
 
     @Test
     fun `WebGpuComputeBackend toString`() {
@@ -22,13 +14,9 @@ class WebGpuComputeBackendTest {
     }
 
     @Test
-    fun `RenderBackend WebGpu toString`() {
-        assertEquals("RenderBackend.WebGpu", RenderBackend.WebGpu.toString())
-    }
-
-    @Test
-    fun `RenderBackend WebGpu is stable singleton`() {
-        assertSame(RenderBackend.WebGpu, RenderBackend.WebGpu)
+    fun `WebGpuProviderImpl provides stable singletons`() {
+        assertSame(WebGpuProviderImpl.sortingBackend, WebGpuProviderImpl.sortingBackend)
+        assertSame(WebGpuProviderImpl.renderBackend, WebGpuProviderImpl.renderBackend)
     }
 
     @Test

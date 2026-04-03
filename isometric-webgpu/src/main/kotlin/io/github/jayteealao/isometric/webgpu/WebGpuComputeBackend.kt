@@ -22,11 +22,10 @@ import kotlinx.coroutines.sync.withLock
  * ## Usage
  *
  * ```kotlin
- * IsometricScene(config = SceneConfig(computeBackend = ComputeBackend.WebGpu)) { ... }
+ * IsometricScene(config = SceneConfig(renderMode = RenderMode.Canvas(compute = Compute.WebGpu))) { ... }
  * ```
  *
- * `ComputeBackend.WebGpu` is defined as a companion extension property in
- * [ComputeBackendExtensions].
+ * Accessed via [WebGpuProviderImpl.computeBackend].
  */
 class WebGpuComputeBackend : SortingComputeBackend {
     enum class Status {
@@ -41,8 +40,6 @@ class WebGpuComputeBackend : SortingComputeBackend {
         val detail: String? = null,
         val depthKeyCount: Int? = null,
     )
-
-    override val isAsync: Boolean = true
 
     private val initMutex = Mutex()
     private var gpuContext: GpuContext? = null

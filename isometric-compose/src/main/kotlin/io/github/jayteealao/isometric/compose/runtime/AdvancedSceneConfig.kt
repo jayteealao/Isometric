@@ -2,9 +2,7 @@ package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import io.github.jayteealao.isometric.ComputeBackend
 import io.github.jayteealao.isometric.IsoColor
-import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderOptions
@@ -27,6 +25,7 @@ import io.github.jayteealao.isometric.Vector
  * @param gestures Tap and drag interaction configuration.
  * @param useNativeCanvas When `true`, renders to the platform's native canvas.
  * @param cameraState Optional pan/zoom camera state.
+ * @param renderMode Determines how the scene is rendered and computed.
  * @param engine The [SceneProjector] implementation used for world-to-screen projection.
  *   Defaults to [IsometricEngine].
  * @param enablePathCaching When `true`, caches computed paths between frames to reduce
@@ -65,8 +64,7 @@ class AdvancedSceneConfig(
     gestures: GestureConfig = GestureConfig.Disabled,
     useNativeCanvas: Boolean = false,
     cameraState: CameraState? = null,
-    renderBackend: RenderBackend = RenderBackend.Canvas,
-    computeBackend: ComputeBackend = ComputeBackend.Cpu,
+    renderMode: RenderMode = RenderMode.Canvas(),
     val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
@@ -90,8 +88,7 @@ class AdvancedSceneConfig(
     gestures = gestures,
     useNativeCanvas = useNativeCanvas,
     cameraState = cameraState,
-    renderBackend = renderBackend,
-    computeBackend = computeBackend,
+    renderMode = renderMode,
 ) {
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {

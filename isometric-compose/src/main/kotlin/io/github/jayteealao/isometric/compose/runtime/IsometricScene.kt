@@ -34,7 +34,6 @@ import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
 import io.github.jayteealao.isometric.SortingComputeBackend
-import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -44,7 +43,7 @@ private const val LONG_PRESS_TIMEOUT_MS = 500L
 internal data class AsyncPrepareInputs(
     val renderOptions: io.github.jayteealao.isometric.RenderOptions,
     val lightDirection: io.github.jayteealao.isometric.Vector,
-    val computeBackend: io.github.jayteealao.isometric.ComputeBackend,
+    val renderMode: RenderMode,
 )
 
 internal data class AsyncPrepareRequest(
@@ -102,8 +101,7 @@ fun IsometricScene(
             gestures = config.gestures,
             useNativeCanvas = config.useNativeCanvas,
             cameraState = config.cameraState,
-            renderBackend = config.renderBackend,
-            computeBackend = config.computeBackend,
+            renderMode = config.renderMode,
         ),
         content = content
     )
@@ -304,10 +302,17 @@ fun IsometricScene(
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
 
+    // Derive rendering strategy from RenderMode.
+    val renderMode = config.renderMode
+    val isCanvasBackend = renderMode is RenderMode.Canvas
+    val isAsyncCompute = when (renderMode) {
+        is RenderMode.Canvas -> renderMode.compute == RenderMode.Canvas.Compute.WebGpu
+        is RenderMode.WebGpu -> true
+    }
+
     // Async prepared scene for GPU compute path.
     // Called unconditionally to satisfy Compose's rules of hooks — remember count
     // must be stable across recompositions regardless of config changes.
-    val isAsyncCompute = config.computeBackend.isAsync && config.computeBackend is SortingComputeBackend
     // Version counter triggers Canvas invalidation without storing PreparedScene
     // in Compose's snapshot state. Storing PreparedScene in mutableStateOf caused
     // the snapshot system to retain old scene values (and their entire RenderCommand
@@ -317,19 +322,18 @@ fun IsometricScene(
     val asyncPrepareInputs = remember(
         config.renderOptions,
         config.lightDirection,
-        config.computeBackend,
+        config.renderMode,
     ) {
         AsyncPrepareInputs(
             renderOptions = config.renderOptions,
             lightDirection = config.lightDirection,
-            computeBackend = config.computeBackend,
+            renderMode = config.renderMode,
         )
     }
 
     // Whether gesture/hit-test handling is active — computed once, used by both
     // the async compute path (to skip hit-test index rebuilds) and the Canvas.
     val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
-    val isCanvasBackend = config.renderBackend == RenderBackend.Canvas
     val backendSceneVersion = remember { mutableIntStateOf(0) }
     val backendPreparedSceneState = remember(renderer) {
         object : State<PreparedScene?> {
@@ -343,7 +347,7 @@ fun IsometricScene(
     }
 
     // Async compute path — prepares scenes with GPU depth sorting.
-    // Only activates for SortingComputeBackend. The CPU path is untouched.
+    // Only activates for Canvas + WebGpu compute. The CPU path is untouched.
     // Requests are conflated so animated scenes do not cancel in-flight GPU work
     // every frame and destroy buffers while the device is still using them.
     //
@@ -356,9 +360,9 @@ fun IsometricScene(
     // - SceneCache releases the old prepared scene before constructing the new one
     // - core projection uses reusable buffers and packed DoubleArray points
     if (isAsyncCompute && isCanvasBackend) {
-        val computeBackend = config.computeBackend as SortingComputeBackend
+        val sortingBackend = remember { WebGpuProvider.get().sortingBackend }
         val skipHitTest = !gesturesActive
-        LaunchedEffect(renderer, computeBackend, asyncPrepareInputs) {
+        LaunchedEffect(renderer, sortingBackend, asyncPrepareInputs) {
             snapshotFlow {
                 AsyncPrepareRequest(
                     sceneVersion = sceneVersion,
@@ -381,7 +385,7 @@ fun IsometricScene(
                             ),
                             width = request.canvasWidth,
                             height = request.canvasHeight,
-                            computeBackend = computeBackend,
+                            computeBackend = sortingBackend,
                             skipHitTest = skipHitTest,
                         )
                     }
@@ -395,7 +399,7 @@ fun IsometricScene(
 
     if (!isCanvasBackend) {
         val skipHitTest = !gesturesActive
-        LaunchedEffect(renderer, config.computeBackend, asyncPrepareInputs, isCanvasBackend) {
+        LaunchedEffect(renderer, asyncPrepareInputs, isCanvasBackend) {
             snapshotFlow {
                 AsyncPrepareRequest(
                     sceneVersion = sceneVersion,
@@ -414,25 +418,13 @@ fun IsometricScene(
                             renderOptions = request.inputs.renderOptions,
                             lightDirection = request.inputs.lightDirection,
                         )
-                        val backend = request.inputs.computeBackend
-                        if (backend is SortingComputeBackend) {
-                            renderer.prepareAsync(
-                                rootNode = rootNode,
-                                context = context,
-                                width = request.canvasWidth,
-                                height = request.canvasHeight,
-                                computeBackend = backend,
-                                skipHitTest = skipHitTest,
-                            )
-                        } else {
-                            renderer.prepareScene(
-                                rootNode = rootNode,
-                                context = context,
-                                width = request.canvasWidth,
-                                height = request.canvasHeight,
-                                skipHitTest = skipHitTest,
-                            )
-                        }
+                        renderer.prepareScene(
+                            rootNode = rootNode,
+                            context = context,
+                            width = request.canvasWidth,
+                            height = request.canvasHeight,
+                            skipHitTest = skipHitTest,
+                        )
                     }
                     backendSceneVersion.intValue++
                 }
@@ -665,6 +657,8 @@ fun IsometricScene(
         }
         }
     } else {
+        // WebGPU render path
+        val webGpuRenderBackend = remember { WebGpuProvider.get().renderBackend }
         Box(
             modifier = modifier
                 .onSizeChanged {
@@ -672,7 +666,7 @@ fun IsometricScene(
                     canvasHeight = it.height
                 }
         ) {
-            config.renderBackend.Surface(
+            webGpuRenderBackend.Surface(
                 preparedScene = backendPreparedSceneState,
                 renderContext = renderContext,
                 modifier = Modifier.fillMaxSize(),

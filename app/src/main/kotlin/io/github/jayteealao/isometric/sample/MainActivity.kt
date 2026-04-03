@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
                 )
                 SampleCard(
                     title = "WebGPU",
-                    description = "ComputeBackend.WebGpu and RenderBackend.WebGpu samples for sorting and frontend rendering",
+                    description = "RenderMode.WebGpu and RenderMode.Canvas(Compute.WebGpu) samples",
                     onClick = { onSelect(Intent(this@MainActivity, WebGpuSampleActivity::class.java)) }
                 )
                 SampleCard(

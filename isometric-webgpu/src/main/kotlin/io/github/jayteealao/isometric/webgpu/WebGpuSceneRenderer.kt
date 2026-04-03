@@ -30,6 +30,28 @@ import kotlinx.coroutines.runBlocking
 internal class WebGpuSceneRenderer : AutoCloseable {
     companion object {
         private const val TAG = "WebGpuSceneRenderer"
+
+        /**
+         * Diagnostic flag: when true, skip the M3→M5 compute dispatch entirely and
+         * just submit a plain clear render pass. Flip to `true` to determine whether
+         * `VK_ERROR_DEVICE_LOST` is caused by our compute shaders (TDR) or by an
+         * external factor (surface/swapchain/driver). Set back to `false` for
+         * production use.
+         */
+        private const val DEBUG_SKIP_COMPUTE = false
+
+        /**
+         * Diagnostic flag: when true, submit each compute stage (M3, M4a, every sort stage,
+         * M5) as a separate [GPUQueue.submit] call instead of batching them into one command
+         * buffer. This forces a Vulkan timeline semaphore between every pair of consecutive
+         * compute stages, working around the Adreno bug where compute→compute barriers within
+         * a single VkCommandBuffer are not honoured.
+         *
+         * If enabling this flag fixes the `VK_ERROR_DEVICE_LOST` TDR, the root cause is
+         * the Adreno compute-barrier bug. See WEBGPU_CRASH_INVESTIGATION.md § Bug 2.
+         */
+        private const val DEBUG_INDIVIDUAL_COMPUTE_SUBMITS = false
+
     }
 
     private var gpuContext: GpuContext? = null
@@ -139,8 +161,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         // F2: Use getContextIfReady() (opportunistic, no-trigger) instead of
         // awaitContextForSharing() to avoid forcing compute backend GPU init when the user
         // has CPU compute selected. Only reuse a context that already exists.
-        val sharedContext = (WebGpuComputeBackendHolder.instance as? WebGpuComputeBackend)
-            ?.getContextIfReady()
+        val sharedContext = WebGpuProviderImpl.computeBackend.getContextIfReady()
 
         val context: GpuContext
         if (sharedContext != null) {
@@ -263,11 +284,14 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         lastUploadWidth  = w
         lastUploadHeight = h
 
-        if (scene == null || scene.commands.isEmpty()) return
-
         val ctx = checkNotNull(gpuContext)
         ctx.withGpu {
-            fullPipeline!!.upload(scene, w, h)
+            val gp = fullPipeline!!
+            if (scene == null || scene.commands.isEmpty()) {
+                gp.clearScene()
+            } else {
+                gp.upload(scene, w, h)
+            }
         }
     }
 
@@ -286,19 +310,40 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 SurfaceGetCurrentTextureStatus.SuccessOptimal,
                 SurfaceGetCurrentTextureStatus.SuccessSuboptimal -> {
                     val textureView = surfaceTexture.texture.createView()
-                    val encoder = ctx.device.createCommandEncoder()
 
-                    // Encode compute passes (M3→M4→M5) before the render pass.
-                    // The compute results (vertex buffer + indirect args) are consumed by
-                    // the render pass in the same command buffer. WebGPU guarantees
-                    // ordering within a single queue.submit call.
                     val gp = fullPipeline
-                    val shouldDraw = gp != null && gp.hasScene
-                    if (shouldDraw) {
-                        gp!!.dispatch(encoder)
+                    val shouldDraw = !DEBUG_SKIP_COMPUTE && gp != null && gp.hasScene
+                    if (DEBUG_SKIP_COMPUTE) {
+                        Log.d(TAG, "DEBUG_SKIP_COMPUTE=true — bypassing compute dispatch")
                     }
 
-                    val pass = encoder.beginRenderPass(
+                    // A1: Submit compute (M3→M5) and render in SEPARATE command buffers.
+                    //
+                    // On Adreno, using a compute-written buffer as a vertex/indirect buffer
+                    // within the same VkCommandBuffer causes VK_ERROR_DEVICE_LOST (GPU TDR).
+                    // This is a confirmed Adreno driver bug where Dawn's implicit barriers
+                    // for Storage→Vertex and Storage→Indirect usage transitions are not
+                    // honoured when compute and render passes share one command stream.
+                    //
+                    // A2 (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS): also submit each compute stage
+                    // in its own command buffer. This additionally works around the Adreno
+                    // bug where compute→compute barriers within a single VkCommandBuffer are
+                    // broken (each sort stage needs to see the previous stage's writes).
+                    if (shouldDraw) {
+                        if (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS) {
+                            gp!!.dispatchIndividualSubmits()
+                        } else {
+                            val computeEncoder = ctx.device.createCommandEncoder()
+                            gp!!.dispatch(computeEncoder)
+                            val computeCmdBuf = computeEncoder.finish()
+                            ctx.queue.submit(arrayOf(computeCmdBuf))
+                            computeCmdBuf.close()
+                            computeEncoder.close()
+                        }
+                    }
+
+                    val renderEncoder = ctx.device.createCommandEncoder()
+                    val pass = renderEncoder.beginRenderPass(
                         GPURenderPassDescriptor(
                             colorAttachments = arrayOf(
                                 GPURenderPassColorAttachment(
@@ -322,10 +367,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     pass.end()
                     pass.close()
 
-                    val commandBuffer = encoder.finish()
-                    ctx.queue.submit(arrayOf(commandBuffer))
-                    commandBuffer.close()
-                    encoder.close()
+                    val renderCmdBuf = renderEncoder.finish()
+                    ctx.queue.submit(arrayOf(renderCmdBuf))
+                    renderCmdBuf.close()
+                    renderEncoder.close()
 
                     // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
                     // the Vulkan surface is invalidated before the render loop is cancelled;

@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
@@ -32,20 +33,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import io.github.jayteealao.isometric.ComputeBackend
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.compose.runtime.ForEach
 import io.github.jayteealao.isometric.compose.runtime.GestureConfig
 import io.github.jayteealao.isometric.compose.runtime.IsometricScene
+import io.github.jayteealao.isometric.compose.runtime.RenderMode
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
-import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
-import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Prism
-import io.github.jayteealao.isometric.webgpu.WebGpu
 import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
+import io.github.jayteealao.isometric.webgpu.WebGpuProviderImpl
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
@@ -56,6 +55,9 @@ private const val WEBGPU_SAMPLE_TAG = "WebGpuSample"
 class WebGpuSampleActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep screen on so automated adb test launches don't hit the display-off timeout
+        // (which invalidates the Vulkan surface and fires VK_ERROR_DEVICE_LOST).
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContent {
             MaterialTheme {
                 Surface(
@@ -110,7 +112,7 @@ private fun WebGpuSamplesScreen() {
 @Composable
 private fun WebGpuExplainerCard(
 ) {
-    val webGpuBackend = remember { ComputeBackend.WebGpu as WebGpuComputeBackend }
+    val webGpuBackend = remember { WebGpuProviderImpl.computeBackend }
     val backendStatus by webGpuBackend.status.collectAsState()
     val statusColor = when (backendStatus.status) {
         WebGpuComputeBackend.Status.Uninitialized -> Color(0xFF616161)
@@ -246,10 +248,8 @@ private fun WebGpuDenseGridSample() {
 
 @Composable
 private fun AnimatedTowersBackendSample() {
-    var computeSelection by remember { mutableStateOf(ComputeBackend.Cpu) }
-    var useWebGpuRenderBackend by remember { mutableStateOf(false) }
+    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu) }
     val phase = rememberPhaseAnimation(speedRadiansPerSecond = 3.4)
-    val renderBackend = if (useWebGpuRenderBackend) RenderBackend.WebGpu else RenderBackend.Canvas
 
     Column(modifier = Modifier.fillMaxSize()) {
         Card(
@@ -262,41 +262,29 @@ private fun AnimatedTowersBackendSample() {
                 Text(text = "Animated Towers", style = MaterialTheme.typography.subtitle1)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Render backend",
+                    text = "Render mode",
                     style = MaterialTheme.typography.caption
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TogglePill(
                         label = "Canvas",
-                        selected = !useWebGpuRenderBackend,
-                        onClick = { useWebGpuRenderBackend = false }
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.Cpu,
+                        onClick = { renderMode = RenderMode.Canvas() }
+                    )
+                    TogglePill(
+                        label = "Canvas + GPU Sort",
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.WebGpu,
+                        onClick = { renderMode = RenderMode.Canvas(compute = RenderMode.Canvas.Compute.WebGpu) }
                     )
                     TogglePill(
                         label = "WebGPU",
-                        selected = useWebGpuRenderBackend,
-                        onClick = { useWebGpuRenderBackend = true }
+                        selected = renderMode is RenderMode.WebGpu,
+                        onClick = { renderMode = RenderMode.WebGpu }
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Compute backend",
-                    style = MaterialTheme.typography.caption
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TogglePill(
-                        label = "CPU",
-                        selected = computeSelection == ComputeBackend.Cpu,
-                        onClick = { computeSelection = ComputeBackend.Cpu }
-                    )
-                    TogglePill(
-                        label = "WebGPU",
-                        selected = computeSelection != ComputeBackend.Cpu,
-                        onClick = { computeSelection = ComputeBackend.WebGpu }
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Current: ${renderBackend.toString()} + ${computeSelection.toString()}",
+                    text = "Current: $renderMode",
                     style = MaterialTheme.typography.body2
                 )
             }
@@ -305,8 +293,7 @@ private fun AnimatedTowersBackendSample() {
         Box(modifier = Modifier.weight(1f)) {
             AnimatedTowersScene(
                 phase = phase,
-                renderBackend = renderBackend,
-                computeBackend = computeSelection,
+                renderMode = renderMode,
             )
         }
     }
@@ -338,8 +325,7 @@ private fun TogglePill(
 @Composable
 private fun AnimatedTowersScene(
     phase: Double,
-    renderBackend: RenderBackend,
-    computeBackend: ComputeBackend,
+    renderMode: RenderMode,
 ) {
     val stage = SmokeStage(
         name = "Animated",
@@ -353,21 +339,7 @@ private fun AnimatedTowersScene(
         stage = stage,
         phase = phase,
         includeCylinder = false,
-        renderBackend = renderBackend,
-        computeBackend = computeBackend,
-    )
-}
-
-@Composable
-private fun CpuGridScene(
-    stage: SmokeStage,
-    phase: Double,
-) {
-    WebGpuGridScene(
-        stage = stage,
-        phase = phase,
-        renderBackend = RenderBackend.Canvas,
-        computeBackend = ComputeBackend.Cpu,
+        renderMode = renderMode,
     )
 }
 
@@ -376,15 +348,13 @@ private fun WebGpuGridScene(
     stage: SmokeStage,
     phase: Double,
     includeCylinder: Boolean = true,
-    renderBackend: RenderBackend = RenderBackend.Canvas,
-    computeBackend: ComputeBackend = ComputeBackend.WebGpu,
+    renderMode: RenderMode = RenderMode.Canvas(),
 ) {
     IsometricScene(
         modifier = Modifier.fillMaxSize(),
         config = SceneConfig(
             renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-            renderBackend = renderBackend,
-            computeBackend = computeBackend,
+            renderMode = renderMode,
             useNativeCanvas = false,
             gestures = GestureConfig.Disabled,
         )
@@ -428,18 +398,6 @@ private fun WebGpuGridScene(
                     color = IsoColor(245.0, 245.0, 255.0)
                 )
             }
-        }
-
-        if (includeCylinder) {
-            Shape(
-                geometry = Cylinder(
-                    position = Point(0.2, -0.2, 0.0),
-                    radius = 1.45,
-                    height = 2.4,
-                    vertices = 28
-                ),
-                color = IsoColor(250.0, 170.0, 70.0)
-            )
         }
     }
 }

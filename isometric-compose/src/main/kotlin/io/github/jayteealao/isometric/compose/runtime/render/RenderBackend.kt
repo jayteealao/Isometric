@@ -10,9 +10,9 @@ import io.github.jayteealao.isometric.compose.runtime.StrokeStyle
 /**
  * Pluggable rendering surface for [IsometricScene].
  *
- * The default is [RenderBackend.Canvas], which uses Compose's `DrawScope` and is
- * supported on all devices. Optional backends (e.g. WebGPU) are provided by the
- * `isometric-webgpu` artifact.
+ * Implementations are internal to the rendering pipeline. Users select a rendering
+ * strategy via [RenderMode][io.github.jayteealao.isometric.compose.runtime.RenderMode],
+ * which is resolved to the appropriate [RenderBackend] implementation internally.
  *
  * ## Ownership contract
  *
@@ -21,15 +21,6 @@ import io.github.jayteealao.isometric.compose.runtime.StrokeStyle
  * - Backends must NEVER access the mutable scene tree.
  * - Hit testing is handled by [IsometricScene] via its existing pointer-input block —
  *   backends do not participate in hit testing.
- *
- * ## Guideline alignment
- *
- * - §1 Hero Scenario: `RenderBackend.Canvas` is the default — zero configuration.
- * - §2 Progressive Disclosure: `RenderBackend.WebGpu` adds one config field, not a new API.
- * - §6 Make Invalid States Hard to Express: The [PreparedScene] state parameter is immutable;
- *   backends cannot mutate the scene tree because they never receive it.
- * - §8 Composition Over God Objects: Backends are small focused implementations, not
- *   subclasses of a renderer monolith.
  */
 interface RenderBackend {
     /**
@@ -53,9 +44,4 @@ interface RenderBackend {
         modifier: Modifier,
         strokeStyle: StrokeStyle,
     )
-
-    companion object {
-        /** Canvas-based renderer. Supported on all devices. Always available. */
-        val Canvas: RenderBackend = CanvasRenderBackend()
-    }
 }
