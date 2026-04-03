@@ -44,6 +44,7 @@ dependencies {
     // Isometric modules under test
     implementation(project(":isometric-core"))
     implementation(project(":isometric-compose"))
+    implementation(project(":isometric-webgpu"))
 
     // Android
     implementation(libs.appcompat)

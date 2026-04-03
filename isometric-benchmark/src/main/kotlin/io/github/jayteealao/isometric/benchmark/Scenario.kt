@@ -56,12 +56,13 @@ data class BenchmarkConfig(
             val size = "N${scenario.sceneSize}"
             val mutation = if (scenario.mutationRate > 0.0) "mut${(scenario.mutationRate * 100).toInt()}" else "static"
             val interaction = scenario.interactionPattern.name.lowercase()
-            val flagSuffix = when (flags) {
+            val flagSuffix = when (flags.copy(renderModeId = RenderModeId.CANVAS_CPU)) {
                 BenchmarkFlags.ALL_OFF -> "baseline"
                 BenchmarkFlags.ALL_ON -> "allOn"
                 else -> "custom"
             }
-            return "${size}_${mutation}_${interaction}_$flagSuffix"
+            val mode = flags.renderModeId.replace("_", "")
+            return "${size}_${mutation}_${interaction}_${flagSuffix}_$mode"
         }
     }
 }

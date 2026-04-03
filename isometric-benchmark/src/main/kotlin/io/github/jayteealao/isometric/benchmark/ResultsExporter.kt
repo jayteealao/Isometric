@@ -207,7 +207,7 @@ object ResultsExporter {
         values.add(config.scenario.interactionPattern.name)
 
         // Flags
-        config.flags.toValueList().forEach { values.add(it.toString()) }
+        config.flags.toValueList().forEach { values.add(it) }
 
         // Prepare metrics
         values.add("%.4f".format(metrics.prepareTimeMs.mean))
@@ -291,6 +291,7 @@ object ResultsExporter {
                 put("enablePreparedSceneCache", config.flags.enablePreparedSceneCache)
                 put("enableNativeCanvas", config.flags.enableNativeCanvas)
                 put("enableBroadPhaseSort", config.flags.enableBroadPhaseSort)
+                put("renderMode", config.flags.renderModeId)
             })
             put("config", JSONObject().apply {
                 put("iterations", config.iterations)

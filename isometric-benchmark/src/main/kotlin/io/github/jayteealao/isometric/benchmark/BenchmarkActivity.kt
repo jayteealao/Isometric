@@ -105,7 +105,8 @@ class BenchmarkActivity : ComponentActivity() {
                     enableSpatialIndex = fj.optBoolean("enableSpatialIndex", false),
                     enablePreparedSceneCache = fj.optBoolean("enablePreparedSceneCache", false),
                     enableNativeCanvas = fj.optBoolean("enableNativeCanvas", false),
-                    enableBroadPhaseSort = fj.optBoolean("enableBroadPhaseSort", false)
+                    enableBroadPhaseSort = fj.optBoolean("enableBroadPhaseSort", false),
+                    renderModeId = fj.optString("renderMode", RenderModeId.CANVAS_CPU),
                 )
             } else {
                 Log.w(TAG, "No flags specified in config — defaulting to ALL_OFF (baseline)")

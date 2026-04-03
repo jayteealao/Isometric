@@ -112,6 +112,7 @@ fun BenchmarkScreen(
                 enableSpatialIndex = flags.enableSpatialIndex,
                 forceRebuild = !flags.enablePreparedSceneCache,
                 frameVersion = frameVersion,
+                renderMode = flags.renderMode,
                 onHitTestReady = { hitTest -> orchestrator.hitTestFn = hitTest },
                 onFlagsReady = { snapshot ->
                     runtimeFlagSnapshot = snapshot

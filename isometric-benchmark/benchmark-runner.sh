@@ -6,6 +6,7 @@
 #   ./isometric-benchmark/benchmark-runner.sh [--skip-selftests] [--sizes "10 50"] [--label NAME]
 #     [--enable-spatial-index] [--enable-prepared-scene-cache]
 #     [--enable-path-caching] [--enable-native-canvas] [--enable-broad-phase-sort]
+#     [--render-mode canvas_cpu|canvas_webgpu|webgpu]
 #
 # Prerequisites:
 #   - Android device connected via ADB
@@ -27,6 +28,7 @@ ENABLE_PREPARED_SCENE_CACHE=false
 ENABLE_PATH_CACHING=false
 ENABLE_NATIVE_CANVAS=false
 ENABLE_BROAD_PHASE_SORT=false
+RENDER_MODE="canvas_cpu"
 LABEL=""
 
 # Plan-specified defaults: sizes 10,50,100,200; mutation rates 0.10,0.50
@@ -45,6 +47,7 @@ while [[ $# -gt 0 ]]; do
         --enable-path-caching) ENABLE_PATH_CACHING=true; shift ;;
         --enable-native-canvas) ENABLE_NATIVE_CANVAS=true; shift ;;
         --enable-broad-phase-sort) ENABLE_BROAD_PHASE_SORT=true; shift ;;
+        --render-mode) RENDER_MODE="$2"; shift 2 ;;
         --label) LABEL="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -66,6 +69,7 @@ echo "enablePreparedSceneCache: ${ENABLE_PREPARED_SCENE_CACHE}"
 echo "enablePathCaching: ${ENABLE_PATH_CACHING}"
 echo "enableNativeCanvas: ${ENABLE_NATIVE_CANVAS}"
 echo "enableBroadPhaseSort: ${ENABLE_BROAD_PHASE_SORT}"
+echo "renderMode: ${RENDER_MODE}"
 echo ""
 
 # Create local results directory
@@ -202,7 +206,7 @@ for size in "${SIZES[@]}"; do
             echo ""
             echo "[$current/$total] $name"
 
-            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500,\"flags\":{\"enablePathCaching\":${ENABLE_PATH_CACHING},\"enableSpatialIndex\":${ENABLE_SPATIAL_INDEX},\"enablePreparedSceneCache\":${ENABLE_PREPARED_SCENE_CACHE},\"enableNativeCanvas\":${ENABLE_NATIVE_CANVAS},\"enableBroadPhaseSort\":${ENABLE_BROAD_PHASE_SORT}}}"
+            config_json="{\"sceneSize\":${size},\"mutationRate\":${rate},\"interactionPattern\":\"${pattern}\",\"name\":\"${name}\",\"iterations\":3,\"measurementFrames\":500,\"flags\":{\"enablePathCaching\":${ENABLE_PATH_CACHING},\"enableSpatialIndex\":${ENABLE_SPATIAL_INDEX},\"enablePreparedSceneCache\":${ENABLE_PREPARED_SCENE_CACHE},\"enableNativeCanvas\":${ENABLE_NATIVE_CANVAS},\"enableBroadPhaseSort\":${ENABLE_BROAD_PHASE_SORT},\"renderMode\":\"${RENDER_MODE}\"}}"
 
             if ! run_scenario "$config_json" "$name"; then
                 failed=$((failed + 1))

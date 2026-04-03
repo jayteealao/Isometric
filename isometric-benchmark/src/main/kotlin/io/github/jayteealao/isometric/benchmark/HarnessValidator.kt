@@ -174,6 +174,9 @@ object HarnessValidator {
         if (runtimeFlags.useNativeCanvas != flags.enableNativeCanvas) {
             mismatches.add("useNativeCanvas: config=${flags.enableNativeCanvas}, runtime=${runtimeFlags.useNativeCanvas}")
         }
+        if (runtimeFlags.renderMode != flags.renderMode) {
+            mismatches.add("renderMode: config=${flags.renderModeId}, runtime=${RenderModeId.fromRenderMode(runtimeFlags.renderMode)}")
+        }
 
         return if (mismatches.isEmpty()) {
             ValidationResult("flags", true, "All runtime flags match config")

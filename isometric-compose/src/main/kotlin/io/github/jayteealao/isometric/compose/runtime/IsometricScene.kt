@@ -64,7 +64,8 @@ data class RuntimeFlagSnapshot(
     val forceRebuild: Boolean,
     val useNativeCanvas: Boolean,
     val canvasWidth: Int,
-    val canvasHeight: Int
+    val canvasHeight: Int,
+    val renderMode: RenderMode = RenderMode.Canvas(),
 )
 
 /**
@@ -232,7 +233,8 @@ fun IsometricScene(
                 forceRebuild = renderer.forceRebuild,
                 useNativeCanvas = config.useNativeCanvas,
                 canvasWidth = canvasWidth,
-                canvasHeight = canvasHeight
+                canvasHeight = canvasHeight,
+                renderMode = config.renderMode,
             )
         )
 
