@@ -29,23 +29,9 @@ Isometric is a Kotlin library for rendering interactive isometric (2.5D) scenes 
 
 ### Installation
 
-> **Note:** This library is not yet published to Maven Central. To use it now, clone the repository and include the modules as local dependencies.
-
-```kotlin
-// settings.gradle.kts — composite build
-includeBuild("path/to/Isometric") {
-    dependencySubstitution {
-        substitute(module("io.github.jayteealao:isometric-core")).using(project(":isometric-core"))
-        substitute(module("io.github.jayteealao:isometric-compose")).using(project(":isometric-compose"))
-    }
-}
-```
-
-Once published to Maven Central:
-
 ```kotlin
 dependencies {
-    implementation("io.github.jayteealao:isometric-compose:<version>")
+    implementation("io.github.jayteealao:isometric-compose:1.1.0")
 }
 ```
 
