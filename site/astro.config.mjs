@@ -37,6 +37,7 @@ export default defineConfig({
 						{ label: 'Camera & Viewport', slug: 'guides/camera' },
 						{ label: 'Custom Shapes', slug: 'guides/custom-shapes' },
 						{ label: 'Performance', slug: 'guides/performance' },
+						{ label: 'Compose Interop', slug: 'guides/compose-interop' },
 						{ label: 'Advanced Config', slug: 'guides/advanced-config' },
 					],
 				},

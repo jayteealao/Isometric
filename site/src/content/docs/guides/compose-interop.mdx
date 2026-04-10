@@ -1,0 +1,393 @@
+---
+title: Compose Interop
+description: Embed IsometricScene in a Compose UI — layout, state, gestures, theming, and lifecycle
+sidebar:
+  order: 8
+---
+
+`IsometricScene` is a regular `@Composable` that renders to a `Canvas`. It participates in Compose layout like any other composable — you size it with `Modifier`, place it in `Column`/`Row`/`Box`, and share state across the boundary with normal Compose state.
+
+This guide covers the patterns and gotchas you encounter when `IsometricScene` lives alongside Material components, scrollables, navigation, and `ViewModel`s.
+
+## Layout and Sizing
+
+`IsometricScene` renders nothing until it has a non-zero size. The most common mistake is placing it in a `Column` without giving it a height:
+
+```kotlin
+// Bad — IsometricScene has zero height, renders nothing
+Column {
+    Text("My Scene")
+    IsometricScene { Shape(geometry = Prism(Point.ORIGIN)) }
+}
+
+// Good — weight gives it remaining space
+Column {
+    Text("My Scene")
+    IsometricScene(
+        modifier = Modifier.weight(1f).fillMaxWidth()
+    ) {
+        Shape(geometry = Prism(Point.ORIGIN))
+    }
+}
+```
+
+### Fixed-height scenes
+
+Use `Modifier.height()` when you want a scene inside a card or list item:
+
+```kotlin
+Card(modifier = Modifier.padding(16.dp)) {
+    IsometricScene(
+        modifier = Modifier.fillMaxWidth().height(200.dp)
+    ) {
+        Shape(geometry = Prism(Point.ORIGIN))
+    }
+}
+```
+
+### Scenes in scrollable containers
+
+`IsometricScene` works inside `LazyColumn` or `verticalScroll`, but you **must** give it a fixed height — unbounded constraints cause an exception:
+
+```kotlin
+LazyColumn {
+    item {
+        IsometricScene(
+            modifier = Modifier.fillMaxWidth().height(300.dp)
+        ) {
+            Shape(geometry = Prism(Point.ORIGIN))
+        }
+    }
+    items(otherItems) { item -> Text(item.name) }
+}
+```
+
+:::caution
+Do not use `Modifier.fillMaxSize()` inside `LazyColumn` — it produces an infinite constraint and crashes. Always use a fixed height.
+:::
+
+## Sharing State
+
+Compose state flows freely across the `IsometricScene` boundary. The scene's `content` lambda captures whatever state you declare in the parent:
+
+```kotlin
+@Composable
+fun Dashboard() {
+    var selectedId by remember { mutableStateOf<String?>(null) }
+    var buildingCount by remember { mutableIntStateOf(5) }
+
+    Column {
+        // Material controls
+        Row(horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Buildings: $buildingCount")
+            Slider(
+                value = buildingCount.toFloat(),
+                onValueChange = { buildingCount = it.toInt() },
+                valueRange = 1f..20f
+            )
+        }
+
+        // Isometric scene reads the same state
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(
+                gestures = GestureConfig(
+                    onTap = { event -> selectedId = event.node?.nodeId }
+                )
+            )
+        ) {
+            ForEach((0 until buildingCount).toList(), key = { it }) { i ->
+                Shape(
+                    geometry = Prism(
+                        position = Point(i.toDouble() * 1.5, 0.0, 0.0)
+                    ),
+                    color = if (i.toString() == selectedId)
+                        IsoColor(255.0, 100.0, 0.0) else IsoColor(33.0, 150.0, 243.0)
+                )
+            }
+        }
+
+        // Info panel reads scene events
+        Text(
+            text = selectedId?.let { "Selected: $it" } ?: "Tap a building",
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+```
+
+State changes in the slider recompose the scene content. Tap events in the scene update the info panel. No special bridging is needed — it is all standard Compose state.
+
+## Engine Access Outside the Scene
+
+`LocalIsometricEngine` is only available **inside** the `IsometricScene` content block. To use the engine from a sibling composable (e.g. a coordinate readout panel), use the `onEngineReady` callback:
+
+```kotlin
+@Composable
+fun SceneWithInfoPanel() {
+    var engine by remember { mutableStateOf<SceneProjector?>(null) }
+
+    Row {
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            config = AdvancedSceneConfig(
+                onEngineReady = { engine = it }
+            )
+        ) {
+            Shape(geometry = Prism(Point.ORIGIN))
+        }
+
+        // Sibling panel uses the engine
+        engine?.let { eng ->
+            Column(modifier = Modifier.width(200.dp).padding(16.dp)) {
+                val screenPos = eng.worldToScreen(
+                    Point(0.0, 0.0, 0.0), 400, 400
+                )
+                Text("Origin → (${screenPos.x.toInt()}, ${screenPos.y.toInt()})")
+            }
+        }
+    }
+}
+```
+
+## Touch Coordination with Scrollables
+
+`IsometricScene` installs a `pointerInput` handler when gestures are enabled or a `CameraState` is provided. This handler **consumes** drag events once the drag threshold is exceeded. In practice:
+
+- **Taps** do not interfere with parent scrollables — they are consumed only on release.
+- **Drags** inside the scene are consumed by the scene's gesture handler. The parent `LazyColumn` or `verticalScroll` will not scroll while dragging inside the scene.
+
+If you want the scene to be drag-interactive and the parent to scroll, you need to decide which gesture "wins." Two patterns work:
+
+### Option A: Scene handles drag, scroll is elsewhere
+
+Place the scrollable content outside the scene, not as a parent:
+
+```kotlin
+Column {
+    IsometricScene(
+        modifier = Modifier.height(300.dp).fillMaxWidth(),
+        config = SceneConfig(cameraState = remember { CameraState() })
+    ) {
+        Shape(geometry = Prism(Point.ORIGIN))
+    }
+
+    // This scrolls independently — no gesture conflict
+    LazyColumn(modifier = Modifier.weight(1f)) {
+        items(100) { Text("Item $it") }
+    }
+}
+```
+
+### Option B: Scene is tap-only, parent scrolls freely
+
+Disable drag handling so the parent scrollable receives all move events:
+
+```kotlin
+LazyColumn {
+    item {
+        IsometricScene(
+            modifier = Modifier.fillMaxWidth().height(300.dp),
+            config = SceneConfig(
+                gestures = GestureConfig(
+                    onTap = { /* tap works, no drag interception */ }
+                )
+            )
+        ) {
+            Shape(geometry = Prism(Point.ORIGIN))
+        }
+    }
+}
+```
+
+When no `onDrag` is set and no `CameraState` is provided, move events are not consumed, so the parent scrollable receives them.
+
+## Overlaying Compose Content
+
+Use `Box` to layer Material components over or under the scene:
+
+```kotlin
+@Composable
+fun SceneWithHUD() {
+    val camera = remember { CameraState() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Scene fills the box
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(cameraState = camera)
+        ) {
+            TileGrid(width = 8, height = 8) { coord ->
+                Shape(geometry = Prism(), color = IsoColor(180.0, 200.0, 220.0))
+            }
+        }
+
+        // HUD overlays in the corner
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            FloatingActionButton(onClick = { camera.zoomBy(1.2) }) {
+                Icon(Icons.Default.Add, "Zoom in")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            FloatingActionButton(onClick = { camera.zoomBy(0.8) }) {
+                Icon(Icons.Default.Remove, "Zoom out")
+            }
+        }
+
+        // Info bar at the bottom
+        Surface(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f)
+        ) {
+            Text("8x8 grid", modifier = Modifier.padding(12.dp))
+        }
+    }
+}
+```
+
+Taps on the FABs are handled by the FABs, not the scene — standard Compose pointer event propagation applies.
+
+## Material Theme Integration
+
+Isometric uses `IsoColor` (0-255 doubles) rather than Compose `Color` (0-1 floats). Extension functions bridge the two:
+
+```kotlin
+import io.github.jayteealao.isometric.compose.toIsoColor
+import io.github.jayteealao.isometric.compose.toComposeColor
+
+// Material → Isometric
+val isoPrimary = MaterialTheme.colorScheme.primary.toIsoColor()
+
+// Isometric → Material
+val composeColor = IsoColor(33.0, 150.0, 243.0).toComposeColor()
+```
+
+### Syncing a Material palette to IsometricScene
+
+Build a `ColorPalette` from your Material theme and pass it via `SceneConfig`:
+
+```kotlin
+@Composable
+fun ThemedScene() {
+    val colors = MaterialTheme.colorScheme
+
+    val isoPalette = remember(colors) {
+        ColorPalette(
+            primary = colors.primary.toIsoColor(),
+            secondary = colors.secondary.toIsoColor(),
+            accent = colors.tertiary.toIsoColor(),
+            background = colors.background.toIsoColor(),
+            surface = colors.surface.toIsoColor(),
+            error = colors.error.toIsoColor()
+        )
+    }
+
+    IsometricScene(
+        modifier = Modifier.fillMaxSize(),
+        config = SceneConfig(
+            colorPalette = isoPalette,
+            defaultColor = colors.primary.toIsoColor()
+        )
+    ) {
+        // Shapes pick up the Material palette
+        Shape(geometry = Prism(Point.ORIGIN))
+    }
+}
+```
+
+When the user toggles dark mode, `MaterialTheme.colorScheme` changes, `isoPalette` is recomputed, and the scene redraws with the new colors automatically.
+
+## Stabilizing Config to Prevent Rebuilds
+
+`SceneConfig` is compared by value. If you create it inline on every recomposition, it stays equal and the renderer is not recreated. However, `AdvancedSceneConfig` with an engine parameter needs care:
+
+```kotlin
+// Bad — new IsometricEngine() on every recomposition
+IsometricScene(
+    config = AdvancedSceneConfig(
+        engine = IsometricEngine(), // new instance each time!
+        enablePathCaching = true
+    )
+) { ... }
+
+// Good — stable engine via remember
+val engine = remember { IsometricEngine() }
+IsometricScene(
+    config = AdvancedSceneConfig(
+        engine = engine,
+        enablePathCaching = true
+    )
+) { ... }
+```
+
+The `SceneConfig` overload of `IsometricScene` handles this for you — it `remember`s the engine internally. You only need to worry about this when using `AdvancedSceneConfig` directly.
+
+:::tip
+Inline lambdas in `GestureConfig` (like `onTap`, `onDrag`) are safe to pass without `remember`. The scene uses `rememberUpdatedState` internally, so new lambda instances do not trigger a renderer rebuild.
+:::
+
+## Navigation and Lifecycle
+
+### Surviving configuration changes
+
+`CameraState` is backed by `mutableDoubleStateOf` — it survives recomposition but not process death. To survive rotation or process recreation, hoist the values into a `ViewModel`:
+
+```kotlin
+class MapViewModel : ViewModel() {
+    val cameraState = CameraState()
+    var selectedTile by mutableStateOf<TileCoordinate?>(null)
+}
+
+@Composable
+fun MapScreen(viewModel: MapViewModel = viewModel()) {
+    IsometricScene(
+        modifier = Modifier.fillMaxSize(),
+        config = SceneConfig(cameraState = viewModel.cameraState)
+    ) {
+        TileGrid(
+            width = 10, height = 10,
+            onTileClick = { viewModel.selectedTile = it }
+        ) { coord ->
+            Shape(
+                geometry = Prism(),
+                color = if (coord == viewModel.selectedTile)
+                    IsoColor(255.0, 100.0, 0.0) else IsoColor(200.0, 200.0, 200.0)
+            )
+        }
+    }
+}
+```
+
+### Scenes inside NavHost
+
+`IsometricScene` follows normal Compose lifecycle. When you navigate away from a destination, the scene's composition is disposed and the renderer is closed. When you navigate back, a fresh scene is created.
+
+To preserve camera position across navigation, keep `CameraState` in a `ViewModel` scoped to the navigation graph rather than the individual destination:
+
+```kotlin
+NavHost(navController, startDestination = "map") {
+    composable("map") {
+        val viewModel: MapViewModel = viewModel() // scoped to nav graph
+        MapScreen(viewModel)
+    }
+    composable("detail/{id}") { /* ... */ }
+}
+```
+
+## Quick Reference
+
+| Task | Pattern |
+|------|---------|
+| Size the scene | `Modifier.weight(1f)`, `Modifier.height(200.dp)`, `Modifier.fillMaxSize()` |
+| Share state | Declare state in parent, read/write from both sides |
+| Engine outside scene | `AdvancedSceneConfig(onEngineReady = { ... })` |
+| Overlay HUD | `Box { IsometricScene(...); FloatingActionButton(...) }` |
+| Bridge Material colors | `color.toIsoColor()` / `isoColor.toComposeColor()` |
+| Sync dark mode | Build `ColorPalette` from `MaterialTheme.colorScheme` in `remember(colors)` |
+| Stable engine | `val engine = remember { IsometricEngine() }` |
+| Survive rotation | Hoist `CameraState` into `ViewModel` |
+| Scene in `LazyColumn` | Fixed `Modifier.height()`, no drag gestures (or wrap in non-scrollable parent) |
+| Tap-only in scrollable | `GestureConfig(onTap = { ... })` without `onDrag` or `cameraState` |

@@ -63,6 +63,7 @@ See the [Quick Start guide](site/src/content/docs/getting-started/quickstart.mdx
 - [**Theming & Colors**](site/src/content/docs/guides/theming.mdx) — `IsoColor`, palettes, lighting, stroke styles
 - [**Custom Shapes**](site/src/content/docs/guides/custom-shapes.mdx) — `Path`, `Shape.extrude`, and `CustomNode`
 - [**Performance**](site/src/content/docs/guides/performance.mdx) — Caching, native canvas, spatial indexing
+- [**Compose Interop**](site/src/content/docs/guides/compose-interop.mdx) — Layout, state sharing, Material theming, navigation
 - [**Advanced Configuration**](site/src/content/docs/guides/advanced-config.mdx) — Lifecycle hooks, custom engines, escape hatches
 - [**Scene Graph**](site/src/content/docs/concepts/scene-graph.mdx) — Architecture, node types, and dirty tracking
 - [**Depth Sorting**](site/src/content/docs/concepts/depth-sorting.mdx) — How isometric draw order works
