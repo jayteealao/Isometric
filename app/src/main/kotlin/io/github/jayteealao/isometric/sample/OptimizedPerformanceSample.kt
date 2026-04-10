@@ -113,10 +113,14 @@ fun OptimizedPerformanceSample() {
             }
         }
 
-        // Scene with gesture handling
+        // Scene with gesture handling and performance toggles wired in
         IsometricScene(
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            config = SceneConfig(
+            config = AdvancedSceneConfig(
+                engine = engine,
+                enableSpatialIndex = enableSpatialIndex,
+                enablePathCaching = true,
+                useNativeCanvas = useNativeCanvas,
                 gestures = GestureConfig(
                     onTap = {
                         val startTime = System.nanoTime()
@@ -243,14 +247,21 @@ fun PerformanceComparisonDemo() {
         if (useOptimized) {
             // Optimized version with all optimizations enabled
             IsometricScene(
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                config = AdvancedSceneConfig(
+                    engine = engine,
+                    enablePathCaching = true,
+                    enableSpatialIndex = true,
+                    useNativeCanvas = true,
+                )
             ) {
                 LargeAnimatedGrid(wave)
             }
         } else {
-            // Standard version
+            // Standard version — default config, no optimizations
             IsometricScene(
-                modifier = Modifier.weight(1f).fillMaxWidth()
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                config = SceneConfig()
             ) {
                 LargeAnimatedGrid(wave)
             }

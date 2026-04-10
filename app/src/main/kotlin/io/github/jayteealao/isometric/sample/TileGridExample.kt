@@ -15,7 +15,7 @@ import io.github.jayteealao.isometric.compose.runtime.TileGrid
 import io.github.jayteealao.isometric.shapes.Prism
 
 /**
- * Interactive tile selector: a 10×10 grid where tapping a tile highlights it.
+ * Interactive tile selector: a 6×6 grid where tapping a tile highlights it.
  *
  * Demonstrates the hero scenario for [TileGrid]:
  * - No [GestureConfig] required on the scene — tap handling activates automatically
