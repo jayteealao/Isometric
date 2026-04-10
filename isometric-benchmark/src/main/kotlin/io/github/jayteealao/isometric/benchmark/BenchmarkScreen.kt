@@ -19,6 +19,7 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.LocalBenchmarkHooks
 import io.github.jayteealao.isometric.compose.runtime.RuntimeFlagSnapshot
 import io.github.jayteealao.isometric.compose.runtime.Shape
+import io.github.jayteealao.isometric.webgpu.WebGpuFrameCallback
 
 /**
  * Result of a benchmark run, bundling per-iteration metrics with raw timing
@@ -56,6 +57,30 @@ fun BenchmarkScreen(
     // Single collector instance — shared by hooks and orchestrator
     val collector = remember { MetricsCollector(config.measurementFrames) }
     val benchmarkHooks = remember(collector) { BenchmarkHooksImpl(collector) }
+
+    // WebGPU frame callback adapter — bridges WebGpuFrameCallback to MetricsCollector
+    // for CPU wall-clock draw timing and GPU timestamp delivery in the WebGPU render path.
+    val webGpuFrameCallback = remember(benchmarkHooks, collector) {
+        object : WebGpuFrameCallback {
+            private var drawStartNanos = 0L
+
+            override fun onDrawFrameStart() {
+                drawStartNanos = System.nanoTime()
+            }
+
+            override fun onDrawFrameEnd() {
+                val elapsed = System.nanoTime() - drawStartNanos
+                collector.recordDrawTime(elapsed)
+                benchmarkHooks.signalDrawComplete()
+            }
+
+            override fun onGpuTimestamps(computeNanos: Long, renderNanos: Long) {
+                collector.recordGpuComputeTime(computeNanos)
+                collector.recordGpuRenderTime(renderNanos)
+                collector.gpuTimestampsAvailable = true
+            }
+        }
+    }
 
     // Runtime flag snapshot — populated by IsometricScene's onFlagsReady callback
     var runtimeFlagSnapshot: RuntimeFlagSnapshot? = remember { null }
@@ -118,7 +143,8 @@ fun BenchmarkScreen(
                     runtimeFlagSnapshot = snapshot
                     orchestrator.viewportWidth = snapshot.canvasWidth
                     orchestrator.viewportHeight = snapshot.canvasHeight
-                }
+                },
+                webGpuFrameCallback = webGpuFrameCallback,
             )
         ) {
             ForEach(items, key = { it.id }) { item ->

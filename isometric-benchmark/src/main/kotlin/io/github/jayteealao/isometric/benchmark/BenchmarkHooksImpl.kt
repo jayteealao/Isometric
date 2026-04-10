@@ -16,7 +16,7 @@ class BenchmarkHooksImpl(
 
     private var prepareStartNanos: Long = 0
     private var drawStartNanos: Long = 0
-    var drawPassCount: Long = 0
+    @Volatile var drawPassCount: Long = 0
         private set
 
     override fun onPrepareStart() {
@@ -32,10 +32,13 @@ class BenchmarkHooksImpl(
         drawStartNanos = System.nanoTime()
     }
 
+    /** Increment [drawPassCount] to signal a draw pass completed, without recording draw time. */
+    fun signalDrawComplete() { drawPassCount++ }
+
     override fun onDrawEnd() {
         val elapsed = System.nanoTime() - drawStartNanos
         collector.recordDrawTime(elapsed)
-        drawPassCount++
+        signalDrawComplete()
     }
 
     override fun onCacheHit() {

@@ -261,7 +261,11 @@ internal class GpuSortKeyPacker(
      * @param encoder      The command encoder to record into.
      * @param paddedCount  Power-of-2 sort array size — must match [ensureBuffers].
      */
-    fun dispatch(encoder: GPUCommandEncoder, paddedCount: Int) {
+    fun dispatch(
+        encoder: GPUCommandEncoder,
+        paddedCount: Int,
+        timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
+    ) {
         require(paddedCount > 0) { "paddedCount must be > 0, got $paddedCount" }
         checkNotNull(computePipeline) { "Pipeline not ready — call ensurePipeline first" }
         checkNotNull(bindGroup) { "Bind group not ready — call ensureBuffers first" }
@@ -269,7 +273,9 @@ internal class GpuSortKeyPacker(
         val workgroupCount =
             ceil(paddedCount.toDouble() / PackSortKeysShader.WORKGROUP_SIZE).toInt()
 
-        val pass = encoder.beginComputePass()
+        val pass = timestampWrites?.let {
+            encoder.beginComputePass(androidx.webgpu.GPUComputePassDescriptor(timestampWrites = it))
+        } ?: encoder.beginComputePass()
         pass.setPipeline(computePipeline!!)
         pass.setBindGroup(0, bindGroup!!)
         pass.dispatchWorkgroups(workgroupCount)

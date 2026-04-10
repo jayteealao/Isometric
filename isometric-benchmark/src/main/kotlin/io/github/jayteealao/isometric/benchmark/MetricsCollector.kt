@@ -17,8 +17,14 @@ data class FrameMetrics(
     val allocatedMB: Double,
     val gcInvocations: Long,
     val frameCount: Int,
-    val warmupFrames: Int
+    val warmupFrames: Int,
+    val gpuComputeTimeMs: StatSummary = ZERO_STATS,
+    val gpuRenderTimeMs: StatSummary = ZERO_STATS,
+    val gpuTimestampsAvailable: Boolean = false,
 )
+
+/** Zero-valued [StatSummary] used as default for optional metrics. */
+val ZERO_STATS = StatSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 /**
  * Statistical summary of a metric distribution.
@@ -55,12 +61,16 @@ class MetricsCollector(private val maxFrames: Int) {
     private val frameTimes = LongArray(maxFrames)
     private val hitTestTimes = LongArray(maxFrames)
     private val mutationCounts = IntArray(maxFrames)
+    private val gpuComputeTimes = LongArray(maxFrames)
+    private val gpuRenderTimes = LongArray(maxFrames)
 
-    private var frameIndex = 0
+    @Volatile private var frameIndex = 0
     var cacheHits: Long = 0
         private set
     var cacheMisses: Long = 0
         private set
+    /** Whether GPU timestamp data was recorded during this iteration. */
+    @Volatile var gpuTimestampsAvailable: Boolean = false
 
     /** Warmup frame count, set by orchestrator after warmup completes */
     var warmupFrames: Int = 0
@@ -95,6 +105,27 @@ class MetricsCollector(private val maxFrames: Int) {
 
     fun recordCacheHit() { cacheHits++ }
     fun recordCacheMiss() { cacheMisses++ }
+
+    /**
+     * Record GPU compute pass duration in nanoseconds for the current frame.
+     *
+     * Note: GPU timestamps are delivered one frame late (double-buffered readback).
+     * The value stored at `gpuComputeTimes[N]` reflects GPU work from frame N-1.
+     * This does not affect aggregate statistics (mean, p50, etc.) but means raw
+     * per-frame GPU/CPU timing pairs are offset by one frame.
+     */
+    fun recordGpuComputeTime(nanos: Long) {
+        if (frameIndex < maxFrames) {
+            gpuComputeTimes[frameIndex] = nanos
+        }
+    }
+
+    /** Record GPU render pass duration in nanoseconds for the current frame. */
+    fun recordGpuRenderTime(nanos: Long) {
+        if (frameIndex < maxFrames) {
+            gpuRenderTimes[frameIndex] = nanos
+        }
+    }
 
     /** Record actual mutation count for the current frame */
     fun recordMutationCount(count: Int) {
@@ -131,6 +162,7 @@ class MetricsCollector(private val maxFrames: Int) {
         cacheHits = 0
         cacheMisses = 0
         warmupFrames = 0
+        gpuTimestampsAvailable = false
         // Arrays are overwritten by index, no need to clear
     }
 
@@ -167,7 +199,10 @@ class MetricsCollector(private val maxFrames: Int) {
             allocatedMB = allocatedMB,
             gcInvocations = gcInvocations,
             frameCount = count,
-            warmupFrames = warmupFrames
+            warmupFrames = warmupFrames,
+            gpuComputeTimeMs = computeStatsNonZero(gpuComputeTimes, count),
+            gpuRenderTimeMs = computeStatsNonZero(gpuRenderTimes, count),
+            gpuTimestampsAvailable = gpuTimestampsAvailable,
         )
     }
 
@@ -181,7 +216,9 @@ class MetricsCollector(private val maxFrames: Int) {
             prepareTimes = prepareTimes.copyOf(count),
             drawTimes = drawTimes.copyOf(count),
             frameTimes = frameTimes.copyOf(count),
-            hitTestTimes = hitTestTimes.copyOf(count)
+            hitTestTimes = hitTestTimes.copyOf(count),
+            gpuComputeTimes = gpuComputeTimes.copyOf(count),
+            gpuRenderTimes = gpuRenderTimes.copyOf(count),
         )
     }
 
@@ -220,6 +257,18 @@ class MetricsCollector(private val maxFrames: Int) {
         return StatSummary(mean, p50, p95, p99, min, max, stdDev, cv)
     }
 
+    /**
+     * Compute stats excluding zero entries. Used for GPU timestamps where frame-0
+     * (no previous readback) and the last frame (readback arrives after loop ends)
+     * have 0L values that would distort statistics.
+     */
+    private fun computeStatsNonZero(data: LongArray, count: Int): StatSummary {
+        if (count == 0) return StatSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        val nonZero = data.copyOf(count).filter { it > 0L }.toLongArray()
+        if (nonZero.isEmpty()) return StatSummary(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        return computeStats(nonZero, nonZero.size)
+    }
+
     private fun percentileIndex(count: Int, percentile: Int): Int {
         return ((count - 1) * percentile / 100).coerceIn(0, count - 1)
     }
@@ -232,7 +281,9 @@ data class RawTimings(
     val prepareTimes: LongArray,
     val drawTimes: LongArray,
     val frameTimes: LongArray,
-    val hitTestTimes: LongArray
+    val hitTestTimes: LongArray,
+    val gpuComputeTimes: LongArray = LongArray(0),
+    val gpuRenderTimes: LongArray = LongArray(0),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -240,7 +291,9 @@ data class RawTimings(
         return prepareTimes.contentEquals(other.prepareTimes) &&
                 drawTimes.contentEquals(other.drawTimes) &&
                 frameTimes.contentEquals(other.frameTimes) &&
-                hitTestTimes.contentEquals(other.hitTestTimes)
+                hitTestTimes.contentEquals(other.hitTestTimes) &&
+                gpuComputeTimes.contentEquals(other.gpuComputeTimes) &&
+                gpuRenderTimes.contentEquals(other.gpuRenderTimes)
     }
 
     override fun hashCode(): Int {
@@ -248,6 +301,8 @@ data class RawTimings(
         result = 31 * result + drawTimes.contentHashCode()
         result = 31 * result + frameTimes.contentHashCode()
         result = 31 * result + hitTestTimes.contentHashCode()
+        result = 31 * result + gpuComputeTimes.contentHashCode()
+        result = 31 * result + gpuRenderTimes.contentHashCode()
         return result
     }
 }

@@ -42,6 +42,11 @@ internal class SceneCache(
     )
 
     // Cache state
+    // @Volatile: written by the prepare LaunchedEffect on Dispatchers.Default,
+    // read by the WebGPU render loop on a different Dispatchers.Default thread.
+    // Without volatile, the render loop thread may cache a stale null reference
+    // indefinitely, causing a permanent black screen in the WebGPU path.
+    @Volatile
     var currentPreparedScene: PreparedScene? = null
         private set
     var cachedPaths: List<CachedPath>? = null

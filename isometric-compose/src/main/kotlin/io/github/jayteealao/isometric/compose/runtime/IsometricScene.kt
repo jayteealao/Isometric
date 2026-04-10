@@ -668,12 +668,16 @@ fun IsometricScene(
                     canvasHeight = it.height
                 }
         ) {
-            webGpuRenderBackend.Surface(
-                preparedScene = backendPreparedSceneState,
-                renderContext = renderContext,
-                modifier = Modifier.fillMaxSize(),
-                strokeStyle = config.strokeStyle,
-            )
+            CompositionLocalProvider(
+                LocalWebGpuFrameCallback provides (config as? AdvancedSceneConfig)?.webGpuFrameCallback
+            ) {
+                webGpuRenderBackend.Surface(
+                    preparedScene = backendPreparedSceneState,
+                    renderContext = renderContext,
+                    modifier = Modifier.fillMaxSize(),
+                    strokeStyle = config.strokeStyle,
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()

@@ -21,6 +21,7 @@ import androidx.webgpu.helper.Util.windowFromSurface
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuFullPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
+import io.github.jayteealao.isometric.webgpu.pipeline.GpuTimestampProfiler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -82,13 +83,26 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         preparedScene: State<PreparedScene?>,
         renderContextWidth: State<Int>,
         renderContextHeight: State<Int>,
+        frameCallback: WebGpuFrameCallback = object : WebGpuFrameCallback {},
+        enableGpuTimestamps: Boolean = false,
     ) {
+        var profiler: GpuTimestampProfiler? = null
         try {
             ensureInitialized(
                 androidSurface = androidSurface,
                 width = surfaceWidth,
                 height = surfaceHeight,
+                enableGpuTimestamps = enableGpuTimestamps,
             )
+
+            // Create GPU timestamp profiler if supported and requested
+            val ctx = gpuContext
+            if (enableGpuTimestamps && ctx != null && ctx.supportsTimestamps) {
+                profiler = ctx.withGpu { GpuTimestampProfiler(ctx.device, ctx.instance, ctx.queue) }
+                Log.i(TAG, "GPU timestamp profiler enabled")
+            } else if (enableGpuTimestamps) {
+                Log.i(TAG, "GPU timestamps requested but not supported by device")
+            }
 
             while (currentCoroutineContext().isActive) {
                 // F3: Reconfigure the surface if the viewport dimensions changed since
@@ -123,16 +137,37 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 // CancellationException is always re-thrown — it means the caller
                 // cancelled the render loop intentionally (Activity exit, recompose).
                 try {
+                    // Read back previous frame's GPU timestamps (one frame late).
+                    // readResults() uses raw mapAsync + processEvents pumping internally
+                    // (not mapAndAwait) to avoid deadlocking the single GPU thread.
+                    // Must run on GPU thread since processEvents is thread-confined.
+                    if (profiler != null) {
+                        val result = gpuContext?.withGpu { profiler.readResults() }
+                        if (result != null) {
+                            frameCallback.onGpuTimestamps(
+                                computeNanos = result.totalComputeNanos,
+                                renderNanos = result.renderPassNanos,
+                            )
+                        }
+                    }
+
                     val scene = preparedScene.value
                     // Re-upload when scene changes OR when viewport was reconfigured since
                     // the last upload (uniforms and emit bind group include viewport dims).
                     val viewportChanged = currentWidth != lastUploadWidth ||
                         currentHeight != lastUploadHeight
                     if (scene !== lastScene || viewportChanged) {
+                        frameCallback.onUploadStart()
                         uploadScene(scene)
+                        frameCallback.onUploadEnd()
                         lastScene = scene
                     }
-                    drawFrame(androidSurface)
+                    frameCallback.onDrawFrameStart()
+                    drawFrame(androidSurface, profiler)
+                    frameCallback.onDrawFrameEnd()
+
+                    // Swap profiler buffers so next frame reads this frame's timestamps
+                    profiler?.swapBuffers()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -147,6 +182,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 currentCoroutineContext().ensureActive()
             }
         } finally {
+            profiler?.close()
             cleanup()
         }
     }
@@ -155,6 +191,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         androidSurface: Surface,
         width: Int,
         height: Int,
+        enableGpuTimestamps: Boolean = false,
     ) {
         if (gpuContext != null && gpuSurface != null && renderPipeline != null && fullPipeline != null) return
 
@@ -182,7 +219,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             // G1: Use createForSurface() to guarantee the selected adapter is compatible
             // with the render surface. The surface is created inside the factory so the
             // GPUInstance is available when GPUSurface is constructed.
-            val (newContext, surface) = GpuContext.createForSurface { instance ->
+            val (newContext, surface) = GpuContext.createForSurface(enableTimestamps = enableGpuTimestamps) { instance ->
                 instance.createSurface(
                     GPUSurfaceDescriptor(
                         label = "IsometricSurface",
@@ -295,7 +332,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         }
     }
 
-    private suspend fun drawFrame(androidSurface: Surface) {
+    private suspend fun drawFrame(
+        androidSurface: Surface,
+        profiler: GpuTimestampProfiler? = null,
+    ) {
         val ctx = checkNotNull(gpuContext)
         val surface = checkNotNull(gpuSurface)
         val pipeline = checkNotNull(renderPipeline)
@@ -334,7 +374,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                             gp!!.dispatchIndividualSubmits()
                         } else {
                             val computeEncoder = ctx.device.createCommandEncoder()
-                            gp!!.dispatch(computeEncoder)
+                            gp!!.dispatch(computeEncoder, profiler)
                             val computeCmdBuf = computeEncoder.finish()
                             ctx.queue.submit(arrayOf(computeCmdBuf))
                             computeCmdBuf.close()
@@ -352,7 +392,8 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                                     loadOp = LoadOp.Clear,
                                     storeOp = StoreOp.Store,
                                 )
-                            )
+                            ),
+                            timestampWrites = profiler?.timestampWritesFor(4),
                         )
                     )
 
@@ -371,6 +412,16 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     ctx.queue.submit(arrayOf(renderCmdBuf))
                     renderCmdBuf.close()
                     renderEncoder.close()
+
+                    // Resolve timestamp queries → readback buffer (after compute+render)
+                    if (profiler != null) {
+                        val resolveEncoder = ctx.device.createCommandEncoder()
+                        profiler.encodeResolveAndCopy(resolveEncoder)
+                        val resolveCmdBuf = resolveEncoder.finish()
+                        ctx.queue.submit(arrayOf(resolveCmdBuf))
+                        resolveCmdBuf.close()
+                        resolveEncoder.close()
+                    }
 
                     // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
                     // the Vulkan surface is invalidated before the render loop is cancelled;

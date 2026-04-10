@@ -273,21 +273,21 @@ internal class GpuFullPipeline(
      *
      * @param encoder The command encoder to record compute passes into.
      */
-    fun dispatch(encoder: GPUCommandEncoder) {
+    fun dispatch(encoder: GPUCommandEncoder, profiler: GpuTimestampProfiler? = null) {
         val faceCount = lastFaceCount
         require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
 
         // M3: Transform + Cull + Light — one thread per face.
-        transform.dispatch(encoder, faceCount)
+        transform.dispatch(encoder, faceCount, profiler?.timestampWritesFor(0))
 
         // M4a: Pack sort keys — one thread per padded entry.
-        packer.dispatch(encoder, lastPaddedCount)
+        packer.dispatch(encoder, lastPaddedCount, profiler?.timestampWritesFor(1))
 
         // M4b: Bitonic sort — all stages in one encoder.
-        sort.dispatch(encoder)
+        sort.dispatch(encoder, profiler?.timestampWritesFor(2))
 
         // M5: Triangulate+Emit — fixed-stride, no atomicAdd, no separate indirect-args pass.
-        emit.dispatch(encoder)
+        emit.dispatch(encoder, profiler?.timestampWritesFor(3))
     }
 
     /**

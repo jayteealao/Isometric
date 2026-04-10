@@ -145,7 +145,10 @@ object ResultsExporter {
             allocatedMB = iterations.maxOf { it.allocatedMB },
             gcInvocations = iterations.maxOf { it.gcInvocations },
             frameCount = iterations.first().frameCount,
-            warmupFrames = iterations.first().warmupFrames
+            warmupFrames = iterations.first().warmupFrames,
+            gpuComputeTimeMs = aggregateStats { it.gpuComputeTimeMs },
+            gpuRenderTimeMs = aggregateStats { it.gpuRenderTimeMs },
+            gpuTimestampsAvailable = iterations.all { it.gpuTimestampsAvailable },
         )
     }
 
@@ -193,7 +196,11 @@ object ResultsExporter {
             "deviceModel",
             "androidVersion",
             "isEmulator",
-            "timestamp"
+            "timestamp",
+            "gpuComputeMs",
+            "gpuRenderMs",
+            "gpuTotalMs",
+            "gpuTimestampsAvailable"
         ))
         return columns.joinToString(",")
     }
@@ -259,6 +266,12 @@ object ResultsExporter {
         values.add(isEmulator().toString())
         values.add(runTimestamp ?: "unknown")
 
+        // GPU timestamp columns (appended for backward compatibility)
+        values.add("%.4f".format(metrics.gpuComputeTimeMs.mean))
+        values.add("%.4f".format(metrics.gpuRenderTimeMs.mean))
+        values.add("%.4f".format(metrics.gpuComputeTimeMs.mean + metrics.gpuRenderTimeMs.mean))
+        values.add(metrics.gpuTimestampsAvailable.toString())
+
         return values.joinToString(",")
     }
 
@@ -322,6 +335,13 @@ object ResultsExporter {
                     put("allocatedMB", metrics.allocatedMB)
                     put("gcInvocations", metrics.gcInvocations)
 
+                    // GPU timestamp summary
+                    put("gpuTimestamps", JSONObject().apply {
+                        put("available", metrics.gpuTimestampsAvailable)
+                        put("compute", metricsToJson(metrics.gpuComputeTimeMs))
+                        put("render", metricsToJson(metrics.gpuRenderTimeMs))
+                    })
+
                     // Raw per-frame timings for this iteration
                     if (index < iterationRawTimings.size) {
                         val raw = iterationRawTimings[index]
@@ -330,6 +350,8 @@ object ResultsExporter {
                             put("drawTimes", longArrayToJsonArray(raw.drawTimes))
                             put("frameTimes", longArrayToJsonArray(raw.frameTimes))
                             put("hitTestTimes", longArrayToJsonArray(raw.hitTestTimes))
+                            put("gpuComputeTimes", longArrayToJsonArray(raw.gpuComputeTimes))
+                            put("gpuRenderTimes", longArrayToJsonArray(raw.gpuRenderTimes))
                         })
                     }
                 })

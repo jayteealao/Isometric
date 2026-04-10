@@ -258,7 +258,11 @@ internal class GpuTransformPipeline(
      * @param encoder    The command encoder to record into.
      * @param faceCount  Number of active faces in the scene (> 0).
      */
-    fun dispatch(encoder: GPUCommandEncoder, faceCount: Int) {
+    fun dispatch(
+        encoder: GPUCommandEncoder,
+        faceCount: Int,
+        timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
+    ) {
         require(faceCount > 0) { "faceCount must be > 0, got $faceCount" }
         checkNotNull(computePipeline) { "Pipeline not ready — call ensurePipeline first" }
         checkNotNull(bindGroup) { "Bind group not ready — call ensureBuffers first" }
@@ -266,7 +270,9 @@ internal class GpuTransformPipeline(
         val workgroups = ceil(faceCount.toDouble() / TransformCullLightShader.WORKGROUP_SIZE)
             .toInt()
 
-        val pass = encoder.beginComputePass()
+        val pass = timestampWrites?.let {
+            encoder.beginComputePass(androidx.webgpu.GPUComputePassDescriptor(timestampWrites = it))
+        } ?: encoder.beginComputePass()
         pass.setPipeline(computePipeline!!)
         pass.setBindGroup(0, bindGroup!!)
         pass.dispatchWorkgroups(workgroups)

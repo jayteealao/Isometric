@@ -271,7 +271,10 @@ internal class GpuBitonicSort(
      *
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
-    fun dispatch(encoder: GPUCommandEncoder) {
+    fun dispatch(
+        encoder: GPUCommandEncoder,
+        timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
+    ) {
         checkNotNull(sortPipeline) { "Pipeline not ready — call ensurePipeline first" }
         val bindGroups = checkNotNull(cachedBindGroups) {
             "Bind groups not ready — call ensureBuffers first"
@@ -280,8 +283,24 @@ internal class GpuBitonicSort(
         val workgroupCount =
             ceil(cachedPaddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
 
-        for (bg in bindGroups) {
-            val pass = encoder.beginComputePass()
+        for ((idx, bg) in bindGroups.withIndex()) {
+            // Timestamp the first pass (beginning) and last pass (end) to measure total sort time
+            val passTimestamps = when {
+                timestampWrites == null -> null
+                idx == 0 && bindGroups.size == 1 -> timestampWrites // single pass: both timestamps
+                idx == 0 -> androidx.webgpu.GPUPassTimestampWrites(
+                    querySet = timestampWrites.querySet,
+                    beginningOfPassWriteIndex = timestampWrites.beginningOfPassWriteIndex,
+                )
+                idx == bindGroups.size - 1 -> androidx.webgpu.GPUPassTimestampWrites(
+                    querySet = timestampWrites.querySet,
+                    endOfPassWriteIndex = timestampWrites.endOfPassWriteIndex,
+                )
+                else -> null
+            }
+            val pass = passTimestamps?.let {
+                encoder.beginComputePass(androidx.webgpu.GPUComputePassDescriptor(timestampWrites = it))
+            } ?: encoder.beginComputePass()
             pass.setPipeline(sortPipeline!!)
             pass.setBindGroup(0, bg)
             pass.dispatchWorkgroups(workgroupCount)

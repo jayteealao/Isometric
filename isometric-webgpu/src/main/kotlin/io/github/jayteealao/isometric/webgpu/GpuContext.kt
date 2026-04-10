@@ -12,6 +12,7 @@ import androidx.webgpu.GPURequestAdapterOptions
 import androidx.webgpu.GPUSurface
 import androidx.webgpu.PowerPreference
 import androidx.webgpu.DeviceLostCallback
+import androidx.webgpu.FeatureName
 import androidx.webgpu.UncapturedErrorCallback
 import androidx.webgpu.helper.initLibrary
 import java.util.concurrent.Executor
@@ -66,6 +67,8 @@ class GpuContext private constructor(
     private val pollingJob: Job,
     private val isClosing: AtomicBoolean,
     private val lastFailure: AtomicReference<Throwable?>,
+    /** Whether the device was created with `FeatureName.TimestampQuery` enabled. */
+    val supportsTimestamps: Boolean = false,
 ) {
     companion object {
         private const val TAG = "GpuContext"
@@ -91,6 +94,7 @@ class GpuContext private constructor(
          */
         suspend fun create(
             requestAdapterOptionsFactory: ((GPUInstance) -> GPURequestAdapterOptions)? = null,
+            enableTimestamps: Boolean = false,
         ): GpuContext {
             // Must be called before any androidx.webgpu call.
             initLibrary()
@@ -107,7 +111,7 @@ class GpuContext private constructor(
 
             // Run all Dawn initialization on the dedicated GPU thread.
             // On failure, shut down the dispatcher to avoid leaking the thread.
-            val (instance, adapter, device) = try {
+            val (instance, adapter, device, timestampsAvailable) = try {
                 withContext(gpuDispatcher) {
                     // Capture the thread reference (runs on the GPU thread).
                     if (gpuThreadRef == null) gpuThreadRef = Thread.currentThread()
@@ -122,10 +126,14 @@ class GpuContext private constructor(
 
                     val adapter = instance.requestAdapter(adapterOptions)
 
-                    val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure))
+                    val timestampsOk = enableTimestamps && adapter.hasFeature(FeatureName.TimestampQuery)
+                    if (enableTimestamps && !timestampsOk) {
+                        Log.w(TAG, "create: TimestampQuery requested but adapter does not support it")
+                    }
+                    val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure, timestampsOk))
 
                     assertComputeLimits(device)
-                    ContextInitResult(instance, adapter, device)
+                    ContextInitResult(instance, adapter, device, timestampsOk)
                 }
             } catch (t: Throwable) {
                 gpuDispatcher.close()
@@ -144,6 +152,7 @@ class GpuContext private constructor(
                 pollingJob = pollingJob,
                 isClosing = isClosing,
                 lastFailure = lastFailure,
+                supportsTimestamps = timestampsAvailable,
             )
         }
 
@@ -169,6 +178,7 @@ class GpuContext private constructor(
          * @throws Exception if adapter or device creation fails after both attempts.
          */
         suspend fun createForSurface(
+            enableTimestamps: Boolean = false,
             surfaceFactory: (GPUInstance) -> GPUSurface,
         ): Pair<GpuContext, GPUSurface> {
             initLibrary()
@@ -183,7 +193,7 @@ class GpuContext private constructor(
 
             val lastFailure = AtomicReference<Throwable?>(null)
 
-            val (instance, adapter, device, surface) = try {
+            val (instance, adapter, device, surface, timestampsAvailable) = try {
                 withContext(gpuDispatcher) {
                     if (gpuThreadRef == null) gpuThreadRef = Thread.currentThread()
 
@@ -212,10 +222,14 @@ class GpuContext private constructor(
                         )
                     }
 
-                    val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure))
+                    val timestampsOk = enableTimestamps && adapter.hasFeature(FeatureName.TimestampQuery)
+                    if (enableTimestamps && !timestampsOk) {
+                        Log.w(TAG, "createForSurface: TimestampQuery requested but adapter does not support it")
+                    }
+                    val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure, timestampsOk))
 
                     assertComputeLimits(device)
-                    SurfaceInitResult(instance, adapter, device, surface)
+                    SurfaceInitResult(instance, adapter, device, surface, timestampsOk)
                 }
             } catch (t: Throwable) {
                 gpuDispatcher.close()
@@ -235,6 +249,7 @@ class GpuContext private constructor(
                 pollingJob = pollingJob,
                 isClosing = isClosing,
                 lastFailure = lastFailure,
+                supportsTimestamps = timestampsAvailable,
             )
             return context to surface
         }
@@ -267,9 +282,11 @@ class GpuContext private constructor(
          */
         private fun buildDeviceDescriptor(
             lastFailure: AtomicReference<Throwable?>,
+            enableTimestamps: Boolean = false,
         ): GPUDeviceDescriptor = GPUDeviceDescriptor(
             deviceLostCallbackExecutor = Executor(Runnable::run),
             uncapturedErrorCallbackExecutor = Executor(Runnable::run),
+            requiredFeatures = if (enableTimestamps) intArrayOf(FeatureName.TimestampQuery) else intArrayOf(),
             deviceLostCallback = DeviceLostCallback { _, reason, message ->
                 lastFailure.compareAndSet(
                     null,
@@ -318,6 +335,7 @@ class GpuContext private constructor(
             val instance: GPUInstance,
             val adapter: GPUAdapter,
             val device: GPUDevice,
+            val timestampsAvailable: Boolean = false,
         )
 
         /** Typed result of the [createForSurface] init block, used for destructuring. */
@@ -326,6 +344,7 @@ class GpuContext private constructor(
             val adapter: GPUAdapter,
             val device: GPUDevice,
             val surface: GPUSurface,
+            val timestampsAvailable: Boolean = false,
         )
     }
 

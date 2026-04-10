@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.compose.runtime.LocalWebGpuFrameCallback
 import io.github.jayteealao.isometric.compose.runtime.RenderContext
 import io.github.jayteealao.isometric.compose.runtime.StrokeStyle
 import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
@@ -29,6 +30,7 @@ internal class WebGpuRenderBackend : RenderBackend {
         strokeStyle: StrokeStyle,
     ) {
         val renderer = remember { WebGpuSceneRenderer() }
+        val frameCallback = LocalWebGpuFrameCallback.current
         val currentPreparedScene by rememberUpdatedState(preparedScene)
 
         // F3: Track renderContext dimensions as State so the renderLoop can observe changes
@@ -62,6 +64,8 @@ internal class WebGpuRenderBackend : RenderBackend {
                     )
                 }
                 withContext(Dispatchers.Default) {
+                    val typedCallback = frameCallback as? WebGpuFrameCallback
+                        ?: object : WebGpuFrameCallback {}
                     renderer.renderLoop(
                         androidSurface = surface,
                         surfaceWidth = width,
@@ -69,6 +73,9 @@ internal class WebGpuRenderBackend : RenderBackend {
                         preparedScene = currentPreparedScene,
                         renderContextWidth = contextWidth,
                         renderContextHeight = contextHeight,
+                        frameCallback = typedCallback,
+                        // Enable GPU timestamps only when a real WebGpuFrameCallback is provided
+                        enableGpuTimestamps = frameCallback is WebGpuFrameCallback,
                     )
                 }
             }

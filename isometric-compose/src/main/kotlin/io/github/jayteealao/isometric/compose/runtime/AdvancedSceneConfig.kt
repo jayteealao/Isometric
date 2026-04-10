@@ -78,7 +78,13 @@ class AdvancedSceneConfig(
     val onRendererReady: ((IsometricRenderer) -> Unit)? = null,
     val onBeforeDraw: (DrawScope.() -> Unit)? = null,
     val onAfterDraw: (DrawScope.() -> Unit)? = null,
-    val onPreparedSceneReady: ((PreparedScene) -> Unit)? = null
+    val onPreparedSceneReady: ((PreparedScene) -> Unit)? = null,
+    /**
+     * Type-erased frame callback for WebGPU benchmark timing instrumentation.
+     * In practice a `WebGpuFrameCallback` from `isometric-webgpu` — type-erased because
+     * this module does not depend on `isometric-webgpu`. Ignored by Canvas backends.
+     */
+    val webGpuFrameCallback: Any? = null
 ) : SceneConfig(
     renderOptions = renderOptions,
     lightDirection = lightDirection,

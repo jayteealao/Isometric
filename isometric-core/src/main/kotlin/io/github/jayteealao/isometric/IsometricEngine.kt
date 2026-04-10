@@ -294,7 +294,7 @@ class IsometricEngine @JvmOverloads constructor(
         }
 
         // Sort by depth if enabled (same guard as synchronous path)
-        val sortedItems = if (renderOptions.enableDepthSorting) {
+        val sortedItems = if (renderOptions.enableDepthSorting && transformedItems.isNotEmpty()) {
             // Extract depth keys for GPU sort, reusing the FloatArray when the
             // count is unchanged (typical for animated scenes with a fixed model).
             val count = transformedItems.size

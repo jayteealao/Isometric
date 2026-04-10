@@ -373,14 +373,19 @@ internal class GpuTriangulateEmitPipeline(
      *
      * @param encoder The command encoder to record into.
      */
-    fun dispatch(encoder: GPUCommandEncoder) {
+    fun dispatch(
+        encoder: GPUCommandEncoder,
+        timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
+    ) {
         check(emitPipeline != null) { "Pipeline not ready — call ensurePipelines first" }
         check(emitBindGroup != null) { "Bind group not ready — call ensureBuffers first" }
 
         val workgroupCount =
             ceil(lastPaddedCount.toDouble() / TriangulateEmitShader.WORKGROUP_SIZE).toInt()
 
-        val emitPass = encoder.beginComputePass()
+        val emitPass = timestampWrites?.let {
+            encoder.beginComputePass(androidx.webgpu.GPUComputePassDescriptor(timestampWrites = it))
+        } ?: encoder.beginComputePass()
         emitPass.setPipeline(emitPipeline!!)
         emitPass.setBindGroup(0, emitBindGroup!!)
         emitPass.dispatchWorkgroups(workgroupCount)

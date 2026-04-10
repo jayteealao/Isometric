@@ -152,6 +152,17 @@ val LocalColorPalette = staticCompositionLocalOf {
 val LocalBenchmarkHooks = staticCompositionLocalOf<RenderBenchmarkHooks?> { null }
 
 /**
+ * CompositionLocal for passing a type-erased frame callback to the WebGPU render backend.
+ *
+ * In practice, the value is a `WebGpuFrameCallback` instance from `isometric-webgpu`.
+ * Type-erased to `Any?` because this module does not depend on `isometric-webgpu`.
+ * The WebGPU backend reads this and casts internally. Canvas backends ignore it.
+ *
+ * Defaults to null (no callback).
+ */
+val LocalWebGpuFrameCallback = staticCompositionLocalOf<Any?> { null }
+
+/**
  * CompositionLocal for providing the [IsometricEngine] to child composables.
  *
  * Uses [staticCompositionLocalOf] because the engine instance is set once per

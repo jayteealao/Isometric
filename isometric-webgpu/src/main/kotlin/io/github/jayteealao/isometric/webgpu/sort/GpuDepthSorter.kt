@@ -161,21 +161,24 @@ class GpuDepthSorter(
 
                     ctx.checkHealthy()
 
-                    // Encode all compute passes in one command buffer.
-                    val encoder = ctx.device.createCommandEncoder()
-
-                    // Encode all bitonic sort stages using cached bind groups.
-                    // Each compute pass encoder wraps a native Dawn handle via JNI.
-                    // Explicitly close() after end() to release the native handle
-                    // immediately rather than waiting for GC finalization, which
-                    // can't keep up at 60fps (~45 passes/frame = ~2700 handles/sec).
+                    // Submit each bitonic sort stage as a separate queue.submit() call.
+                    // On Adreno, compute→compute barriers within a single VkCommandBuffer
+                    // may not be honoured, causing subsequent stages to read stale data.
+                    // Submitting individually forces Dawn to insert a Vulkan timeline
+                    // semaphore between consecutive stages, guaranteeing visibility.
+                    // See GpuBitonicSort.dispatchIndividually() for the same workaround.
                     for (idx in bindGroups.indices) {
+                        val encoder = ctx.device.createCommandEncoder()
                         val pass = encoder.beginComputePass()
                         pass.setPipeline(sortPipeline!!)
                         pass.setBindGroup(0, bindGroups[idx])
                         pass.dispatchWorkgroups(workgroupCount)
                         pass.end()
                         pass.close()
+                        val commandBuffer = encoder.finish()
+                        ctx.queue.submit(arrayOf(commandBuffer))
+                        commandBuffer.close()
+                        encoder.close()
                     }
 
                     // The final result is in primary or scratch depending on stage count parity.
@@ -186,16 +189,14 @@ class GpuDepthSorter(
                     }
 
                     // Copy final sorted result to the readback buffer.
-                    encoder.copyBufferToBuffer(
+                    val copyEncoder = ctx.device.createCommandEncoder()
+                    copyEncoder.copyBufferToBuffer(
                         finalOutputBuffer, 0L, resultReadback!!, 0L, sortBufferSize
                     )
-
-                    // Single submit for the entire sort operation.
-                    // Close the command buffer and encoder immediately after submit.
-                    val commandBuffer = encoder.finish()
-                    ctx.queue.submit(arrayOf(commandBuffer))
-                    commandBuffer.close()
-                    encoder.close()
+                    val copyCmdBuf = copyEncoder.finish()
+                    ctx.queue.submit(arrayOf(copyCmdBuf))
+                    copyCmdBuf.close()
+                    copyEncoder.close()
                     onProgress("Submitted sort for $count depth keys", count)
 
                     // Wait for GPU work and map readback buffer using reusable callbacks

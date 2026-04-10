@@ -44,5 +44,6 @@ docs/internal/reviews/performance-deep-dive-part1.md
 # Benchmark comparison scripts (ephemeral analysis tooling)
 compare_benchmarks.py
 compare_gc.py
-build-logic/.kotlin/errors/errors-1775216256585.log
-build-logic/.kotlin/errors/errors-1775216297051.log
+/build-logic/.kotlin/errors/errors-1775216256585.log
+/build-logic/.kotlin/errors/errors-1775216297051.log
+webgpu_screen.png
