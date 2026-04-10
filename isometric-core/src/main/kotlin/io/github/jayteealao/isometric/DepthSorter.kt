@@ -181,7 +181,7 @@ internal object DepthSorter {
                 for (b in a + 1 until bucket.size) {
                     val first = minOf(bucket[a], bucket[b])
                     val second = maxOf(bucket[a], bucket[b])
-                    val key = pairKey(first, second)
+                    val key = symmetricPairHash(first, second)
                     if (seen.add(key)) {
                         pairs.add(packPair(second, first))
                     }
@@ -196,7 +196,8 @@ internal object DepthSorter {
         return (col.toLong() shl 32) xor (row.toLong() and 0xffffffffL)
     }
 
-    private fun pairKey(first: Int, second: Int): Long {
+    /** Commutative hash for dedup: order of first/second does not matter. */
+    private fun symmetricPairHash(first: Int, second: Int): Long {
         return (first.toLong() shl 32) xor (second.toLong() and 0xffffffffL)
     }
 
