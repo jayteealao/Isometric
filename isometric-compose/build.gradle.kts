@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.jayteealao"
-version = "1.1.0-SNAPSHOT"
+version = "1.1.0"
 
 android {
     namespace = "io.github.jayteealao.isometric.compose"
