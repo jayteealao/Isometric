@@ -12,8 +12,11 @@ public final class io/github/jayteealao/isometric/HitOrder : java/lang/Enum {
 public final class io/github/jayteealao/isometric/IntersectionUtils {
 	public static final field INSTANCE Lio/github/jayteealao/isometric/IntersectionUtils;
 	public final fun hasIntersection (Ljava/util/List;Ljava/util/List;)Z
+	public final fun hasIntersection ([D[D)Z
 	public final fun isPointCloseToPoly (Ljava/util/List;DDD)Z
+	public final fun isPointCloseToPoly ([DDDD)Z
 	public final fun isPointInPoly (Ljava/util/List;DD)Z
+	public final fun isPointInPoly ([DDD)Z
 }
 
 public final class io/github/jayteealao/isometric/IsoColor {
@@ -55,6 +58,7 @@ public final class io/github/jayteealao/isometric/IsoColor {
 	public final fun lighten (DLio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/IsoColor;
 	public final fun toRGBA ()[I
 	public fun toString ()Ljava/lang/String;
+	public final fun withAlpha (F)Lio/github/jayteealao/isometric/IsoColor;
 }
 
 public final class io/github/jayteealao/isometric/IsoColor$Companion {
@@ -77,9 +81,11 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 	public fun clear ()V
 	public fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
 	public final fun getAngle ()D
+	public final fun getProjectionParams ()Lio/github/jayteealao/isometric/ProjectionParams;
 	public fun getProjectionVersion ()J
 	public final fun getScale ()D
 	public fun projectScene (IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;)Lio/github/jayteealao/isometric/PreparedScene;
+	public fun projectSceneAsync (IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/SortingComputeBackend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun screenToWorld (Lio/github/jayteealao/isometric/Point2D;IID)Lio/github/jayteealao/isometric/Point;
 	public static synthetic fun screenToWorld$default (Lio/github/jayteealao/isometric/IsometricEngine;Lio/github/jayteealao/isometric/Point2D;IIDILjava/lang/Object;)Lio/github/jayteealao/isometric/Point;
 	public final fun setAngle (D)V
@@ -171,11 +177,36 @@ public final class io/github/jayteealao/isometric/Point2D$Companion {
 }
 
 public final class io/github/jayteealao/isometric/PreparedScene {
-	public fun <init> (Ljava/util/List;II)V
+	public fun <init> (Ljava/util/List;IILio/github/jayteealao/isometric/ProjectionParams;Lio/github/jayteealao/isometric/Vector;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommands ()Ljava/util/List;
 	public final fun getHeight ()I
+	public final fun getLightDirection ()Lio/github/jayteealao/isometric/Vector;
+	public final fun getProjectionParams ()Lio/github/jayteealao/isometric/ProjectionParams;
 	public final fun getWidth ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/ProjectionParams {
+	public fun <init> (DDDDDDLio/github/jayteealao/isometric/IsoColor;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()D
+	public final fun component7 ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun copy (DDDDDDLio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/ProjectionParams;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/ProjectionParams;DDDDDDLio/github/jayteealao/isometric/IsoColor;ILjava/lang/Object;)Lio/github/jayteealao/isometric/ProjectionParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColorDifference ()D
+	public final fun getLightColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getScale ()D
+	public final fun getT00 ()D
+	public final fun getT01 ()D
+	public final fun getT10 ()D
+	public final fun getT11 ()D
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -191,9 +222,9 @@ public final class io/github/jayteealao/isometric/RenderCommand {
 	public final fun getOwnerNodeId ()Ljava/lang/String;
 	public final fun getPointCount ()I
 	public final fun getPoints ()[D
+	public fun hashCode ()I
 	public final fun pointX (I)D
 	public final fun pointY (I)D
-	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -233,6 +264,7 @@ public abstract interface class io/github/jayteealao/isometric/SceneProjector {
 	public abstract fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
 	public abstract fun getProjectionVersion ()J
 	public abstract fun projectScene (IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;)Lio/github/jayteealao/isometric/PreparedScene;
+	public abstract fun projectSceneAsync (IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/SortingComputeBackend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/jayteealao/isometric/SceneProjector$Companion {
@@ -244,6 +276,8 @@ public final class io/github/jayteealao/isometric/SceneProjector$DefaultImpls {
 	public static synthetic fun findItemAt$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;DILjava/lang/Object;)Lio/github/jayteealao/isometric/RenderCommand;
 	public static fun getProjectionVersion (Lio/github/jayteealao/isometric/SceneProjector;)J
 	public static synthetic fun projectScene$default (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;ILjava/lang/Object;)Lio/github/jayteealao/isometric/PreparedScene;
+	public static fun projectSceneAsync (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/SortingComputeBackend;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun projectSceneAsync$default (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/SortingComputeBackend;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public class io/github/jayteealao/isometric/Shape {
@@ -264,6 +298,10 @@ public class io/github/jayteealao/isometric/Shape {
 public final class io/github/jayteealao/isometric/Shape$Companion {
 	public final fun extrude (Lio/github/jayteealao/isometric/Path;D)Lio/github/jayteealao/isometric/Shape;
 	public static synthetic fun extrude$default (Lio/github/jayteealao/isometric/Shape$Companion;Lio/github/jayteealao/isometric/Path;DILjava/lang/Object;)Lio/github/jayteealao/isometric/Shape;
+}
+
+public abstract interface class io/github/jayteealao/isometric/SortingComputeBackend {
+	public abstract fun sortByDepthKeys ([FLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/jayteealao/isometric/StackAxis : java/lang/Enum {

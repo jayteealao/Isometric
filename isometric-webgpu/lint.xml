@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- WebGPU flag constants (BufferUsage, ShaderStage, etc.) use bitwise OR
+         which Android lint's @IntDef checker cannot verify. These are valid
+         WebGPU API usages, not actual WrongConstant violations. -->
+    <issue id="WrongConstant" severity="warning" />
+
+    <!-- androidx.webgpu is an alpha library with @RestrictTo annotations that
+         lint flags when accessed from a different groupId. We are intentionally
+         consuming the alpha API as an early adopter. -->
+    <issue id="RestrictedApi" severity="warning" />
+</lint>

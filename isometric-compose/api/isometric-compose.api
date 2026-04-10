@@ -4,14 +4,15 @@ public final class io/github/jayteealao/isometric/compose/ColorExtensionsKt {
 }
 
 public final class io/github/jayteealao/isometric/compose/RenderExtensionsKt {
+	public static final fun fillComposePath (Lio/github/jayteealao/isometric/RenderCommand;Landroidx/compose/ui/graphics/Path;)V
 	public static final fun toComposePath (Lio/github/jayteealao/isometric/RenderCommand;)Landroidx/compose/ui/graphics/Path;
 }
 
 public final class io/github/jayteealao/isometric/compose/runtime/AdvancedSceneConfig : io/github/jayteealao/isometric/compose/runtime/SceneConfig {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/RenderMode;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ljava/lang/Object;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/RenderMode;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ljava/lang/Object;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEnablePathCaching ()Z
 	public final fun getEnableSpatialIndex ()Z
@@ -27,6 +28,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/AdvancedSceneC
 	public final fun getOnRenderError ()Lkotlin/jvm/functions/Function2;
 	public final fun getOnRendererReady ()Lkotlin/jvm/functions/Function1;
 	public final fun getSpatialIndexCellSize ()D
+	public final fun getWebGpuFrameCallback ()Ljava/lang/Object;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -83,6 +85,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/CompositionLoc
 	public static final fun getLocalLightDirection ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalRenderOptions ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalStrokeStyle ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalWebGpuFrameCallback ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class io/github/jayteealao/isometric/compose/runtime/CustomRenderNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {
@@ -151,22 +154,26 @@ public abstract interface annotation class io/github/jayteealao/isometric/compos
 }
 
 public final class io/github/jayteealao/isometric/compose/runtime/IsometricComposablesKt {
-	public static final fun Batch (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Ljava/util/List;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLandroidx/compose/runtime/Composer;II)V
-	public static final fun CustomNode (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLio/github/jayteealao/isometric/RenderOptions;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun Batch (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Ljava/util/List;Lio/github/jayteealao/isometric/IsoColor;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
+	public static final fun CustomNode (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLio/github/jayteealao/isometric/RenderOptions;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;III)V
 	public static final fun ForEach (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Ljava/util/List;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
-	public static final fun Group (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLio/github/jayteealao/isometric/RenderOptions;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;II)V
+	public static final fun Group (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLio/github/jayteealao/isometric/RenderOptions;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;III)V
 	public static final fun If (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;ZLkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
-	public static final fun Path (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLandroidx/compose/runtime/Composer;II)V
-	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLandroidx/compose/runtime/Composer;II)V
+	public static final fun Path (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
+	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
 }
 
 public abstract class io/github/jayteealao/isometric/compose/runtime/IsometricNode {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/compose/runtime/IsometricNode$Companion;
 	public fun <init> ()V
+	public final fun getAlpha ()F
 	public final fun getChildrenSnapshot ()Ljava/util/List;
+	public final fun getExplicitNodeId ()Ljava/lang/String;
 	public final fun getNodeId ()Ljava/lang/String;
+	public final fun getOnClick ()Lkotlin/jvm/functions/Function0;
 	public final fun getOnDirty ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnLongClick ()Lkotlin/jvm/functions/Function0;
 	public final fun getParent ()Lio/github/jayteealao/isometric/compose/runtime/IsometricNode;
 	public final fun getPosition ()Lio/github/jayteealao/isometric/Point;
 	public final fun getRenderOptions ()Lio/github/jayteealao/isometric/RenderOptions;
@@ -174,12 +181,17 @@ public abstract class io/github/jayteealao/isometric/compose/runtime/IsometricNo
 	public final fun getRotationOrigin ()Lio/github/jayteealao/isometric/Point;
 	public final fun getScale ()D
 	public final fun getScaleOrigin ()Lio/github/jayteealao/isometric/Point;
+	public final fun getTestTag ()Ljava/lang/String;
 	public final fun isDirty ()Z
 	public final fun isVisible ()Z
 	public final fun markClean ()V
 	public final fun markDirty ()V
 	public abstract fun renderTo (Ljava/util/List;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;)V
+	public final fun setAlpha (F)V
+	public final fun setExplicitNodeId (Ljava/lang/String;)V
+	public final fun setOnClick (Lkotlin/jvm/functions/Function0;)V
 	public final fun setOnDirty (Lkotlin/jvm/functions/Function0;)V
+	public final fun setOnLongClick (Lkotlin/jvm/functions/Function0;)V
 	public final fun setParent (Lio/github/jayteealao/isometric/compose/runtime/IsometricNode;)V
 	public final fun setPosition (Lio/github/jayteealao/isometric/Point;)V
 	public final fun setRenderOptions (Lio/github/jayteealao/isometric/RenderOptions;)V
@@ -187,6 +199,7 @@ public abstract class io/github/jayteealao/isometric/compose/runtime/IsometricNo
 	public final fun setRotationOrigin (Lio/github/jayteealao/isometric/Point;)V
 	public final fun setScale (D)V
 	public final fun setScaleOrigin (Lio/github/jayteealao/isometric/Point;)V
+	public final fun setTestTag (Ljava/lang/String;)V
 	public final fun setVisible (Z)V
 	public final fun updateChildrenSnapshot ()V
 }
@@ -206,10 +219,18 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricRende
 	public final fun getForceRebuild ()Z
 	public final fun getOnRenderError ()Lkotlin/jvm/functions/Function2;
 	public final fun hitTest (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;DDLio/github/jayteealao/isometric/compose/runtime/RenderContext;II)Lio/github/jayteealao/isometric/compose/runtime/IsometricNode;
+	public final fun prepareAsync (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IILio/github/jayteealao/isometric/SortingComputeBackend;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun prepareAsync$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IILio/github/jayteealao/isometric/SortingComputeBackend;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun prepareScene (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IIZ)Lio/github/jayteealao/isometric/PreparedScene;
+	public static synthetic fun prepareScene$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IIZILjava/lang/Object;)Lio/github/jayteealao/isometric/PreparedScene;
 	public final fun render (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;)V
 	public static synthetic fun render$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
+	public final fun renderFromScene (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;)V
+	public static synthetic fun renderFromScene$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
 	public final fun renderNative (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;)V
 	public static synthetic fun renderNative$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
+	public final fun renderNativeFromScene (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;)V
+	public static synthetic fun renderNativeFromScene$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
 	public final fun setBenchmarkHooks (Lio/github/jayteealao/isometric/compose/runtime/RenderBenchmarkHooks;)V
 	public final fun setForceRebuild (Z)V
 	public final fun setOnRenderError (Lkotlin/jvm/functions/Function2;)V
@@ -275,9 +296,43 @@ public final class io/github/jayteealao/isometric/compose/runtime/RenderContext 
 	public static synthetic fun withTransform$default (Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ILjava/lang/Object;)Lio/github/jayteealao/isometric/compose/runtime/RenderContext;
 }
 
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/RenderMode {
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas : io/github/jayteealao/isometric/compose/runtime/RenderMode {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+	public final fun copy (Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;)Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas;Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;ILjava/lang/Object;)Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompute ()Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute : java/lang/Enum {
+	public static final field Cpu Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+	public static final field WebGpu Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+	public static fun values ()[Lio/github/jayteealao/isometric/compose/runtime/RenderMode$Canvas$Compute;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/RenderMode$WebGpu : io/github/jayteealao/isometric/compose/runtime/RenderMode {
+	public static final field $stable I
+	public static final field INSTANCE Lio/github/jayteealao/isometric/compose/runtime/RenderMode$WebGpu;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot {
 	public static final field $stable I
-	public fun <init> (ZZZZZII)V
+	public fun <init> (ZZZZZIILio/github/jayteealao/isometric/compose/runtime/RenderMode;)V
+	public synthetic fun <init> (ZZZZZIILio/github/jayteealao/isometric/compose/runtime/RenderMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component2 ()Z
 	public final fun component3 ()Z
@@ -285,8 +340,9 @@ public final class io/github/jayteealao/isometric/compose/runtime/RuntimeFlagSna
 	public final fun component5 ()Z
 	public final fun component6 ()I
 	public final fun component7 ()I
-	public final fun copy (ZZZZZII)Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;
-	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;ZZZZZIIILjava/lang/Object;)Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;
+	public final fun component8 ()Lio/github/jayteealao/isometric/compose/runtime/RenderMode;
+	public final fun copy (ZZZZZIILio/github/jayteealao/isometric/compose/runtime/RenderMode;)Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;ZZZZZIILio/github/jayteealao/isometric/compose/runtime/RenderMode;ILjava/lang/Object;)Lio/github/jayteealao/isometric/compose/runtime/RuntimeFlagSnapshot;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCanvasHeight ()I
 	public final fun getCanvasWidth ()I
@@ -294,6 +350,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/RuntimeFlagSna
 	public final fun getEnablePathCaching ()Z
 	public final fun getEnableSpatialIndex ()Z
 	public final fun getForceRebuild ()Z
+	public final fun getRenderMode ()Lio/github/jayteealao/isometric/compose/runtime/RenderMode;
 	public final fun getUseNativeCanvas ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -302,14 +359,15 @@ public final class io/github/jayteealao/isometric/compose/runtime/RuntimeFlagSna
 public class io/github/jayteealao/isometric/compose/runtime/SceneConfig {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;)V
-	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/RenderMode;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/RenderMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCameraState ()Lio/github/jayteealao/isometric/compose/runtime/CameraState;
 	public final fun getColorPalette ()Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;
 	public final fun getDefaultColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getGestures ()Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;
 	public final fun getLightDirection ()Lio/github/jayteealao/isometric/Vector;
+	public final fun getRenderMode ()Lio/github/jayteealao/isometric/compose/runtime/RenderMode;
 	public final fun getRenderOptions ()Lio/github/jayteealao/isometric/RenderOptions;
 	public final fun getStrokeStyle ()Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;
 	public final fun getUseNativeCanvas ()Z
@@ -399,5 +457,23 @@ public final class io/github/jayteealao/isometric/compose/runtime/TapEvent {
 
 public final class io/github/jayteealao/isometric/compose/runtime/TileGridKt {
 	public static final fun TileGrid (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;IILio/github/jayteealao/isometric/TileGridConfig;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+}
+
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/WebGpuProvider {
+	public static final field Companion Lio/github/jayteealao/isometric/compose/runtime/WebGpuProvider$Companion;
+	public abstract fun getRenderBackend ()Lio/github/jayteealao/isometric/compose/runtime/render/RenderBackend;
+	public abstract fun getSortingBackend ()Lio/github/jayteealao/isometric/SortingComputeBackend;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/WebGpuProvider$Companion {
+	public final fun get ()Lio/github/jayteealao/isometric/compose/runtime/WebGpuProvider;
+}
+
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/render/RenderBackend {
+	public abstract fun Surface (Landroidx/compose/runtime/State;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;Landroidx/compose/ui/Modifier;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Landroidx/compose/runtime/Composer;I)V
+}
+
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/sort/DepthSortStrategy {
+	public abstract fun sort (Ljava/util/List;)V
 }
 
