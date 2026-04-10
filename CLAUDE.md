@@ -25,6 +25,7 @@ relevant sections of that document and verify compliance. The twelve sections co
 (downloaded from `https://android.googlesource.com/platform/frameworks/support/+archive/refs/heads/androidx-main/webgpu.tar.gz`).
 
 Use it to:
+
 - Verify exact class, function, and parameter names before referencing them in plans or code
 - Understand suspend-function signatures, callback shapes, and enum values
 - Check for API-breaking differences between alpha releases
