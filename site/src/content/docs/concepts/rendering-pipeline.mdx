@@ -90,47 +90,20 @@ IsometricScene(
 }
 ```
 
-## Path Caching
+## Lighting
 
-When `enablePathCaching = true` (set on `AdvancedSceneConfig`), the renderer pre-converts each `RenderCommand.points` list into an `androidx.compose.ui.graphics.Path` object and caches it.
+The light direction vector (default `Vector(2, -1, 3).normalize()`) determines how each face is shaded during projection. For each face, the engine computes the dot product of the face normal and the light direction. Faces angled toward the light are brightened via `IsoColor.lighten()`, while faces angled away are darkened. This produces the classic top-right isometric illumination where top faces are brightest, right-facing faces are mid-tone, and left-facing faces are darkest.
 
-Without path caching, every frame allocates new `Path` objects from the point lists, draws them, and discards them. With path caching, paths are allocated once and reused until the `PreparedScene` changes.
+Override the direction via `SceneConfig.lightDirection` or `LocalLightDirection` to simulate different lighting setups (e.g. top-down, side-lighting). See [Theming & Colors](/guides/theming/) for how to set it.
 
-```kotlin
-IsometricScene(
-    config = AdvancedSceneConfig(enablePathCaching = true)
-) {
-    // 50 prisms = ~150 visible faces = ~150 Path objects cached
-    ForEach((0 until 50).toList()) { i ->
-        Shape(geometry = Prism(Point(i.toDouble() % 10, (i / 10).toDouble(), 0.0)))
-    }
-}
-```
+## Path Caching and Native Canvas
 
-Path caching is most effective in scenes where the geometry is static or changes infrequently. In heavily animated scenes where the `PreparedScene` changes every frame, the cache is rebuilt each time and provides less benefit.
+Two optional optimizations reduce per-frame allocation in the draw phase:
 
-## Native Canvas Path
+- **Path caching** (`enablePathCaching = true`) pre-converts projected point lists into `androidx.compose.ui.graphics.Path` objects and reuses them until the `PreparedScene` changes. Most effective for static or slowly-changing scenes.
+- **Native canvas** (`useNativeCanvas = true`) bypasses Compose `DrawScope` entirely on Android, rendering directly to `android.graphics.Canvas` with reused `Paint` objects. Eliminates Compose Path allocation and DrawScope delegation overhead for roughly a 2x speedup.
 
-When `useNativeCanvas = true` on Android, `NativeSceneRenderer` bypasses Compose `DrawScope` entirely. Instead of creating Compose `Path` objects and calling `drawPath()`, it uses `android.graphics.Canvas` directly with reused `android.graphics.Paint` objects.
-
-This eliminates two layers of overhead:
-
-1. Compose `Path` object allocation and conversion
-2. `DrawScope` to `Canvas` delegation
-
-The result is roughly a 2x rendering speedup on Android. On other platforms, this flag is silently ignored, so you can set it unconditionally:
-
-```kotlin
-IsometricScene(
-    config = SceneConfig(useNativeCanvas = true)
-) {
-    // Rendered directly to android.graphics.Canvas on Android
-    // Falls back to standard DrawScope on other platforms
-    Shape(geometry = Prism(Point.ORIGIN))
-}
-```
-
-Native canvas rendering and path caching are independent. You can enable both, though on Android the native canvas path already avoids Compose `Path` allocation, so `enablePathCaching` provides less additional benefit.
+These are independent and can be combined. See the [Performance guide](/guides/performance/) for when to enable each and how to configure them.
 
 ## PreparedScene
 

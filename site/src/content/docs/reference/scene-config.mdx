@@ -61,24 +61,4 @@ Sealed class with three variants:
 
 `DefaultStrokeColor`: near-transparent black `IsoColor(0, 0, 0, 25)`
 
-### When to use AdvancedSceneConfig
-
-Use `AdvancedSceneConfig` when you need lifecycle hooks, performance tuning beyond `RenderOptions`, or a custom engine. For most scenes, `SceneConfig` is sufficient.
-
-```kotlin
-IsometricScene(
-    config = AdvancedSceneConfig(
-        useNativeCanvas = true,
-        enablePathCaching = true,
-        onRenderError = { commandId, error ->
-            Log.e("Isometric", "Render error in $commandId", error)
-        },
-        onAfterDraw = {
-            // Draw a debug overlay after the scene
-            drawRect(Color.Red.copy(alpha = 0.1f), size = size)
-        }
-    )
-) {
-    Shape(geometry = Prism(Point.ORIGIN))
-}
-```
+For guidance on when to use `AdvancedSceneConfig` vs `SceneConfig`, see the [Advanced Config guide](/guides/advanced-config/).

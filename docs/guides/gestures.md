@@ -88,6 +88,8 @@ fun InteractiveScene() {
 
 Hit testing uses spatial indexing, giving O(1) lookup performance regardless of scene complexity. This means tap and drag callbacks respond quickly even in scenes with hundreds of shapes.
 
+See [Scene Config reference](../reference/scene-config.md) for the complete `GestureConfig` API.
+
 ## Disabling Gestures
 
 Gestures are disabled by default. You can also explicitly pass `GestureConfig.Disabled` to make intent clear:

@@ -19,29 +19,11 @@ IsometricScene(
 }
 ```
 
-### Constructor
-
-`CameraState` accepts optional initial values:
+`CameraState` accepts optional initial values for `panX`, `panY`, and `zoom`. All pan values are in **screen-space pixels**, not world units. See [Scene Config reference](../reference/scene-config.md) for the full parameter table.
 
 ```kotlin
 val camera = remember { CameraState(panX = 100.0, panY = -50.0, zoom = 1.5) }
 ```
-
-| Param | Type | Default | Description |
-|---|---|---|---|
-| `panX` | `Double` | `0.0` | Initial horizontal pan offset (must be finite) |
-| `panY` | `Double` | `0.0` | Initial vertical pan offset (must be finite) |
-| `zoom` | `Double` | `1.0` | Initial zoom level (must be positive and finite) |
-
-## Properties
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `panX` | `Double` | `0.0` | Horizontal pan offset |
-| `panY` | `Double` | `0.0` | Vertical pan offset |
-| `zoom` | `Double` | `1.0` | Zoom level |
-
-Pan values are in **screen-space pixels**, not world units.
 
 ## Methods
 

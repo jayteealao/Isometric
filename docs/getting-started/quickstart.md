@@ -29,7 +29,7 @@ fun MyIsometricScene() {
 
 > **Note**
 >
-Isometric uses `IsoColor` for colors, not `androidx.compose.ui.graphics.Color`. `IsoColor` takes RGB integer values (0--255).
+Isometric uses `IsoColor` for colors, not `androidx.compose.ui.graphics.Color`. `IsoColor` takes numeric values (0-255).
 
 ## Step 3: Add More Shapes
 

@@ -5,43 +5,15 @@ sidebar:
   order: 1
 ---
 
-## Current Status
+## Maven Central
 
-Isometric is **not yet published to Maven Central**. For now, the recommended approach is to use a composite build, which lets you depend on the library directly from source.
-
-## Composite Build Setup (Recommended)
-
-Clone or copy the Isometric repository alongside your project, then add the following to your `settings.gradle.kts`:
-
-```kotlin
-// settings.gradle.kts
-includeBuild("path/to/Isometric") {
-    dependencySubstitution {
-        substitute(module("io.github.jayteealao:isometric-core")).using(project(":isometric-core"))
-        substitute(module("io.github.jayteealao:isometric-compose")).using(project(":isometric-compose"))
-    }
-}
-```
-
-Then add the dependency in your module's `build.gradle.kts`:
-
-```kotlin
-dependencies {
-    implementation("io.github.jayteealao:isometric-compose:<version>")
-}
-```
-
-Gradle's dependency substitution will resolve these coordinates against the included build automatically.
-
-## Future: Maven Central
-
-Once the library is published, you will be able to add it directly without a composite build.
+Isometric is published to [Maven Central](https://central.sonatype.com/artifact/io.github.jayteealao/isometric-compose). Add the dependency to your module's `build.gradle.kts`:
 
 <Tabs>
 <TabItem label="build.gradle.kts">
 ```kotlin
 dependencies {
-    implementation("io.github.jayteealao:isometric-compose:<version>")
+    implementation("io.github.jayteealao:isometric-compose:1.1.0")
 }
 ```
 </TabItem>
@@ -49,7 +21,7 @@ dependencies {
 ```toml
 # gradle/libs.versions.toml
 [versions]
-isometric = "<version>"
+isometric = "1.1.0"
 
 [libraries]
 isometric-core = { module = "io.github.jayteealao:isometric-core", version.ref = "isometric" }
@@ -65,6 +37,30 @@ dependencies {
 ```
 </TabItem>
 </Tabs>
+
+## Composite Build (Unreleased / Development)
+
+To depend on an unreleased version from source, clone the Isometric repository alongside your project and use a composite build:
+
+```kotlin
+// settings.gradle.kts
+includeBuild("path/to/Isometric") {
+    dependencySubstitution {
+        substitute(module("io.github.jayteealao:isometric-core")).using(project(":isometric-core"))
+        substitute(module("io.github.jayteealao:isometric-compose")).using(project(":isometric-compose"))
+    }
+}
+```
+
+Then add the dependency as usual:
+
+```kotlin
+dependencies {
+    implementation("io.github.jayteealao:isometric-compose:1.2.0-SNAPSHOT")
+}
+```
+
+Gradle's dependency substitution will resolve these coordinates against the included build automatically.
 
 ## Requirements
 

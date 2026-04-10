@@ -99,13 +99,7 @@ CompositionLocalProvider(
 
 ## StrokeStyle
 
-`StrokeStyle` is a sealed class controlling edge rendering:
-
-| Variant | Description |
-|---------|-------------|
-| `FillOnly` | Solid faces, no edges drawn |
-| `Stroke(width, color)` | Edges only, no fill |
-| `FillAndStroke(width, color)` | Filled faces with visible edges (default) |
+`StrokeStyle` is a sealed class with three variants: `FillOnly`, `Stroke(width, color)`, and `FillAndStroke(width, color)` (default). See [Scene Config reference](/reference/scene-config/) for the full variant table.
 
 ```kotlin
 CompositionLocalProvider(
@@ -116,7 +110,3 @@ CompositionLocalProvider(
     }
 }
 ```
-
-## Lighting
-
-The light direction vector determines how each face is shaded. Faces angled toward the light are brightened via `lighten()`, while faces angled away are darkened. The default direction `Vector(2, -1, 3).normalize()` produces a classic top-right illumination.

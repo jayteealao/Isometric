@@ -73,24 +73,4 @@ val rotated = box.rotateZ(Point(0.5, 0.5, 0.0), Math.PI / 4) // 45 degrees
 
 ## Extruding 2D Paths
 
-`Shape.extrude` takes a 2D `Path` and lifts it into a 3D solid by the given height.
-
-**Before extrusion** — a flat triangle path:
-
-![Before extrude](/screenshots/extrude-before.png)
-
-**After extrusion** — a triangular prism:
-
-![After extrude](/screenshots/extrude-after.png)
-
-```kotlin
-val trianglePath = io.fabianterhorst.isometric.Path(
-    Point(0.0, 0.0, 0.0),
-    Point(2.0, 0.0, 0.0),
-    Point(2.0, 2.0, 0.0)
-)
-val solid = Shape.extrude(trianglePath, height = 1.0)
-
-// Render it
-Shape(geometry = solid, color = IsoColor.RED)
-```
+`Shape.extrude` takes a 2D `Path` and lifts it into a 3D solid. See the [Custom Shapes guide](custom-shapes.md) for the full extrusion walkthrough and examples.

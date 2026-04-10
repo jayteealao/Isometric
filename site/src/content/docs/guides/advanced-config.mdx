@@ -33,7 +33,7 @@ All hooks are optional and default to `null`. They fire at specific points in th
 | `onAfterDraw` | `DrawScope.() -> Unit` | Immediately after scene drawing | Draw debug overlays, bounding boxes, or HUD elements on top |
 | `onPreparedSceneReady` | `(PreparedScene) -> Unit` | Projection completes | Export, serialize, or inspect the projected render commands |
 
-## Debug Overlay Example
+## Drawing debug overlays
 
 Use `onAfterDraw` to render debug information on top of the scene. The callback receives a `DrawScope`, so you have full access to Compose drawing primitives:
 
@@ -73,7 +73,7 @@ fun DebugScene() {
 
 You can also use `onBeforeDraw` to paint a background gradient or watermark that sits behind all scene geometry.
 
-## Error Handling
+## Handling render errors
 
 `onRenderError` fires when a specific render command fails. The callback receives the `commandId` and the `Throwable`, allowing you to log the error without crashing the entire scene:
 
@@ -92,7 +92,7 @@ IsometricScene(
 
 Other commands in the scene continue to render normally. This is useful in production to catch edge cases without a blank screen.
 
-## Engine Access
+## Accessing the engine outside the scene
 
 Use `onEngineReady` to capture a reference to the `SceneProjector`. This is useful for coordinate conversion -- for example, mapping a screen tap to a world-space position outside of gesture callbacks:
 
@@ -118,7 +118,7 @@ fun EngineAccessScene() {
 
 The engine reference remains valid for the lifetime of the scene composable.
 
-## Custom Engine
+## Injecting a custom engine
 
 The `engine` parameter accepts any `SceneProjector` implementation. This is the primary extension point for custom projection logic or testing:
 
@@ -171,7 +171,7 @@ class MockProjector : SceneProjector {
 }
 ```
 
-## Cache Control
+## Controlling the cache
 
 Two parameters give you manual control over the PreparedScene cache:
 

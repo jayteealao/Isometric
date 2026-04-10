@@ -96,15 +96,7 @@ fun CoordinateDisplay() {
 >
 Reading `LocalIsometricEngine.current` outside of an `IsometricScene` throws an `IllegalStateException`. Always access it from composables that are children of an `IsometricScene`.
 
-## Why staticCompositionLocalOf?
-
-All Isometric locals use `staticCompositionLocalOf` rather than `compositionLocalOf`. Static locals do not track reads per-composable, so when the value changes, the entire subtree beneath the provider recomposes. This is the correct trade-off here because:
-
-1. **Engine and light direction rarely change** -- they are typically set once per scene.
-2. **When they do change, every shape is affected** -- a new light direction reshades every face, so targeted invalidation would save no work.
-3. **Lower overhead** -- static locals skip per-read tracking, reducing memory and allocation pressure during composition.
-
-If you need a value that changes frequently and only affects a few consumers, prefer regular Compose `mutableStateOf` over a `CompositionLocal`.
+All Isometric locals use `staticCompositionLocalOf` rather than `compositionLocalOf`. See [Scene Graph — Compose Runtime Integration](../concepts/scene-graph.md#the-compose-runtime-integration) for why this is the correct trade-off.
 
 ## ColorPalette
 

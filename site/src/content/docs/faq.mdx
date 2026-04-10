@@ -8,7 +8,7 @@ description: Frequently asked questions and troubleshooting
 Kotlin's standard library has `kotlin.io.path.Path`. Use an import alias:
 
 ```kotlin
-import io.fabianterhorst.isometric.Path as IsoPath
+import io.github.jayteealao.isometric.Path as IsoPath
 ```
 
 ### "Color is ambiguous"
@@ -16,7 +16,7 @@ import io.fabianterhorst.isometric.Path as IsoPath
 Compose has `androidx.compose.ui.graphics.Color`. The library uses `IsoColor`:
 
 ```kotlin
-import io.fabianterhorst.isometric.IsoColor
+import io.github.jayteealao.isometric.IsoColor
 // Use IsoColor(r, g, b) everywhere in isometric scenes
 ```
 
@@ -39,7 +39,7 @@ Isometric uses depth sorting: `depth = x + y - 2z`. Shapes with higher depth ren
 
 ### "Is this published to Maven Central?"
 
-Not yet. Use a composite build for now — see the Installation guide.
+Yes. All three modules are published to [Maven Central](https://central.sonatype.com/artifact/io.github.jayteealao/isometric-compose). See the [Installation guide](/getting-started/installation/) for coordinates and version catalog setup.
 
 ### "Can I use this without Compose?"
 

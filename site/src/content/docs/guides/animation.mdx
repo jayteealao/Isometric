@@ -63,10 +63,8 @@ fun WaveScene() {
 }
 ```
 
-## Performance
+For more animation recipes — color cycling, pulsing scale, orbiting shapes, staggered entrances — see [Animation Patterns](/examples/animation-patterns/).
 
-Isometric tracks dirty state per node. When `angle` or `time` changes, only the affected `Shape` composables recompose — the rest of the scene tree is skipped entirely. This makes it practical to animate individual shapes in a large scene without paying the cost of a full re-render.
-
-:::tip
-Use `remember` for expensive geometry computations so they are not recalculated every frame. Only the properties that actually change (like `rotation` or `position`) should depend on the animated value.
+:::tip[Performance]
+Isometric tracks dirty state per node. When `angle` or `time` changes, only the affected `Shape` composables recompose — the rest of the scene tree is skipped. Use `remember` for expensive geometry computations so they are not recalculated every frame. Only the properties that actually change (like `rotation` or `position`) should depend on the animated value.
 :::

@@ -210,36 +210,4 @@ This abstraction enables:
 
 ## Direct Usage Outside Compose
 
-You can use `IsometricEngine` as a standalone projection library without the Compose runtime. This is useful for server-side rendering, screenshot generation, or integration with other UI frameworks.
-
-```kotlin
-fun renderToCommands(): List<RenderCommand> {
-    val engine = IsometricEngine(scale = 100.0)
-
-    // Build the scene
-    engine.add(Prism(Point.ORIGIN, 2.0, 2.0, 2.0), IsoColor(33, 150, 243))
-    engine.add(Pyramid(Point(0.0, 0.0, 2.0), 2.0, 2.0, 1.0), IsoColor.RED)
-
-    // Project to 2D
-    val scene = engine.projectScene(width = 800, height = 600)
-
-    // Iterate render commands (each is a projected polygon with color)
-    for (command in scene.commands) {
-        // command.points: List<Point2D> -- screen coordinates
-        // command.color: IsoColor -- lit and shaded color
-        // command.ownerNodeId: String? -- node identity for grouping
-    }
-
-    // Hit test
-    val hit = engine.findItemAt(scene, 400.0, 300.0)
-
-    // Clean up for next frame
-    engine.clear()
-
-    return scene.commands
-}
-```
-
-:::tip
-When using the engine directly, remember to call `clear()` before each frame if you are rebuilding the scene. The Compose runtime handles this automatically.
-:::
+`IsometricEngine` can be used as a standalone projection library without the Compose runtime, for server-side rendering, screenshot generation, or non-Compose UI frameworks. See [Advanced Patterns — Direct Engine Usage](/examples/advanced-patterns/#direct-engine-usage-outside-compose) for a full worked example.

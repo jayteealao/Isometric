@@ -19,7 +19,7 @@ These systems compose: a scene with 200 shapes where one shape animates will dir
 
 ## RenderOptions Tuning
 
-`RenderOptions` controls the rendering pipeline. Pass it inside `SceneConfig` or `AdvancedSceneConfig`:
+`RenderOptions` controls depth sorting, culling, bounds checking, and the broad-phase spatial grid. Pass it inside `SceneConfig` or `AdvancedSceneConfig`:
 
 ```kotlin
 IsometricScene(
@@ -37,19 +37,13 @@ IsometricScene(
 }
 ```
 
-| Flag | Default | Impact | When to change |
-|------|---------|--------|----------------|
-| `enableDepthSorting` | `true` | Sorts faces by depth for correct overlap | Disable for flat 2D overlays where you control draw order manually |
-| `enableBackfaceCulling` | `true` | Skips faces pointing away from the camera | Disable if you need to see inside hollow shapes |
-| `enableBoundsChecking` | `true` | Skips shapes entirely outside the viewport | Disable only for debugging -- it is always beneficial |
-| `enableBroadPhaseSort` | `true` | Uses spatial grid to reduce sort comparisons | Disable to fall back to O(n^2) pairwise sort for debugging |
-| `broadPhaseCellSize` | `100.0` | Grid cell size for the broad-phase pass | Decrease for dense scenes with many overlapping shapes |
-
 Three presets cover common scenarios:
 
 - **`RenderOptions.Default`** -- all optimizations enabled, suitable for most scenes
 - **`RenderOptions.NoDepthSorting`** -- insertion-order rendering, useful for flat overlays
 - **`RenderOptions.NoCulling`** -- backface culling disabled, useful for transparent or hollow geometry
+
+See [Scene Config reference](/reference/scene-config/) for the full parameter table.
 
 ## Native Canvas
 

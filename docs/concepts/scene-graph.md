@@ -96,6 +96,16 @@ Compose calls methods on the applier to build and update the node tree:
 
 This is analogous to how Compose UI uses `UiApplier` with `LayoutNode`. The key difference is that isometric nodes have no layout pass -- they go straight from the node tree to projection.
 
+### Why staticCompositionLocalOf?
+
+All Isometric `CompositionLocal` values use `staticCompositionLocalOf` rather than `compositionLocalOf`. Static locals do not track reads per-composable, so when the value changes, the entire subtree beneath the provider recomposes. This is the correct trade-off because:
+
+1. **Engine and light direction rarely change** -- they are typically set once per scene.
+2. **When they do change, every shape is affected** -- a new light direction reshades every face, so targeted invalidation would save no work.
+3. **Lower overhead** -- static locals skip per-read tracking, reducing memory and allocation pressure during composition.
+
+If you need a value that changes frequently and only affects a few consumers, prefer regular Compose `mutableStateOf` over a `CompositionLocal`.
+
 ## High-Level vs Low-Level
 
 Most users work at the composable level:
@@ -108,30 +118,13 @@ IsometricScene {
 }
 ```
 
-Advanced users can drop to the node level using `ComposeNode` for direct node manipulation:
+Advanced users can drop to lower levels for more control:
 
-```kotlin
-IsometricScene {
-    ComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode() },
-        update = {
-            set(myShape) { this.shape = it }
-            set(myColor) { this.color = it }
-        }
-    )
-}
-```
+- **`ComposeNode`** — direct node manipulation via `IsometricApplier`, bypassing the `Shape`/`Group` composables.
+- **`CustomNode`** — emit raw `RenderCommand` objects from within the composition.
+- **Standalone engine** — use `IsometricEngine` without Compose for server-side rendering, image export, or non-Compose UI frameworks.
 
-The engine can also be used standalone, outside of Compose entirely:
-
-```kotlin
-val engine = IsometricEngine()
-engine.add(Prism(Point.ORIGIN), IsoColor.BLUE)
-val scene: PreparedScene = engine.projectScene(width = 800, height = 600)
-// Draw scene.commands to any canvas
-```
-
-This is useful for server-side rendering, image export, or integration with non-Compose UI frameworks.
+See [Advanced Patterns](../examples/advanced-patterns.md) for worked examples of each approach.
 
 ## RenderContext
 
