@@ -117,11 +117,12 @@ internal object SceneDataPacker {
                 }
             }
 
-            // baseColor: vec4<f32> RGBA in [0, 1]
-            buffer.putFloat(cmd.color.r.toFloat() / 255f)
-            buffer.putFloat(cmd.color.g.toFloat() / 255f)
-            buffer.putFloat(cmd.color.b.toFloat() / 255f)
-            buffer.putFloat(cmd.color.a.toFloat() / 255f)
+            // baseColor: vec4<f32> RGBA in [0, 1] — use raw material color (pre-lighting)
+            // so the GPU M3 shader applies lighting exactly once.
+            buffer.putFloat(cmd.baseColor.r.toFloat() / 255f)
+            buffer.putFloat(cmd.baseColor.g.toFloat() / 255f)
+            buffer.putFloat(cmd.baseColor.b.toFloat() / 255f)
+            buffer.putFloat(cmd.baseColor.a.toFloat() / 255f)
 
             // normal: vec3<f32> — cross product of first two edge vectors, inlined to
             // avoid Triple<Float,Float,Float> allocation per face.
