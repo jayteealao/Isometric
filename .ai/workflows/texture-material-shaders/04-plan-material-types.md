@@ -6,11 +6,11 @@ slice-slug: material-types
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
-metric-files-to-touch: 9
-metric-step-count: 12
+updated-at: "2026-04-11T22:44:12Z"
+metric-files-to-touch: 11
+metric-step-count: 14
 has-blockers: false
-revision-count: 2
+revision-count: 3
 tags: [texture, material, module]
 refs:
   index: 00-index.md
@@ -26,122 +26,193 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 
 ## Current State
 
-The codebase has no material abstraction. Rendering is color-only:
+**Already implemented (commit 3dbb876) — needs rework.** The first implementation added
+`api(project(":isometric-shader"))` to `isometric-compose`, making compose depend on
+shader. The user's feedback: **isometric-compose must be usable without isometric-shader
+and must not depend on it.** Instead of adding a `material` parameter to the existing
+`Shape()` composable, provide **overloaded `Shape()` composables** in `isometric-shader`
+that accept `IsometricMaterial` instead of `IsoColor`.
 
-- `RenderCommand` carries `color: IsoColor` and `baseColor: IsoColor` (for GPU lighting) but no material or UV data.
-- `ShapeNode` and `PathNode` each carry a `color: IsoColor` property.
-- `Shape()` composable accepts `color: IsoColor` as its second parameter.
-- No `isometric-shader` module exists; `settings.gradle` lists six modules: `:app`, `:isometric-core`, `:isometric-compose`, `:isometric-android-view`, `:isometric-webgpu`, `:isometric-benchmark`.
-- `isometric-core` is a **pure Kotlin/JVM** module (no Android dependencies). This is a hard constraint — anything referencing `android.graphics.Bitmap` or `@DrawableRes` cannot live there.
-- `isometric-compose` depends on `isometric-core` via `api(project(":isometric-core"))`.
+### What exists now (from commit 3dbb876)
+
+- `isometric-shader` module with `IsometricMaterial`, `TextureSource`, `UvCoord`, `UvTransform`, DSL builders — **keep all of this**
+- `MaterialData` marker interface in `isometric-core` — **keep**
+- `RenderCommand` with `material: MaterialData?` and `uvCoords: FloatArray?` — **keep**
+- `isometric-compose/build.gradle.kts` has `api(project(":isometric-shader"))` — **remove**
+- `ShapeNode`/`PathNode` have `material: IsometricMaterial?` — **change to `MaterialData?`**
+- `Shape()`/`Path()` composables have `material: IsometricMaterial?` parameter — **remove parameter**
+- `isometric-shader` depends on `isometric-core` only — **add `isometric-compose` + Compose deps**
+- No overloaded composables in `isometric-shader` — **add them**
+
+### Target dependency graph
+
+```
+isometric-core  (pure JVM — MaterialData, RenderCommand)
+       ↓
+isometric-compose  (depends on core ONLY — Shape(geometry, color), no shader reference)
+       ↓
+isometric-shader  (depends on core + compose — types + Shape(geometry, material) overloads)
+       ↓
+isometric-webgpu  (depends on compose + shader — reads material from RenderCommand)
+```
+
+`isometric-compose` is fully usable without `isometric-shader`. Users who want material
+support add `isometric-shader` as a dependency and use the overloaded composables.
 
 ## Likely Files to Touch
 
 | # | File | Change Type | Module |
 |---|------|-------------|--------|
-| 1 | `settings.gradle` | Add `include ':isometric-shader'` | root |
-| 2 | `isometric-shader/build.gradle.kts` | New file — Android library module | isometric-shader (new) |
-| 3 | `isometric-shader/src/main/kotlin/.../IsometricMaterial.kt` | New file — sealed interface + DSL | isometric-shader (new) |
-| 4 | `isometric-shader/src/main/kotlin/.../TextureSource.kt` | New file — sealed interface | isometric-shader (new) |
-| 5 | `isometric-shader/src/main/kotlin/.../UvCoord.kt` | New file — data class + UvTransform | isometric-shader (new) |
-| 6 | `isometric-core/src/main/kotlin/.../RenderCommand.kt` | Add `material` + `uvCoords` fields | isometric-core |
-| 7 | `isometric-compose/.../IsometricNode.kt` | Add `material` property to `ShapeNode` + `PathNode` | isometric-compose |
-| 8 | `isometric-compose/.../IsometricComposables.kt` | Add `material` parameter to `Shape()` + `Path()` | isometric-compose |
-| 9 | `isometric-compose/build.gradle.kts` | Add `api(project(":isometric-shader"))` dependency | isometric-compose |
+| 1 | `isometric-compose/build.gradle.kts` | Remove `api(project(":isometric-shader"))` | isometric-compose |
+| 2 | `isometric-compose/.../IsometricNode.kt` | Change `IsometricMaterial?` → `MaterialData?`, remove shader import | isometric-compose |
+| 3 | `isometric-compose/.../IsometricComposables.kt` | Remove `material` param from `Shape()`/`Path()`, remove shader import | isometric-compose |
+| 4 | `isometric-shader/build.gradle.kts` | Add `api(project(":isometric-compose"))` + Compose deps | isometric-shader |
+| 5 | `isometric-shader/.../IsometricMaterialComposables.kt` | **New file** — overloaded `Shape()` and `Path()` accepting `IsometricMaterial` | isometric-shader |
+| 6 | `isometric-compose/api/isometric-compose.api` | Updated by `apiDump` (material param removed) | isometric-compose |
+| 7 | `isometric-shader/api/isometric-shader.api` | Updated by `apiDump` (new composables added) | isometric-shader |
 
-Total: 9 files (4 new, 5 modified).
+Total: 7 files (1 new, 6 modified). Steps 1-7 from original plan (module creation, core types,
+DSL builders, tests) are already done and **unchanged**.
 
 ## Proposed Change Strategy
 
-### Module placement decision
+### Overloaded composable design
 
-`IsometricMaterial` references `@DrawableRes` (Android annotation) and `android.graphics.Bitmap` inside `TextureSource`. This makes a pure-JVM home in `isometric-core` impossible without a split. The cleanest approach is a new **Android library** module `isometric-shader` that:
+Instead of `Shape(geometry, color, material)` in compose, provide two separate
+composable signatures:
 
-- depends on `isometric-core` for `IsoColor`
-- is depended on by `isometric-compose` (and later `isometric-android-view`, `isometric-webgpu`)
-
-This avoids polluting `isometric-core` with Android types and avoids circular dependencies.
-
-**Dependency graph after this slice:**
-```
-isometric-core  (pure JVM, no change to dependency graph)
-       ↓
-isometric-shader  (new Android library — depends on isometric-core)
-       ↓
-isometric-compose  (depends on isometric-shader AND isometric-core)
+**In `isometric-compose` (no shader dependency):**
+```kotlin
+// Existing — unchanged
+fun IsometricScope.Shape(geometry: Shape, color: IsoColor = ..., ...)
 ```
 
-### Backward compatibility
+**In `isometric-shader` (new overloads):**
+```kotlin
+// Overload: material instead of color
+fun IsometricScope.Shape(geometry: Shape, material: IsometricMaterial, ...)
+```
 
-The existing `Shape(geometry, color)` call site must not break. Strategy: keep `color` as a named parameter with its default (`LocalDefaultColor.current`) but add `material: IsometricMaterial? = null` after it. When `material` is null at render time, the node falls back to the existing `color`-based `RenderCommand` path. No rendering changes — the renderer ignores `material` entirely in this slice.
+The overloaded `Shape()` in shader creates the same `ShapeNode` and sets `material`
+on it. When `material` is `FlatColor`, it extracts the color; otherwise it uses
+`LocalDefaultColor.current` as the base color and sets the material.
 
-### `RenderCommand` extension
+### Node-level plumbing
 
-`RenderCommand` is in `isometric-core` (pure JVM). The `material` field type must not introduce Android dependencies into core. `IsometricMaterial` lives in `isometric-shader` (Android), so it cannot be referenced from `isometric-core` directly.
+`ShapeNode.material` stays but is typed as `MaterialData?` (from core) instead of
+`IsometricMaterial?` (from shader). This keeps the pipeline working — `RenderCommand`
+carries `MaterialData?`, and downstream renderers (Canvas, WebGPU) that depend on
+`isometric-shader` cast to `IsometricMaterial` when needed.
 
-**Resolution:** Keep `RenderCommand` in `isometric-core` clean. Add `material` and `uvCoords` as fields typed to interfaces that live in `isometric-core`:
+### isometric-shader gains Compose dependency
 
-- `material: Any? = null` — type-erased, carries the `IsometricMaterial` instance opaquely through the core pipeline without a compile dependency
-- `uvCoords: FloatArray? = null` — UV coordinates as a flat packed float array `[u0, v0, u1, v1, ...]`, matching the existing `points: DoubleArray` convention
-
-This is the same pattern already used for `ownerNodeId: String?` — a loosely-typed field that higher layers interpret. The compose renderer (which does depend on `isometric-shader`) can safely cast `material as? IsometricMaterial`.
-
-Alternatively, if the team prefers stronger typing at the cost of a core→shader dependency: introduce a `MaterialData` marker interface in `isometric-core` that `IsometricMaterial` implements. This avoids the cast and adds no Android dependency to core. **Recommended**: use the marker interface approach — it makes invalid casts impossible (guideline §6).
-
-### UvCoord placement
-
-`UvCoord` and `UvTransform` contain only `Double` fields — they are pure Kotlin and could live in `isometric-core`. However, placing them in `isometric-shader` keeps all texture/UV types co-located and avoids splitting the conceptual domain. The `uvCoords: FloatArray?` field on `RenderCommand` avoids any cross-module reference.
+`isometric-shader` now depends on `isometric-compose` (and transitively on Compose
+Runtime). This is acceptable:
+- `isometric-shader` is already an Android library module
+- The composable overloads are the natural home for material-aware API
+- No circular dependency: `compose` does NOT depend on `shader`
 
 ## Step-by-Step Plan
 
-### Step 1 — Add `isometric-shader` to `settings.gradle`
+**Steps 1–7 from the original plan are already implemented and correct.** The changes
+below are a rework of steps 8–12.
 
-File: `settings.gradle`
+### Step 8 (rework) — Change `ShapeNode`/`PathNode` material type to `MaterialData?`
 
-Append after the existing `include` lines:
-```groovy
-include ':isometric-shader'
+File: `isometric-compose/.../IsometricNode.kt`
+
+**Remove** the import:
+```kotlin
+- import io.github.jayteealao.isometric.shader.IsometricMaterial
 ```
 
-### Step 2 — Create `isometric-shader/build.gradle.kts`
+**Add** the import:
+```kotlin
++ import io.github.jayteealao.isometric.MaterialData
+```
 
-New file: `isometric-shader/build.gradle.kts`
+**Change** `ShapeNode` constructor:
+```kotlin
+class ShapeNode(
+    var shape: Shape,
+    var color: IsoColor,
+    var material: MaterialData? = null,    // was IsometricMaterial?
+) : IsometricNode() {
+```
 
+**Change** `PathNode` constructor identically.
+
+The `renderTo()` method already passes `material = material` to `RenderCommand` which
+accepts `MaterialData?` — no change needed there.
+
+### Step 9 (rework) — Remove `material` from `Shape()`/`Path()` composables
+
+File: `isometric-compose/.../IsometricComposables.kt`
+
+**Remove** the import:
+```kotlin
+- import io.github.jayteealao.isometric.shader.IsometricMaterial
+```
+
+**Remove** the `material` parameter from `Shape()`:
+```kotlin
+fun IsometricScope.Shape(
+    geometry: Shape,
+    color: IsoColor = LocalDefaultColor.current,
+-   material: IsometricMaterial? = null,
+    alpha: Float = 1f,
+    ...
+```
+
+**Revert** the factory back to two-arg:
+```kotlin
+factory = { ShapeNode(geometry, color) },
+```
+
+**Remove** the material update line:
+```kotlin
+-   set(material) { this.material = it; markDirty() }
+```
+
+**Remove** the `@param material` KDoc line.
+
+Apply the same changes to `Path()`.
+
+### Step 10 (rework) — Remove `isometric-shader` dependency from `isometric-compose`
+
+File: `isometric-compose/build.gradle.kts`
+
+**Remove** these lines:
+```kotlin
+-   // api because IsometricMaterial appears in public composable signatures (Shape, Path)
+-   api(project(":isometric-shader"))
+```
+
+### Step 11 (rework) — Add Compose dependency to `isometric-shader`
+
+File: `isometric-shader/build.gradle.kts`
+
+**Add** plugins and dependencies:
 ```kotlin
 plugins {
     id("isometric.android.library")
++   alias(libs.plugins.kotlin.compose)       // enables Compose compiler
     alias(libs.plugins.dokka)
     id("isometric.publishing")
 }
 
-group = "io.github.jayteealao"
-version = "1.2.0-SNAPSHOT"
-
 android {
     namespace = "io.github.jayteealao.isometric.shader"
-
-    defaultConfig {
-        consumerProguardFiles("consumer-rules.pro")
-    }
-}
-
-mavenPublishing {
-    coordinates(
-        groupId = "io.github.jayteealao",
-        artifactId = "isometric-shader",
-        version = version.toString()
-    )
-
-    pom {
-        name.set("Isometric Shader")
-        description.set("Material and texture type system for the Isometric rendering engine")
-    }
++   buildFeatures { compose = true }
+    ...
 }
 
 dependencies {
-    // api because IsometricMaterial, TextureSource, UvCoord appear in public composable signatures
     api(project(":isometric-core"))
++   api(project(":isometric-compose"))
+    implementation(libs.annotation)
     implementation(libs.kotlin.stdlib)
++   implementation(libs.compose.runtime)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)
@@ -149,480 +220,214 @@ dependencies {
 }
 ```
 
-Also create the directory structure:
-- `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/`
-- `isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/`
-- `isometric-shader/consumer-rules.pro` (empty)
-- `isometric-shader/proguard-rules.pro` (empty)
+### Step 12 (new) — Create overloaded `Shape()` and `Path()` composables in `isometric-shader`
 
-### Step 3 — Create `MaterialData` marker interface in `isometric-core`
-
-New file: `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/MaterialData.kt`
-
-```kotlin
-package io.github.jayteealao.isometric
-
-/**
- * Marker interface for material data carried through the render pipeline.
- *
- * Implemented by `IsometricMaterial` in the `isometric-shader` module.
- * `RenderCommand` holds a reference typed to this interface so that
- * `isometric-core` remains free of Android dependencies while still
- * providing compile-time safety for the material field.
- */
-interface MaterialData
-```
-
-### Step 4 — Extend `RenderCommand` with `material` and `uvCoords`
-
-File: `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/RenderCommand.kt`
-
-Add two nullable fields at the end of the constructor parameter list (both default to null so all existing call sites remain valid):
-
-```kotlin
-class RenderCommand(
-    val commandId: String,
-    val points: DoubleArray,
-    val color: IsoColor,
-    val originalPath: Path,
-    val originalShape: Shape?,
-    val ownerNodeId: String? = null,
-    val baseColor: IsoColor = color,
-    val material: MaterialData? = null,          // NEW
-    val uvCoords: FloatArray? = null,            // NEW: packed [u0,v0,u1,v1,...]
-) {
-```
-
-Update `equals`, `hashCode`, and `toString` to include the new fields:
-
-- `equals`: add `material == other.material && (uvCoords contentEquals other.uvCoords || uvCoords == null && other.uvCoords == null)`
-- `hashCode`: add `result = 31 * result + (material?.hashCode() ?: 0)` and `result = 31 * result + (uvCoords?.contentHashCode() ?: 0)`
-- `toString`: append `, material=$material, uvCoords=${uvCoords?.size?.let { "$it coords" }}`
-
-### Step 5 — Create `UvCoord.kt` and `UvTransform.kt` in `isometric-shader`
-
-New file: `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/UvCoord.kt`
+New file: `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/IsometricMaterialComposables.kt`
 
 ```kotlin
 package io.github.jayteealao.isometric.shader
 
-/**
- * A texture coordinate.
- *
- * Values are typically in [0, 1] for a single texture fill, but may exceed this range
- * when tiling is enabled (e.g., `UvTransform.scaleU = 2f` produces UVs in [0, 2]).
- * No range validation is applied — the shader's `TileMode` (REPEAT/CLAMP/MIRROR)
- * determines how out-of-range values are interpreted.
- *
- * @property u Horizontal texture coordinate (0 = left edge, 1 = right edge)
- * @property v Vertical texture coordinate (0 = top edge, 1 = bottom edge)
- */
-data class UvCoord(val u: Float, val v: Float) {
-    companion object {
-        val TOP_LEFT     = UvCoord(0f, 0f)
-        val TOP_RIGHT    = UvCoord(1f, 0f)
-        val BOTTOM_RIGHT = UvCoord(1f, 1f)
-        val BOTTOM_LEFT  = UvCoord(0f, 1f)
-    }
-}
-
-/**
- * Affine UV transform applied to texture coordinates before sampling.
- *
- * Applied in order: scale → rotate → offset.
- *
- * @property scaleU Horizontal scale factor (1.0 = no repeat, 2.0 = tile twice)
- * @property scaleV Vertical scale factor
- * @property offsetU Horizontal offset (0.0 = no offset)
- * @property offsetV Vertical offset
- * @property rotationDegrees Rotation in degrees around the texture center (0.0 = no rotation)
- */
-data class UvTransform(
-    val scaleU: Float = 1f,
-    val scaleV: Float = 1f,
-    val offsetU: Float = 0f,
-    val offsetV: Float = 0f,
-    val rotationDegrees: Float = 0f,
-) {
-    companion object {
-        val IDENTITY = UvTransform()
-    }
-}
-```
-
-### Step 6 — Create `TextureSource.kt` in `isometric-shader`
-
-New file: `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/TextureSource.kt`
-
-```kotlin
-package io.github.jayteealao.isometric.shader
-
-import android.graphics.Bitmap
-import androidx.annotation.DrawableRes
-
-/**
- * Describes where a texture's pixel data comes from.
- *
- * Sealed to prevent invalid combinations at compile time (guideline §6).
- * Use the DSL functions [textured], [texturedAsset], [texturedBitmap] from
- * [IsometricMaterial] builders to construct instances idiomatically.
- */
-sealed interface TextureSource {
-    /**
-     * A drawable resource bundled with the app.
-     *
-     * @property resId Android drawable resource identifier (e.g., `R.drawable.brick`)
-     */
-    data class Resource(@DrawableRes val resId: Int) : TextureSource
-
-    /**
-     * A file in the app's `assets/` directory.
-     *
-     * @property path Relative path within `assets/` (e.g., `"textures/grass.png"`)
-     */
-    data class Asset(val path: String) : TextureSource {
-        init {
-            require(path.isNotBlank()) { "Asset path must not be blank" }
-        }
-    }
-
-    /**
-     * A pre-decoded [Bitmap] provided directly by the caller.
-     *
-     * The caller retains ownership of the bitmap's lifecycle.
-     * Do not recycle the bitmap while any material referencing it is active.
-     *
-     * @property bitmap The source bitmap. Must not be recycled.
-     */
-    data class BitmapSource(val bitmap: Bitmap) : TextureSource {
-        init {
-            require(!bitmap.isRecycled) { "Bitmap must not be recycled" }
-        }
-    }
-}
-```
-
-Note: the `Bitmap` variant is named `BitmapSource` to avoid shadowing `android.graphics.Bitmap` in the same file.
-
-### Step 7 — Create `IsometricMaterial.kt` in `isometric-shader`
-
-New file: `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/IsometricMaterial.kt`
-
-```kotlin
-package io.github.jayteealao.isometric.shader
-
-import androidx.annotation.DrawableRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReusableComposeNode
 import io.github.jayteealao.isometric.IsoColor
-import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.Shape
+import io.github.jayteealao.isometric.Path
+import io.github.jayteealao.isometric.compose.runtime.IsometricApplier
+import io.github.jayteealao.isometric.compose.runtime.IsometricComposable
+import io.github.jayteealao.isometric.compose.runtime.IsometricScope
+import io.github.jayteealao.isometric.compose.runtime.LocalDefaultColor
+import io.github.jayteealao.isometric.compose.runtime.ShapeNode
+import io.github.jayteealao.isometric.compose.runtime.PathNode
 
 /**
- * Describes how a face should be painted.
+ * Add a 3D shape with a material to the isometric scene.
  *
- * Implements [MaterialData] so that [io.github.jayteealao.isometric.RenderCommand]
- * can carry a material reference without depending on Android types.
+ * This overload accepts an [IsometricMaterial] instead of an [IsoColor].
+ * For [IsometricMaterial.FlatColor], the color is extracted from the material.
+ * For textured or per-face materials, [LocalDefaultColor] is used as the
+ * base color and the material is set on the node for the renderer to interpret.
  *
- * ## Progressive disclosure (guideline §2)
- *
- * - **Simple:** `flatColor(IsoColor.BLUE)` — zero overhead, identical to existing color path
- * - **Configurable:** `textured(R.drawable.brick) { uvScale(2f, 2f) }` — bitmap texture
- * - **Advanced:** `perFace { top = textured(...); sides = flatColor(...) }` — per-face control
- *
- * ## Sealed interface (guideline §6)
- *
- * Subtypes are exhaustive — renderers `when`-match without an else branch.
+ * @param geometry The 3D shape to render
+ * @param material The material describing how faces should be painted
+ * @see io.github.jayteealao.isometric.compose.runtime.Shape for the color-only overload
  */
-sealed interface IsometricMaterial : MaterialData {
-
-    /**
-     * Renders the face with a solid [IsoColor]. Zero texture overhead.
-     * This is the default when no material is specified (backward compatible path).
-     */
-    data class FlatColor(val color: IsoColor) : IsometricMaterial
-
-    /**
-     * Renders the face with a [TextureSource] bitmap, optionally tinted and transformed.
-     *
-     * @property source Where to load the bitmap from
-     * @property tint Multiplicative color tint applied over the texture (WHITE = no tint)
-     * @property uvTransform Affine UV transform (scale, offset, rotation)
-     */
-    data class Textured(
-        val source: TextureSource,
-        val tint: IsoColor = IsoColor.WHITE,
-        val uvTransform: UvTransform = UvTransform.IDENTITY,
-    ) : IsometricMaterial
-
-    /**
-     * Assigns different materials to different faces of a shape.
-     *
-     * Faces not covered by this map fall back to [default].
-     *
-     * @property faceMap Map from face index (0-based, matching [Shape.paths] order) to material
-     * @property default Material used for faces not present in [faceMap]
-     */
-    data class PerFace(
-        val faceMap: Map<Int, IsometricMaterial>,
-        val default: IsometricMaterial,
-    ) : IsometricMaterial
-}
-
-// ── DSL builders ─────────────────────────────────────────────────────────────
-
-/**
- * Creates a [IsometricMaterial.FlatColor] material.
- *
- * ```kotlin
- * Shape(Prism(origin), material = flatColor(IsoColor.BLUE))
- * ```
- */
-fun flatColor(color: IsoColor): IsometricMaterial.FlatColor = IsometricMaterial.FlatColor(color)
-
-/**
- * Creates a [IsometricMaterial.Textured] material from a drawable resource.
- *
- * ```kotlin
- * Shape(Prism(origin), material = textured(R.drawable.brick) {
- *     tint = IsoColor.WHITE
- *     uvScale(2f, 2f)
- * })
- * ```
- */
-fun textured(
-    @DrawableRes resId: Int,
-    block: TexturedBuilder.() -> Unit = {},
-): IsometricMaterial.Textured = TexturedBuilder(TextureSource.Resource(resId)).apply(block).build()
-
-/**
- * Creates a [IsometricMaterial.Textured] material from an asset path.
- */
-fun texturedAsset(
-    path: String,
-    block: TexturedBuilder.() -> Unit = {},
-): IsometricMaterial.Textured = TexturedBuilder(TextureSource.Asset(path)).apply(block).build()
-
-/**
- * Creates a [IsometricMaterial.Textured] material from a [android.graphics.Bitmap].
- */
-fun texturedBitmap(
-    bitmap: android.graphics.Bitmap,
-    block: TexturedBuilder.() -> Unit = {},
-): IsometricMaterial.Textured = TexturedBuilder(TextureSource.BitmapSource(bitmap)).apply(block).build()
-
-/**
- * Creates a [IsometricMaterial.PerFace] material via a builder.
- *
- * ```kotlin
- * Shape(Prism(origin), material = perFace(default = flatColor(IsoColor.GRAY)) {
- *     face(0, textured(R.drawable.grass))   // top face
- *     face(1, textured(R.drawable.dirt))    // front face
- *     face(2, textured(R.drawable.dirt))    // right face
- * })
- * ```
- */
-fun perFace(
-    default: IsometricMaterial = IsometricMaterial.FlatColor(IsoColor.GRAY),
-    block: PerFaceBuilder.() -> Unit,
-): IsometricMaterial.PerFace = PerFaceBuilder(default).apply(block).build()
-
-// ── Builder classes ───────────────────────────────────────────────────────────
-
-@IsometricMaterialDsl
-class TexturedBuilder internal constructor(private val source: TextureSource) {
-    var tint: IsoColor = IsoColor.WHITE
-    private var uvTransform: UvTransform = UvTransform.IDENTITY
-
-    /** Sets the UV scale. Values > 1 tile the texture; values < 1 show a sub-region. */
-    fun uvScale(scaleU: Float, scaleV: Float) {
-        uvTransform = uvTransform.copy(scaleU = scaleU, scaleV = scaleV)
-    }
-
-    /** Sets the UV offset in [0, 1] space. */
-    fun uvOffset(offsetU: Float, offsetV: Float) {
-        uvTransform = uvTransform.copy(offsetU = offsetU, offsetV = offsetV)
-    }
-
-    /** Sets the UV rotation in degrees. */
-    fun uvRotate(degrees: Float) {
-        uvTransform = uvTransform.copy(rotationDegrees = degrees)
-    }
-
-    internal fun build(): IsometricMaterial.Textured =
-        IsometricMaterial.Textured(source = source, tint = tint, uvTransform = uvTransform)
-}
-
-@IsometricMaterialDsl
-class PerFaceBuilder internal constructor(private val default: IsometricMaterial) {
-    private val faceMap = mutableMapOf<Int, IsometricMaterial>()
-
-    /** Assigns [material] to the face at [index] (0-based, matching shape.paths order). */
-    fun face(index: Int, material: IsometricMaterial) {
-        require(index >= 0) { "Face index must be non-negative, got $index" }
-        faceMap[index] = material
-    }
-
-    internal fun build(): IsometricMaterial.PerFace =
-        IsometricMaterial.PerFace(faceMap = faceMap.toMap(), default = default)
-}
-
-/** DSL marker preventing scope leakage between nested builders (guideline §10). */
-@DslMarker
-annotation class IsometricMaterialDsl
-```
-
-### Step 8 — Add `material` property to `ShapeNode` and `PathNode`
-
-File: `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt`
-
-In `ShapeNode`, add a `material` field after `color`:
-
-```kotlin
-class ShapeNode(
-    var shape: Shape,
-    var color: IsoColor,
-    var material: IsometricMaterial? = null,    // NEW
-) : IsometricNode() {
-```
-
-In `ShapeNode.renderTo`, pass `material` into the `RenderCommand`:
-
-```kotlin
-output.add(
-    RenderCommand(
-        commandId = "${nodeId}_${path.hashCode()}",
-        points = DoubleArray(0),
-        color = effectiveColor,
-        originalPath = path,
-        originalShape = transformedShape,
-        ownerNodeId = nodeId,
-        material = material,                   // NEW
-    )
-)
-```
-
-In `PathNode`, add the same `material` field and pass it through identically.
-
-`BatchNode` does **not** get a `material` field in this slice — it uses uniform color semantics and per-face materials don't apply. Leave it for the `per-face-materials` slice.
-
-### Step 9 — Add `material` parameter to `Shape()` and `Path()` composables
-
-File: `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricComposables.kt`
-
-Add import:
-```kotlin
-import io.github.jayteealao.isometric.shader.IsometricMaterial
-```
-
-In `IsometricScope.Shape()`, add `material` parameter after `color`:
-
-```kotlin
+@IsometricComposable
+@Composable
 fun IsometricScope.Shape(
     geometry: Shape,
-    color: IsoColor = LocalDefaultColor.current,
-    material: IsometricMaterial? = null,        // NEW — null means use color
+    material: IsometricMaterial,
     alpha: Float = 1f,
-    // ... remaining params unchanged
+    position: Point = Point(0.0, 0.0, 0.0),
+    rotation: Double = 0.0,
+    scale: Double = 1.0,
+    rotationOrigin: Point? = null,
+    scaleOrigin: Point? = null,
+    visible: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null,
 ) {
+    val color = when (material) {
+        is IsometricMaterial.FlatColor -> material.color
+        else -> LocalDefaultColor.current
+    }
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(geometry, color, material) },
+        factory = { ShapeNode(geometry, color).also { it.material = material } },
         update = {
             set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
-            set(material) { this.material = it; markDirty() }    // NEW
-            // ... remaining sets unchanged
+            set(material) { this.material = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
+            set(position) { this.position = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it; markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it; markDirty()
+            }
+            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
+            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
+            set(visible) { this.isVisible = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it }
+        }
+    )
+}
+
+/**
+ * Add a raw path with a material to the isometric scene.
+ *
+ * Overload accepting [IsometricMaterial] instead of [IsoColor].
+ *
+ * @param path The 2D path to render
+ * @param material The material describing how the path should be painted
+ * @see io.github.jayteealao.isometric.compose.runtime.Path for the color-only overload
+ */
+@IsometricComposable
+@Composable
+fun IsometricScope.Path(
+    path: Path,
+    material: IsometricMaterial,
+    alpha: Float = 1f,
+    position: Point = Point(0.0, 0.0, 0.0),
+    rotation: Double = 0.0,
+    scale: Double = 1.0,
+    rotationOrigin: Point? = null,
+    scaleOrigin: Point? = null,
+    visible: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null,
+) {
+    val color = when (material) {
+        is IsometricMaterial.FlatColor -> material.color
+        else -> LocalDefaultColor.current
+    }
+    ReusableComposeNode<PathNode, IsometricApplier>(
+        factory = { PathNode(path, color).also { it.material = material } },
+        update = {
+            set(path) { this.path = it; markDirty() }
+            set(color) { this.color = it; markDirty() }
+            set(material) { this.material = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
+            set(position) { this.position = it; markDirty() }
+            set(rotation) {
+                require(it.isFinite()) { "rotation must be finite, got $it" }
+                this.rotation = it; markDirty()
+            }
+            set(scale) {
+                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
+                this.scale = it; markDirty()
+            }
+            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
+            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
+            set(visible) { this.isVisible = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it }
         }
     )
 }
 ```
 
-Apply the same change to `IsometricScope.Path()`.
-
-### Step 10 — Wire `isometric-shader` into `isometric-compose`
-
-File: `isometric-compose/build.gradle.kts`
-
-Add dependency:
-```kotlin
-// api because IsometricMaterial appears in public composable signatures (Shape, Path)
-api(project(":isometric-shader"))
-```
-
-### Step 11 — Write unit tests for `isometric-shader`
-
-New file: `isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/IsometricMaterialTest.kt`
-
-Tests to cover:
-1. `flatColor(IsoColor.BLUE)` returns `IsometricMaterial.FlatColor(IsoColor.BLUE)`
-2. `textured(R.drawable.brick)` returns `IsometricMaterial.Textured` with `tint = IsoColor.WHITE` and `uvTransform = UvTransform.IDENTITY`
-3. `textured(R.drawable.brick) { uvScale(2f, 2f) }` sets `uvTransform.scaleU == 2f`
-4. `perFace(default = flatColor(IsoColor.GRAY)) { face(0, flatColor(IsoColor.GREEN)) }` produces `PerFace` with correct map
-5. `UvCoord(2f, 3f)` is valid (tiling produces values > 1.0)
-6. `TextureSource.Asset("")` rejects blank path
-7. `PerFaceBuilder.face(-1, ...)` rejects negative index
-
-Note: `@DrawableRes` is an annotation and does not require a running Android device for tests.
-
-### Step 12 — Run `apiDump` and verify `apiCheck`
+### Step 13 — Run `apiDump` and verify `apiCheck`
 
 ```bash
 ./gradlew :isometric-shader:apiDump
-./gradlew :isometric-core:apiDump
 ./gradlew :isometric-compose:apiDump
 ./gradlew apiCheck
 ```
 
-This records the new public surface for binary compatibility tracking.
+### Step 14 — Verify full build and tests
+
+```bash
+./gradlew build test apiCheck
+```
 
 ## Test / Verification Plan
 
 | Check | Command | Expected |
 |-------|---------|----------|
-| Module compiles | `./gradlew :isometric-shader:assembleDebug` | BUILD SUCCESSFUL |
-| Core compiles (no regression) | `./gradlew :isometric-core:compileKotlin` | BUILD SUCCESSFUL |
-| Compose compiles | `./gradlew :isometric-compose:assembleDebug` | BUILD SUCCESSFUL |
+| Compose compiles WITHOUT shader dep | `./gradlew :isometric-compose:assembleDebug` | BUILD SUCCESSFUL |
+| Shader compiles WITH compose dep | `./gradlew :isometric-shader:assembleDebug` | BUILD SUCCESSFUL |
+| No circular dependency | Gradle resolves all projects | No cycle error |
 | Existing core tests pass | `./gradlew :isometric-core:test` | all green |
-| New shader tests pass | `./gradlew :isometric-shader:test` | all green |
+| Shader tests pass | `./gradlew :isometric-shader:test` | all green |
 | Compose tests pass | `./gradlew :isometric-compose:testDebugUnitTest` | all green |
-| API surface recorded | `./gradlew apiDump` | new `.api` file for `isometric-shader` |
-| API check passes | `./gradlew apiCheck` | no changes reported for existing modules |
+| API check passes | `./gradlew apiCheck` | no unexpected changes |
 | Full build | `./gradlew build` | BUILD SUCCESSFUL |
 
-**Manual backward-compat check:** After wiring into the sample app, verify that all existing `Shape(geometry, color)` calls still compile and render identically.
+**Overload resolution check:** Verify that calling `Shape(Prism(origin), flatColor(IsoColor.BLUE))`
+resolves to the shader overload, and `Shape(Prism(origin), IsoColor.BLUE)` resolves to the
+compose overload. The Kotlin compiler distinguishes by parameter type (`IsometricMaterial` vs
+`IsoColor`).
 
 ## Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|-----------|
-| `isometric-core` accidentally gains Android dep via `MaterialData` | Low | High | `MaterialData` is a pure Kotlin marker interface — no imports. CI will fail the moment `android.*` appears in `isometric-core`. |
-| Circular module dependency (`isometric-shader` → `isometric-compose` → `isometric-shader`) | Low | High | `isometric-shader` must only depend on `isometric-core`. Never on `isometric-compose`. Enforced by build graph — Gradle will error on cycles. |
-| `TextureSource.BitmapSource` holding a recycled bitmap | Medium | Medium | Init guard in `BitmapSource` rejects recycled bitmaps at construction time (guideline §7). |
-| `perFace { face(0, ...) }` face index mismatch with actual shape path order | Medium | Low | Document clearly that indices are 0-based matching `Shape.paths` order. Actual UV/face-name mapping deferred to `per-face-materials` slice. |
-| Binary compatibility breakage in `RenderCommand` | Low | High | New fields have defaults — existing call sites compile without change. `apiDump` records the change; `apiCheck` enforces it. |
-| Sealed interface evolution risk | Medium | Medium | Adding a new `IsometricMaterial` subtype in the future is a **breaking change** for consumers using exhaustive `when` expressions. Document this in KDoc: "This sealed hierarchy may grow in future versions. Use an `else` branch in `when` if forward compatibility is needed." Consider adding `@Suppress("WHEN_ENUM_CAN_BE_NULL_IN_JAVA")` guidance in docs. |
-| `isometric-compose` failing `apiCheck` due to new `material` param | Low | Medium | Adding a defaulted parameter to a composable is source-compatible but may be detected as a binary change. Run `apiDump` first and commit the updated `.api` file. |
+| `isometric-core` accidentally gains Android dep via `MaterialData` | Low | High | `MaterialData` is a pure Kotlin marker interface. CI will fail immediately. |
+| Overload ambiguity between `Shape(geo, color)` and `Shape(geo, material)` | Low | Medium | `IsoColor` and `IsometricMaterial` are unrelated types — Kotlin overload resolution handles this cleanly. Named arguments also disambiguate. |
+| `isometric-shader` Compose dependency makes it heavier | Low | Low | Only `compose.runtime` is needed (not UI, Foundation). It's already an Android library. |
+| `TextureSource.BitmapSource` holding a recycled bitmap | Medium | Medium | Init guard rejects recycled bitmaps at construction time. |
+| Sealed interface evolution risk | Medium | Medium | Documented in KDoc. |
+| `ShapeNode`/`PathNode` using `MaterialData?` loses type safety | Low | Low | Only `isometric-shader` overloads set the material field. Renderers cast to `IsometricMaterial` — safe because only `IsometricMaterial` implements `MaterialData`. |
 
 ## Dependencies
 
-**Compile-time:**
-- `isometric-shader` depends on `isometric-core` (for `IsoColor`, `MaterialData`)
-- `isometric-compose` depends on `isometric-shader` (for `IsometricMaterial`)
+**Compile-time (revised):**
+- `isometric-core` depends on nothing
+- `isometric-compose` depends on `isometric-core` (NO shader dependency)
+- `isometric-shader` depends on `isometric-core` + `isometric-compose`
+- `isometric-webgpu` depends on `isometric-compose` (and will add `isometric-shader` in the `webgpu-textures` slice)
 
 **Slice dependencies:**
 - This slice has no dependencies on sibling slices (it is the dependency root).
-- All other slices (`uv-generation`, `canvas-textures`, `webgpu-textures`, `per-face-materials`, `sample-demo`) depend on this slice.
+- All other slices depend on this slice.
 
 ## Assumptions
 
-1. The `isometric.android.library` convention plugin (in `build-logic`) is the correct template for `isometric-shader`. It sets `compileSdk = 35`, `minSdk = 24`, `jvmTarget = 11`.
-2. `@DrawableRes` is from `androidx.annotation` which is already available transitively through `isometric-core`'s dependents — but `isometric-shader/build.gradle.kts` may need to add `implementation(libs.androidx.annotation)` if the transitive path doesn't exist. Check after Step 2.
-3. The `libs.plugins.dokka` and `id("isometric.publishing")` plugins are safe to apply to the new module (same pattern as `isometric-core`).
-4. Face index 0-based ordering in `PerFace.faceMap` is sufficient for this slice. Named face accessors (e.g., `PrismFace.TOP`) are deferred to `per-face-materials`.
-5. No changes to `isometric-android-view` or `isometric-webgpu` in this slice — those modules render from `RenderCommand` and currently ignore the new nullable `material` field.
+1. The `isometric.android.library` convention plugin is correct for `isometric-shader`.
+2. `alias(libs.plugins.kotlin.compose)` and `libs.compose.runtime` are available in the version catalog (already used by `isometric-compose`).
+3. `ShapeNode` and `PathNode` are public (needed for `ReusableComposeNode` from shader module). Verified: they are public classes.
+4. `IsometricApplier`, `IsometricScope`, `@IsometricComposable`, and `LocalDefaultColor` are public in `isometric-compose`. Verified: all are public.
+5. No changes to `isometric-android-view` or `isometric-webgpu` in this slice.
+
+## Blockers
+
+None.
 
 ## Freshness Research
 
-The research doc (`TEXTURE_SHADER_RESEARCH.md`) uses `sealed interface Material` as the type name in section 8.1. This plan uses `IsometricMaterial` per the slice definition (`03-slice-material-types.md`) to avoid name collision with Kotlin's `Material` in Compose Material Design. The research doc's `TextureSource.Bitmap` variant is renamed to `TextureSource.BitmapSource` to avoid shadowing `android.graphics.Bitmap` in the same compilation unit.
-
-The `RenderCommand` in the research doc (section 8.5) shows `data class RenderCommand(... val material: Material? = null, val uvCoords: List<UvCoord>? = null)`. The current implementation uses a `class` (not `data class`) with a flat `DoubleArray` for points. This plan follows the current implementation pattern: adds `material: MaterialData?` (typed to the marker interface) and `uvCoords: FloatArray?` (flat-packed to match the `points: DoubleArray` convention).
+No changes since rev 2. All external dependency assumptions still valid.
 
 ## Revision History
 
@@ -635,26 +440,28 @@ The `RenderCommand` in the research doc (section 8.5) shows `data class RenderCo
 ### 2026-04-11 — Directed Fix: web-searched best practices (rev 2)
 - Mode: Directed Fix
 - Feedback: "review plan against web searched best practices and understanding"
-- Web research performed on: sealed interface API design, BitmapShader best practices,
-  marker interface vs type-erased Any pattern, isometric UV generation per-face architecture
-- Issues found: 2
-  1. **UvCoord range validation too strict** (HIGH) — `require(u in 0f..1f)` would crash on
-     tiled textures where `UvTransform.scaleU > 1` produces UVs beyond [0,1]. Fix: removed
-     range validation; TileMode handles out-of-range values. Updated KDoc to explain.
-  2. **Sealed interface evolution risk undocumented** (MED) — adding a new `IsometricMaterial`
-     subtype in the future is a breaking change for consumers with exhaustive `when`. Fix:
-     added to Risks table with mitigation guidance.
-- Also updated: test plan item 5 (was "rejects u=1.5f", now "u=2f is valid for tiling")
-- Best practices confirmed correct:
-  - `sealed interface` over `sealed class` — plan already correct
-  - `MaterialData` marker interface over `Any?` — plan already uses this (strongly preferred)
-  - BitmapShader + `setLocalMatrix` + `ARGB_8888` — plan already uses this
-  - `@DslMarker` annotation — plan already uses this
-  - Per-face planar/box UV projection for isometric — plan already uses this
+- Issues found: 2 (UvCoord validation, sealed interface evolution risk). Fixed.
+
+### 2026-04-11 — Directed Fix: dependency inversion (rev 3)
+- Mode: Directed Fix
+- Feedback: "isometric-compose should be usable without isometric-shader and should not
+  depend on it. plan has been implemented but this needs changing. instead of adding a new
+  material parameter why not overload with a constructor that accepts material instead of color"
+- **Architectural change:** Reversed the compose→shader dependency. Now shader→compose.
+- Changes:
+  1. **Step 8 reworked:** `ShapeNode`/`PathNode` use `MaterialData?` (core) not `IsometricMaterial?` (shader)
+  2. **Step 9 reworked:** Removed `material` parameter from compose's `Shape()`/`Path()` composables entirely
+  3. **Step 10 reworked:** Removed `api(project(":isometric-shader"))` from compose
+  4. **Step 11 reworked:** Added `api(project(":isometric-compose"))` + Compose deps to shader
+  5. **Step 12 new:** Created overloaded `Shape(geometry, material)` and `Path(path, material)` composables in `isometric-shader`
+  6. **Dependency graph:** `core → compose → shader` (was `core → shader → compose`)
+  7. **Risk table updated:** Removed circular dependency risk (impossible now), added overload ambiguity risk (low)
+  8. **Files to touch reduced:** 11 → 7 (since original steps 1-7 are already done)
+  9. **All sibling plans** (`uv-generation`, `canvas-textures`, etc.) reference `isometric-shader` for material types — this is now correct since shader is the leaf module that combines types + composables
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf-implement texture-material-shaders material-types` — plan
-  verified, ready for execution. Consider `/compact` first.
-- **Option B:** `/wf-plan texture-material-shaders uv-generation` — review the next
-  slice's plan before implementing.
+- **Option A (default):** `/wf-implement texture-material-shaders material-types` — rework
+  the already-implemented code per this revised plan. Consider `/compact` first.
+- **Option B:** `/wf-plan texture-material-shaders uv-generation` — review the next slice's
+  plan before reworking.

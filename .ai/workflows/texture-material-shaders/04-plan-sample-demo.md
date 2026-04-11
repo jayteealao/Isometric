@@ -6,11 +6,11 @@ slice-slug: sample-demo
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
-metric-files-to-touch: 7
-metric-step-count: 9
+updated-at: "2026-04-11T22:49:12Z"
+metric-files-to-touch: 8
+metric-step-count: 10
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [sample, demo]
 refs:
   index: 00-index.md
@@ -223,6 +223,27 @@ Optional (if snapshot tests are added):
 
 ## Step-by-Step Implementation
 
+### Step 0 — Add `isometric-shader` dependency to the app module
+
+**File to modify:** `app/build.gradle.kts`
+
+The app module currently depends on `:isometric-compose` and `:isometric-webgpu` but NOT
+on `:isometric-shader`. The textured demo uses the shader module's overloaded `Shape()`
+composable, `textured()`, `perFace {}` DSL, and `TextureSource`. Add:
+
+```kotlin
+implementation(project(":isometric-shader"))
+```
+
+**Imports needed in `TexturedDemoActivity.kt`:**
+```kotlin
+import io.github.jayteealao.isometric.shader.Shape  // overloaded composable
+import io.github.jayteealao.isometric.shader.textured
+import io.github.jayteealao.isometric.shader.texturedBitmap
+import io.github.jayteealao.isometric.shader.perFace
+import io.github.jayteealao.isometric.shader.TextureSource
+```
+
 ### Step 1 — Texture assets helper
 
 Create `TextureAssets.kt`. Implement `buildGrassTop()` and `buildDirtSide()` using the
@@ -319,3 +340,16 @@ Canvas + GPU Sort, WebGPU. Verify:
   `:app-sample-ui` module.
 - **`ForEach` key stability:** `col` and `row` integers are stable keys, so no
   recomposition churn on mode switch.
+
+## Revision History
+
+### 2026-04-11 — Cohesion Review (rev 1)
+- Mode: Review-All (cohesion check after material-types dependency inversion)
+- Issues found: 3 (1 HIGH, 2 MED)
+  1. **HIGH:** Missing `:isometric-shader` dependency in `app/build.gradle.kts`. The `Shape()`
+     overload accepting `material`, `textured()`, `perFace {}`, and `TextureSource` all live in
+     `isometric-shader`. Fix: added Step 0.
+  2. **MED:** No import statement for the shader-module `Shape` overload — could be confused with
+     compose-module `Shape`. Fix: added explicit imports in Step 0.
+  3. **MED:** `textured()`, `perFace {}`, `TextureSource` not attributed to shader module.
+     Fix: addressed by Step 0 imports.

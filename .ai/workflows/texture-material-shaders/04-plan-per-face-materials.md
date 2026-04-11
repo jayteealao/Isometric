@@ -6,11 +6,11 @@ slice-slug: per-face-materials
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
+updated-at: "2026-04-11T22:49:12Z"
 metric-files-to-touch: 12
 metric-step-count: 14
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [material, per-face]
 refs:
   index: 00-index.md
@@ -561,20 +561,23 @@ lives as a `private` function in this file or a sibling `PerFaceMaterialResolver
 
 ---
 
-### T10 — Ensure `ShapeNode` and `Shape()` composable accept `PerFace`
+### T10 — Ensure overloaded `Shape()` in `isometric-shader` accepts `PerFace`
 
 **File:** `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt`
 
-`ShapeNode.material: IsometricMaterial?` already exists from material-types. No change
-needed unless `PerFace` requires special constructor or equality handling. Verify
-`ShapeNode.renderTo()` passes `material` through to `RenderCommand` unchanged. The
-`RenderCommand.faceType` is populated by UV generation, not here.
+`ShapeNode.material: MaterialData?` (typed to core marker interface, set by shader module).
+Verify `ShapeNode.renderTo()` passes `material` through to `RenderCommand` unchanged. The
+`RenderCommand.faceType` is populated by UV generation, not here. No change expected.
 
-**File (composable):** `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScene.kt`
-(or wherever the `Shape()` composable is defined)
+**File (shader composable):** `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/IsometricMaterialComposables.kt`
 
-Confirm `material = perFace { ... }` is accepted without compile error. No code change
-expected — `IsometricMaterial` is already the parameter type.
+Confirm the overloaded `Shape(geometry, material: IsometricMaterial)` accepts
+`perFace { ... }` (which returns `IsometricMaterial.PerFace`). This works because
+`PerFace` is a subtype of `IsometricMaterial`. No code change expected.
+
+**Note (material-types rev 3):** The `Shape()` composable in `isometric-compose` has NO
+material parameter. The DSL examples in this plan (`Shape(shape, material = perFace { ... })`)
+use the shader module's overloaded `Shape()`, not the compose module's.
 
 **Dep:** T1
 
@@ -703,3 +706,14 @@ Batch 5 (needs Batch 4): T14 (T12)
 - [ ] Existing WebGPU benchmark: no performance regression for non-textured scenes
   (faceType=null fast path in `resolvePerFaceMaterials()`)
 - [ ] Paparazzi snapshot tests pass for all 3 golden image cases
+
+## Revision History
+
+### 2026-04-11 — Cohesion Review (rev 1)
+- Mode: Review-All (cohesion check after material-types dependency inversion)
+- Issues found: 2 (1 MED, 1 LOW)
+  1. **MED:** T10 verification targeted compose-level `Shape()` and `IsometricScene.kt` —
+     but the `Shape()` composable accepting `IsometricMaterial` is in `isometric-shader`, not
+     compose. Fix: rewrote T10 to target the shader module's overloaded `Shape()`.
+  2. **LOW:** DSL examples show `Shape(shape, material = perFace { ... })` without clarifying
+     this is the shader-module overload. Fix: added note in T10.

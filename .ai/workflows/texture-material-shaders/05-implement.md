@@ -5,12 +5,12 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-11T22:32:12Z"
+updated-at: "2026-04-11T23:37:39Z"
 slices-implemented: 1
 slices-total: 6
-metric-total-files-changed: 13
-metric-total-lines-added: 509
-metric-total-lines-removed: 14
+metric-total-files-changed: 8
+metric-total-lines-added: 190
+metric-total-lines-removed: 30
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
@@ -23,9 +23,10 @@ next-invocation: "/wf-verify texture-material-shaders material-types"
 
 ## Slices Implemented
 
-### `material-types` — complete
-- Files: 13 (6 new, 7 modified/generated)
-- Summary: New `isometric-shader` module with `IsometricMaterial` sealed interface, `TextureSource`, `UvCoord`/`UvTransform`, DSL builders. Wired through `RenderCommand`, nodes, and composables.
+### `material-types` — complete (reworked)
+- Files: 8 modified/created (phase 2 rework of dependency inversion)
+- Summary: `isometric-compose` no longer depends on `isometric-shader`. Shader provides
+  overloaded `Shape(geometry, material)` composables. Nodes use `MaterialData?` from core.
 - Record: [05-implement-material-types.md](05-implement-material-types.md)
 
 ### `uv-generation` — not started
@@ -35,9 +36,10 @@ next-invocation: "/wf-verify texture-material-shaders material-types"
 ### `sample-demo` — not started
 
 ## Cross-Slice Integration Notes
-- `RenderCommand.material` and `RenderCommand.uvCoords` are now available for all downstream slices
-- `isometric-shader` module is wired into `isometric-compose` via `api()` — ready for `isometric-webgpu` to depend on it in the `webgpu-textures` slice
+- Dependency graph: `core → compose → shader → webgpu`
+- `isometric-compose` has zero shader imports — fully usable standalone
+- `ShapeNode.material: MaterialData?` is the cross-module bridge
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders material-types` — verify the foundation slice
-- **Option B:** `/wf-implement texture-material-shaders uv-generation` — proceed to next slice (skip verify)
+- **Option A (default):** `/wf-verify texture-material-shaders material-types`
+- **Option B:** `/wf-implement texture-material-shaders uv-generation` — skip verify

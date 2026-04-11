@@ -6,11 +6,11 @@ slice-slug: uv-generation
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
+updated-at: "2026-04-11T22:49:12Z"
 metric-files-to-touch: 7
 metric-step-count: 8
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [uv, geometry]
 refs:
   index: 00-index.md
@@ -39,9 +39,12 @@ This plan assumes the `material-types` slice has been implemented and delivers:
 - `IsometricMaterial` sealed interface with `FlatColor`, `Textured`, `PerFace` variants
 - `TextureSource` sealed interface (`Resource`, `Asset`, `Bitmap`)
 - `UvCoord(u: Float, v: Float)` data class
-- `RenderCommand` extended with `material: IsometricMaterial?` and `uvCoords: FloatArray?`
+- `RenderCommand` extended with `material: MaterialData?` and `uvCoords: FloatArray?`
   where `uvCoords` is a flat float array in `[u0,v0, u1,v1, ...]` layout (4 pairs = 8 floats
   for a quad face), `null` when material is not `Textured`
+- `isometric-compose` does NOT depend on `isometric-shader` (dependency reversed in rev 3)
+- `isometric-shader` depends on `isometric-compose` and provides overloaded `Shape(geometry, material)` composables
+- `ShapeNode.material` is typed as `MaterialData?` (from core), not `IsometricMaterial?`
 
 ## Context: Prism Face Geometry
 
@@ -258,78 +261,88 @@ The `Pair<Double,Double>` destructuring above is clear but allocates. For the ho
 (called inside `renderTo()`), replace with direct index writes to avoid allocation —
 see Step 4 note.
 
-### Step 3 — Wire UV generation into `ShapeNode.renderTo()`
+### Step 3 — Wire UV generation into the shader module's overloaded `Shape()` composable
 
-**File:** `isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt`
+**File:** `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/IsometricMaterialComposables.kt`
 
-`ShapeNode.renderTo()` currently iterates `transformedShape.paths` and emits one
-`RenderCommand` per path. When the node's material is `IsometricMaterial.Textured`, UV
-generation must be triggered.
+**Architectural note (rev 3 of material-types):** `isometric-compose` does NOT depend on
+`isometric-shader`. UV generation cannot happen in `ShapeNode.renderTo()` (in compose)
+because compose cannot import `IsometricMaterial` or `UvGenerator` (in shader). Instead,
+UV generation is wired into the shader module's overloaded `Shape(geometry, material)`
+composable, which creates a `ShapeNode` and uses `material` typed as `MaterialData?`.
 
-The challenge: after `localContext.applyTransformsToShape(shape)`, the returned
-`transformedShape` is a generic `Shape` — it has lost the `Prism` type. UV coordinates
-must be generated from the **original `Prism`** (pre-transform) using dimensional
-extents (`width`, `depth`, `height`), which are scale-invariant ratios and remain valid
-after uniform transforms. If a non-uniform scale is applied, the UVs must be regenerated
-from the new effective dimensions — but this is deferred (see Risks below).
+The overloaded `Shape()` composable in `isometric-shader` (created by material-types slice)
+is extended to:
+1. Check if `material is IsometricMaterial.Textured && geometry is Prism`
+2. If so, pre-compute UV coordinates via `UvGenerator` and store them on a
+   UV-aware wrapper or pass them through a `CompositionLocal`
 
-**Design decision:** Generate UVs from the unmodified `Prism` stored on `ShapeNode`, not
-the post-transform shape. This works because UV formulas normalize by `width/depth/height`,
-and translation never changes relative positions within a face.
+**Design decision:** Since `ShapeNode.renderTo()` emits one `RenderCommand` per path
+(face), and UV generation needs the face index, the UV population happens **downstream**
+after `ShapeNode.renderTo()` is called. The cleanest approach:
 
-**Change to `ShapeNode`:**
+- Add a `uvProvider` field to `ShapeNode` typed as `((Shape, Int) -> FloatArray?)?`
+  (a lambda that takes the original shape and face index, returns UV coords). This field
+  is `null` by default (no UVs). The shader module's `Shape()` composable sets it.
+- In `ShapeNode.renderTo()`, call `uvProvider?.invoke(shape, index)` to get UVs per face.
+  This requires no shader imports in compose — the lambda is opaque.
+
+**Change to `ShapeNode` (in isometric-compose):**
 
 ```kotlin
-// existing field
-var shape: Shape
-
-// new field (added by material-types slice)
-var material: IsometricMaterial? = null
+// New field — set by the shader module's overloaded Shape() composable
+var uvProvider: ((Shape, Int) -> FloatArray?)? = null
 ```
 
-**Change to `renderTo()` in `ShapeNode`:**
+**Change to `ShapeNode.renderTo()` (in isometric-compose):**
 
 ```kotlin
-override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
-    if (!isVisible) return
-    // ... existing transform setup ...
-
-    val transformedShape = localContext.applyTransformsToShape(shape)
-    val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
-    val effectiveMaterial = material
-
-    // UV generation: only for Prism + Textured material
-    val prism = if (effectiveMaterial is IsometricMaterial.Textured && shape is Prism) {
-        shape as Prism
-    } else null
-
-    for ((index, path) in transformedShape.paths.withIndex()) {
-        val uvCoords: FloatArray? = if (prism != null) {
-            UvGenerator.forPrismFace(prism, index)
-        } else null
-
-        output.add(
-            RenderCommand(
-                commandId = "${nodeId}_${path.hashCode()}",
-                points = DoubleArray(0),
-                color = effectiveColor,
-                originalPath = path,
-                originalShape = transformedShape,
-                ownerNodeId = nodeId,
-                material = effectiveMaterial,
-                uvCoords = uvCoords,
-            )
+for ((index, path) in transformedShape.paths.withIndex()) {
+    output.add(
+        RenderCommand(
+            commandId = "${nodeId}_${path.hashCode()}",
+            points = DoubleArray(0),
+            color = effectiveColor,
+            originalPath = path,
+            originalShape = transformedShape,
+            ownerNodeId = nodeId,
+            material = material,
+            uvCoords = uvProvider?.invoke(shape, index),
         )
-    }
+    )
 }
 ```
 
-**Import to add:**
+**Change to shader module's `Shape()` overload:**
+
 ```kotlin
-import io.github.jayteealao.isometric.shader.UvGenerator
-import io.github.jayteealao.isometric.shader.IsometricMaterial
+// In IsometricMaterialComposables.kt
+val uvProviderLambda: ((Shape, Int) -> FloatArray?)? = if (
+    material is IsometricMaterial.Textured && geometry is Prism
+) {
+    { shape, faceIndex -> UvGenerator.forPrismFace(shape as Prism, faceIndex) }
+} else null
+
+ReusableComposeNode<ShapeNode, IsometricApplier>(
+    factory = {
+        ShapeNode(geometry, color).also {
+            it.material = material
+            it.uvProvider = uvProviderLambda
+        }
+    },
+    update = {
+        // ... existing sets ...
+        set(uvProviderLambda) { this.uvProvider = it; markDirty() }
+    }
+)
+```
+
+**Imports needed (in isometric-shader only):**
+```kotlin
 import io.github.jayteealao.isometric.shapes.Prism
 ```
+
+No shader imports in `isometric-compose` — `uvProvider` is a plain Kotlin lambda.
 
 ### Step 4 — Performance note for `UvGenerator`
 
@@ -605,3 +618,13 @@ The `PrismFace.kt` creation is independent and can be merged first.
 - [ ] `apiDump` updated for both modules
 - [ ] No regressions in existing `isometric-core` tests
 - [ ] `material-types` slice is merged (prerequisite)
+
+## Revision History
+
+### 2026-04-11 — Cohesion Review (rev 1)
+- Mode: Review-All (cohesion check after material-types dependency inversion)
+- Issues found: 3 (2 HIGH, 1 MED)
+  1. **HIGH:** Step 3 imported `IsometricMaterial` and `UvGenerator` into `isometric-compose` — illegal under new arch (compose cannot depend on shader)
+  2. **HIGH:** `ShapeNode.material` typed as `IsometricMaterial?` — must be `MaterialData?` (from core)
+  3. **MED:** Plan assumed compose's `Shape()` has a material parameter — removed in rev 3
+- Fix: Rewrote Step 3 to use a `uvProvider: ((Shape, Int) -> FloatArray?)?` lambda on `ShapeNode`. The lambda is set by the shader module's `Shape()` overload, keeping compose free of shader imports. Updated prerequisite section to reflect new dependency graph.

@@ -6,11 +6,11 @@ slice-slug: webgpu-textures
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
-metric-files-to-touch: 9
-metric-step-count: 10
+updated-at: "2026-04-11T22:49:12Z"
+metric-files-to-touch: 10
+metric-step-count: 11
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [webgpu, texture, shader, wgsl]
 refs:
   index: 00-index.md
@@ -27,7 +27,7 @@ next-invocation: "/wf-implement texture-material-shaders webgpu-textures"
 ## Goal
 
 Wire texture sampling into the existing WebGPU render pipeline so that faces carrying
-a `Material.Textured` render with their bitmap applied via UV-interpolated
+a `IsometricMaterial.Textured` render with their bitmap applied via UV-interpolated
 `textureSample()` in the fragment shader. Non-textured faces take a zero-cost fast path
 (`textureIndex == 0xFFFFFFFF`). A 2×2 checkerboard fallback GPU texture stands in for
 any texture slot that has not been loaded yet.
@@ -35,10 +35,15 @@ any texture slot that has not been loaded yet.
 ## Dependency contract
 
 This plan assumes:
-- `material-types` slice has shipped: `RenderCommand` carries `material: Material?`
-  and `uvCoords: List<UvCoord>?`.
+- `material-types` slice has shipped (rev 3): `RenderCommand` carries `material: MaterialData?`
+  and `uvCoords: FloatArray?`. `isometric-compose` does NOT depend on `isometric-shader`.
+  `isometric-shader` depends on `isometric-compose`. Overloaded `Shape(geometry, material)`
+  composables live in `isometric-shader`.
 - `uv-generation` slice has shipped: UV coordinates are populated for Prism faces on
   `RenderCommand.uvCoords` before `SceneDataPacker.packInto()` is called.
+- `isometric-webgpu` must add `implementation(project(":isometric-shader"))` to its
+  `build.gradle.kts` so it can cast `MaterialData?` to `IsometricMaterial` when interpreting
+  render commands.
 
 If either dependency is absent at implementation time, the implementer must shim the
 missing fields before proceeding (temporary `null` / zero-UV stubs are acceptable).
@@ -57,6 +62,24 @@ missing fields before proceeding (temporary `null` / zero-UV stubs are acceptabl
 The vertex stride does **not** change. UV coordinates are already allocated in the vertex
 buffer. The only work is to write real values instead of zeros, bind a texture + sampler
 to `@group(1)`, and teach the fragment shader to use them.
+
+---
+
+## Step 0 — Add `isometric-shader` dependency to `isometric-webgpu`
+
+**File to modify:** `isometric-webgpu/build.gradle.kts`
+
+Add dependency so `SceneDataPacker` and `GpuFullPipeline` can cast `MaterialData?` to
+`IsometricMaterial.Textured` and access bitmap data:
+
+```kotlin
+implementation(project(":isometric-shader"))
+```
+
+**Import needed in `SceneDataPacker.kt` and `GpuFullPipeline.kt`:**
+```kotlin
+import io.github.jayteealao.isometric.shader.IsometricMaterial
+```
 
 ---
 
@@ -392,13 +415,13 @@ triangles use UV (0,0) for v0 and equal-arc positions for subsequent vertices.
    reading `cmd.material`:
    ```kotlin
    val texIndex = when (val m = cmd.material) {
-       is Material.Textured -> /* resolved GPU texture slot index */
+       is IsometricMaterial.Textured -> /* resolved GPU texture slot index */
        else -> SceneDataLayout.NO_TEXTURE
    }
    buffer.putInt(texIndex)
    ```
    For this slice, the single bound texture is always slot 0. Write `0` when the
-   material is `Material.Textured`, `NO_TEXTURE` otherwise.
+   material is `IsometricMaterial.Textured`, `NO_TEXTURE` otherwise.
 
 2. **`FaceData` struct** does not change size (144 bytes). The UV coordinates do NOT
    live in `FaceData` — they are emitted per-vertex in M5 (see Step 7). No stride
@@ -420,9 +443,9 @@ triangles use UV (0,0) for v0 and equal-arc positions for subsequent vertices.
 
 1. Hold a `GpuTextureStore` and `GpuTextureBinder`.
 2. On `upload(scene, w, h)`:
-   a. Scan `scene.commands` for `Material.Textured` entries. If none, use the fallback
+   a. Scan `scene.commands` for `IsometricMaterial.Textured` entries. If none, use the fallback
       checkerboard texture and write `NO_TEXTURE` to all slots.
-   b. For the first (and currently only) `Material.Textured` found, upload its bitmap
+   b. For the first (and currently only) `IsometricMaterial.Textured` found, upload its bitmap
       via `textureStore.uploadBitmap(bitmap)`. Cache the result keyed by bitmap identity
       to avoid re-uploading on every frame.
    c. Build `textureBinder.buildBindGroup(uploadedTexture.createView())`.
@@ -547,3 +570,17 @@ CPU (uploadScene)                    GPU M3             GPU M5             GPU R
    │                                    │                  │   setVertexBuffer + drawIndirect
    │                                    │                  │   fragmentMain: textureSample
 ```
+
+## Revision History
+
+### 2026-04-11 — Cohesion Review (rev 1)
+- Mode: Review-All (cohesion check after material-types dependency inversion)
+- Issues found: 4 (1 HIGH, 2 MED, 1 LOW)
+  1. **HIGH:** Missing `isometric-shader` dependency step for `isometric-webgpu/build.gradle.kts`.
+     Fix: added Step 0 to declare the dependency.
+  2. **MED:** All references to `Material.Textured` should be `IsometricMaterial.Textured`.
+     Fix: replaced all 6 occurrences.
+  3. **MED:** `SceneDataPacker` and `GpuFullPipeline` need shader imports, not documented.
+     Fix: added import notes to Step 0.
+  4. **LOW:** Dependency contract said `material: Material?` instead of `material: MaterialData?`.
+     Fix: updated dependency contract section.

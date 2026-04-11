@@ -26,3 +26,9 @@ slug: texture-material-shaders
 
 **WebGPU texture priority:** Both Canvas and WebGPU get texture support in this effort (not Canvas-first)
 
+## 2026-04-11 — Plan (directed fix)
+
+**Module dependency policy:** `isometric-compose` must be usable without `isometric-shader` and must not depend on it. The dependency arrow is reversed: `isometric-shader` depends on `isometric-compose`.
+
+**Composable API strategy:** Instead of adding a `material` parameter to the existing `Shape()` composable in `isometric-compose`, provide overloaded `Shape(geometry, material)` composables in `isometric-shader` that accept `IsometricMaterial` instead of `IsoColor`.
+

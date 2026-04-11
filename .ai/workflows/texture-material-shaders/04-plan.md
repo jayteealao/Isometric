@@ -5,7 +5,7 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:50:00Z"
+updated-at: "2026-04-11T22:49:12Z"
 planning-mode: all
 slices-planned: 6
 slices-total: 6
@@ -23,37 +23,36 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 
 ## Slice Plan Summaries
 
-### `material-types`
-- **Files:** 9 (5 new, 4 modified)
-- **Steps:** 12
-- **Strategy:** New `isometric-shader` Android library module. `IsometricMaterial` sealed
-  interface with `FlatColor`/`Textured`/`PerFace`. `TextureSource` sealed interface.
-  `RenderCommand` extended with `material`/`uvCoords` fields. `Shape()` composable gets
-  `material` parameter. Zero rendering changes.
-- **Key risk:** Module must be Android library (not pure JVM) because `TextureSource`
-  references `android.graphics.Bitmap` and `@DrawableRes`.
+### `material-types` (rev 3)
+- **Files:** 7 (1 new, 6 modified) — rework of already-implemented steps 8-12
+- **Steps:** 14 (steps 1-7 already done; steps 8-14 are the rework)
+- **Strategy:** New `isometric-shader` Android library module with types + DSL (done).
+  **Rework:** Remove compose→shader dependency. `isometric-compose` uses `MaterialData?`
+  (core) on nodes, no material param on composables. `isometric-shader` depends on compose
+  and provides overloaded `Shape(geometry, material)` composables.
+- **Key risk:** Overload resolution between `Shape(geo, color: IsoColor)` and
+  `Shape(geo, material: IsometricMaterial)` — types are unrelated, Kotlin handles cleanly.
 
-### `uv-generation`
+### `uv-generation` (rev 1)
 - **Files:** 7 (5 new, 2 modified)
 - **Steps:** 8
-- **Strategy:** `PrismFace` enum in `isometric-core` with stable index mapping (0=FRONT
-  through 5=TOP). `UvGenerator` in `isometric-shader` computes per-vertex UVs from 3D
-  `Path.points` before projection (correct for orthographic). Wire into `ShapeNode.renderTo()`.
+- **Strategy:** `PrismFace` enum in `isometric-core`. `UvGenerator` in `isometric-shader`.
+  UV wiring via `uvProvider` lambda on `ShapeNode` (set by shader's `Shape()` overload) —
+  **not** via direct import of shader types in compose.
 - **Key risk:** Prism face ordering stability across transforms — verified stable.
 
-### `canvas-textures`
+### `canvas-textures` (rev 1)
 - **Files:** 12 (4 new, 3 modified, 5 test)
 - **Steps:** 22
-- **Strategy:** `TextureCache` (LRU, `LinkedHashMap`), `MaterialResolver` with fallback
-  chain. `CanvasRenderBackend` uses `drawIntoCanvas` with `BitmapShader` + 3-point affine
-  `Matrix.setPolyToPoly`. Shader created once at cache-put time; only `setLocalMatrix`
-  per draw. Checkerboard fallback (16x16, magenta/black). 3 Paparazzi snapshot tests.
-- **Key risk:** `DrawScope.drawIntoCanvas` integration — must not break existing flat-color
-  draw path.
+- **Strategy:** `TextureCache`, `MaterialResolver`, `TextureLoader` all live in
+  `isometric-shader` (not compose). `TexturedCanvasRenderBackend` decorator in shader wraps
+  compose's base backend. `BitmapShader` + 3-point affine `Matrix.setPolyToPoly`.
+- **Key risk:** Decorator pattern for canvas render backend — must hook into compose's draw
+  path without breaking existing flat-color rendering.
 
-### `webgpu-textures`
-- **Files:** 9 modified + 2 new
-- **Steps:** 10
+### `webgpu-textures` (rev 1)
+- **Files:** 10 modified + 2 new (added `build.gradle.kts` for shader dep)
+- **Steps:** 11 (added Step 0: add `:isometric-shader` dep to webgpu)
 - **Strategy:** Vertex stride grows 32→36 bytes (new `textureIndex` attribute at location 3).
   `GpuTextureStore` uploads bitmaps to `GPUTexture`. Fragment shader: `if (textureIndex == NO_TEXTURE) return color; else textureSample`. Bind group 1 for texture+sampler.
   `SceneDataPacker` writes real `textureIndex` from `RenderCommand.material`. Emit shader
@@ -71,9 +70,9 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 - **Key risk:** Atlas packing correctness (texture bleeding). Mitigated by padding +
   half-pixel correction.
 
-### `sample-demo`
-- **Files:** 7 (2 new, 5 modified)
-- **Steps:** 9
+### `sample-demo` (rev 1)
+- **Files:** 8 (2 new, 6 modified — added `app/build.gradle.kts` for shader dep)
+- **Steps:** 10 (added Step 0: add `:isometric-shader` dep to app)
 - **Strategy:** `TexturedDemoActivity` with 4x4 grid of Prisms. Procedurally generated
   grass/dirt textures (64x64 bitmaps, no external assets needed). Three-button render
   mode toggle (Canvas / Canvas+GPU Sort / WebGPU). Added to `MainActivity` chooser.
@@ -81,8 +80,11 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 
 ## Cross-Cutting Concerns
 
-- **Backward compatibility:** All slices preserve `Shape(shape, color)` API. The
-  `material` parameter defaults to `null` everywhere.
+- **Dependency graph (rev 3):** `core → compose → shader → webgpu`. Compose does NOT
+  depend on shader. All material-aware logic (types, DSL, caching, resolution, composable
+  overloads) lives in `isometric-shader`. Compose only uses `MaterialData?` (core marker).
+- **Backward compatibility:** `Shape(shape, color)` in compose is unchanged. Material
+  overloads (`Shape(shape, material)`) live in shader module — additive only.
 - **`apiCheck`:** Slices 1 and 2 add new public API. Must run `apiDump` + `apiCheck`.
 - **Test coverage:** Each slice includes its own tests. Total new tests across all slices:
   ~30+ unit tests, 3 snapshot tests.
@@ -111,11 +113,15 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 
 ## Conflicts Found
 
-None. The 6 sub-agents produced compatible plans with no overlapping file modifications
-or contradictory assumptions. Key coordination points are well-defined:
-- `RenderCommand` fields added in slice 1, consumed by slices 2-5
-- `PrismFace` enum added in slice 2, consumed by slices 3-5
-- Vertex stride change in slice 4 is self-contained within the webgpu module
+**Post-rev-3 cohesion review (2026-04-11):** 16 issues found across 5 plans (6 HIGH,
+5 MED, 5 LOW). All caused by the dependency inversion in `material-types` rev 3. All fixed.
+
+Key coordination points after fix:
+- `RenderCommand.material: MaterialData?` (core) — consumed by all slices
+- `isometric-compose` has NO shader imports — uses `MaterialData?` and `uvProvider` lambda
+- `isometric-shader` provides composable overloads, texture caching, material resolution
+- `isometric-webgpu` adds `isometric-shader` dependency in the `webgpu-textures` slice
+- `app` adds `isometric-shader` dependency in the `sample-demo` slice
 
 ## Freshness Research
 
@@ -126,8 +132,7 @@ or contradictory assumptions. Key coordination points are well-defined:
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf-implement texture-material-shaders material-types` — start
-  with the foundation slice. All other slices depend on it.
-  **Consider `/compact` first** — planning research is noise for implementation.
-- **Option B:** `/wf-implement texture-material-shaders material-types` then sequential
-  through all 6 slices in order.
+- **Option A (default):** `/wf-implement texture-material-shaders material-types` — rework
+  the already-implemented material-types slice per rev 3 (reverse the dependency).
+  **Consider `/compact` first** — planning/review context is noise for implementation.
+- **Option B:** Sequential through all 6 slices after material-types rework.

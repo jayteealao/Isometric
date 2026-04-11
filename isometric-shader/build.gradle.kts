@@ -1,5 +1,6 @@
 plugins {
     id("isometric.android.library")
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.dokka)
     id("isometric.publishing")
 }
@@ -9,6 +10,10 @@ version = "1.2.0-SNAPSHOT"
 
 android {
     namespace = "io.github.jayteealao.isometric.shader"
+
+    buildFeatures {
+        compose = true
+    }
 
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
@@ -30,8 +35,10 @@ mavenPublishing {
 
 dependencies {
     api(project(":isometric-core"))
+    api(project(":isometric-compose"))
     implementation(libs.annotation)
     implementation(libs.kotlin.stdlib)
+    implementation(libs.compose.runtime)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)

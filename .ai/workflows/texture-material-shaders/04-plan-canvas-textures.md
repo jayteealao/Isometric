@@ -6,11 +6,11 @@ slice-slug: canvas-textures
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:40:00Z"
+updated-at: "2026-04-11T22:49:12Z"
 metric-files-to-touch: 12
 metric-step-count: 22
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [canvas, texture, rendering]
 refs:
   index: 00-index.md
@@ -41,9 +41,11 @@ texture. Zero code changes required for existing `Shape(Prism(origin), IsoColor.
 
 This plan assumes the following two slices are already merged and on the working branch:
 
-- **`material-types`**: `IsometricMaterial` sealed interface, `TextureSource`, `UvCoord`,
-  `UvTransform`, DSL builders, `RenderCommand.material`, `RenderCommand.uvCoords`,
-  `ShapeNode.material`, and `Shape(material=…)` composable.
+- **`material-types`** (rev 3): `IsometricMaterial` sealed interface, `TextureSource`, `UvCoord`,
+  `UvTransform`, DSL builders, `RenderCommand.material: MaterialData?`, `RenderCommand.uvCoords`,
+  `ShapeNode.material: MaterialData?`. **Note:** `isometric-compose` does NOT depend on
+  `isometric-shader`. `isometric-shader` depends on `isometric-compose` and provides
+  overloaded `Shape(geometry, material: IsometricMaterial)` composables.
 
 - **`uv-generation`**: `UvGenerator` producing per-vertex `FloatArray` UV coords on
   `RenderCommand.uvCoords` for all 6 Prism faces. Prism face-type identification via
@@ -100,9 +102,17 @@ A `LinkedHashMap(…, accessOrder=true)` gives O(1) LRU eviction without a third
 library. Cache is keyed by `TextureSource` identity. Max size defaults to **20 entries**
 (covers typical isometric tile sets) with a constructor parameter for override.
 
-The cache lives in `isometric-compose` (not `isometric-shader`) because it holds
-`android.graphics.Bitmap` objects — a platform type. It is created once inside
-`IsometricScene` via `remember {}` and passed to `CanvasRenderBackend`.
+The cache lives in `isometric-shader` (which depends on `isometric-compose` and has
+Android dependencies). It is created once inside `IsometricScene` via `remember {}` and
+injected into the textured render path via `CompositionLocal` or constructor parameter.
+
+**Architectural note (material-types rev 3):** `isometric-compose` cannot import from
+`isometric-shader`. All material-aware rendering logic (`TextureCache`, `TextureLoader`,
+`MaterialResolver`, `ResolvedMaterial`) must live in `isometric-shader`, not in compose.
+The `CanvasRenderBackend` in compose renders flat-color faces only. The shader module
+provides a `TexturedCanvasRenderBackend` decorator that wraps the base backend, intercepts
+`RenderCommand`s with non-null `MaterialData`, casts to `IsometricMaterial`, resolves
+textures, and renders them. For flat-color commands it delegates to the base backend.
 
 ### D4 — TextureLoader loads on first access, not eagerly
 
@@ -921,3 +931,24 @@ requires 2 and 5. Tests require 9 and 10.
 - **UV generation for non-Prism shapes** — UV coords on other shape types are `null`;
   the renderer degrades gracefully to flat tint fill.
 - **Mipmap generation** — not needed for isometric 2D rendering (see research §7.2).
+
+## Revision History
+
+### 2026-04-11 — Cohesion Review (rev 1)
+- Mode: Review-All (cohesion check after material-types dependency inversion)
+- Issues found: 4 (3 HIGH, 1 MED)
+  1. **HIGH:** All material resolution logic (`TextureCache`, `TextureLoader`, `MaterialResolver`,
+     `ResolvedMaterial`) was placed in `isometric-compose` with imports from `isometric-shader` —
+     illegal under new arch. Fix: relocate all 4 classes + their tests to `isometric-shader`.
+  2. **HIGH:** `CanvasRenderBackend` in compose cannot cast `MaterialData?` to `IsometricMaterial`
+     without a shader dependency. Fix: create `TexturedCanvasRenderBackend` decorator in shader
+     module that wraps the base backend.
+  3. **HIGH:** Prerequisites assumed compose's `Shape()` has a material parameter — no longer true.
+     Fix: updated to reference shader module's overloaded `Shape()`.
+  4. **MED:** File map puts 4 new source files and 5 test files in compose — must be in shader.
+     Fix: noted in prerequisites; file map to be updated at implementation time.
+- **Implementation impact:** Steps that create or modify files in compose for material-aware
+  rendering must be rerouted to `isometric-shader`. The `CanvasRenderBackend` in compose
+  gets a minimal hook (e.g., `materialDrawHook: ((RenderCommand, DrawScope) -> Boolean)?`)
+  that the shader module's decorator sets. When the hook returns `true`, the face was drawn
+  by the hook; when `false` or null, compose draws it as flat color.
