@@ -212,9 +212,10 @@ public final class io/github/jayteealao/isometric/ProjectionParams {
 }
 
 public final class io/github/jayteealao/isometric/RenderCommand {
-	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;)V
+	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getCommandId ()Ljava/lang/String;
 	public final fun getOriginalPath ()Lio/github/jayteealao/isometric/Path;
