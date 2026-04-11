@@ -996,4 +996,78 @@ class IsometricRendererTest {
             error!!.message!!.contains("closed")
         )
     }
+
+    // --- prepareSceneForGpu tests ---
+
+    @Test
+    fun `prepareSceneForGpu produces a PreparedScene with commands`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val root = buildSceneRoot()
+
+        val scene = renderer.prepareSceneForGpu(root, defaultContext, 800, 600)
+
+        assertNotNull("prepareSceneForGpu should return a non-null PreparedScene", scene)
+        assertTrue(
+            "PreparedScene should contain at least one command for a shape node",
+            scene!!.commands.isNotEmpty()
+        )
+    }
+
+    @Test
+    fun `prepareSceneForGpu returns cached scene on second call without changes`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val root = buildSceneRoot()
+
+        val first = renderer.prepareSceneForGpu(root, defaultContext, 800, 600)
+        assertNotNull(first)
+
+        // No mutations — tree is still clean, context and dimensions are identical
+        val second = renderer.prepareSceneForGpu(root, defaultContext, 800, 600)
+
+        assertTrue(
+            "prepareSceneForGpu should return the same PreparedScene instance on cache hit",
+            first === second
+        )
+    }
+
+    @Test
+    fun `prepareSceneForGpu returns empty commands for empty scene`() {
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val emptyRoot = GroupNode()
+        emptyRoot.updateChildrenSnapshot()
+
+        val scene = renderer.prepareSceneForGpu(emptyRoot, defaultContext, 800, 600)
+
+        assertNotNull("prepareSceneForGpu should return a PreparedScene even for an empty scene", scene)
+        assertTrue(
+            "PreparedScene for an empty scene should have no commands",
+            scene!!.commands.isEmpty()
+        )
+    }
+
+    @Test
+    fun `prepareSceneForGpu uses baseColor not lit color`() {
+        // The GPU pipeline skips CPU lighting — commands are emitted directly from
+        // ShapeNode.renderTo() without running engine.projectScene(). That means
+        // RenderCommand.color and RenderCommand.baseColor are both the raw material
+        // color (ShapeNode.color), with no lighting adjustment applied.
+        val engine = IsometricEngine()
+        val renderer = IsometricRenderer(engine, enablePathCaching = false)
+        val root = buildSceneRoot() // ShapeNode with IsoColor.BLUE
+
+        val scene = renderer.prepareSceneForGpu(root, defaultContext, 800, 600)
+
+        assertNotNull(scene)
+        assertTrue("Scene should have commands to verify colors on", scene!!.commands.isNotEmpty())
+        for (command in scene.commands) {
+            assertEquals(
+                "In the GPU path, baseColor must equal color — no CPU lighting applied",
+                command.baseColor,
+                command.color
+            )
+        }
+    }
 }
