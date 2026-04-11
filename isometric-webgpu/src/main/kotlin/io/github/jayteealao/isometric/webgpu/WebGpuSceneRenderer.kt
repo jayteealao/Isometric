@@ -103,6 +103,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     ) {
         useVsync = vsync
         var profiler: GpuTimestampProfiler? = null
+        var profilerFailures = 0
         try {
             ensureInitialized(
                 androidSurface = androidSurface,
@@ -157,13 +158,27 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     // readResults() uses raw mapAsync + processEvents pumping internally
                     // (not mapAndAwait) to avoid deadlocking the single GPU thread.
                     // Must run on GPU thread since processEvents is thread-confined.
-                    if (profiler != null) {
-                        val result = gpuContext?.withGpu { profiler.readResults() }
+                    val p = profiler
+                    if (p != null) {
+                        val result = try {
+                            gpuContext?.withGpu { p.readResults() }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Timestamp readback exception: ${e.message}")
+                            null
+                        }
                         if (result != null) {
+                            profilerFailures = 0
                             frameCallback.onGpuTimestamps(
                                 computeNanos = result.totalComputeNanos,
                                 renderNanos = result.renderPassNanos,
                             )
+                        } else if (++profilerFailures >= 5) {
+                            // Disable profiler after 5 consecutive failures to prevent
+                            // JNI global reference accumulation from callback objects
+                            // that Dawn never releases on failed readbacks.
+                            Log.w(TAG, "Disabling GPU timestamp profiler after $profilerFailures consecutive failures")
+                            p.close()
+                            profiler = null
                         }
                     }
 
