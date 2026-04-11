@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
@@ -207,6 +208,61 @@ internal class SceneCache(
             scene
         } catch (e: Exception) {
             onRenderError?.invoke("rebuildAsync", e)
+            null
+        }
+    }
+
+    /**
+     * Lightweight rebuild for the Full WebGPU pipeline.
+     *
+     * Collects render commands from the node tree and wraps them in a [PreparedScene]
+     * with projection parameters and light direction, but **skips** the expensive CPU
+     * work that the GPU pipeline re-does anyway:
+     * - No CPU 3D-to-2D projection
+     * - No CPU back-face culling or bounds checking
+     * - No CPU lighting
+     * - No CPU depth sorting
+     * - No path caching (Full WebGPU doesn't use Canvas draw)
+     *
+     * The GPU's M3 (transform+cull+light) and M4 (sort) stages handle all of this from
+     * the original 3D vertices in [RenderCommand.originalPath].
+     */
+    fun rebuildForGpu(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int,
+        onRenderError: ((String, Throwable) -> Unit)?
+    ): PreparedScene? {
+        return try {
+            val commands = reusableCommandList
+                ?: ArrayList<RenderCommand>().also { reusableCommandList = it }
+            commands.clear()
+            rootNode.renderTo(commands, context)
+
+            // Get projection params directly from the engine. The GPU needs these as
+            // uniforms for its own projection pass (M3).
+            val concreteEngine = engine as IsometricEngine
+            val scene = PreparedScene(
+                commands = commands.toList(),
+                width = width,
+                height = height,
+                projectionParams = concreteEngine.projectionParams,
+                lightDirection = context.lightDirection,
+            )
+
+            currentPreparedScene = scene
+            cachedWidth = width
+            cachedHeight = height
+            cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+            cachedProjectionVersion = engine.projectionVersion
+
+            rootNode.markClean()
+            cacheValid = true
+
+            scene
+        } catch (e: Exception) {
+            onRenderError?.invoke("rebuildForGpu", e)
             null
         }
     }

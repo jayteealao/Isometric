@@ -306,6 +306,37 @@ class IsometricRenderer(
     }
 
     /**
+     * Lightweight prepare for the Full WebGPU pipeline.
+     *
+     * Collects render commands from the node tree without running the CPU projection,
+     * culling, lighting, or depth sort — the GPU handles all of that. Hit-test indices
+     * are not built since Full WebGPU does not use the CPU hit-test path.
+     *
+     * @see SceneCache.rebuildForGpu
+     */
+    fun prepareSceneForGpu(
+        rootNode: GroupNode,
+        context: RenderContext,
+        width: Int,
+        height: Int,
+    ): PreparedScene? {
+        check(!closed) { "Renderer has been closed and cannot be used for rendering" }
+        if (width <= 0 || height <= 0) return null
+        if (forceRebuild) clearCache()
+
+        if (cache.needsUpdate(rootNode, context, width, height)) {
+            benchmarkHooks?.onCacheMiss()
+            benchmarkHooks?.onPrepareStart()
+            val scene = cache.rebuildForGpu(rootNode, context, width, height, onRenderError)
+            benchmarkHooks?.onPrepareEnd()
+            return scene
+        }
+
+        benchmarkHooks?.onCacheHit()
+        return cache.currentPreparedScene
+    }
+
+    /**
      * Draw a pre-built scene without running the prepare step.
      *
      * Used by the GPU compute path: the `LaunchedEffect` prepares the scene via [prepareAsync],

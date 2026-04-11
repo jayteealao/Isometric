@@ -400,7 +400,6 @@ fun IsometricScene(
     }
 
     if (!isCanvasBackend) {
-        val skipHitTest = !gesturesActive
         LaunchedEffect(renderer, asyncPrepareInputs, isCanvasBackend) {
             snapshotFlow {
                 AsyncPrepareRequest(
@@ -420,12 +419,15 @@ fun IsometricScene(
                             renderOptions = request.inputs.renderOptions,
                             lightDirection = request.inputs.lightDirection,
                         )
-                        renderer.prepareScene(
+                        // Lightweight path: collects the node tree into RenderCommands
+                        // without running CPU projection, culling, lighting, or depth
+                        // sort. The GPU pipeline (M3-M5) handles all of that from the
+                        // original 3D vertices.
+                        renderer.prepareSceneForGpu(
                             rootNode = rootNode,
                             context = context,
                             width = request.canvasWidth,
                             height = request.canvasHeight,
-                            skipHitTest = skipHitTest,
                         )
                     }
                     backendSceneVersion.intValue++
