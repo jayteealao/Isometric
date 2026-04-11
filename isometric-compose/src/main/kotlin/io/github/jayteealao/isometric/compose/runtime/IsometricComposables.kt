@@ -10,6 +10,7 @@ import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Shape
+import io.github.jayteealao.isometric.shader.IsometricMaterial
 
 /**
  * Composable annotation for isometric nodes
@@ -31,6 +32,8 @@ annotation class IsometricComposable
  *
  * @param geometry The 3D [io.github.jayteealao.isometric.Shape] to render (e.g., [io.github.jayteealao.isometric.shapes.Prism])
  * @param color The color of the shape (defaults to [LocalDefaultColor])
+ * @param material Optional material for textured rendering. When non-null, overrides
+ *   flat-color rendering. When null (default), the shape renders with [color] as before.
  * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
@@ -51,6 +54,7 @@ annotation class IsometricComposable
 fun IsometricScope.Shape(
     geometry: Shape,
     color: IsoColor = LocalDefaultColor.current,
+    material: IsometricMaterial? = null,
     alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
@@ -64,10 +68,11 @@ fun IsometricScope.Shape(
     nodeId: String? = null
 ) {
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(geometry, color) },
+        factory = { ShapeNode(geometry, color, material) },
         update = {
             set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(material) { this.material = it; markDirty() }
             set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {
@@ -154,6 +159,8 @@ fun IsometricScope.Group(
  *
  * @param path The 2D path to render
  * @param color The color of the path (defaults to LocalDefaultColor)
+ * @param material Optional material for textured rendering. When non-null, overrides
+ *   flat-color rendering. When null (default), the path renders with [color] as before.
  * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
@@ -174,6 +181,7 @@ fun IsometricScope.Group(
 fun IsometricScope.Path(
     path: Path,
     color: IsoColor = LocalDefaultColor.current,
+    material: IsometricMaterial? = null,
     alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
@@ -187,10 +195,11 @@ fun IsometricScope.Path(
     nodeId: String? = null
 ) {
     ReusableComposeNode<PathNode, IsometricApplier>(
-        factory = { PathNode(path, color) },
+        factory = { PathNode(path, color, material) },
         update = {
             set(path) { this.path = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(material) { this.material = it; markDirty() }
             set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {

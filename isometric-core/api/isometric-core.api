@@ -96,6 +96,9 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 public final class io/github/jayteealao/isometric/IsometricEngine$Companion {
 }
 
+public abstract interface class io/github/jayteealao/isometric/MaterialData {
+}
+
 public class io/github/jayteealao/isometric/Path {
 	public fun <init> (Ljava/util/List;)V
 	public fun <init> ([Lio/github/jayteealao/isometric/Point;)V
@@ -212,17 +215,19 @@ public final class io/github/jayteealao/isometric/ProjectionParams {
 }
 
 public final class io/github/jayteealao/isometric/RenderCommand {
-	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;)V
-	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[F)V
+	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBaseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getCommandId ()Ljava/lang/String;
+	public final fun getMaterial ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getOriginalPath ()Lio/github/jayteealao/isometric/Path;
 	public final fun getOriginalShape ()Lio/github/jayteealao/isometric/Shape;
 	public final fun getOwnerNodeId ()Ljava/lang/String;
 	public final fun getPointCount ()I
 	public final fun getPoints ()[D
+	public final fun getUvCoords ()[F
 	public fun hashCode ()I
 	public final fun pointX (I)D
 	public final fun pointY (I)D

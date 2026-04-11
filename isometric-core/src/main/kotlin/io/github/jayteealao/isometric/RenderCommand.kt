@@ -16,6 +16,12 @@ package io.github.jayteealao.isometric
  *   existing callers are unaffected.
  * @property originalPath Reference to the original 3D path (for callbacks/hit testing)
  * @property originalShape Reference to the original shape (if this path belongs to one)
+ * @property material Material data for textured rendering. Carries an `IsometricMaterial`
+ *   instance from `isometric-shader` opaquely through the core pipeline. Renderers that
+ *   depend on `isometric-shader` cast this to `IsometricMaterial`. Null means flat-color only.
+ * @property uvCoords Per-vertex texture coordinates as a flat packed float array
+ *   `[u0, v0, u1, v1, ...]`, matching the vertex order in [originalPath]. Null when
+ *   no texture mapping is active.
  */
 class RenderCommand(
     val commandId: String,
@@ -25,6 +31,8 @@ class RenderCommand(
     val originalShape: Shape?,
     val ownerNodeId: String? = null,
     val baseColor: IsoColor = color,
+    val material: MaterialData? = null,
+    val uvCoords: FloatArray? = null,
 ) {
     /** Number of 2D vertices in [points]. */
     val pointCount: Int get() = points.size / 2
@@ -43,7 +51,9 @@ class RenderCommand(
             baseColor == other.baseColor &&
             originalPath == other.originalPath &&
             originalShape == other.originalShape &&
-            ownerNodeId == other.ownerNodeId
+            ownerNodeId == other.ownerNodeId &&
+            material == other.material &&
+            (uvCoords contentEquals other.uvCoords)
 
     override fun hashCode(): Int {
         var result = commandId.hashCode()
@@ -53,9 +63,11 @@ class RenderCommand(
         result = 31 * result + originalPath.hashCode()
         result = 31 * result + (originalShape?.hashCode() ?: 0)
         result = 31 * result + (ownerNodeId?.hashCode() ?: 0)
+        result = 31 * result + (material?.hashCode() ?: 0)
+        result = 31 * result + (uvCoords?.contentHashCode() ?: 0)
         return result
     }
 
     override fun toString(): String =
-        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId)"
+        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }})"
 }

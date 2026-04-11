@@ -6,6 +6,7 @@ import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Shape
+import io.github.jayteealao.isometric.shader.IsometricMaterial
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
 
@@ -216,7 +217,8 @@ class GroupNode : IsometricNode() {
  */
 class ShapeNode(
     var shape: Shape,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: IsometricMaterial? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -246,7 +248,8 @@ class ShapeNode(
                     color = effectiveColor,
                     originalPath = path,
                     originalShape = transformedShape,
-                    ownerNodeId = nodeId
+                    ownerNodeId = nodeId,
+                    material = material,
                 )
             )
         }
@@ -259,7 +262,8 @@ class ShapeNode(
  */
 class PathNode(
     var path: Path,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: IsometricMaterial? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -287,7 +291,8 @@ class PathNode(
                 color = effectiveColor,
                 originalPath = transformedPath,
                 originalShape = null,
-                ownerNodeId = nodeId
+                ownerNodeId = nodeId,
+                material = material,
             )
         )
     }

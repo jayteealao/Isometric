@@ -40,6 +40,8 @@ dependencies {
     // Internal collaborators (SceneGraph, IsometricProjection, DepthSorter, HitTester)
     // are marked internal and don't leak through api.
     api(project(":isometric-core"))
+    // api because IsometricMaterial appears in public composable signatures (Shape, Path)
+    api(project(":isometric-shader"))
 
     // Compose
     implementation(libs.compose.ui)
