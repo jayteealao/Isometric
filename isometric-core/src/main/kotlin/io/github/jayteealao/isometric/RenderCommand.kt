@@ -10,7 +10,10 @@ package io.github.jayteealao.isometric
  *
  * @property commandId Stable identifier for this command (for hit testing and tracking)
  * @property points Flat packed 2D screen-space vertices: [x0, y0, x1, y1, ...]
- * @property color The color to render (with lighting applied)
+ * @property color The color to render (with lighting applied in Canvas modes)
+ * @property baseColor The raw material color before lighting. GPU backends use this to avoid
+ *   double-lighting (the GPU shader applies its own lighting). Defaults to [color] so
+ *   existing callers are unaffected.
  * @property originalPath Reference to the original 3D path (for callbacks/hit testing)
  * @property originalShape Reference to the original shape (if this path belongs to one)
  */
@@ -20,7 +23,8 @@ class RenderCommand(
     val color: IsoColor,
     val originalPath: Path,
     val originalShape: Shape?,
-    val ownerNodeId: String? = null
+    val ownerNodeId: String? = null,
+    val baseColor: IsoColor = color,
 ) {
     /** Number of 2D vertices in [points]. */
     val pointCount: Int get() = points.size / 2
@@ -36,6 +40,7 @@ class RenderCommand(
             commandId == other.commandId &&
             points.contentEquals(other.points) &&
             color == other.color &&
+            baseColor == other.baseColor &&
             originalPath == other.originalPath &&
             originalShape == other.originalShape &&
             ownerNodeId == other.ownerNodeId
@@ -44,6 +49,7 @@ class RenderCommand(
         var result = commandId.hashCode()
         result = 31 * result + points.contentHashCode()
         result = 31 * result + color.hashCode()
+        result = 31 * result + baseColor.hashCode()
         result = 31 * result + originalPath.hashCode()
         result = 31 * result + (originalShape?.hashCode() ?: 0)
         result = 31 * result + (ownerNodeId?.hashCode() ?: 0)
@@ -51,5 +57,5 @@ class RenderCommand(
     }
 
     override fun toString(): String =
-        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId)"
+        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId)"
 }

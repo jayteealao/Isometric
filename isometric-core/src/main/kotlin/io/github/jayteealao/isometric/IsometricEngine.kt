@@ -229,7 +229,8 @@ class IsometricEngine @JvmOverloads constructor(
                 color = transformedItem.litColor,
                 originalPath = transformedItem.item.path,
                 originalShape = transformedItem.item.originalShape,
-                ownerNodeId = transformedItem.item.ownerNodeId
+                ownerNodeId = transformedItem.item.ownerNodeId,
+                baseColor = transformedItem.item.baseColor,
             )
         }
 
@@ -340,7 +341,8 @@ class IsometricEngine @JvmOverloads constructor(
                     color = transformedItem.litColor,
                     originalPath = transformedItem.item.path,
                     originalShape = transformedItem.item.originalShape,
-                    ownerNodeId = transformedItem.item.ownerNodeId
+                    ownerNodeId = transformedItem.item.ownerNodeId,
+                    baseColor = transformedItem.item.baseColor,
                 )
             )
         }
