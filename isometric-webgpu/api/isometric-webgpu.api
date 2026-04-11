@@ -1,0 +1,115 @@
+public final class io/github/jayteealao/isometric/webgpu/GpuContext {
+	public static final field $stable I
+	public static final field Companion Lio/github/jayteealao/isometric/webgpu/GpuContext$Companion;
+	public synthetic fun <init> (Landroidx/webgpu/GPUInstance;Landroidx/webgpu/GPUAdapter;Landroidx/webgpu/GPUDevice;Landroidx/webgpu/GPUQueue;Lkotlinx/coroutines/ExecutorCoroutineDispatcher;Ljava/lang/Thread;Lkotlinx/coroutines/Job;Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/util/concurrent/atomic/AtomicReference;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun checkHealthy ()V
+	public final fun destroy ()V
+	public final fun getAdapter ()Landroidx/webgpu/GPUAdapter;
+	public final fun getDevice ()Landroidx/webgpu/GPUDevice;
+	public final fun getGpuDispatcher ()Lkotlinx/coroutines/ExecutorCoroutineDispatcher;
+	public final fun getInstance ()Landroidx/webgpu/GPUInstance;
+	public final fun getQueue ()Landroidx/webgpu/GPUQueue;
+	public final fun getSupportsTimestamps ()Z
+	public final fun withGpu (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/GpuContext$Companion {
+	public final fun create (Lkotlin/jvm/functions/Function1;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun create$default (Lio/github/jayteealao/isometric/webgpu/GpuContext$Companion;Lkotlin/jvm/functions/Function1;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun createForSurface (ZLkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun createForSurface$default (Lio/github/jayteealao/isometric/webgpu/GpuContext$Companion;ZLkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/WebGpuComputeBackend : io/github/jayteealao/isometric/SortingComputeBackend {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun getStatus ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun sortByDepthKeys ([FLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status : java/lang/Enum {
+	public static final field Failed Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public static final field Initializing Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public static final field Ready Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public static final field Uninitialized Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public static fun values ()[Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$StatusSnapshot {
+	public static final field $stable I
+	public fun <init> (Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;Ljava/lang/String;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Integer;
+	public final fun copy (Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;Ljava/lang/String;Ljava/lang/Integer;)Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$StatusSnapshot;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$StatusSnapshot;Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$StatusSnapshot;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDepthKeyCount ()Ljava/lang/Integer;
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getStatus ()Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$Status;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/jayteealao/isometric/webgpu/WebGpuFrameCallback {
+	public abstract fun onDrawFrameEnd ()V
+	public abstract fun onDrawFrameStart ()V
+	public abstract fun onGpuTimestamps (JJ)V
+	public abstract fun onUploadEnd ()V
+	public abstract fun onUploadStart ()V
+}
+
+public final class io/github/jayteealao/isometric/webgpu/WebGpuFrameCallback$DefaultImpls {
+	public static fun onDrawFrameEnd (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
+	public static fun onDrawFrameStart (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
+	public static fun onGpuTimestamps (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;JJ)V
+	public static fun onUploadEnd (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
+	public static fun onUploadStart (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
+}
+
+public final class io/github/jayteealao/isometric/webgpu/WebGpuProviderImpl : io/github/jayteealao/isometric/compose/runtime/WebGpuProvider {
+	public static final field $stable I
+	public static final field INSTANCE Lio/github/jayteealao/isometric/webgpu/WebGpuProviderImpl;
+	public final fun getComputeBackend ()Lio/github/jayteealao/isometric/webgpu/WebGpuComputeBackend;
+	public fun getRenderBackend ()Lio/github/jayteealao/isometric/compose/runtime/render/RenderBackend;
+	public fun getSortingBackend ()Lio/github/jayteealao/isometric/SortingComputeBackend;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/pipeline/GpuTimestampResult {
+	public static final field $stable I
+	public fun <init> (JJJJJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun component4 ()J
+	public final fun component5 ()J
+	public final fun copy (JJJJJ)Lio/github/jayteealao/isometric/webgpu/pipeline/GpuTimestampResult;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/webgpu/pipeline/GpuTimestampResult;JJJJJILjava/lang/Object;)Lio/github/jayteealao/isometric/webgpu/pipeline/GpuTimestampResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBitonicSortNanos ()J
+	public final fun getPackSortKeysNanos ()J
+	public final fun getRenderPassNanos ()J
+	public final fun getTotalComputeNanos ()J
+	public final fun getTotalGpuNanos ()J
+	public final fun getTransformCullLightNanos ()J
+	public final fun getTriangulateEmitNanos ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/sort/GpuDepthSorter {
+	public static final field $stable I
+	public static final field Companion Lio/github/jayteealao/isometric/webgpu/sort/GpuDepthSorter$Companion;
+	public fun <init> (Lio/github/jayteealao/isometric/webgpu/GpuContext;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/webgpu/GpuContext;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun destroyCachedBuffers ()V
+	public final fun sortByDepthKeys ([FLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/jayteealao/isometric/webgpu/sort/GpuDepthSorter$Companion {
+}
+
