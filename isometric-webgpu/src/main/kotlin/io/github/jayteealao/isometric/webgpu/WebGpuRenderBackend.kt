@@ -6,11 +6,11 @@ import android.view.Surface
 import android.view.WindowManager
 import androidx.compose.foundation.AndroidExternalSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.PreparedScene
@@ -21,6 +21,7 @@ import io.github.jayteealao.isometric.compose.runtime.StrokeStyle
 import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicReference
 
 internal class WebGpuRenderBackend : RenderBackend {
     @Composable
@@ -33,7 +34,16 @@ internal class WebGpuRenderBackend : RenderBackend {
         val renderer = remember { WebGpuSceneRenderer() }
         val frameCallback = LocalWebGpuFrameCallback.current
         val vsync = LocalWebGpuVsync.current
-        val currentPreparedScene by rememberUpdatedState(preparedScene)
+
+        // R-03: Bridge Compose State → AtomicReference for thread-safe off-thread reads.
+        // The render loop runs on Dispatchers.Default and cannot safely read Compose
+        // snapshot state. snapshotFlow observes changes on the main thread and publishes
+        // them to the AtomicReference that the render loop reads with .get().
+        val sceneRef = remember { AtomicReference<PreparedScene?>(null) }
+        LaunchedEffect(preparedScene) {
+            snapshotFlow { preparedScene.value }
+                .collect { sceneRef.set(it) }
+        }
 
         // F3: Track renderContext dimensions as State so the renderLoop can observe changes
         // and reconfigure the GPU surface on window/fold resize without waiting for
@@ -71,7 +81,7 @@ internal class WebGpuRenderBackend : RenderBackend {
                         androidSurface = surface,
                         surfaceWidth = width,
                         surfaceHeight = height,
-                        preparedScene = currentPreparedScene,
+                        preparedScene = sceneRef,
                         renderContextWidth = contextWidth,
                         renderContextHeight = contextHeight,
                         frameCallback = typedCallback,

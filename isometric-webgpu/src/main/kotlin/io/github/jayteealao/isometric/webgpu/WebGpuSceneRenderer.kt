@@ -27,6 +27,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicReference
 
 internal class WebGpuSceneRenderer : AutoCloseable {
     companion object {
@@ -94,7 +95,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         androidSurface: Surface,
         surfaceWidth: Int,
         surfaceHeight: Int,
-        preparedScene: State<PreparedScene?>,
+        preparedScene: AtomicReference<PreparedScene?>,
         renderContextWidth: State<Int>,
         renderContextHeight: State<Int>,
         frameCallback: WebGpuFrameCallback = object : WebGpuFrameCallback {},
@@ -115,7 +116,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             // Create GPU timestamp profiler if supported and requested
             val ctx = gpuContext
             if (enableGpuTimestamps && ctx != null && ctx.supportsTimestamps) {
-                profiler = ctx.withGpu { GpuTimestampProfiler(ctx.device, ctx.instance, ctx.queue) }
+                profiler = ctx.withGpu { GpuTimestampProfiler(ctx) }
                 Log.i(TAG, "GPU timestamp profiler enabled")
             } else if (enableGpuTimestamps) {
                 Log.i(TAG, "GPU timestamps requested but not supported by device")
@@ -177,12 +178,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                             // JNI global reference accumulation from callback objects
                             // that Dawn never releases on failed readbacks.
                             Log.w(TAG, "Disabling GPU timestamp profiler after $profilerFailures consecutive failures")
-                            p.close()
+                            try { gpuContext?.withGpu { p.close() } } catch (_: Exception) {}
                             profiler = null
                         }
                     }
 
-                    val scene = preparedScene.value
+                    val scene = preparedScene.get()
                     // Re-upload when scene changes OR when viewport was reconfigured since
                     // the last upload (uniforms and emit bind group include viewport dims).
                     val viewportChanged = currentWidth != lastUploadWidth ||
@@ -213,7 +214,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                 currentCoroutineContext().ensureActive()
             }
         } finally {
-            profiler?.close()
+            // R-02: Close profiler on GPU thread to avoid Dawn JNI handle race
+            // with processEvents(). Guard with try-catch for the case where the
+            // context is already destroyed.
+            profiler?.let { p ->
+                try { gpuContext?.withGpu { p.close() } } catch (_: Exception) {}
+            }
             cleanup()
         }
     }
@@ -351,12 +357,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     }
 
     private suspend fun uploadScene(scene: PreparedScene?) {
-        // Snapshot dimensions before the withGpu suspension point so that lastUpload*
-        // and the upload call itself always see the same width/height values.
+        // Snapshot dimensions before the withGpu suspension point so that the upload
+        // call sees consistent width/height values.
         val w = currentWidth
         val h = currentHeight
-        lastUploadWidth  = w
-        lastUploadHeight = h
 
         val ctx = checkNotNull(gpuContext)
         ctx.withGpu {
@@ -366,6 +370,11 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             } else {
                 gp.upload(scene, w, h)
             }
+            // R-08: Set lastUpload* inside withGpu so they are only updated after the
+            // GPU upload succeeds. If withGpu throws, the stale values ensure the next
+            // frame re-uploads correctly.
+            lastUploadWidth  = w
+            lastUploadHeight = h
         }
     }
 

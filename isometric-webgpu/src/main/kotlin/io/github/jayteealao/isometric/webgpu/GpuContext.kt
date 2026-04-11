@@ -357,6 +357,21 @@ class GpuContext private constructor(
     }
 
     /**
+     * Assert that the caller is running on the dedicated GPU thread.
+     *
+     * Throws [IllegalStateException] if called from any other thread. Call this at the
+     * entry of every GPU operation (upload, dispatch, etc.) to catch thread-confinement
+     * violations at the point of misuse rather than as a silent data race in the driver.
+     */
+    fun assertGpuThread() {
+        check(Thread.currentThread() === gpuThread) {
+            "GPU operation called from wrong thread '${Thread.currentThread().name}'; " +
+                "must run on the dedicated GPU thread '${gpuThread.name}'. " +
+                "Use ctx.withGpu { ... } to dispatch work to the GPU thread."
+        }
+    }
+
+    /**
      * Release all GPU resources and shut down the dedicated GPU thread.
      * Idempotent — safe to call multiple times.
      *

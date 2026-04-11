@@ -2,6 +2,7 @@ public final class io/github/jayteealao/isometric/webgpu/GpuContext {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/webgpu/GpuContext$Companion;
 	public synthetic fun <init> (Landroidx/webgpu/GPUInstance;Landroidx/webgpu/GPUAdapter;Landroidx/webgpu/GPUDevice;Landroidx/webgpu/GPUQueue;Lkotlinx/coroutines/ExecutorCoroutineDispatcher;Ljava/lang/Thread;Lkotlinx/coroutines/Job;Ljava/util/concurrent/atomic/AtomicBoolean;Ljava/util/concurrent/atomic/AtomicReference;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun assertGpuThread ()V
 	public final fun checkHealthy ()V
 	public final fun destroy ()V
 	public final fun getAdapter ()Landroidx/webgpu/GPUAdapter;

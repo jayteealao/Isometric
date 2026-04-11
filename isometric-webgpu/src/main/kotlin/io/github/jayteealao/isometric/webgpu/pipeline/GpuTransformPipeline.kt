@@ -263,6 +263,7 @@ internal class GpuTransformPipeline(
         faceCount: Int,
         timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
     ) {
+        ctx.assertGpuThread()
         require(faceCount > 0) { "faceCount must be > 0, got $faceCount" }
         checkNotNull(computePipeline) { "Pipeline not ready — call ensurePipeline first" }
         checkNotNull(bindGroup) { "Bind group not ready — call ensureBuffers first" }

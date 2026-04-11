@@ -377,6 +377,7 @@ internal class GpuTriangulateEmitPipeline(
         encoder: GPUCommandEncoder,
         timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
     ) {
+        ctx.assertGpuThread()
         check(emitPipeline != null) { "Pipeline not ready — call ensurePipelines first" }
         check(emitBindGroup != null) { "Bind group not ready — call ensureBuffers first" }
 

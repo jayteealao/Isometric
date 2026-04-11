@@ -14,6 +14,7 @@ import androidx.webgpu.GPUQuerySetDescriptor
 import androidx.webgpu.GPURequestCallback
 import androidx.webgpu.MapMode
 import androidx.webgpu.QueryType
+import io.github.jayteealao.isometric.webgpu.GpuContext
 import java.nio.ByteOrder
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
@@ -33,10 +34,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - 8,9 = render pass
  */
 internal class GpuTimestampProfiler(
-    private val device: GPUDevice,
-    private val instance: GPUInstance,
-    private val queue: GPUQueue,
+    private val ctx: GpuContext,
 ) : AutoCloseable {
+    private val device: GPUDevice get() = ctx.device
+    private val instance: GPUInstance get() = ctx.instance
+    private val queue: GPUQueue get() = ctx.queue
 
     private val querySet: GPUQuerySet = device.createQuerySet(
         GPUQuerySetDescriptor(type = QueryType.Timestamp, count = QUERY_COUNT)
@@ -83,6 +85,7 @@ internal class GpuTimestampProfiler(
      * Call on the command encoder AFTER all compute/render passes have ended.
      */
     fun encodeResolveAndCopy(encoder: GPUCommandEncoder) {
+        ctx.assertGpuThread()
         val resolve = resolveBuffers[writeIndex]
         val readback = readbackBuffers[writeIndex]
         encoder.resolveQuerySet(querySet, 0, QUERY_COUNT, resolve, 0L)
@@ -111,6 +114,7 @@ internal class GpuTimestampProfiler(
      *   or null if no previous frame data is available or readback fails.
      */
     fun readResults(): GpuTimestampResult? {
+        ctx.assertGpuThread()
         if (!previousFrameReady) return null
 
         val readIndex = 1 - writeIndex  // previous frame's buffer

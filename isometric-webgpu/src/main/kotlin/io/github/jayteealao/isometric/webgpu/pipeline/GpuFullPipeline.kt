@@ -172,6 +172,7 @@ internal class GpuFullPipeline(
      * @param viewportHeight Current render surface height in pixels.
      */
     fun upload(scene: PreparedScene, viewportWidth: Int, viewportHeight: Int) {
+        ctx.assertGpuThread()
         // Upload 3D geometry (uses RenderCommand.originalPath.points).
         sceneData.upload(scene.commands)
         val faceCount = sceneData.faceCount
@@ -274,6 +275,7 @@ internal class GpuFullPipeline(
      * @param encoder The command encoder to record compute passes into.
      */
     fun dispatch(encoder: GPUCommandEncoder, profiler: GpuTimestampProfiler? = null) {
+        ctx.assertGpuThread()
         val faceCount = lastFaceCount
         require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
 
@@ -309,6 +311,7 @@ internal class GpuFullPipeline(
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
     fun dispatchIndividualSubmits() {
+        ctx.assertGpuThread()
         val faceCount = lastFaceCount
         require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
 
