@@ -53,6 +53,19 @@ internal class WebGpuSceneRenderer : AutoCloseable {
          */
         private const val DEBUG_INDIVIDUAL_COMPUTE_SUBMITS = false
 
+        /**
+         * Diagnostic flag: when true, log per-step `System.nanoTime()` breakdown inside
+         * `drawFrame()` to identify where the ~14.5ms draw floor originates.
+         *
+         * Expected output per frame:
+         * ```
+         * drawFrame: acquire=Xns compute=Yns render=Zns resolve=Wns present=Vns total=Tns
+         * ```
+         *
+         * `const val = false` → compiler eliminates all timing code at compile time.
+         */
+        private const val DEBUG_DRAW_TIMING = false
+
     }
 
     private var gpuContext: GpuContext? = null
@@ -70,6 +83,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     // call unconfigure() on a surface that was never configured — doing so passes a
     // native handle that Dawn never initialised, which causes a Scudo double-free (SIGABRT).
     private var surfaceConfigured: Boolean = false
+    private var useVsync: Boolean = false
     private var lastScene: PreparedScene? = null
     // Track last uploaded viewport so we re-upload uniforms and bind groups when the
     // surface is reconfigured while the scene remains unchanged.
@@ -85,7 +99,9 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         renderContextHeight: State<Int>,
         frameCallback: WebGpuFrameCallback = object : WebGpuFrameCallback {},
         enableGpuTimestamps: Boolean = false,
+        vsync: Boolean = false,
     ) {
+        useVsync = vsync
         var profiler: GpuTimestampProfiler? = null
         try {
             ensureInitialized(
@@ -163,7 +179,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         lastScene = scene
                     }
                     frameCallback.onDrawFrameStart()
-                    drawFrame(androidSurface, profiler)
+                    drawFrame(androidSurface, profiler, frameCallback)
                     frameCallback.onDrawFrameEnd()
 
                     // Swap profiler buffers so next frame reads this frame's timestamps
@@ -268,16 +284,22 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     "Surface does not support RenderAttachment usage"
                 }
 
+                Log.d(TAG, "Available presentModes: ${capabilities.presentModes.toList()}")
+
                 surfaceFormat = when {
                     capabilities.formats.contains(TextureFormat.BGRA8Unorm) -> TextureFormat.BGRA8Unorm
                     capabilities.formats.contains(TextureFormat.RGBA8Unorm) -> TextureFormat.RGBA8Unorm
                     else -> capabilities.formats.first()
                 }
-                presentMode = if (capabilities.presentModes.contains(PresentMode.Fifo)) {
-                    PresentMode.Fifo
-                } else {
-                    capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
+                presentMode = when {
+                    !useVsync && capabilities.presentModes.contains(PresentMode.Mailbox) ->
+                        PresentMode.Mailbox
+                    capabilities.presentModes.contains(PresentMode.Fifo) ->
+                        PresentMode.Fifo
+                    else ->
+                        capabilities.presentModes.firstOrNull() ?: PresentMode.Fifo
                 }
+                Log.d(TAG, "Using presentMode=$presentMode (vsync=$useVsync)")
                 alphaMode = if (capabilities.alphaModes.contains(CompositeAlphaMode.Auto)) {
                     CompositeAlphaMode.Auto
                 } else {
@@ -335,6 +357,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     private suspend fun drawFrame(
         androidSurface: Surface,
         profiler: GpuTimestampProfiler? = null,
+        frameCallback: WebGpuFrameCallback? = null,
     ) {
         val ctx = checkNotNull(gpuContext)
         val surface = checkNotNull(gpuSurface)
@@ -345,11 +368,17 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             // failure. Let it propagate — renderLoop() catches and breaks.
             ctx.checkHealthy()
 
+            val acquireStart = System.nanoTime()
+
             val surfaceTexture = surface.getCurrentTexture()
+            val postAcquire = System.nanoTime()
+            val acquireNanos = postAcquire - acquireStart
+
             when (surfaceTexture.status) {
                 SurfaceGetCurrentTextureStatus.SuccessOptimal,
                 SurfaceGetCurrentTextureStatus.SuccessSuboptimal -> {
                     val textureView = surfaceTexture.texture.createView()
+                    frameCallback?.onAcquireEnd(acquireNanos)
 
                     val gp = fullPipeline
                     val shouldDraw = !DEBUG_SKIP_COMPUTE && gp != null && gp.hasScene
@@ -381,6 +410,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                             computeEncoder.close()
                         }
                     }
+                    val t2 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
                     val renderEncoder = ctx.device.createCommandEncoder()
                     val pass = renderEncoder.beginRenderPass(
@@ -412,6 +442,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     ctx.queue.submit(arrayOf(renderCmdBuf))
                     renderCmdBuf.close()
                     renderEncoder.close()
+                    val t3 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
                     // Resolve timestamp queries → readback buffer (after compute+render)
                     if (profiler != null) {
@@ -422,12 +453,20 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         resolveCmdBuf.close()
                         resolveEncoder.close()
                     }
+                    val t4 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
                     // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
                     // the Vulkan surface is invalidated before the render loop is cancelled;
                     // present() then fires the device-lost callback synchronously and throws
                     // IllegalStateException. Let it propagate — renderLoop() catches and breaks.
                     surface.present()
+                    val t5 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
+
+                    if (DEBUG_DRAW_TIMING) {
+                        Log.d(TAG, "drawFrame: acquire=${acquireNanos}ns compute=${t2-postAcquire}ns " +
+                            "render=${t3-t2}ns resolve=${t4-t3}ns present=${t5-t4}ns " +
+                            "total=${t5-acquireStart}ns")
+                    }
 
                     textureView.close()
                     surfaceTexture.texture.close()

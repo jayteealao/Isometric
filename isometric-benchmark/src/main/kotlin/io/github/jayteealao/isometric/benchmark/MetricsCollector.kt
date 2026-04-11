@@ -18,6 +18,7 @@ data class FrameMetrics(
     val gcInvocations: Long,
     val frameCount: Int,
     val warmupFrames: Int,
+    val acquireTimeMs: StatSummary = ZERO_STATS,
     val gpuComputeTimeMs: StatSummary = ZERO_STATS,
     val gpuRenderTimeMs: StatSummary = ZERO_STATS,
     val gpuTimestampsAvailable: Boolean = false,
@@ -61,6 +62,7 @@ class MetricsCollector(private val maxFrames: Int) {
     private val frameTimes = LongArray(maxFrames)
     private val hitTestTimes = LongArray(maxFrames)
     private val mutationCounts = IntArray(maxFrames)
+    private val acquireTimes = LongArray(maxFrames)
     private val gpuComputeTimes = LongArray(maxFrames)
     private val gpuRenderTimes = LongArray(maxFrames)
 
@@ -79,6 +81,13 @@ class MetricsCollector(private val maxFrames: Int) {
     fun recordPrepareTime(nanos: Long) {
         if (frameIndex < maxFrames) {
             prepareTimes[frameIndex] = nanos
+        }
+    }
+
+    /** Record swapchain acquire duration in nanoseconds (vsync wait component of draw). */
+    fun recordAcquireTime(nanos: Long) {
+        if (frameIndex < maxFrames) {
+            acquireTimes[frameIndex] = nanos
         }
     }
 
@@ -163,7 +172,8 @@ class MetricsCollector(private val maxFrames: Int) {
         cacheMisses = 0
         warmupFrames = 0
         gpuTimestampsAvailable = false
-        // Arrays are overwritten by index, no need to clear
+        // Arrays are overwritten by index; acquireTimes uses computeStatsNonZero
+        // which filters zeros from frames where onAcquireEnd didn't fire.
     }
 
     /**
@@ -200,6 +210,7 @@ class MetricsCollector(private val maxFrames: Int) {
             gcInvocations = gcInvocations,
             frameCount = count,
             warmupFrames = warmupFrames,
+            acquireTimeMs = computeStatsNonZero(acquireTimes, count),
             gpuComputeTimeMs = computeStatsNonZero(gpuComputeTimes, count),
             gpuRenderTimeMs = computeStatsNonZero(gpuRenderTimes, count),
             gpuTimestampsAvailable = gpuTimestampsAvailable,

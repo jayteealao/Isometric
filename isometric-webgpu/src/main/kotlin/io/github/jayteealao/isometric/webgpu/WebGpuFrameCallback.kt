@@ -11,8 +11,15 @@ interface WebGpuFrameCallback {
     fun onUploadStart() {}
     /** Called after uploadScene() completes. */
     fun onUploadEnd() {}
-    /** Called before drawFrame() — compute dispatch + render pass + present. */
+    /** Called before drawFrame() — includes swapchain acquire + compute + render + present. */
     fun onDrawFrameStart() {}
+    /**
+     * Called after surface.getCurrentTexture() succeeds, before compute/render work.
+     *
+     * @param acquireNanos Wall-clock time spent in getCurrentTexture(), measured on the
+     *   GPU thread. Under Mailbox this is ~40μs; under Fifo (vsync) this is 9-14ms.
+     */
+    fun onAcquireEnd(acquireNanos: Long) {}
     /** Called after drawFrame() completes (after present()). */
     fun onDrawFrameEnd() {}
 

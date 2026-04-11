@@ -19,7 +19,7 @@ object RenderModeId {
     fun toRenderMode(id: String): RenderMode = when (id) {
         CANVAS_CPU -> RenderMode.Canvas()
         CANVAS_WEBGPU -> RenderMode.Canvas(compute = RenderMode.Canvas.Compute.WebGpu)
-        WEBGPU -> RenderMode.WebGpu
+        WEBGPU -> RenderMode.WebGpu()
         else -> throw IllegalArgumentException("Unknown renderMode: $id. Valid: $ALL")
     }
 

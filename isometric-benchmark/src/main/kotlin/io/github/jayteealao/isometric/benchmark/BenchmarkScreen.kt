@@ -62,15 +62,29 @@ fun BenchmarkScreen(
     // for CPU wall-clock draw timing and GPU timestamp delivery in the WebGPU render path.
     val webGpuFrameCallback = remember(benchmarkHooks, collector) {
         object : WebGpuFrameCallback {
-            private var drawStartNanos = 0L
+            private var totalStartNanos = 0L
+            @Volatile private var acquireEndNanos = 0L
 
             override fun onDrawFrameStart() {
-                drawStartNanos = System.nanoTime()
+                totalStartNanos = System.nanoTime()
+            }
+
+            override fun onAcquireEnd(acquireNanos: Long) {
+                // Mark the boundary between acquire wait and GPU work.
+                // Both nanoTime calls are fine cross-thread (CLOCK_MONOTONIC).
+                acquireEndNanos = System.nanoTime()
             }
 
             override fun onDrawFrameEnd() {
-                val elapsed = System.nanoTime() - drawStartNanos
-                collector.recordDrawTime(elapsed)
+                val now = System.nanoTime()
+                val aeNanos = acquireEndNanos // volatile read
+                if (aeNanos > totalStartNanos) {
+                    collector.recordAcquireTime(aeNanos - totalStartNanos)
+                    collector.recordDrawTime(now - aeNanos)
+                } else {
+                    // Fallback: record entire frame as draw if acquire boundary wasn't set
+                    collector.recordDrawTime(now - totalStartNanos)
+                }
                 benchmarkHooks.signalDrawComplete()
             }
 

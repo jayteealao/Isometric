@@ -248,7 +248,7 @@ private fun WebGpuDenseGridSample() {
 
 @Composable
 private fun AnimatedTowersBackendSample() {
-    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu) }
+    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu()) }
     val phase = rememberPhaseAnimation(speedRadiansPerSecond = 3.4)
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -279,7 +279,7 @@ private fun AnimatedTowersBackendSample() {
                     TogglePill(
                         label = "WebGPU",
                         selected = renderMode is RenderMode.WebGpu,
-                        onClick = { renderMode = RenderMode.WebGpu }
+                        onClick = { renderMode = RenderMode.WebGpu() }
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))

@@ -28,14 +28,19 @@ import androidx.compose.runtime.Immutable
  * // Canvas + GPU sort
  * SceneConfig(renderMode = RenderMode.Canvas(compute = Canvas.Compute.WebGpu))
  *
- * // Full GPU pipeline
- * SceneConfig(renderMode = RenderMode.WebGpu)
+ * // Full GPU pipeline (Mailbox — lowest latency, default)
+ * SceneConfig(renderMode = RenderMode.WebGpu())
+ *
+ * // Full GPU pipeline with VSync (battery-friendly)
+ * SceneConfig(renderMode = RenderMode.WebGpu(vsync = true))
  * ```
  *
  * ## Guideline alignment
  *
  * - §2 Progressive Disclosure: `Canvas()` covers most users; `compute =` is the advanced knob.
- * - §3 Defaults: `Canvas()` with CPU sort is safe and requires no GPU.
+ *   `WebGpu()` is the simple GPU path; `vsync =` is the configurable knob.
+ * - §3 Defaults: `Canvas()` with CPU sort is safe and requires no GPU. `WebGpu()` defaults
+ *   to Mailbox (non-blocking present), which on Android is tear-free via SurfaceFlinger.
  * - §6 Invalid States: WebGPU render always uses GPU compute — no way to misconfigure.
  */
 @Immutable
@@ -47,8 +52,14 @@ sealed interface RenderMode {
      *
      * Requires the `isometric-webgpu` artifact. If absent at runtime, [IsometricScene]
      * throws [IllegalStateException] with an actionable message.
+     *
+     * @param vsync When `true`, locks frame presentation to the display refresh rate
+     *   (VSync / Fifo mode). When `false` (default), presents frames immediately without
+     *   waiting for vsync (Mailbox mode). Mailbox gives lower input latency and avoids
+     *   the ~14ms vsync wait per frame; Fifo saves battery on static scenes. On Android,
+     *   SurfaceFlinger composites the final output tear-free regardless of this setting.
      */
-    data object WebGpu : RenderMode
+    data class WebGpu(val vsync: Boolean = false) : RenderMode
 
     /**
      * Compose Canvas rendering with configurable depth-sort strategy.

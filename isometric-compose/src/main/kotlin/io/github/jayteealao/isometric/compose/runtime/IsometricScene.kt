@@ -671,7 +671,8 @@ fun IsometricScene(
                 }
         ) {
             CompositionLocalProvider(
-                LocalWebGpuFrameCallback provides (config as? AdvancedSceneConfig)?.webGpuFrameCallback
+                LocalWebGpuFrameCallback provides (config as? AdvancedSceneConfig)?.webGpuFrameCallback,
+                LocalWebGpuVsync provides ((renderMode as? RenderMode.WebGpu)?.vsync ?: false),
             ) {
                 webGpuRenderBackend.Surface(
                     preparedScene = backendPreparedSceneState,

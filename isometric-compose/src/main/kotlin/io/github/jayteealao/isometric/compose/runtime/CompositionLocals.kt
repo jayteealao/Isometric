@@ -163,6 +163,16 @@ val LocalBenchmarkHooks = staticCompositionLocalOf<RenderBenchmarkHooks?> { null
 val LocalWebGpuFrameCallback = staticCompositionLocalOf<Any?> { null }
 
 /**
+ * CompositionLocal for passing the vsync preference to the WebGPU render backend.
+ *
+ * When `true`, the backend uses `PresentMode.Fifo` (vsync-locked, battery-friendly).
+ * When `false` (default), the backend uses `PresentMode.Mailbox` (non-blocking, lowest latency).
+ *
+ * Set from [RenderMode.WebGpu.vsync] in [IsometricScene]. Canvas backends ignore it.
+ */
+val LocalWebGpuVsync = staticCompositionLocalOf { false }
+
+/**
  * CompositionLocal for providing the [IsometricEngine] to child composables.
  *
  * Uses [staticCompositionLocalOf] because the engine instance is set once per

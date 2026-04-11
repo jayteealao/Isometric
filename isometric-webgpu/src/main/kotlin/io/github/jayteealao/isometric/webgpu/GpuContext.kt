@@ -127,9 +127,7 @@ class GpuContext private constructor(
                     val adapter = instance.requestAdapter(adapterOptions)
 
                     val timestampsOk = enableTimestamps && adapter.hasFeature(FeatureName.TimestampQuery)
-                    if (enableTimestamps && !timestampsOk) {
-                        Log.w(TAG, "create: TimestampQuery requested but adapter does not support it")
-                    }
+                    Log.i(TAG, "create: TimestampQuery feature: supported=${adapter.hasFeature(FeatureName.TimestampQuery)}, requested=$enableTimestamps, enabled=$timestampsOk")
                     val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure, timestampsOk))
 
                     assertComputeLimits(device)
@@ -223,9 +221,7 @@ class GpuContext private constructor(
                     }
 
                     val timestampsOk = enableTimestamps && adapter.hasFeature(FeatureName.TimestampQuery)
-                    if (enableTimestamps && !timestampsOk) {
-                        Log.w(TAG, "createForSurface: TimestampQuery requested but adapter does not support it")
-                    }
+                    Log.i(TAG, "createForSurface: TimestampQuery feature: supported=${adapter.hasFeature(FeatureName.TimestampQuery)}, requested=$enableTimestamps, enabled=$timestampsOk")
                     val device = adapter.requestDevice(buildDeviceDescriptor(lastFailure, timestampsOk))
 
                     assertComputeLimits(device)

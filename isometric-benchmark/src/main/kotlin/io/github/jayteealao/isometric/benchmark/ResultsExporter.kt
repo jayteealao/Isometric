@@ -197,6 +197,8 @@ object ResultsExporter {
             "androidVersion",
             "isEmulator",
             "timestamp",
+            "avgAcquireMs",
+            "p50AcquireMs",
             "gpuComputeMs",
             "gpuRenderMs",
             "gpuTotalMs",
@@ -265,6 +267,10 @@ object ResultsExporter {
         values.add("${Build.VERSION.SDK_INT}")
         values.add(isEmulator().toString())
         values.add(runTimestamp ?: "unknown")
+
+        // Acquire time (vsync wait component of draw)
+        values.add("%.4f".format(metrics.acquireTimeMs.mean))
+        values.add("%.4f".format(metrics.acquireTimeMs.p50))
 
         // GPU timestamp columns (appended for backward compatibility)
         values.add("%.4f".format(metrics.gpuComputeTimeMs.mean))

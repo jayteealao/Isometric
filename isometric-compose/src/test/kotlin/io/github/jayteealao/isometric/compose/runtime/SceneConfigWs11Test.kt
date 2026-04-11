@@ -34,7 +34,7 @@ class SceneConfigWs11Test {
     @Test
     fun `different render modes are not equal`() {
         val a = SceneConfig(renderMode = RenderMode.Canvas())
-        val b = SceneConfig(renderMode = RenderMode.WebGpu)
+        val b = SceneConfig(renderMode = RenderMode.WebGpu())
         assertThat(a).isNotEqualTo(b)
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.compose.runtime.LocalWebGpuFrameCallback
+import io.github.jayteealao.isometric.compose.runtime.LocalWebGpuVsync
 import io.github.jayteealao.isometric.compose.runtime.RenderContext
 import io.github.jayteealao.isometric.compose.runtime.StrokeStyle
 import io.github.jayteealao.isometric.compose.runtime.render.RenderBackend
@@ -31,6 +32,7 @@ internal class WebGpuRenderBackend : RenderBackend {
     ) {
         val renderer = remember { WebGpuSceneRenderer() }
         val frameCallback = LocalWebGpuFrameCallback.current
+        val vsync = LocalWebGpuVsync.current
         val currentPreparedScene by rememberUpdatedState(preparedScene)
 
         // F3: Track renderContext dimensions as State so the renderLoop can observe changes
@@ -42,12 +44,11 @@ internal class WebGpuRenderBackend : RenderBackend {
         contextHeight.intValue = renderContext.height
 
         // G4: Read display refresh rate to use as a Surface.setFrameRate hint.
-        // Frame pacing is provided by PresentMode.Fifo in Dawn: surface.present()
-        // (mapped to vkQueuePresentKHR) blocks the GPU thread at each vsync boundary —
-        // no additional delay() is needed or correct. The setFrameRate hint tells
-        // SurfaceFlinger to maintain the target Hz for this surface, preventing LTPO
-        // power-saving from dropping the refresh rate (e.g. Galaxy Z Fold 6 inner panel
-        // dropping from 120 Hz to 60 Hz when no touch events are detected).
+        // When vsync=true, frame pacing is provided by PresentMode.Fifo in Dawn:
+        // getCurrentTexture() blocks on the swapchain semaphore at each vsync boundary.
+        // When vsync=false (default), PresentMode.Mailbox presents immediately.
+        // The setFrameRate hint tells SurfaceFlinger to maintain the target Hz for this
+        // surface, preventing LTPO power-saving from dropping the refresh rate.
         val context = LocalContext.current
         val displayRefreshHz = remember(context) { context.displayRefreshRateHz() }
 
@@ -76,6 +77,7 @@ internal class WebGpuRenderBackend : RenderBackend {
                         frameCallback = typedCallback,
                         // Enable GPU timestamps only when a real WebGpuFrameCallback is provided
                         enableGpuTimestamps = frameCallback is WebGpuFrameCallback,
+                        vsync = vsync,
                     )
                 }
             }

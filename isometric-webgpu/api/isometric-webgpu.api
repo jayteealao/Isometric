@@ -56,6 +56,7 @@ public final class io/github/jayteealao/isometric/webgpu/WebGpuComputeBackend$St
 }
 
 public abstract interface class io/github/jayteealao/isometric/webgpu/WebGpuFrameCallback {
+	public abstract fun onAcquireEnd (J)V
 	public abstract fun onDrawFrameEnd ()V
 	public abstract fun onDrawFrameStart ()V
 	public abstract fun onGpuTimestamps (JJ)V
@@ -64,6 +65,7 @@ public abstract interface class io/github/jayteealao/isometric/webgpu/WebGpuFram
 }
 
 public final class io/github/jayteealao/isometric/webgpu/WebGpuFrameCallback$DefaultImpls {
+	public static fun onAcquireEnd (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;J)V
 	public static fun onDrawFrameEnd (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
 	public static fun onDrawFrameStart (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;)V
 	public static fun onGpuTimestamps (Lio/github/jayteealao/isometric/webgpu/WebGpuFrameCallback;JJ)V
