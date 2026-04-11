@@ -226,6 +226,14 @@ internal class SceneCache(
      *
      * The GPU's M3 (transform+cull+light) and M4 (sort) stages handle all of this from
      * the original 3D vertices in [RenderCommand.originalPath].
+     *
+     * **baseColor contract (R-07):** Commands emitted by standard nodes (`ShapeNode`,
+     * `PathNode`, `BatchNode`) set `baseColor == color` — both are the raw, unlit
+     * material color. The GPU's M3 shader applies lighting once from `baseColor`.
+     * `CustomRenderNode` implementations that return pre-lit `RenderCommand.color` values
+     * **must** set `baseColor` to the original material color explicitly, or the GPU will
+     * double-light (apply lighting on top of an already-lit color). See `SceneDataPacker`
+     * which reads `cmd.baseColor` for the GPU color upload.
      */
     fun rebuildForGpu(
         rootNode: GroupNode,
