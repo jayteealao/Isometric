@@ -201,7 +201,10 @@ internal class GpuBitonicSort(
         require(paddedCount and (paddedCount - 1) == 0) {
             "paddedCount must be a power of two, got $paddedCount — use BitonicSortNetwork.nextPowerOfTwo"
         }
-        if (paddedCount == cachedPaddedCount) return
+        // R-09: Grow-only — never shrink sort buffers. If paddedCount oscillates around
+        // a power-of-2 boundary (e.g. 127↔129 → paddedCount 128↔256), the existing
+        // larger buffers are reused. This avoids per-frame buffer reallocation thrash.
+        if (paddedCount <= cachedPaddedCount) return
 
         // Release old per-capacity resources before allocating new ones.
         // Note: close() only (no destroy()) — the previous frame's GPU commands may still
@@ -227,29 +230,38 @@ internal class GpuBitonicSort(
             )
         ).also { it.setLabel("IsometricSortPrimary") }
 
-        scratchBuf = ctx.device.createBuffer(
-            GPUBufferDescriptor(
-                usage = BufferUsage.Storage or BufferUsage.CopySrc,
-                size = sortBufferSize,
+        // paddedCount == 1 produces 0 sort stages (buildStages returns empty for count <= 1).
+        // Skip the sort network entirely — no scratch buffer, params buffer, or bind groups
+        // needed. dispatch() and dispatchIndividually() will return early. resultBuffer
+        // correctly returns primaryBuf because stageCount is 0 (even).
+        if (paddedCount > 1) {
+            scratchBuf = ctx.device.createBuffer(
+                GPUBufferDescriptor(
+                    usage = BufferUsage.Storage or BufferUsage.CopySrc,
+                    size = sortBufferSize,
+                )
+            ).also { it.setLabel("IsometricSortScratch") }
+
+            val stages = BitonicSortNetwork.buildStages(paddedCount)
+            paramsBuffer = BitonicSortNetwork.createParamsBuffer(
+                ctx.device, stages, paddedCount, label = "IsometricBitonicParams"
             )
-        ).also { it.setLabel("IsometricSortScratch") }
+            cachedBindGroups = BitonicSortNetwork.buildBindGroups(
+                ctx.device, stages.size,
+                primaryBuf!!, scratchBuf!!, paramsBuffer!!,
+                checkNotNull(bindGroupLayout) { "Bind group layout is null — call ensurePipeline first" },
+            )
 
-        val stages = BitonicSortNetwork.buildStages(paddedCount)
-        paramsBuffer = BitonicSortNetwork.createParamsBuffer(
-            ctx.device, stages, paddedCount, label = "IsometricBitonicParams"
-        )
-        cachedBindGroups = BitonicSortNetwork.buildBindGroups(
-            ctx.device, stages.size,
-            primaryBuf!!, scratchBuf!!, paramsBuffer!!,
-            checkNotNull(bindGroupLayout) { "Bind group layout is null — call ensurePipeline first" },
-        )
+            Log.d(
+                TAG,
+                "Buffers ready: paddedCount=$paddedCount stages=${stages.size} " +
+                    "bufferSize=${sortBufferSize}B"
+            )
+        } else {
+            Log.d(TAG, "Buffers ready: paddedCount=1 — sort skipped (single element)")
+        }
+
         cachedPaddedCount = paddedCount
-
-        Log.d(
-            TAG,
-            "Buffers ready: paddedCount=$paddedCount stages=${stages.size} " +
-                "bufferSize=${sortBufferSize}B"
-        )
     }
 
     // ── Per-frame dispatch ───────────────────────────────────────────────────
@@ -275,10 +287,10 @@ internal class GpuBitonicSort(
         encoder: GPUCommandEncoder,
         timestampWrites: androidx.webgpu.GPUPassTimestampWrites? = null,
     ) {
+        ctx.assertGpuThread()
         checkNotNull(sortPipeline) { "Pipeline not ready — call ensurePipeline first" }
-        val bindGroups = checkNotNull(cachedBindGroups) {
-            "Bind groups not ready — call ensureBuffers first"
-        }
+        // 0 or 1 elements need no sort — resultBuffer already points to primaryBuf.
+        val bindGroups = cachedBindGroups?.takeIf { it.isNotEmpty() } ?: return
 
         val workgroupCount =
             ceil(cachedPaddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
@@ -325,10 +337,10 @@ internal class GpuBitonicSort(
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
     fun dispatchIndividually() {
+        ctx.assertGpuThread()
         val pipeline = checkNotNull(sortPipeline) { "Pipeline not ready — call ensurePipeline first" }
-        val bindGroups = checkNotNull(cachedBindGroups) {
-            "Bind groups not ready — call ensureBuffers first"
-        }
+        // 0 or 1 elements need no sort — resultBuffer already points to primaryBuf.
+        val bindGroups = cachedBindGroups?.takeIf { it.isNotEmpty() } ?: return
         val workgroupCount =
             ceil(cachedPaddedCount.toDouble() / GPUBitonicSortShader.WORKGROUP_SIZE).toInt()
 
