@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.PrismFace
+
 /**
  * A platform-agnostic rendering command representing a single polygon to draw.
  * Contains the 2D screen-space points and color, ready for rendering.
@@ -22,6 +24,15 @@ package io.github.jayteealao.isometric
  * @property uvCoords Per-vertex texture coordinates as a flat packed float array
  *   `[u0, v0, u1, v1, ...]`, matching the vertex order in [originalPath]. Null when
  *   no texture mapping is active.
+ * @property faceType Identifies which face of a Prism this command represents (null for
+ *   non-Prism shapes). Used by per-face material resolution to look up the correct
+ *   sub-material from [IsometricMaterial.PerFace.faceMap].
+ * @property uvOffset Atlas sub-region UV offset `[u0, v0]` for WebGPU texture atlas mapping.
+ *   Null means identity (no atlas transform). Set by the WebGPU pipeline during per-face
+ *   material resolution.
+ * @property uvScale Atlas sub-region UV scale `[uScale, vScale]` for WebGPU texture atlas
+ *   mapping. Null means identity (1.0, 1.0). Set by the WebGPU pipeline during per-face
+ *   material resolution.
  */
 class RenderCommand(
     val commandId: String,
@@ -33,6 +44,9 @@ class RenderCommand(
     val baseColor: IsoColor = color,
     val material: MaterialData? = null,
     val uvCoords: FloatArray? = null,
+    val faceType: PrismFace? = null,
+    val uvOffset: FloatArray? = null,
+    val uvScale: FloatArray? = null,
 ) {
     /** Number of 2D vertices in [points]. */
     val pointCount: Int get() = points.size / 2
@@ -53,7 +67,10 @@ class RenderCommand(
             originalShape == other.originalShape &&
             ownerNodeId == other.ownerNodeId &&
             material == other.material &&
-            uvCoords.contentEqualsNullable(other.uvCoords)
+            uvCoords.contentEqualsNullable(other.uvCoords) &&
+            faceType == other.faceType &&
+            uvOffset.contentEqualsNullable(other.uvOffset) &&
+            uvScale.contentEqualsNullable(other.uvScale)
 
     override fun hashCode(): Int {
         var result = commandId.hashCode()
@@ -65,11 +82,14 @@ class RenderCommand(
         result = 31 * result + (ownerNodeId?.hashCode() ?: 0)
         result = 31 * result + (material?.hashCode() ?: 0)
         result = 31 * result + (uvCoords?.contentHashCode() ?: 0)
+        result = 31 * result + (faceType?.hashCode() ?: 0)
+        result = 31 * result + (uvOffset?.contentHashCode() ?: 0)
+        result = 31 * result + (uvScale?.contentHashCode() ?: 0)
         return result
     }
 
     override fun toString(): String =
-        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }})"
+        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }}, faceType=$faceType)"
 }
 
 /** Null-safe contentEquals for nullable FloatArrays. Both null → true. */

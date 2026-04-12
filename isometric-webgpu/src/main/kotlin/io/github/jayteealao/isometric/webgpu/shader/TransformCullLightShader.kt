@@ -73,7 +73,7 @@ internal object TransformCullLightShader {
 
     val WGSL: String = """
         // ── FaceData ──────────────────────────────────────────────────────────────
-        // 144 bytes per face.  Matches SceneDataPacker byte-for-byte.
+        // 160 bytes per face.  Matches SceneDataPacker byte-for-byte.
         //
         //  offset  size  field
         //    0-15   16   v0 (vec3<f32>) + _p0 (f32 pad)
@@ -86,7 +86,11 @@ internal object TransformCullLightShader {
         //  112-123  12   normal (vec3<f32>, pre-normalised)
         //  124-127   4   textureIndex (u32; 0xFFFFFFFF = no texture)
         //  128-131   4   faceIndex (u32)
-        //  132-143  12   padding (3 × u32)  → struct stride = 144
+        //  132-135   4   uvOffsetU (f32 — atlas sub-region U offset)
+        //  136-139   4   uvOffsetV (f32 — atlas sub-region V offset)
+        //  140-143   4   uvScaleU (f32 — atlas sub-region U scale)
+        //  144-147   4   uvScaleV (f32 — atlas sub-region V scale)
+        //  148-159  12   padding (3 × u32) → struct stride = 160
         struct FaceData {
             v0: vec3<f32>,  _p0: f32,
             v1: vec3<f32>,  _p1: f32,
@@ -98,6 +102,10 @@ internal object TransformCullLightShader {
             normal:      vec3<f32>,
             textureIndex: u32,
             faceIndex:   u32,
+            uvOffsetU:   f32,
+            uvOffsetV:   f32,
+            uvScaleU:    f32,
+            uvScaleV:    f32,
             _f0: u32, _f1: u32, _f2: u32,
         }
 

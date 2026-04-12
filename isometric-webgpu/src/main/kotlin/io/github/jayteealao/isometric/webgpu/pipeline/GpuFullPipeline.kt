@@ -6,7 +6,6 @@ import androidx.webgpu.GPUBindGroup
 import androidx.webgpu.GPUBuffer
 import androidx.webgpu.GPUBufferDescriptor
 import androidx.webgpu.GPUCommandEncoder
-import androidx.webgpu.GPUTexture
 import androidx.webgpu.GPUTextureView
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.shader.IsometricMaterial
@@ -17,6 +16,7 @@ import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
 import io.github.jayteealao.isometric.webgpu.texture.GpuTextureBinder
 import io.github.jayteealao.isometric.webgpu.texture.GpuTextureStore
+import io.github.jayteealao.isometric.webgpu.texture.TextureAtlasManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -100,17 +100,13 @@ internal class GpuFullPipeline(
 
     val textureStore  = GpuTextureStore(ctx)
     private lateinit var textureBinder: GpuTextureBinder
-
+    private lateinit var atlasManager: TextureAtlasManager
 
 
     // ── Texture state ────────────────────────────────────────────────────────
 
-    /** Currently uploaded GPU texture (null if using fallback). */
-    private var uploadedTexture: GPUTexture? = null
-    private var uploadedTextureView: GPUTextureView? = null
-
-    /** Cached bitmap reference to avoid re-uploading on every frame (compared by ===). */
-    private var lastUploadedBitmap: android.graphics.Bitmap? = null
+    /** Signature of the last atlas build, to detect changes. */
+    private var lastAtlasSignature: Set<TextureSource>? = null
 
     /** Current texture bind group for the render pass. */
     private var _textureBindGroup: GPUBindGroup? = null
@@ -135,6 +131,12 @@ internal class GpuFullPipeline(
     private var texIndexGpuBuffer: GPUBuffer? = null
     private var texIndexCpuBuffer: ByteBuffer? = null
     private var texIndexCapacity: Int = 0
+
+    // ── UV region buffer ─────────────────────────────────────────────────────
+
+    private var uvRegionGpuBuffer: GPUBuffer? = null
+    private var uvRegionCpuBuffer: ByteBuffer? = null
+    private var uvRegionCapacity: Int = 0
 
     // ── Reusable indirect-args staging buffer ─────────────────────────────────
 
@@ -209,6 +211,9 @@ internal class GpuFullPipeline(
             val layout = renderPipeline.takeTextureBindGroupLayout()
             textureBinder = GpuTextureBinder(ctx, layout)
         }
+        if (!::atlasManager.isInitialized) {
+            atlasManager = TextureAtlasManager(ctx, textureStore)
+        }
         transform.ensurePipeline()
         sort.ensurePipeline()
         packer.ensurePipeline()
@@ -260,6 +265,9 @@ internal class GpuFullPipeline(
         // ── Compact tex-index buffer ─────────────────────────────────────────
         uploadTexIndexBuffer(scene, faceCount)
 
+        // ── Compact UV region buffer ─────────────────────────────────────────
+        uploadUvRegionBuffer(scene, faceCount)
+
         // paddedCount must be a power of two for the bitonic sort network to be correct.
         // nextPowerOfTwo(faceCount) ≤ capacity (since capacity is always a power-of-two
         // multiple of INITIAL_CAPACITY_FACES and capacity ≥ faceCount by construction).
@@ -289,6 +297,7 @@ internal class GpuFullPipeline(
             transformedBuffer = transform.transformedBuffer,
             sortedKeysBuffer  = sort.resultBuffer,
             texIndexBuffer    = texIndexGpuBuffer!!,
+            uvRegionBuffer    = uvRegionGpuBuffer!!,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
@@ -306,82 +315,85 @@ internal class GpuFullPipeline(
     }
 
     /**
-     * Scan the scene for textured materials and upload the first texture found to the GPU.
-     * Caches the uploaded texture by bitmap identity to avoid re-upload every frame.
+     * Collect all distinct textured materials from the scene, pack them into an atlas,
+     * and rebuild the texture bind group. Caches by texture source set to avoid
+     * rebuilding when the same textures are used across frames.
      */
     private fun uploadTextures(scene: PreparedScene) {
-        // Find the first Textured material in the scene
-        var texturedMaterial: IsometricMaterial.Textured? = null
+        // Collect all distinct TextureSource references from the scene
+        val textureSources = mutableSetOf<TextureSource>()
         for (cmd in scene.commands) {
-            when (val m = cmd.material) {
-                is IsometricMaterial.Textured -> { texturedMaterial = m; break }
-                is IsometricMaterial.PerFace -> {
-                    if (m.default is IsometricMaterial.Textured) {
-                        texturedMaterial = m.default as IsometricMaterial.Textured; break
-                    }
-                    val texFace = m.faceMap.values.firstOrNull { it is IsometricMaterial.Textured }
-                    if (texFace != null) {
-                        texturedMaterial = texFace as IsometricMaterial.Textured; break
-                    }
-                }
-                else -> {}
-            }
-            if (texturedMaterial != null) break
+            collectTextureSources(cmd.material, cmd.faceType, textureSources)
         }
 
-        if (texturedMaterial == null) {
+        if (textureSources.isEmpty()) {
             // No textures in scene — use fallback
-            if (lastUploadedBitmap != null) {
-                releaseUploadedTexture()
+            if (lastAtlasSignature != null) {
+                atlasManager.destroy()
+                lastAtlasSignature = null
             }
             rebuildBindGroup(textureStore.fallbackTextureView)
             return
         }
 
-        // Resolve TextureSource to Bitmap.
-        // For this slice, only BitmapSource is supported directly in the GPU pipeline.
-        // Resource/Asset loading requires an Android Context, which is wired in the
-        // sample-demo slice via ProvideTextureRendering.
-        val bitmap = when (val src = texturedMaterial.source) {
-            is TextureSource.BitmapSource -> {
-                src.ensureNotRecycled()
-                src.bitmap
+        // Cache check: avoid re-building atlas if same set of textures
+        if (textureSources == lastAtlasSignature) return
+
+        // Resolve all TextureSources to Bitmaps
+        val entries = mutableMapOf<TextureSource, android.graphics.Bitmap>()
+        for (source in textureSources) {
+            val bitmap = when (source) {
+                is TextureSource.BitmapSource -> {
+                    source.ensureNotRecycled()
+                    source.bitmap
+                }
+                else -> {
+                    Log.w(TAG, "TextureSource ${source::class.simpleName} not yet supported in WebGPU — skipping")
+                    null
+                }
             }
-            else -> {
-                Log.w(TAG, "TextureSource ${src::class.simpleName} not yet supported in WebGPU — using fallback")
-                null
-            }
+            if (bitmap != null) entries[source] = bitmap
         }
 
-        if (bitmap == null) {
-            // Failed to load — release any previously uploaded texture and use fallback
-            releaseUploadedTexture()
+        if (entries.isEmpty()) {
             rebuildBindGroup(textureStore.fallbackTextureView)
+            lastAtlasSignature = null
             return
         }
 
-        // Cache check: avoid re-uploading the same bitmap (reference identity)
-        if (bitmap === lastUploadedBitmap) return
-
-        // Upload new texture
-        releaseUploadedTexture()
-        val gpuTex = textureStore.uploadBitmap(bitmap)
-        uploadedTexture = gpuTex
-        val view = gpuTex.createView()
-        uploadedTextureView = view
-        lastUploadedBitmap = bitmap
-
-        rebuildBindGroup(view)
+        // Rebuild atlas
+        val built = atlasManager.rebuild(entries)
+        if (built) {
+            val atlasView = atlasManager.textureView!!
+            rebuildBindGroup(atlasView)
+        } else {
+            rebuildBindGroup(textureStore.fallbackTextureView)
+        }
+        lastAtlasSignature = textureSources
     }
 
-    private fun releaseUploadedTexture() {
-        uploadedTextureView?.close()
-        uploadedTextureView = null
-        if (uploadedTexture != null) {
-            textureStore.releaseTexture(uploadedTexture!!)
-            uploadedTexture = null
+    /**
+     * Recursively collect [TextureSource] references from a material, expanding
+     * [IsometricMaterial.PerFace] into its constituent sub-materials.
+     */
+    private fun collectTextureSources(
+        material: io.github.jayteealao.isometric.MaterialData?,
+        faceType: io.github.jayteealao.isometric.shapes.PrismFace?,
+        out: MutableSet<TextureSource>,
+    ) {
+        when (val m = material) {
+            is IsometricMaterial.Textured -> out.add(m.source)
+            is IsometricMaterial.PerFace -> {
+                // Collect from all face entries and default
+                for (sub in m.faceMap.values) {
+                    if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                }
+                if (m.default is IsometricMaterial.Textured) {
+                    out.add((m.default as IsometricMaterial.Textured).source)
+                }
+            }
+            else -> {}
         }
-        lastUploadedBitmap = null
     }
 
     /**
@@ -413,6 +425,78 @@ internal class GpuFullPipeline(
 
         SceneDataPacker.packTexIndicesInto(scene.commands, texIndexCpuBuffer!!)
         ctx.queue.writeBuffer(texIndexGpuBuffer!!, 0L, texIndexCpuBuffer!!)
+    }
+
+    /**
+     * Pack and upload the compact per-face UV region buffer for the emit shader.
+     * Each face gets 4 floats: [uvOffsetU, uvOffsetV, uvScaleU, uvScaleV] = 16 bytes.
+     */
+    private fun uploadUvRegionBuffer(scene: PreparedScene, faceCount: Int) {
+        if (faceCount == 0) return
+
+        // Ensure GPU buffer capacity (x2 growth)
+        val entryBytes = 16 // 4 floats × 4 bytes
+        if (faceCount > uvRegionCapacity) {
+            uvRegionGpuBuffer?.close()
+            val newCapacity = maxOf(faceCount, faceCount * 2)
+            uvRegionGpuBuffer = ctx.device.createBuffer(
+                GPUBufferDescriptor(
+                    usage = BufferUsage.Storage or BufferUsage.CopyDst,
+                    size = (newCapacity * entryBytes).toLong(),
+                )
+            ).also { it.setLabel("IsometricUvRegions") }
+            uvRegionCapacity = newCapacity
+        }
+
+        // Ensure CPU staging buffer capacity (x2 growth)
+        val requiredBytes = faceCount * entryBytes
+        val cpu = uvRegionCpuBuffer
+        if (cpu == null || cpu.capacity() < requiredBytes) {
+            val newSize = maxOf(requiredBytes, requiredBytes * 2)
+            uvRegionCpuBuffer = ByteBuffer.allocateDirect(newSize).order(ByteOrder.nativeOrder())
+        }
+
+        // Pack UV regions: for each command, resolve atlas region and write 4 floats
+        val buf = uvRegionCpuBuffer!!
+        buf.rewind()
+        buf.limit(requiredBytes)
+        for (cmd in scene.commands) {
+            val region = resolveAtlasRegion(cmd)
+            if (region != null) {
+                buf.putFloat(region.uvOffset[0])
+                buf.putFloat(region.uvOffset[1])
+                buf.putFloat(region.uvScale[0])
+                buf.putFloat(region.uvScale[1])
+            } else {
+                // Identity transform: offset (0,0), scale (1,1)
+                buf.putFloat(0f)
+                buf.putFloat(0f)
+                buf.putFloat(1f)
+                buf.putFloat(1f)
+            }
+        }
+        buf.rewind()
+
+        ctx.queue.writeBuffer(uvRegionGpuBuffer!!, 0L, buf)
+    }
+
+    /**
+     * Resolve the atlas region for a command's effective texture. Returns null for
+     * non-textured faces. Expands [IsometricMaterial.PerFace] using the command's
+     * [RenderCommand.faceType].
+     */
+    private fun resolveAtlasRegion(cmd: io.github.jayteealao.isometric.RenderCommand): TextureAtlasManager.AtlasRegion? {
+        val effective = when (val m = cmd.material) {
+            is IsometricMaterial.PerFace -> {
+                val face = cmd.faceType
+                if (face != null) m.resolve(face) else m.default
+            }
+            else -> m
+        }
+        return when (effective) {
+            is IsometricMaterial.Textured -> atlasManager.getRegion(effective.source)
+            else -> null
+        }
     }
 
     /**
@@ -526,7 +610,8 @@ internal class GpuFullPipeline(
         // Close texture resources
         _textureBindGroup?.close()
         _textureBindGroup = null
-        releaseUploadedTexture()
+        if (::atlasManager.isInitialized) atlasManager.destroy()
+        lastAtlasSignature = null
         if (::textureBinder.isInitialized) textureBinder.close()
         textureStore.close()
 
@@ -534,6 +619,11 @@ internal class GpuFullPipeline(
         texIndexGpuBuffer?.close()
         texIndexGpuBuffer = null
         texIndexCapacity = 0
+
+        // Close UV region buffer
+        uvRegionGpuBuffer?.close()
+        uvRegionGpuBuffer = null
+        uvRegionCapacity = 0
 
         // Close in reverse-dependency order: consumers before producers.
         emit.close()

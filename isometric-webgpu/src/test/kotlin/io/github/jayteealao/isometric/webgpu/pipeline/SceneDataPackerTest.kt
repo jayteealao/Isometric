@@ -106,6 +106,6 @@ class SceneDataPackerTest {
 
     @Test
     fun `face data byte size matches six vertex layout`() {
-        assertEquals(144, SceneDataLayout.FACE_DATA_BYTES)
+        assertEquals(160, SceneDataLayout.FACE_DATA_BYTES)
     }
 }

@@ -16,6 +16,6 @@ class TriangulateEmitShaderTest {
     @Test
     fun `wgsl emits up to four fan triangles`() {
         assertTrue(TriangulateEmitShader.WGSL.contains("Triangle 3: (s0, s4, s5)"))
-        assertTrue(TriangulateEmitShader.WGSL.contains("vertexCount >= 6u"))
+        assertTrue(TriangulateEmitShader.WGSL.contains("triCount >= 4u"))
     }
 }

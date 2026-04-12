@@ -6,11 +6,11 @@ slice-slug: per-face-materials
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:49:12Z"
+updated-at: "2026-04-12T22:41:13Z"
 metric-files-to-touch: 12
 metric-step-count: 14
 has-blockers: false
-revision-count: 1
+revision-count: 3
 tags: [material, per-face]
 refs:
   index: 00-index.md
@@ -175,35 +175,35 @@ data class PerFace(
 
 ### Where Resolution Happens
 
-`MaterialResolver` (introduced in canvas-textures) receives a `RenderCommand` and returns
-rendering instructions. Currently it handles `FlatColor` and `Textured`. This slice adds
-a `PerFace` branch:
+`TexturedCanvasDrawHook` (introduced in canvas-textures) is a `MaterialDrawHook` that
+receives a `RenderCommand` and draws textured faces using `BitmapShader` + affine matrix.
+Currently it handles `FlatColor` (returns false — delegates to flat path), `Textured`
+(draws with shader), and `PerFace` (only resolves `.default` — falls back if not `Textured`).
+
+This slice updates the `PerFace` branch in `TexturedCanvasDrawHook.draw()` to resolve
+per-face using `cmd.faceType`:
 
 ```kotlin
-// In MaterialResolver.resolveForCanvas(cmd: RenderCommand): CanvasRenderInstruction
-when (val mat = cmd.material) {
-    is IsometricMaterial.FlatColor -> /* existing path */
-    is IsometricMaterial.Textured  -> /* existing path */
-    is IsometricMaterial.PerFace   -> {
-        val faceType = cmd.faceType  // PrismFace? tag set by uv-generation
-        val resolved = if (faceType != null) mat.resolve(faceType) else mat.default
-        resolveForCanvas(cmd.copy(material = resolved))  // tail-recursive dispatch
+is IsometricMaterial.PerFace -> {
+    val faceType = cmd.faceType  // PrismFace? tag from uv-generation (added by this slice)
+    val sub = if (faceType != null) material.resolve(faceType) else material.default
+    when (sub) {
+        is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
+        is IsometricMaterial.FlatColor -> false  // delegate to flat-color path
+        is IsometricMaterial.PerFace -> false     // should not happen (validated in init)
     }
-    null -> /* flat color fallback */
 }
 ```
 
-`cmd.faceType: PrismFace?` is a field added to `RenderCommand` by the uv-generation slice.
+`cmd.faceType: PrismFace?` is a field added to `RenderCommand` **by this slice** (T2).
 For non-Prism shapes it is `null`, which triggers `mat.default`.
 
 **No Canvas architecture change** — resolution is per-`RenderCommand`, one command per face,
 so the existing one-command-per-draw-call model works unchanged. Each face simply gets a
 different `BitmapShader` (or `Paint.color`) depending on its role.
 
-**Performance note** (from research §6): Canvas must change `Paint.shader` between faces
-with different textures. This is expected and unavoidable on Canvas. Batching faces by
-material (grouping TOP faces, then SIDE faces, etc.) could reduce state changes in a future
-optimization but is explicitly out of scope here.
+**Performance note**: Canvas must change `Paint.shader` between faces with different
+textures. This is expected and unavoidable. Batching by material is out of scope.
 
 ---
 
@@ -320,7 +320,7 @@ offset 148   4  _padding   (u32)
 total: 152 bytes → round up to next 16-byte boundary = 160 bytes
 ```
 
-Update `SceneDataLayout.FACE_DATA_BYTES = 160`.
+Update `SceneDataLayout.FACE_DATA_BYTES = 152`.
 
 ### Per-Face Material Resolution on WebGPU
 
@@ -387,13 +387,13 @@ change needed there once the emit pass writes the correct transformed UVs.
 ```
 T1 (PerFaceMaterialScope + PerFace.resolve()) ─────────────────────────────────────────┐
 T2 (RenderCommand: add faceType, atlasTextureIndex, uvOffset, uvScale) ─────────────┐  │
-T3 (MaterialResolver: PerFace branch, Canvas) ← T1, T2 ────────────────────────────┤  │
+T3 (TexturedCanvasDrawHook: PerFace branch, Canvas) ← T1, T2 ──────────────────────┤  │
 T4 (TextureAtlasManager) ← (device available from webgpu-textures) ─────────────────┤  │
 T5 (SceneDataLayout: FACE_DATA_BYTES 144→160, add uvOffset/uvScale fields) ─────────┤  │
 T6 (SceneDataPacker: write faceIndex, uvOffset, uvScale, textureIndex per face) ← T2,T5┤  │
 T7 (WGSL FaceData struct update: uvOffset/uvScale fields) ← T5 ─────────────────────┤  │
 T8 (GpuTriangulateEmitPipeline: emit per-face UV transform) ← T7 ───────────────────┤  │
-T9 (WebGpuSceneRenderer: resolvePerFaceMaterials() + wire TextureAtlasManager) ← T1,T2,T4,T6 │
+T9 (GpuFullPipeline: resolvePerFaceMaterials() + wire TextureAtlasManager) ← T1,T2,T4,T6 │
 T10 (ShapeNode.material: accept PerFace; Shape() composable wire-up) ← T1 ──────────┘  │
 T11 (Unit tests: PerFace.resolve() for all 6 faces, default fallback) ← T1 ─────────────┤
 T12 (Integration tests: Canvas PerFace renders grass top / dirt sides) ← T3, T10 ───────┤
@@ -419,13 +419,13 @@ and complete the class contract. The `sides` write-only convenience setter must 
 
 ---
 
-### T2 — Extend `RenderCommand` with per-face atlas fields
+### T2 — Extend `RenderCommand` with `faceType` + per-face atlas fields
 
 **File:** `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/RenderCommand.kt`
 
 Add defaulted fields so existing construction sites compile unchanged:
 ```kotlin
-val faceType: PrismFace? = null,          // set by UV-generation
+val faceType: PrismFace? = null,          // set during renderTo() for Prism shapes
 val atlasTextureIndex: Int? = null,        // set by WebGPU resolver
 val uvOffset: FloatArray = floatArrayOf(0f, 0f),  // atlas sub-region offset
 val uvScale:  FloatArray = floatArrayOf(1f, 1f),  // atlas sub-region scale
@@ -434,16 +434,28 @@ val uvScale:  FloatArray = floatArrayOf(1f, 1f),  // atlas sub-region scale
 Update `equals`, `hashCode`, `toString`, and `copy()` accordingly.
 Update `apiDump` for `isometric-core`.
 
+**File:** `isometric-compose/src/main/kotlin/.../runtime/IsometricNode.kt`
+
+In `ShapeNode.renderTo()` (line ~278), populate `faceType` when the shape is a `Prism`:
+```kotlin
+faceType = if (transformedShape is Prism) PrismFace.fromPathIndex(index) else null,
+```
+
+Similarly update `MaterialShapeNode.renderTo()` and `MultiMaterialShapeNode.renderTo()`.
+
+**Note:** The uv-generation slice did NOT add `faceType` — this slice adds it.
+
 **Dep:** None (can run in parallel with T1)
 
 ---
 
-### T3 — `MaterialResolver`: handle `PerFace` on Canvas
+### T3 — `TexturedCanvasDrawHook`: per-face resolution
 
-**File:** `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/MaterialResolver.kt`
+**File:** `isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHook.kt`
 
-Add the `is IsometricMaterial.PerFace` branch (tail-recursive dispatch to resolved
-material). When `cmd.faceType == null`, fall through to `mat.default`.
+Update the `is IsometricMaterial.PerFace` branch in `draw()` (currently at line 52–59)
+to resolve using `cmd.faceType` instead of always falling back to `material.default`.
+When `cmd.faceType == null` (non-Prism shapes), still fall through to `mat.default`.
 
 **Dep:** T1, T2
 
@@ -478,7 +490,7 @@ Update comment block and constant:
 //   148       4   _padding    (u32)
 // 152  →  160  (next 16-byte aligned boundary)
 
-const val FACE_DATA_BYTES = 160
+const val FACE_DATA_BYTES = 152
 ```
 
 **Dep:** None (constant-only change, but must land before T6 and T7)
@@ -515,20 +527,22 @@ buffer.putInt(0)
 
 ### T7 — Update WGSL `FaceData` struct
 
-**File:** `isometric-webgpu/src/main/assets/shaders/transform_cull_light.wgsl`
+**File:** `isometric-webgpu/src/main/kotlin/.../shader/TransformCullLightShader.kt`
 
+The WGSL is embedded as a Kotlin string (`val WGSL: String`), not an asset file.
 Update `struct FaceData` to add `uvOffset` and `uvScale` fields at the correct offsets
-matching T5. The `faceIndex` field moves from offset 128 (its current position) to
-remain at 128 — the `_padding` block shrinks from 12 to 4 bytes.
+matching T5. The `faceIndex` field stays at offset 128 — the `_padding` block
+(`_f0, _f1, _f2: u32 × 3`) shrinks to `uvOffset: vec2<f32>`, `uvScale: vec2<f32>`,
+`_padding: u32`.
 
 **Dep:** T5
 
 ---
 
-### T8 — `GpuTriangulateEmitPipeline`: apply per-face UV transform
+### T8 — `TriangulateEmitShader`: apply per-face UV transform
 
-**File:** `isometric-webgpu/src/main/assets/shaders/triangulate_emit.wgsl`
-(and `GpuTriangulateEmitPipeline.kt` if it constructs UV values)
+**File:** `isometric-webgpu/src/main/kotlin/.../shader/TriangulateEmitShader.kt`
+(WGSL is embedded as a Kotlin string in the `WGSL` property)
 
 Modify the emit pass to transform per-vertex UVs using the face's `uvOffset`/`uvScale`:
 ```wgsl
@@ -542,20 +556,31 @@ position within the quad). The fragment shader receives `atlasUV` and samples th
 
 ---
 
-### T9 — `WebGpuSceneRenderer`: wire per-face resolution and atlas manager
+### T9 — `GpuFullPipeline` + `WebGpuSceneRenderer`: wire per-face resolution and atlas manager
 
-**File:** `isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/WebGpuSceneRenderer.kt`
+**File:** `isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/GpuFullPipeline.kt`
 
-1. Instantiate `TextureAtlasManager` after device initialization.
-2. In `uploadScene()`, before `SceneDataPacker.packInto()`, call
-   `resolvePerFaceMaterials()` to expand `PerFace` materials into per-command atlas
-   regions and populate `atlasTextureIndex`, `uvOffset`, `uvScale` on each command.
-3. After packing, bind the atlas texture at `@group(1) @binding(0)` (replaces the
-   single-texture binding established in webgpu-textures; now backed by the atlas page).
-4. In `close()` / `destroy()`, call `atlasManager.destroy()`.
+**Post-review-fix state:** `textureBinder` is `private lateinit var`, created inside
+`ensurePipelines(renderPipeline: GpuRenderPipeline)`. The `uploadTextures()` method
+currently handles only a single texture (first found). Replace with atlas-based upload:
 
-The `resolvePerFaceMaterials()` helper (see §WebGPU Per-Face Material Resolution above)
-lives as a `private` function in this file or a sibling `PerFaceMaterialResolver.kt`.
+1. Add `TextureAtlasManager` as a field (created in `ensurePipelines`).
+2. Replace `uploadTextures(scene)` with `uploadTextureAtlas(scene)` that:
+   - Scans all commands for distinct textures (expanding `PerFace` materials)
+   - Packs all distinct bitmaps into the atlas
+   - Rebuilds the bind group with the atlas texture view
+3. Replace the single-texture `uploadedTexture`/`uploadedTextureView` fields with
+   atlas-managed textures.
+4. In `close()`, destroy atlas manager.
+
+**File:** `isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/GpuFullPipeline.kt`
+
+In `upload()`, before `SceneDataPacker.packInto()`, call `resolvePerFaceMaterials()`
+to expand `PerFace` materials into per-command atlas regions and populate
+`atlasTextureIndex`, `uvOffset`, `uvScale` on each command.
+
+The `resolvePerFaceMaterials()` helper lives as a `private` function in
+`GpuFullPipeline` or a sibling file.
 
 **Dep:** T1, T2, T4, T6
 
@@ -664,19 +689,20 @@ Batch 5 (needs Batch 4): T14 (T12)
 |------|--------|-------|
 | `isometric-shader/.../material/PerFaceMaterial.kt` | NEW | T1 |
 | `isometric-core/.../RenderCommand.kt` | MODIFY | T2 |
-| `isometric-shader/.../MaterialResolver.kt` | MODIFY | T3 |
+| `isometric-compose/.../runtime/IsometricNode.kt` | MODIFY | T2 (populate faceType) |
+| `isometric-shader/.../render/TexturedCanvasDrawHook.kt` | MODIFY | T3 |
 | `isometric-webgpu/.../atlas/TextureAtlasManager.kt` | NEW | T4 |
 | `isometric-webgpu/.../pipeline/SceneDataPacker.kt` | MODIFY | T5, T6 |
-| `isometric-webgpu/src/main/assets/shaders/transform_cull_light.wgsl` | MODIFY | T7 |
-| `isometric-webgpu/src/main/assets/shaders/triangulate_emit.wgsl` | MODIFY | T8 |
-| `isometric-webgpu/.../WebGpuSceneRenderer.kt` | MODIFY | T9 |
-| `isometric-compose/.../runtime/IsometricNode.kt` | VERIFY (likely no change) | T10 |
+| `isometric-webgpu/.../shader/TransformCullLightShader.kt` | MODIFY | T7 |
+| `isometric-webgpu/.../shader/TriangulateEmitShader.kt` | MODIFY | T8 |
+| `isometric-webgpu/.../pipeline/GpuFullPipeline.kt` | MODIFY | T9 |
+| `isometric-shader/.../IsometricMaterialComposables.kt` | VERIFY (likely no change) | T10 |
 | `isometric-shader/src/test/.../PerFaceMaterialTest.kt` | NEW | T11 |
 | `isometric-compose/src/androidTest/.../PerFaceCanvasTest.kt` | NEW | T12 |
 | `isometric-webgpu/src/androidTest/.../PerFaceWebGpuTest.kt` | NEW | T13 |
 | `isometric-compose/src/test/.../PerFaceMaterialSnapshotTest.kt` | NEW | T14 |
 
-**Total:** 13 files (5 new, 7 modified, 1 verify)
+**Total:** 14 files (5 new, 8 modified, 1 verify)
 
 ---
 
@@ -692,20 +718,103 @@ Batch 5 (needs Batch 4): T14 (T12)
 
 ---
 
+## Test / Verification Plan
+
+### Automated checks
+
+- **Build:** `./gradlew build -x test -x apiCheck` — all modules compile
+- **Unit tests:** `./gradlew test` — all existing + new `PerFaceMaterialTest` pass
+- **API compatibility:** `./gradlew apiCheck` — no unintended public API breaks
+- **Buffer layout test (T13):** Byte-level inspection of `SceneDataPacker` output verifying
+  `uvOffset`/`uvScale` at correct offsets (132, 140) in the 152-byte `FaceData`
+
+### Interactive verification (human-in-the-loop)
+
+The per-face-materials slice requires on-device visual verification for 3 acceptance
+criteria. The sample-demo slice adds a "Per-Face" tab to `WebGpuSampleActivity`. If
+implementing before sample-demo, temporarily add a per-face test scene to the existing
+"Textured" tab.
+
+#### V1 — Per-face Canvas rendering: distinct textures per face
+
+- **What to verify:** A Prism with `perFace { top = textured(grass); sides = textured(dirt) }`
+  shows the grass texture on the top face and dirt texture on the four side faces
+- **Platform & tool:** Android device (Samsung SM-F956B), adb
+- **Steps:**
+  1. `./gradlew :app:installDebug`
+  2. `adb shell am start -n io.github.jayteealao.isometric.sample/.WebGpuSampleActivity`
+  3. Navigate to the tab containing the per-face sample scene
+  4. Select "Canvas" render mode
+  5. `adb exec-out screencap -p > verify-evidence/perface-canvas.png`
+- **Pass criteria:** Top face visibly different texture from side faces. No magenta
+  checkerboard (fallback) on any visible face.
+
+#### V2 — Per-face WebGPU rendering: atlas-backed texture mapping
+
+- **What to verify:** Same `perFace` material renders correctly in Full WebGPU mode
+  with distinct textures per face, matching the Canvas layout
+- **Platform & tool:** Same device, adb
+- **Steps:**
+  1. Same app, same tab
+  2. Select "Full WebGPU" render mode
+  3. `adb exec-out screencap -p > verify-evidence/perface-webgpu.png`
+  4. Compare side-by-side with `perface-canvas.png`
+- **Pass criteria:** Same face-to-texture mapping as Canvas. Top face has grass, sides
+  have dirt. No atlas UV bleeding (seams between textures). No GPU errors in logcat.
+
+#### V3 — Mixed per-face + flat-color scene
+
+- **What to verify:** A scene with one `perFace` prism and one flat-color prism renders
+  both correctly — per-face prism has distinct textures, flat-color prism is solid
+- **Platform & tool:** Same device, adb
+- **Steps:**
+  1. Same app; scene should include both material types
+  2. Verify in both Canvas and WebGPU modes
+  3. `adb exec-out screencap -p > verify-evidence/perface-mixed.png`
+- **Pass criteria:** Flat-color prism renders as solid color (no texture). Per-face prism
+  shows correct per-face textures. No interference between the two.
+
+#### V4 — Default fallback for unset faces
+
+- **What to verify:** A `perFace { top = textured(grass) }` prism with no other faces set
+  uses the `default` material (transparent or flat color) for non-top faces
+- **Platform & tool:** Same device, adb
+- **Steps:**
+  1. Modify sample scene to have a prism with only `top` set
+  2. Verify non-top faces render using the default material
+- **Pass criteria:** Non-top faces are either transparent (default) or the specified
+  default color. Top face shows the grass texture.
+
+#### V5 — No performance regression on non-textured scenes
+
+- **What to verify:** "Animated Towers" tab (all non-textured prisms) still renders
+  smoothly at interactive framerate in WebGPU mode
+- **Platform & tool:** Same device, visual inspection
+- **Steps:**
+  1. Navigate to "Animated Towers" tab, select "Full WebGPU"
+  2. Observe rendering for 5+ seconds
+  3. Check logcat: `adb logcat -d | grep -i "device.lost\|TDR\|error"` filtered to app
+- **Pass criteria:** Smooth animation, no jank, no device-lost, no GPU errors.
+
+### Evidence storage
+
+All screenshots saved to `.ai/workflows/texture-material-shaders/verify-evidence/`
+with `perface-` prefix.
+
+---
+
 ## Acceptance Criteria Verification
 
 - [ ] `perFace { top = textured(grass); sides = textured(dirt) }` — Canvas: top face
-  renders grass BitmapShader, side faces render dirt BitmapShader
-- [ ] Same material in WebGPU mode: same face-to-texture mapping visible on device
-- [ ] `PerFace` with no `bottom` specified — bottom face uses `default` material
-- [ ] `perFace {}` (all unset) — all faces render as transparent (no crash)
-- [ ] `resolve(face)` for every `PrismFace` value returns correct material or default
-- [ ] Atlas UV regions do not overlap for 2 different textures packed together
-- [ ] `SceneDataPacker` writes `uvOffset`/`uvScale` at correct byte offsets (verified by
-  byte-level buffer inspection test)
-- [ ] Existing WebGPU benchmark: no performance regression for non-textured scenes
-  (faceType=null fast path in `resolvePerFaceMaterials()`)
-- [ ] Paparazzi snapshot tests pass for all 3 golden image cases
+  renders grass BitmapShader, side faces render dirt BitmapShader **(V1)**
+- [ ] Same material in WebGPU mode: same face-to-texture mapping visible on device **(V2)**
+- [ ] `PerFace` with no `bottom` specified — bottom face uses `default` material **(V4)**
+- [ ] `perFace {}` (all unset) — all faces render as transparent (no crash) **(unit test T11)**
+- [ ] `resolve(face)` for every `PrismFace` value returns correct material or default **(unit test T11)**
+- [ ] Atlas UV regions do not overlap for 2 different textures packed together **(unit test T13)**
+- [ ] `SceneDataPacker` writes `uvOffset`/`uvScale` at correct byte offsets **(unit test T13)**
+- [ ] No performance regression for non-textured scenes **(V5)**
+- [ ] Mixed per-face + flat-color scene renders correctly **(V3)**
 
 ## Revision History
 
@@ -717,3 +826,39 @@ Batch 5 (needs Batch 4): T14 (T12)
      compose. Fix: rewrote T10 to target the shader module's overloaded `Shape()`.
   2. **LOW:** DSL examples show `Shape(shape, material = perFace { ... })` without clarifying
      this is the shader-module overload. Fix: added note in T10.
+
+### 2026-04-12 — Auto-Review (rev 2)
+- Mode: Auto-Review (post webgpu-textures implementation + review fixes)
+- Issues found: 6
+
+  1. **HIGH:** `MaterialResolver` class does not exist. Canvas-textures slice implemented
+     `TexturedCanvasDrawHook` instead. Fix: rewrote T3 and §Canvas Renderer to reference
+     `TexturedCanvasDrawHook.draw()` PerFace branch.
+
+  2. **HIGH:** `RenderCommand.faceType` does not exist. The uv-generation slice did NOT
+     add this field. Fix: moved `faceType` addition into T2 (this slice adds it), and
+     documented the population point in `ShapeNode.renderTo()` / `IsometricNode.kt`.
+
+  3. **MED:** `GpuFullPipeline` refactored by review fixes — `textureBinder` is now
+     `lateinit`, `ensurePipelines()` takes `GpuRenderPipeline` param. Fix: updated T9
+     to target `GpuFullPipeline` instead of `WebGpuSceneRenderer`.
+
+  4. **MED:** WGSL shaders are Kotlin string objects (e.g., `TransformCullLightShader.kt`),
+     not `.wgsl` asset files. Fix: corrected file paths in T7 and T8.
+
+  5. **LOW:** `FACE_DATA_BYTES` inconsistency — plan body computed 152 but index summary
+     said 160. Fix: standardized to 152 throughout (next 8-byte aligned boundary after
+     148 bytes of content = 152, since vec2 alignment is 8).
+
+  6. **LOW:** File inventory had wrong target for T3 (`MaterialResolver.kt` → 
+     `TexturedCanvasDrawHook.kt`) and wrong target for T9 (`WebGpuSceneRenderer` →
+     `GpuFullPipeline`). Fix: updated inventory.
+
+### 2026-04-12 — Directed Fix (rev 3)
+- Mode: Directed Fix
+- Feedback: "visual verification"
+- What was changed: Added `## Test / Verification Plan` section with 5 interactive
+  verification steps (V1–V5) covering Canvas per-face rendering, WebGPU atlas rendering,
+  mixed scenes, default fallback, and performance regression. Each step includes platform,
+  adb commands, screenshot capture, and pass criteria. Cross-referenced acceptance criteria
+  with verification IDs. Added evidence storage convention.

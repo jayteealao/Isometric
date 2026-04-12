@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-12T14:47:56Z"
-slices-verified: 3
+updated-at: "2026-04-12T16:37:28Z"
+slices-verified: 4
 slices-total: 6
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders canvas-textures"
+next-invocation: "/wf-review texture-material-shaders webgpu-textures"
 ---
 
 # Verify Index
@@ -40,6 +40,13 @@ next-invocation: "/wf-review texture-material-shaders canvas-textures"
 - Evidence: `verify-evidence/verify-textured-fixed.png`
 - Record: [06-verify-canvas-textures.md](06-verify-canvas-textures.md)
 
+### `webgpu-textures` — PARTIAL (automated pass, interactive pending)
+- Checks: 4/4 passed (build, tests, apiCheck, 7-invariant static shader review)
+- Acceptance: 0/4 met (all require on-device visual verification)
+- Interactive: 0 runs — requires Android device + textured WebGPU sample scene
+- Issues: 0
+- Record: [06-verify-webgpu-textures.md](06-verify-webgpu-textures.md)
+
 ## Recommended Next Stage
-- **Option A (default):** `/wf-review texture-material-shaders canvas-textures` — all checks pass, all ACs met
+- **Option A (default):** `/wf-review texture-material-shaders webgpu-textures` — code review; on-device testing can follow after sample-demo slice
 - **Option B:** `/compact` then Option A

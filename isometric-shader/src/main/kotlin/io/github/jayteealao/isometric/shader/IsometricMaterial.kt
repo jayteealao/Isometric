@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.PrismFace
 
 /**
  * Describes how a face should be painted.
@@ -46,16 +47,16 @@ sealed interface IsometricMaterial : MaterialData {
     ) : IsometricMaterial
 
     /**
-     * Assigns different materials to different faces of a shape.
+     * Assigns different materials to different faces of a Prism shape.
      *
-     * Faces not covered by this map fall back to [default].
+     * Faces not covered by [faceMap] fall back to [default].
      *
-     * @property faceMap Map from face index (0-based, matching shape paths order) to material
+     * @property faceMap Map from [PrismFace] role to material for that face
      * @property default Material used for faces not present in [faceMap]
      */
     data class PerFace(
-        val faceMap: Map<Int, IsometricMaterial>,
-        val default: IsometricMaterial,
+        val faceMap: Map<PrismFace, IsometricMaterial>,
+        val default: IsometricMaterial = FlatColor(IsoColor(0, 0, 0, 0)),
     ) : IsometricMaterial {
         init {
             require(faceMap.values.none { it is PerFace }) {
@@ -65,6 +66,9 @@ sealed interface IsometricMaterial : MaterialData {
                 "PerFace default cannot itself be PerFace"
             }
         }
+
+        /** Resolve the effective material for [face], falling back to [default]. */
+        fun resolve(face: PrismFace): IsometricMaterial = faceMap[face] ?: default
     }
 }
 
@@ -117,32 +121,58 @@ fun texturedBitmap(
     IsometricMaterial.Textured(source = TextureSource.BitmapSource(bitmap), tint = tint, uvTransform = uvTransform)
 
 /**
- * Creates a [IsometricMaterial.PerFace] material via a builder.
+ * Creates a [IsometricMaterial.PerFace] material via a builder with named face properties.
  *
  * ```kotlin
- * Shape(Prism(origin), material = perFace(default = flatColor(IsoColor.GRAY)) {
- *     face(0, textured(R.drawable.grass))   // top face
- *     face(1, textured(R.drawable.dirt))    // front face
+ * // Simple: grass top, dirt sides
+ * Shape(Prism(origin), material = perFace {
+ *     top = textured(R.drawable.grass)
+ *     sides = textured(R.drawable.dirt)
+ * })
+ *
+ * // Fine-grained: different materials per side
+ * Shape(Prism(origin), material = perFace {
+ *     top = textured(R.drawable.grass)
+ *     front = textured(R.drawable.dirt_shadow)
+ *     left = textured(R.drawable.dirt_light)
+ *     default = flatColor(IsoColor.GRAY)
  * })
  * ```
  */
 fun perFace(
-    default: IsometricMaterial = IsometricMaterial.FlatColor(IsoColor.GRAY),
-    block: PerFaceBuilder.() -> Unit,
+    block: PerFaceMaterialScope.() -> Unit,
 ): IsometricMaterial.PerFace =
-    PerFaceBuilder(default).apply(block).build()
+    PerFaceMaterialScope().apply(block).build()
 
 // -- Builder classes ----------------------------------------------------------
 
-class PerFaceBuilder internal constructor(private val default: IsometricMaterial) {
-    private val faceMap = mutableMapOf<Int, IsometricMaterial>()
+class PerFaceMaterialScope internal constructor() {
+    var top: IsometricMaterial? = null
+    var bottom: IsometricMaterial? = null
+    var front: IsometricMaterial? = null
+    var back: IsometricMaterial? = null
+    var left: IsometricMaterial? = null
+    var right: IsometricMaterial? = null
+    var default: IsometricMaterial = IsometricMaterial.FlatColor(IsoColor(0, 0, 0, 0))
 
-    /** Assigns [material] to the face at [index] (0-based, matching shape.paths order). */
-    fun face(index: Int, material: IsometricMaterial) {
-        require(index >= 0) { "Face index must be non-negative, got $index" }
-        faceMap[index] = material
+    /**
+     * Convenience: sets [front], [back], [left], [right] to the same material.
+     * Write-only — later individual assignments override.
+     */
+    var sides: IsometricMaterial?
+        @Deprecated("sides is write-only", level = DeprecationLevel.ERROR)
+        get() = error("sides is write-only")
+        set(value) { front = value; back = value; left = value; right = value }
+
+    internal fun build(): IsometricMaterial.PerFace {
+        val map = buildMap {
+            top?.let { put(PrismFace.TOP, it) }
+            bottom?.let { put(PrismFace.BOTTOM, it) }
+            front?.let { put(PrismFace.FRONT, it) }
+            back?.let { put(PrismFace.BACK, it) }
+            left?.let { put(PrismFace.LEFT, it) }
+            right?.let { put(PrismFace.RIGHT, it) }
+        }
+        return IsometricMaterial.PerFace(faceMap = map, default = default)
     }
-
-    internal fun build(): IsometricMaterial.PerFace =
-        IsometricMaterial.PerFace(faceMap = faceMap.toMap(), default = default)
 }

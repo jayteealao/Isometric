@@ -12,7 +12,7 @@ import kotlin.math.sqrt
  * These values must match the WGSL struct definitions in `transform_cull_light.wgsl` exactly.
  * Any change here requires a matching change to the shader.
  *
- * ## FaceData memory layout (144 bytes per face)
+ * ## FaceData memory layout (160 bytes per face)
  *
  * ```
  *  offset  size  field
@@ -32,13 +32,17 @@ import kotlin.math.sqrt
  *  112      12   normal      (vec3<f32>)
  *  124       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
  *  128       4   faceIndex   (u32)
- *  132      12   _padding    (vec3<u32>)
- * 144  →   144   (already aligned for storage-buffer layout)
+ *  132       4   uvOffsetU   (f32 — atlas sub-region U offset)
+ *  136       4   uvOffsetV   (f32 — atlas sub-region V offset)
+ *  140       4   uvScaleU    (f32 — atlas sub-region U scale)
+ *  144       4   uvScaleV    (f32 — atlas sub-region V scale)
+ *  148      12   _padding    (3 × u32, to reach 160 = 10 × 16-byte alignment)
+ * 160  →   160
  * ```
  */
 internal object SceneDataLayout {
     /** Bytes per FaceData struct in the GPU scene-data storage buffer. */
-    const val FACE_DATA_BYTES = 144
+    const val FACE_DATA_BYTES = 160
 
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
     const val TRANSFORMED_FACE_BYTES = 96
@@ -152,7 +156,15 @@ internal object SceneDataPacker {
             // faceIndex: u32 — original command list index (used in sort + emit passes)
             buffer.putInt(index)
 
-            // _padding: 12 bytes to bring the struct to 128-byte alignment
+            // uvOffset: 2 × f32 — atlas sub-region offset for this face
+            buffer.putFloat(cmd.uvOffset?.get(0) ?: 0f)
+            buffer.putFloat(cmd.uvOffset?.get(1) ?: 0f)
+
+            // uvScale: 2 × f32 — atlas sub-region scale for this face
+            buffer.putFloat(cmd.uvScale?.get(0) ?: 1f)
+            buffer.putFloat(cmd.uvScale?.get(1) ?: 1f)
+
+            // _padding: 12 bytes to reach 160 (16-byte aligned struct size)
             buffer.putInt(0)
             buffer.putInt(0)
             buffer.putInt(0)
@@ -190,16 +202,21 @@ internal object SceneDataPacker {
     /**
      * Resolve the GPU texture index for a render command's material.
      *
-     * For this slice, there is a single texture slot (index 0). Commands with
-     * `IsometricMaterial.Textured` material get index 0; all others get [SceneDataLayout.NO_TEXTURE].
-     * `PerFace` resolves via its `.default` sub-material.
+     * Commands with `IsometricMaterial.Textured` material get index 0 (atlas texture).
+     * `PerFace` resolves using the command's [RenderCommand.faceType] to find the
+     * per-face sub-material, falling back to the PerFace default.
+     * All others get [SceneDataLayout.NO_TEXTURE].
      */
     private fun resolveTextureIndex(cmd: RenderCommand): Int {
-        return when (val m = cmd.material) {
-            is IsometricMaterial.Textured -> 0
+        val effective = when (val m = cmd.material) {
             is IsometricMaterial.PerFace -> {
-                if (m.default is IsometricMaterial.Textured) 0 else SceneDataLayout.NO_TEXTURE
+                val face = cmd.faceType
+                if (face != null) m.resolve(face) else m.default
             }
+            else -> m
+        }
+        return when (effective) {
+            is IsometricMaterial.Textured -> 0
             else -> SceneDataLayout.NO_TEXTURE
         }
     }

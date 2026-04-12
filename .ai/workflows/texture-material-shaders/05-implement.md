@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-12T16:27:39Z"
-slices-implemented: 4
+updated-at: "2026-04-12T23:26:45Z"
+slices-implemented: 5
 slices-total: 6
-metric-total-files-changed: 30
-metric-total-lines-added: 1137
-metric-total-lines-removed: 240
+metric-total-files-changed: 45
+metric-total-lines-added: 1764
+metric-total-lines-removed: 470
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders webgpu-textures"
+next-invocation: "/wf-verify texture-material-shaders per-face-materials"
 ---
 
 # Implement Index
@@ -43,7 +43,11 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-textures"
 - Summary: GPU texture upload (BGRA8Unorm), @group(0) bind group, fragment shader textureSample with NO_TEXTURE fast path, emit shader real UVs + textureIndex, vertex stride 32→36, SceneDataPacker material resolution
 - Record: [05-implement-webgpu-textures.md](05-implement-webgpu-textures.md)
 
-### `per-face-materials` — not started
+### `per-face-materials` — complete
+- Files: 15 (2 new, 13 modified)
+- Summary: PerFace uses PrismFace keys + resolve() method, PerFaceMaterialScope DSL, faceType on RenderCommand, Canvas per-face resolution, TextureAtlasManager for WebGPU multi-texture, FaceData 144→160 bytes, emit shader UV transform
+- Record: [05-implement-per-face-materials.md](05-implement-per-face-materials.md)
+
 ### `sample-demo` — not started
 
 ## Cross-Slice Integration Notes
@@ -54,5 +58,5 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-textures"
 - `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders webgpu-textures`
+- **Option A (default):** `/wf-verify texture-material-shaders per-face-materials`
 - **Option B:** `/compact` then Option A — clear implementation context

@@ -63,10 +63,12 @@ fun IsometricScope.Shape(
     // Closes over the original Prism reference (model-space dimensions) rather than
     // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
     val prism = geometry as? Prism
-    val uvProvider: UvCoordProvider? = if (
-        material is IsometricMaterial.Textured && prism != null
-    ) {
-        UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(prism, faceIndex) }
+    val needsUvs = prism != null && (
+        material is IsometricMaterial.Textured ||
+        material is IsometricMaterial.PerFace
+    )
+    val uvProvider: UvCoordProvider? = if (needsUvs) {
+        UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(prism!!, faceIndex) }
     } else null
 
     ReusableComposeNode<ShapeNode, IsometricApplier>(

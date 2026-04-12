@@ -50,11 +50,12 @@ internal class TexturedCanvasDrawHook(
             is IsometricMaterial.FlatColor -> false
             is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, material)
             is IsometricMaterial.PerFace -> {
-                val sub = material.default
-                if (sub is IsometricMaterial.Textured) {
-                    drawTextured(nativeCanvas, command, nativePath, sub)
-                } else {
-                    false
+                val face = command.faceType
+                val sub = if (face != null) material.resolve(face) else material.default
+                when (sub) {
+                    is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
+                    is IsometricMaterial.FlatColor -> false // delegate to flat-color path
+                    is IsometricMaterial.PerFace -> false   // should not happen (validated in init)
                 }
             }
         }

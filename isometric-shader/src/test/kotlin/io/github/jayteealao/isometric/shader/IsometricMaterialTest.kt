@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.PrismFace
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -66,19 +67,20 @@ class IsometricMaterialTest {
     fun `perFace creates PerFace with face map and default`() {
         val green = flatColor(IsoColor.GREEN)
         val gray = flatColor(IsoColor.GRAY)
-        val mat = perFace(default = gray) {
-            face(0, green)
+        val mat = perFace {
+            top = green
+            default = gray
         }
         assertIs<IsometricMaterial.PerFace>(mat)
-        assertEquals(green, mat.faceMap[0])
+        assertEquals(green, mat.faceMap[PrismFace.TOP])
         assertEquals(gray, mat.default)
         assertEquals(1, mat.faceMap.size)
     }
 
     @Test
-    fun `perFace default is gray FlatColor`() {
-        val mat = perFace { face(0, flatColor(IsoColor.BLUE)) }
-        assertEquals(IsoColor.GRAY, (mat.default as IsometricMaterial.FlatColor).color)
+    fun `perFace default is transparent FlatColor`() {
+        val mat = perFace { top = flatColor(IsoColor.BLUE) }
+        assertEquals(IsoColor(0, 0, 0, 0), (mat.default as IsometricMaterial.FlatColor).color)
     }
 
     @Test
@@ -149,22 +151,39 @@ class IsometricMaterialTest {
     @Test
     fun `PerFace rejects nested PerFace in faceMap`() {
         val inner = IsometricMaterial.PerFace(
-            faceMap = mapOf(0 to flatColor(IsoColor.RED)),
+            faceMap = mapOf(PrismFace.TOP to flatColor(IsoColor.RED)),
             default = flatColor(IsoColor.GRAY)
         )
         assertFailsWith<IllegalArgumentException> {
             IsometricMaterial.PerFace(
-                faceMap = mapOf(0 to inner),
+                faceMap = mapOf(PrismFace.FRONT to inner),
                 default = flatColor(IsoColor.GRAY)
             )
         }
     }
 
     @Test
-    fun `PerFaceBuilder rejects negative face index`() {
-        assertFailsWith<IllegalArgumentException> {
-            perFace { face(-1, flatColor(IsoColor.RED)) }
-        }
+    fun `perFace sides sets all four side faces`() {
+        val dirt = flatColor(IsoColor.RED)
+        val mat = perFace { sides = dirt }
+        assertEquals(dirt, mat.faceMap[PrismFace.FRONT])
+        assertEquals(dirt, mat.faceMap[PrismFace.BACK])
+        assertEquals(dirt, mat.faceMap[PrismFace.LEFT])
+        assertEquals(dirt, mat.faceMap[PrismFace.RIGHT])
+        assertEquals(4, mat.faceMap.size)
+    }
+
+    @Test
+    fun `PerFace resolve returns face material or default`() {
+        val grass = flatColor(IsoColor.GREEN)
+        val gray = flatColor(IsoColor.GRAY)
+        val mat = IsometricMaterial.PerFace(
+            faceMap = mapOf(PrismFace.TOP to grass),
+            default = gray,
+        )
+        assertEquals(grass, mat.resolve(PrismFace.TOP))
+        assertEquals(gray, mat.resolve(PrismFace.FRONT))
+        assertEquals(gray, mat.resolve(PrismFace.BOTTOM))
     }
 
     @Test
