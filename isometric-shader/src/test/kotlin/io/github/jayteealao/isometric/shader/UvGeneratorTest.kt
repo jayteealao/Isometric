@@ -83,13 +83,15 @@ class UvGeneratorTest {
     }
 
     @Test
-    fun `translated prism produces same UVs as origin prism`() {
+    fun `translated prism produces same UVs as origin prism for all faces`() {
         val translated = Prism(Point(5.0, 7.0, 3.0), width = 1.0, depth = 1.0, height = 1.0)
-        val uvs = UvGenerator.forPrismFace(translated, faceIndex = 0)
-        assertUvAt(uvs, 0, 0f, 0f)
-        assertUvAt(uvs, 1, 1f, 0f)
-        assertUvAt(uvs, 2, 1f, 1f)
-        assertUvAt(uvs, 3, 0f, 1f)
+        val originAll = UvGenerator.forAllPrismFaces(unitPrism)
+        val translatedAll = UvGenerator.forAllPrismFaces(translated)
+        for (face in PrismFace.entries.indices) {
+            for (v in 0..3) {
+                assertUvAt(translatedAll[face], v, originAll[face][v * 2], originAll[face][v * 2 + 1])
+            }
+        }
     }
 
     @Test

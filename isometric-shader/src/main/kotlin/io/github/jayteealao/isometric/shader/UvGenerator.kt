@@ -36,7 +36,7 @@ object UvGenerator {
      * @return List of 6 [FloatArray], each with 8 floats, indexed 0=FRONT through 5=TOP
      */
     fun forAllPrismFaces(prism: Prism): List<FloatArray> =
-        (0..5).map { forPrismFace(prism, it) }
+        PrismFace.entries.indices.map { forPrismFace(prism, it) }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
         val ox = prism.position.x

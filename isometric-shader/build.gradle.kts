@@ -34,7 +34,7 @@ mavenPublishing {
 }
 
 dependencies {
-    api(project(":isometric-core"))
+    // isometric-core is available transitively via isometric-compose
     api(project(":isometric-compose"))
     implementation(libs.annotation)
     implementation(libs.kotlin.stdlib)

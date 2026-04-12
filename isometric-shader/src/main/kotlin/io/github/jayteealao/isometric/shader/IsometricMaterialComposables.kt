@@ -13,6 +13,7 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScope
 import io.github.jayteealao.isometric.compose.runtime.LocalDefaultColor
 import io.github.jayteealao.isometric.compose.runtime.ShapeNode
 import io.github.jayteealao.isometric.compose.runtime.PathNode
+import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 
 /**
  * Add a 3D shape with a material to the isometric scene.
@@ -62,10 +63,10 @@ fun IsometricScope.Shape(
     // Closes over the original Prism reference (model-space dimensions) rather than
     // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
     val prism = geometry as? Prism
-    val uvProvider: ((Shape, Int) -> FloatArray?)? = if (
+    val uvProvider: UvCoordProvider? = if (
         material is IsometricMaterial.Textured && prism != null
     ) {
-        { _, faceIndex -> UvGenerator.forPrismFace(prism, faceIndex) }
+        UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(prism, faceIndex) }
     } else null
 
     ReusableComposeNode<ShapeNode, IsometricApplier>(

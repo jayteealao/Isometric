@@ -11,6 +11,21 @@ import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
 
 /**
+ * Provides per-face UV coordinates for textured rendering.
+ *
+ * Implementations receive the original (pre-transform) [Shape] and a 0-based face index,
+ * and return a packed `FloatArray` of `[u0,v0, u1,v1, ...]` or null if no UVs apply.
+ *
+ * This is a `fun interface` so it can be constructed from a lambda:
+ * ```kotlin
+ * UvCoordProvider { shape, faceIndex -> floatArrayOf(0f, 0f, 1f, 0f, 1f, 1f, 0f, 1f) }
+ * ```
+ */
+fun interface UvCoordProvider {
+    fun provide(shape: Shape, faceIndex: Int): FloatArray?
+}
+
+/**
  * Base node for the isometric scene graph.
  * This is the fundamental building block that Compose Runtime manages.
  * Open for extension to support custom node types via low-level ComposeNode primitives.
@@ -233,11 +248,10 @@ class ShapeNode(
     /**
      * Optional UV coordinate provider. When set, called for each face during
      * [renderTo] with the original (pre-transform) shape and the 0-based face index.
-     * Returns a packed `FloatArray` of `[u0,v0, u1,v1, ...]` or null if no UVs apply.
      *
      * Set by the `isometric-shader` module's composable overloads — not typically set directly.
      */
-    var uvProvider: ((Shape, Int) -> FloatArray?)? = null,
+    var uvProvider: UvCoordProvider? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -269,7 +283,7 @@ class ShapeNode(
                     originalShape = transformedShape,
                     ownerNodeId = nodeId,
                     material = material,
-                    uvCoords = uvProvider?.invoke(shape, index),
+                    uvCoords = uvProvider?.provide(shape, index),
                 )
             )
         }
@@ -328,7 +342,8 @@ class PathNode(
  */
 class BatchNode(
     var shapes: List<Shape>,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: MaterialData? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
