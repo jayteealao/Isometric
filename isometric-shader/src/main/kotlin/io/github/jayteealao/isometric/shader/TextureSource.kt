@@ -18,7 +18,7 @@ sealed interface TextureSource {
      */
     data class Resource(@DrawableRes val resId: Int) : TextureSource {
         init {
-            require(resId > 0) { "Resource ID must be positive, got $resId" }
+            require(resId != 0) { "Resource ID must not be zero" }
         }
     }
 

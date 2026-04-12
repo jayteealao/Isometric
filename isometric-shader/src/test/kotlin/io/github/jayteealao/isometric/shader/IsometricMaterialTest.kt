@@ -140,12 +140,9 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `TextureSource Resource rejects non-positive resId`() {
+    fun `TextureSource Resource rejects zero resId`() {
         assertFailsWith<IllegalArgumentException> {
             TextureSource.Resource(0)
-        }
-        assertFailsWith<IllegalArgumentException> {
-            TextureSource.Resource(-1)
         }
     }
 
