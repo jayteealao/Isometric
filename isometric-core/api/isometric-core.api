@@ -452,6 +452,23 @@ public final class io/github/jayteealao/isometric/shapes/Prism : io/github/jayte
 public final class io/github/jayteealao/isometric/shapes/Prism$Companion {
 }
 
+public final class io/github/jayteealao/isometric/shapes/PrismFace : java/lang/Enum {
+	public static final field BACK Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field BOTTOM Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/PrismFace$Companion;
+	public static final field FRONT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field LEFT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field RIGHT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field TOP Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static fun values ()[Lio/github/jayteealao/isometric/shapes/PrismFace;
+}
+
+public final class io/github/jayteealao/isometric/shapes/PrismFace$Companion {
+	public final fun fromPathIndex (I)Lio/github/jayteealao/isometric/shapes/PrismFace;
+}
+
 public final class io/github/jayteealao/isometric/shapes/Pyramid : io/github/jayteealao/isometric/Shape {
 	public static final field Companion Lio/github/jayteealao/isometric/shapes/Pyramid$Companion;
 	public fun <init> ()V

@@ -127,6 +127,13 @@ public final class io/github/jayteealao/isometric/shader/UvCoord$Companion {
 	public final fun getTOP_RIGHT ()Lio/github/jayteealao/isometric/shader/UvCoord;
 }
 
+public final class io/github/jayteealao/isometric/shader/UvGenerator {
+	public static final field $stable I
+	public static final field INSTANCE Lio/github/jayteealao/isometric/shader/UvGenerator;
+	public final fun forAllPrismFaces (Lio/github/jayteealao/isometric/shapes/Prism;)Ljava/util/List;
+	public final fun forPrismFace (Lio/github/jayteealao/isometric/shapes/Prism;I)[F
+}
+
 public final class io/github/jayteealao/isometric/shader/UvTransform {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/shader/UvTransform$Companion;

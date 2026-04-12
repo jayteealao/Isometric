@@ -6,6 +6,7 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.Path
+import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.compose.runtime.IsometricApplier
 import io.github.jayteealao.isometric.compose.runtime.IsometricComposable
 import io.github.jayteealao.isometric.compose.runtime.IsometricScope
@@ -57,12 +58,25 @@ fun IsometricScope.Shape(
         is IsometricMaterial.FlatColor -> material.color
         else -> LocalDefaultColor.current
     }
+    // UV provider: generates per-face UVs when material is Textured and geometry is a Prism
+    val uvProvider: ((Shape, Int) -> FloatArray?)? = if (
+        material is IsometricMaterial.Textured && geometry is Prism
+    ) {
+        { shape, faceIndex -> UvGenerator.forPrismFace(shape as Prism, faceIndex) }
+    } else null
+
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(geometry, color).also { it.material = material } },
+        factory = {
+            ShapeNode(geometry, color).also {
+                it.material = material
+                it.uvProvider = uvProvider
+            }
+        },
         update = {
             set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
             set(material) { this.material = it; markDirty() }
+            set(uvProvider) { this.uvProvider = it; markDirty() }
             set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {

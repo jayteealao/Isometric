@@ -8,7 +8,7 @@ current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
 updated-at: "2026-04-11T22:49:12Z"
-selected-slice: "material-types"
+selected-slice: "uv-generation"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -17,7 +17,7 @@ pr-number: 0
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders material-types"
+next-invocation: "/wf-verify texture-material-shaders uv-generation"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -38,6 +38,14 @@ workflow-files:
   - 04-plan-sample-demo.md
   - 05-implement.md
   - 05-implement-material-types.md
+  - 05-implement-uv-generation.md
+  - 06-verify.md
+  - 06-verify-material-types.md
+  - 07-review.md
+  - 07-review-correctness.md
+  - 07-review-security.md
+  - 07-review-code-simplification.md
+  - 07-review-architecture.md
   - po-answers.md
 progress:
   intake: complete
@@ -45,7 +53,7 @@ progress:
   slice: complete
   plan: complete
   implement: in-progress
-  verify: not-started
+  verify: in-progress
   review: not-started
   handoff: not-started
   ship: not-started

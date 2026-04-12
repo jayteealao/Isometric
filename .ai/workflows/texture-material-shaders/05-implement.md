@@ -6,7 +6,7 @@ status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
 updated-at: "2026-04-11T23:37:39Z"
-slices-implemented: 1
+slices-implemented: 2
 slices-total: 6
 metric-total-files-changed: 8
 metric-total-lines-added: 190
@@ -29,7 +29,10 @@ next-invocation: "/wf-verify texture-material-shaders material-types"
   overloaded `Shape(geometry, material)` composables. Nodes use `MaterialData?` from core.
 - Record: [05-implement-material-types.md](05-implement-material-types.md)
 
-### `uv-generation` — not started
+### `uv-generation` — complete
+- Files: 9 (4 new, 5 modified/generated)
+- Summary: PrismFace enum, UvGenerator object, uvProvider lambda on ShapeNode, wired from shader's Shape() overload
+- Record: [05-implement-uv-generation.md](05-implement-uv-generation.md)
 ### `canvas-textures` — not started
 ### `webgpu-textures` — not started
 ### `per-face-materials` — not started

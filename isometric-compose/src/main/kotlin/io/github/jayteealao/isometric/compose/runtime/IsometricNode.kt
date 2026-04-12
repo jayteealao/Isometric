@@ -230,6 +230,14 @@ class ShapeNode(
     var shape: Shape,
     var color: IsoColor,
     var material: MaterialData? = null,
+    /**
+     * Optional UV coordinate provider. When set, called for each face during
+     * [renderTo] with the original (pre-transform) shape and the 0-based face index.
+     * Returns a packed `FloatArray` of `[u0,v0, u1,v1, ...]` or null if no UVs apply.
+     *
+     * Set by the `isometric-shader` module's composable overloads — not typically set directly.
+     */
+    var uvProvider: ((Shape, Int) -> FloatArray?)? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -251,7 +259,7 @@ class ShapeNode(
         val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
         // Convert shape to render commands — adds directly to accumulator
-        for (path in transformedShape.paths) {
+        for ((index, path) in transformedShape.paths.withIndex()) {
             output.add(
                 RenderCommand(
                     commandId = "${nodeId}_${path.hashCode()}",
@@ -261,6 +269,7 @@ class ShapeNode(
                     originalShape = transformedShape,
                     ownerNodeId = nodeId,
                     material = material,
+                    uvCoords = uvProvider?.invoke(shape, index),
                 )
             )
         }
