@@ -221,6 +221,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricRende
 	public fun close ()V
 	public final fun getBenchmarkHooks ()Lio/github/jayteealao/isometric/compose/runtime/RenderBenchmarkHooks;
 	public final fun getForceRebuild ()Z
+	public final fun getMaterialDrawHook ()Lio/github/jayteealao/isometric/compose/runtime/MaterialDrawHook;
 	public final fun getOnRenderError ()Lkotlin/jvm/functions/Function2;
 	public final fun hitTest (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;DDLio/github/jayteealao/isometric/compose/runtime/RenderContext;II)Lio/github/jayteealao/isometric/compose/runtime/IsometricNode;
 	public final fun prepareAsync (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IILio/github/jayteealao/isometric/SortingComputeBackend;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -238,6 +239,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricRende
 	public static synthetic fun renderNativeFromScene$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
 	public final fun setBenchmarkHooks (Lio/github/jayteealao/isometric/compose/runtime/RenderBenchmarkHooks;)V
 	public final fun setForceRebuild (Z)V
+	public final fun setMaterialDrawHook (Lio/github/jayteealao/isometric/compose/runtime/MaterialDrawHook;)V
 	public final fun setOnRenderError (Lkotlin/jvm/functions/Function2;)V
 }
 
@@ -250,6 +252,14 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricScene
 }
 
 public abstract interface class io/github/jayteealao/isometric/compose/runtime/IsometricScope {
+}
+
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/MaterialDrawHook {
+	public abstract fun draw (Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/RenderCommand;Landroid/graphics/Path;)Z
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/MaterialDrawHookKt {
+	public static final fun getLocalMaterialDrawHook ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class io/github/jayteealao/isometric/compose/runtime/PathNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {

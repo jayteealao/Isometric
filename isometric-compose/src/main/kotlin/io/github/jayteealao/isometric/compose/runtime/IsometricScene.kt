@@ -160,6 +160,7 @@ fun IsometricScene(
     // Wire benchmark hooks from CompositionLocal — read during composition,
     // then bridged into the imperative renderer via DisposableEffect.
     val currentBenchmarkHooks = LocalBenchmarkHooks.current
+    val currentMaterialDrawHook = LocalMaterialDrawHook.current
     val currentOnRenderError by rememberUpdatedState(config.onRenderError)
 
     // Effect 1: Wire dirty notification and renderer config.
@@ -167,15 +168,17 @@ fun IsometricScene(
     // Callback keys use rememberUpdatedState to avoid churn from inline lambdas.
     // onDispose clears the callback and hooks to prevent stale references when
     // the composable leaves the tree or dependencies are recreated.
-    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, config.forceRebuild) {
+    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, currentMaterialDrawHook, config.forceRebuild) {
         rootNode.onDirty = { sceneVersion++ }
         renderer.benchmarkHooks = currentBenchmarkHooks
+        renderer.materialDrawHook = currentMaterialDrawHook
         renderer.forceRebuild = config.forceRebuild
         renderer.onRenderError = { id, error -> currentOnRenderError?.invoke(id, error) }
 
         onDispose {
             rootNode.onDirty = null
             renderer.benchmarkHooks = null
+            renderer.materialDrawHook = null
             renderer.onRenderError = null
         }
     }

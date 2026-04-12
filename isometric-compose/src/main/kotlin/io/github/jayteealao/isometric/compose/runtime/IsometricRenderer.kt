@@ -77,6 +77,13 @@ class IsometricRenderer(
      */
     var forceRebuild: Boolean = false
 
+    /**
+     * Optional hook for material-aware rendering (textured fills).
+     * Set via [IsometricScene]'s DisposableEffect from [LocalMaterialDrawHook].
+     * Null in production when no texture rendering module is loaded (zero overhead).
+     */
+    var materialDrawHook: MaterialDrawHook? = null
+
     // Closed flag — once true, the renderer must not be used
     private var closed = false
 
@@ -182,7 +189,7 @@ class IsometricRenderer(
 
         cache.currentPreparedScene?.let { scene ->
             with(nativeRenderer) {
-                renderNative(scene, strokeStyle, onRenderError)
+                renderNative(scene, strokeStyle, onRenderError, materialDrawHook)
             }
         }
 
@@ -379,7 +386,7 @@ class IsometricRenderer(
 
         benchmarkHooks?.onDrawStart()
         with(nativeRenderer) {
-            renderNative(scene, strokeStyle, onRenderError)
+            renderNative(scene, strokeStyle, onRenderError, materialDrawHook)
         }
         benchmarkHooks?.onDrawEnd()
     }

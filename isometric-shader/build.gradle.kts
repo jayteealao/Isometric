@@ -2,6 +2,7 @@ plugins {
     id("isometric.android.library")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.paparazzi)
     id("isometric.publishing")
 }
 
@@ -39,6 +40,7 @@ dependencies {
     implementation(libs.annotation)
     implementation(libs.kotlin.stdlib)
     implementation(libs.compose.runtime)
+    implementation(libs.compose.ui)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test)

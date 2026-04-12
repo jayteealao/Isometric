@@ -5,7 +5,7 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:49:12Z"
+updated-at: "2026-04-12T10:19:40Z"
 planning-mode: all
 slices-planned: 6
 slices-total: 6
@@ -41,14 +41,15 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   **not** via direct import of shader types in compose.
 - **Key risk:** Prism face ordering stability across transforms — verified stable.
 
-### `canvas-textures` (rev 1)
-- **Files:** 12 (4 new, 3 modified, 5 test)
-- **Steps:** 22
-- **Strategy:** `TextureCache`, `MaterialResolver`, `TextureLoader` all live in
-  `isometric-shader` (not compose). `TexturedCanvasRenderBackend` decorator in shader wraps
-  compose's base backend. `BitmapShader` + 3-point affine `Matrix.setPolyToPoly`.
-- **Key risk:** Decorator pattern for canvas render backend — must hook into compose's draw
-  path without breaking existing flat-color rendering.
+### `canvas-textures` (rev 2)
+- **Files:** 11 (5 new source, 3 modified, 3 test)
+- **Steps:** 16
+- **Strategy:** `MaterialDrawHook` fun interface in compose (strategy injection pattern,
+  same as `UvCoordProvider`). `TexturedCanvasDrawHook` in shader implements it. Hook is
+  installed via `LocalMaterialDrawHook` CompositionLocal + `ProvideTextureRendering` composable.
+  `NativeSceneRenderer` delegates to hook for material commands. `TextureCache`, `TextureLoader`
+  in shader. `BitmapShader` + 3-point affine `Matrix.setPolyToPoly`.
+- **Key risk:** Paparazzi rendering of native `BitmapShader` draw (LayoutLib limitation).
 
 ### `webgpu-textures` (rev 1)
 - **Files:** 10 modified + 2 new (added `build.gradle.kts` for shader dep)

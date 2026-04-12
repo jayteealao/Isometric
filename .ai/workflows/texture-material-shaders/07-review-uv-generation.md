@@ -86,7 +86,7 @@ This also correctly uses model-space dimensions for UV normalization (not transf
 
 | ID | Sev | Source | Decision | Notes |
 |----|-----|--------|----------|-------|
-| UV-1 | MED | correctness+simplification | untriaged | — |
+| UV-1 | MED | correctness+simplification | **fixed** | Closed over Prism ref instead of re-casting (e2d36fe) |
 | UV-2 | LOW | simplification | untriaged | — |
 | UV-3 | LOW | correctness | untriaged | — |
 | UV-4 | NIT | api-review | untriaged | — |

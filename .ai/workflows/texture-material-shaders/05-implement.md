@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-11T23:37:39Z"
-slices-implemented: 2
+updated-at: "2026-04-12T10:49:14Z"
+slices-implemented: 3
 slices-total: 6
-metric-total-files-changed: 8
-metric-total-lines-added: 190
-metric-total-lines-removed: 30
+metric-total-files-changed: 20
+metric-total-lines-added: 490
+metric-total-lines-removed: 49
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders material-types"
+next-invocation: "/wf-verify texture-material-shaders canvas-textures"
 ---
 
 # Implement Index
@@ -33,7 +33,11 @@ next-invocation: "/wf-verify texture-material-shaders material-types"
 - Files: 9 (4 new, 5 modified/generated)
 - Summary: PrismFace enum, UvGenerator object, uvProvider lambda on ShapeNode, wired from shader's Shape() overload
 - Record: [05-implement-uv-generation.md](05-implement-uv-generation.md)
-### `canvas-textures` — not started
+### `canvas-textures` — complete
+- Files: 12 (6 new, 6 modified including API dumps)
+- Summary: MaterialDrawHook strategy injection in compose, TexturedCanvasDrawHook with BitmapShader + affine matrix in shader, ProvideTextureRendering composable, TextureCache LRU, TextureLoader
+- Record: [05-implement-canvas-textures.md](05-implement-canvas-textures.md)
+
 ### `webgpu-textures` — not started
 ### `per-face-materials` — not started
 ### `sample-demo` — not started
@@ -42,7 +46,9 @@ next-invocation: "/wf-verify texture-material-shaders material-types"
 - Dependency graph: `core → compose → shader → webgpu`
 - `isometric-compose` has zero shader imports — fully usable standalone
 - `ShapeNode.material: MaterialData?` is the cross-module bridge
+- `MaterialDrawHook` is the render-time bridge: compose defines interface, shader implements
+- `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders material-types`
-- **Option B:** `/wf-implement texture-material-shaders uv-generation` — skip verify
+- **Option A (default):** `/wf-verify texture-material-shaders canvas-textures`
+- **Option B:** `/compact` then Option A — clear implementation context

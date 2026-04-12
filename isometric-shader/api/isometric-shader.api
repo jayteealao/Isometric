@@ -162,3 +162,7 @@ public final class io/github/jayteealao/isometric/shader/UvTransform$Companion {
 	public final fun getIDENTITY ()Lio/github/jayteealao/isometric/shader/UvTransform;
 }
 
+public final class io/github/jayteealao/isometric/shader/render/ProvideTextureRenderingKt {
+	public static final fun ProvideTextureRendering (ILkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+}
+
