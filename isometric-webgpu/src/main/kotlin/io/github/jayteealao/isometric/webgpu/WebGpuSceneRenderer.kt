@@ -274,14 +274,14 @@ internal class WebGpuSceneRenderer : AutoCloseable {
 
         context.withGpu {
             configureSurface(width, height)
+            // Create render pipeline first — it auto-derives the @group(0) bind group layout
+            val rp = GpuRenderPipeline(context.device, surfaceFormat)
+            renderPipeline = rp
+            // Create full compute pipeline and wire the auto-derived texture bind group layout
             val gp = GpuFullPipeline(context)
+            gp.textureBinder.bindGroupLayout = rp.textureBindGroupLayout
             gp.ensurePipelines()
             fullPipeline = gp
-            renderPipeline = GpuRenderPipeline(
-                context.device,
-                surfaceFormat,
-                gp.textureBinder.bindGroupLayout,
-            )
         }
 
         Log.d(TAG, "Initialized surface ${currentWidth}x${currentHeight} format=$surfaceFormat owned=$ownsContext")

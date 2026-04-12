@@ -5,8 +5,6 @@ import androidx.webgpu.GPUBindGroupLayout
 import androidx.webgpu.GPUColorTargetState
 import androidx.webgpu.GPUDevice
 import androidx.webgpu.GPUFragmentState
-import androidx.webgpu.GPUPipelineLayout
-import androidx.webgpu.GPUPipelineLayoutDescriptor
 import androidx.webgpu.GPUPrimitiveState
 import androidx.webgpu.GPURenderPipeline
 import androidx.webgpu.GPURenderPipelineDescriptor
@@ -24,16 +22,25 @@ import io.github.jayteealao.isometric.webgpu.shader.IsometricFragmentShader
 import io.github.jayteealao.isometric.webgpu.shader.IsometricVertexShader
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
 
+/**
+ * Creates the render pipeline with auto-derived layout. The fragment shader declares
+ * `@group(0)` bindings for texture + sampler; Dawn auto-derives the bind group layout.
+ * Use [textureBindGroupLayout] to create compatible bind groups.
+ */
 internal class GpuRenderPipeline(
     device: GPUDevice,
     @TextureFormat surfaceFormat: Int,
-    textureBindGroupLayout: GPUBindGroupLayout,
 ) : AutoCloseable {
     val pipeline: GPURenderPipeline
 
+    /**
+     * Auto-derived bind group layout for `@group(0)` (texture + sampler).
+     * Use this to create bind groups via [GpuTextureBinder.buildBindGroup].
+     */
+    val textureBindGroupLayout: GPUBindGroupLayout
+
     private val vertexModule: GPUShaderModule
     private val fragmentModule: GPUShaderModule
-    private val pipelineLayout: GPUPipelineLayout
 
     init {
         vertexModule = device.createShaderModule(
@@ -46,13 +53,6 @@ internal class GpuRenderPipeline(
             GPUShaderModuleDescriptor(
                 label = "IsometricFragmentShader",
                 shaderSourceWGSL = GPUShaderSourceWGSL(IsometricFragmentShader.WGSL),
-            )
-        )
-
-        // Explicit pipeline layout: @group(0) = texture + sampler
-        pipelineLayout = device.createPipelineLayout(
-            GPUPipelineLayoutDescriptor(
-                bindGroupLayouts = arrayOf(textureBindGroupLayout),
             )
         )
 
@@ -101,6 +101,9 @@ internal class GpuRenderPipeline(
             ),
         )
 
+        // Use auto-derived layout (layout = null). Dawn creates the pipeline layout
+        // from the shader's @group/@binding declarations. This avoids a Scudo
+        // double-free in Dawn alpha04 when using explicit GPUPipelineLayout.
         pipeline = device.createRenderPipeline(
             GPURenderPipelineDescriptor(
                 label = "IsometricRenderPipeline",
@@ -110,16 +113,19 @@ internal class GpuRenderPipeline(
                     cullMode = CullMode.None,
                 ),
                 fragment = fragmentState,
-                layout = pipelineLayout,
             )
         ).also {
             it.setLabel("IsometricRenderPipeline")
         }
+
+        // Extract the auto-derived bind group layout for @group(0).
+        // GpuTextureBinder uses this to create compatible bind groups.
+        textureBindGroupLayout = pipeline.getBindGroupLayout(0)
     }
 
     override fun close() {
+        textureBindGroupLayout.close()
         pipeline.close()
-        pipelineLayout.close()
         vertexModule.close()
         fragmentModule.close()
     }
