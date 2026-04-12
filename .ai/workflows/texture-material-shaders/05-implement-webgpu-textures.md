@@ -6,12 +6,12 @@ slice-slug: webgpu-textures
 status: complete
 stage-number: 5
 created-at: "2026-04-12T16:27:39Z"
-updated-at: "2026-04-12T16:27:39Z"
+updated-at: "2026-04-12T21:26:08Z"
 metric-files-changed: 10
 metric-lines-added: 647
 metric-lines-removed: 191
 metric-deviations-from-plan: 1
-metric-review-fixes-applied: 0
+metric-review-fixes-applied: 14
 commit-sha: "96a8d8a"
 tags: [webgpu, texture, shader, wgsl, bgra]
 refs:
@@ -142,7 +142,27 @@ Key additions:
 No external dependency changes. All vendor API calls verified against
 `vendor/androidx-webgpu/` alpha04 snapshot.
 
+## Review Fixes Applied
+
+14 findings fixed from `07-review-webgpu-textures.md`:
+
+| ID | Severity | File(s) | Fix |
+|----|----------|---------|-----|
+| R-1 | HIGH | `WebGpuSceneRenderer.kt` | `pipeline!!` → `checkNotNull` with message |
+| R-2 | HIGH | `GpuFullPipeline.kt` | `identityHashCode`+`Any?` → `Bitmap?`+`===` |
+| R-3 | HIGH | `GpuTextureBinder.kt`, `GpuFullPipeline.kt` | Layout passed as constructor param; `lateinit var textureBinder` |
+| R-4 | HIGH | `GpuRenderPipeline.kt`, `GpuTextureBinder.kt` | `takeTextureBindGroupLayout()` transfers ownership; binder closes layout |
+| R-5 | HIGH | `GpuTextureStore.kt` | `w*h*4` widened to `Long` arithmetic + `require` |
+| R-6 | HIGH | `GpuTextureStore.kt` | `MAX_TEXTURE_DIMENSION = 4096` cap with `require` |
+| R-7 | HIGH | `GpuTextureStore.kt` | `fallbackTextureView.close()` before texture destroy loop |
+| R-8 | MED | `GpuFullPipeline.kt` | `releaseUploadedTexture()` in null-bitmap fallback path |
+| R-9 | MED | `GpuFullPipeline.kt` | `uploadTexIndexBuffer` receives `faceCount` from caller |
+| R-11 | MED | `TriangulateEmitShader.kt` | Real vertices first, degenerate fill after (−33% writes) |
+| R-12 | MED | `GpuRenderPipeline.kt`, `GpuTextureStore.kt`, `GpuFullPipeline.kt` | `assertGpuThread()` on init paths |
+| R-13 | MED | `GpuFullPipeline.kt` | Extracted `rebuildBindGroup(view)` helper (3 call sites) |
+| R-14 | MED | `GpuFullPipeline.kt` | x2 growth factor for texIndex CPU + GPU buffers |
+| R-15 | MED | `GpuFullPipeline.kt` | PerFace checks `faceMap` values + outer break guard |
+
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders webgpu-textures` — verify
-  textured WebGPU rendering on device (4-check plan in `04-plan-webgpu-textures.md`)
+- **Option A (default):** `/wf-verify texture-material-shaders webgpu-textures` — re-verify after review fixes
 - **Option B:** `/compact` then Option A — recommended to clear implementation context

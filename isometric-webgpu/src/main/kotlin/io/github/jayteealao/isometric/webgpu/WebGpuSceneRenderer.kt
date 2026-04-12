@@ -274,12 +274,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
 
         context.withGpu {
             configureSurface(width, height)
-            val rp = GpuRenderPipeline(context.device, surfaceFormat)
-            rp.ensurePipeline()
+            val rp = GpuRenderPipeline(context, surfaceFormat)
             renderPipeline = rp
             val gp = GpuFullPipeline(context)
-            gp.textureBinder.bindGroupLayout = rp.textureBindGroupLayout
-            gp.ensurePipelines()
+            gp.ensurePipelines(rp)
             fullPipeline = gp
         }
 
@@ -454,7 +452,9 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         )
                     )
 
-                    pass.setPipeline(pipeline.pipeline!!)
+                    pass.setPipeline(checkNotNull(pipeline.pipeline) {
+                        "Render pipeline not ready — ensurePipeline() not called"
+                    })
                     if (shouldDraw) {
                         // Bind texture + sampler at @group(0) for the fragment shader.
                         pass.setBindGroup(0, gp!!.textureBindGroup)

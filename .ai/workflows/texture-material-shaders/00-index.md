@@ -4,10 +4,10 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: implement
-stage-number: 5
+current-stage: review
+stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-12T16:27:39Z"
+updated-at: "2026-04-12T21:26:08Z"
 selected-slice: "webgpu-textures"
 branch-strategy: dedicated
 branch: "feat/texture"
@@ -55,6 +55,14 @@ workflow-files:
   - 07-review-code-simplification.md
   - 07-review-architecture.md
   - 05-implement-webgpu-textures.md
+  - 06-verify-webgpu-textures.md
+  - 07-review-webgpu-textures.md
+  - 07-review-webgpu-textures-correctness.md
+  - 07-review-webgpu-textures-security.md
+  - 07-review-webgpu-textures-code-simplification.md
+  - 07-review-webgpu-textures-backend-concurrency.md
+  - 07-review-webgpu-textures-performance.md
+  - 07-review-webgpu-textures-architecture.md
   - po-answers.md
 progress:
   intake: complete
@@ -63,7 +71,7 @@ progress:
   plan: complete
   implement: in-progress
   verify: in-progress
-  review: not-started
+  review: complete
   handoff: not-started
   ship: not-started
   retro: not-started

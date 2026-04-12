@@ -18,6 +18,7 @@ import androidx.webgpu.PrimitiveTopology
 import androidx.webgpu.TextureFormat
 import androidx.webgpu.VertexFormat
 import androidx.webgpu.VertexStepMode
+import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.shader.IsometricFragmentShader
 import io.github.jayteealao.isometric.webgpu.shader.IsometricVertexShader
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
@@ -31,19 +32,35 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * Use [textureBindGroupLayout] to create compatible bind groups after [ensurePipeline].
  */
 internal class GpuRenderPipeline(
-    private val device: GPUDevice,
+    private val ctx: GpuContext,
     @TextureFormat private val surfaceFormat: Int,
 ) : AutoCloseable {
+
+    private val device: GPUDevice get() = ctx.device
 
     var pipeline: GPURenderPipeline? = null
         private set
 
     /**
      * Auto-derived bind group layout for `@group(0)` (texture + sampler).
-     * Available after [ensurePipeline] completes.
+     * Available after [ensurePipeline] completes. Use [takeTextureBindGroupLayout]
+     * to transfer ownership to the caller.
      */
     var textureBindGroupLayout: GPUBindGroupLayout? = null
         private set
+
+    /**
+     * Transfer ownership of [textureBindGroupLayout] to the caller.
+     * After this call, the layout is no longer closed by [close] —
+     * the caller is responsible for closing it.
+     */
+    fun takeTextureBindGroupLayout(): GPUBindGroupLayout {
+        val layout = checkNotNull(textureBindGroupLayout) {
+            "textureBindGroupLayout not available — call ensurePipeline() first"
+        }
+        textureBindGroupLayout = null
+        return layout
+    }
 
     private var vertexModule: GPUShaderModule? = null
     private var fragmentModule: GPUShaderModule? = null
@@ -53,6 +70,7 @@ internal class GpuRenderPipeline(
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
     suspend fun ensurePipeline() {
+        ctx.assertGpuThread()
         if (pipeline != null) return
 
         vertexModule = device.createShaderModule(

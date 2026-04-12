@@ -16,8 +16,9 @@ import io.github.jayteealao.isometric.webgpu.GpuContext
  * Manages the sampler and bind group creation for texture sampling in the
  * render pipeline's fragment shader (`@group(0)`).
  *
- * The bind group layout is provided externally — typically auto-derived from the
- * render pipeline via `GPURenderPipeline.getBindGroupLayout(0)`.
+ * The [bindGroupLayout] is provided at construction time — typically auto-derived
+ * from the render pipeline via `GPURenderPipeline.getBindGroupLayout(0)`.
+ * This class takes ownership of the layout and closes it in [close].
  *
  * ## Bind group entries
  * ```
@@ -27,6 +28,8 @@ import io.github.jayteealao.isometric.webgpu.GpuContext
  */
 internal class GpuTextureBinder(
     private val ctx: GpuContext,
+    /** Auto-derived bind group layout for `@group(0)`. Owned by this class. */
+    val bindGroupLayout: GPUBindGroupLayout,
 ) : AutoCloseable {
 
     val sampler: GPUSampler = ctx.device.createSampler(
@@ -39,24 +42,16 @@ internal class GpuTextureBinder(
         )
     )
 
-    /** The bind group layout to use for creating bind groups. Set after render pipeline creation. */
-    var bindGroupLayout: GPUBindGroupLayout? = null
-
     /**
      * Create a bind group pairing the given [textureView] with the shared [sampler].
-     *
-     * [bindGroupLayout] must be set before calling this method.
      *
      * The returned [GPUBindGroup] should be set on the render pass via
      * `pass.setBindGroup(0, bindGroup)`.
      */
     fun buildBindGroup(textureView: GPUTextureView): GPUBindGroup {
-        val layout = checkNotNull(bindGroupLayout) {
-            "bindGroupLayout not set — call after GpuRenderPipeline creation"
-        }
         return ctx.device.createBindGroup(
             GPUBindGroupDescriptor(
-                layout = layout,
+                layout = bindGroupLayout,
                 entries = arrayOf(
                     GPUBindGroupEntry(binding = 0, textureView = textureView),
                     GPUBindGroupEntry(binding = 1, sampler = sampler),
@@ -66,7 +61,7 @@ internal class GpuTextureBinder(
     }
 
     override fun close() {
-        // bindGroupLayout is owned by GpuRenderPipeline — don't close it here
+        bindGroupLayout.close()
         sampler.close()
     }
 }

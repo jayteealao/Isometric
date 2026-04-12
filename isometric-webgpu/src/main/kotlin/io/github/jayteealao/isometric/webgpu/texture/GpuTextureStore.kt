@@ -24,6 +24,11 @@ import java.nio.ByteOrder
  */
 internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
+    companion object {
+        /** Maximum allowed bitmap dimension (width or height) for GPU upload. */
+        const val MAX_TEXTURE_DIMENSION = 4096
+    }
+
     private val ownedTextures = mutableListOf<GPUTexture>()
 
     /** 2×2 checkerboard fallback GPU texture (magenta/black pattern). */
@@ -33,6 +38,7 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
     val fallbackTextureView: GPUTextureView
 
     init {
+        ctx.assertGpuThread()
         // 2×2 BGRA8Unorm checkerboard: magenta, black, black, magenta
         val pixels = ByteBuffer.allocateDirect(2 * 2 * 4).order(ByteOrder.nativeOrder())
         // pixel (0,0): magenta — BGRA = (255, 0, 255, 255)
@@ -71,8 +77,14 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
         }
         val w = bitmap.width
         val h = bitmap.height
-        val byteCount = w * h * 4
-        val pixels = ByteBuffer.allocateDirect(byteCount).order(ByteOrder.nativeOrder())
+        require(w in 1..MAX_TEXTURE_DIMENSION && h in 1..MAX_TEXTURE_DIMENSION) {
+            "Bitmap dimensions ${w}x${h} exceed maximum $MAX_TEXTURE_DIMENSION"
+        }
+        val byteCount = w.toLong() * h.toLong() * 4L
+        require(byteCount <= Int.MAX_VALUE) {
+            "Bitmap byte count $byteCount exceeds Int.MAX_VALUE"
+        }
+        val pixels = ByteBuffer.allocateDirect(byteCount.toInt()).order(ByteOrder.nativeOrder())
         bitmap.copyPixelsToBuffer(pixels)
         pixels.rewind()
 
@@ -104,11 +116,12 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
         )
 
     override fun close() {
+        // Close views before destroying their backing textures
+        fallbackTextureView.close()
         for (tex in ownedTextures) {
             tex.destroy()
             tex.close()
         }
         ownedTextures.clear()
-        fallbackTextureView.close()
     }
 }

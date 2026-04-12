@@ -99,7 +99,7 @@ internal class GpuFullPipeline(
     // ── Texture components ───────────────────────────────────────────────────
 
     val textureStore  = GpuTextureStore(ctx)
-    val textureBinder = GpuTextureBinder(ctx)
+    private lateinit var textureBinder: GpuTextureBinder
 
 
 
@@ -109,8 +109,8 @@ internal class GpuFullPipeline(
     private var uploadedTexture: GPUTexture? = null
     private var uploadedTextureView: GPUTextureView? = null
 
-    /** Cached bitmap identity to avoid re-uploading on every frame. */
-    private var lastUploadedBitmapIdentity: Any? = null
+    /** Cached bitmap reference to avoid re-uploading on every frame (compared by ===). */
+    private var lastUploadedBitmap: android.graphics.Bitmap? = null
 
     /** Current texture bind group for the render pass. */
     private var _textureBindGroup: GPUBindGroup? = null
@@ -119,10 +119,16 @@ internal class GpuFullPipeline(
     val textureBindGroup: GPUBindGroup
         get() = _textureBindGroup ?: run {
             // Lazily build fallback bind group on first access
-            val bg = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
-            _textureBindGroup = bg
-            bg
+            rebuildBindGroup(textureStore.fallbackTextureView)
         }
+
+    /** Close the current bind group (if any) and create a new one for [view]. */
+    private fun rebuildBindGroup(view: GPUTextureView): GPUBindGroup {
+        _textureBindGroup?.close()
+        val bg = textureBinder.buildBindGroup(view)
+        _textureBindGroup = bg
+        return bg
+    }
 
     // ── Tex-index buffer ─────────────────────────────────────────────────────
 
@@ -186,14 +192,23 @@ internal class GpuFullPipeline(
     // ── Pipeline init ─────────────────────────────────────────────────────────
 
     /**
-     * Compile all compute pipelines if not already done.
+     * Compile all compute pipelines and wire the texture bind group layout.
      *
-     * Calls [ensurePipeline]/[ensurePipelines] on all four compute stages.
+     * Calls [GpuRenderPipeline.ensurePipeline] to guarantee the render pipeline
+     * and its auto-derived bind group layout are available, then transfers layout
+     * ownership to [GpuTextureBinder] (created here on first call).
+     *
      * Safe to call multiple times — each sub-pipeline is a no-op on subsequent calls.
      *
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
-    suspend fun ensurePipelines() {
+    suspend fun ensurePipelines(renderPipeline: GpuRenderPipeline) {
+        ctx.assertGpuThread()
+        renderPipeline.ensurePipeline()
+        if (!::textureBinder.isInitialized) {
+            val layout = renderPipeline.takeTextureBindGroupLayout()
+            textureBinder = GpuTextureBinder(ctx, layout)
+        }
         transform.ensurePipeline()
         sort.ensurePipeline()
         packer.ensurePipeline()
@@ -243,7 +258,7 @@ internal class GpuFullPipeline(
         uploadTextures(scene)
 
         // ── Compact tex-index buffer ─────────────────────────────────────────
-        uploadTexIndexBuffer(scene)
+        uploadTexIndexBuffer(scene, faceCount)
 
         // paddedCount must be a power of two for the bitonic sort network to be correct.
         // nextPowerOfTwo(faceCount) ≤ capacity (since capacity is always a power-of-two
@@ -304,18 +319,22 @@ internal class GpuFullPipeline(
                     if (m.default is IsometricMaterial.Textured) {
                         texturedMaterial = m.default as IsometricMaterial.Textured; break
                     }
+                    val texFace = m.faceMap.values.firstOrNull { it is IsometricMaterial.Textured }
+                    if (texFace != null) {
+                        texturedMaterial = texFace as IsometricMaterial.Textured; break
+                    }
                 }
                 else -> {}
             }
+            if (texturedMaterial != null) break
         }
 
         if (texturedMaterial == null) {
             // No textures in scene — use fallback
-            if (lastUploadedBitmapIdentity != null) {
+            if (lastUploadedBitmap != null) {
                 releaseUploadedTexture()
             }
-            _textureBindGroup?.close()
-            _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
+            rebuildBindGroup(textureStore.fallbackTextureView)
             return
         }
 
@@ -335,16 +354,14 @@ internal class GpuFullPipeline(
         }
 
         if (bitmap == null) {
-            // Failed to load — use fallback
-            _textureBindGroup?.close()
-            _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
-            lastUploadedBitmapIdentity = null
+            // Failed to load — release any previously uploaded texture and use fallback
+            releaseUploadedTexture()
+            rebuildBindGroup(textureStore.fallbackTextureView)
             return
         }
 
-        // Cache check: avoid re-uploading the same bitmap
-        val identity = System.identityHashCode(bitmap)
-        if (identity == lastUploadedBitmapIdentity) return
+        // Cache check: avoid re-uploading the same bitmap (reference identity)
+        if (bitmap === lastUploadedBitmap) return
 
         // Upload new texture
         releaseUploadedTexture()
@@ -352,10 +369,9 @@ internal class GpuFullPipeline(
         uploadedTexture = gpuTex
         val view = gpuTex.createView()
         uploadedTextureView = view
-        lastUploadedBitmapIdentity = identity
+        lastUploadedBitmap = bitmap
 
-        _textureBindGroup?.close()
-        _textureBindGroup = textureBinder.buildBindGroup(view)
+        rebuildBindGroup(view)
     }
 
     private fun releaseUploadedTexture() {
@@ -365,33 +381,34 @@ internal class GpuFullPipeline(
             textureStore.releaseTexture(uploadedTexture!!)
             uploadedTexture = null
         }
-        lastUploadedBitmapIdentity = null
+        lastUploadedBitmap = null
     }
 
     /**
      * Pack and upload the compact per-face texture index buffer for the emit shader.
      */
-    private fun uploadTexIndexBuffer(scene: PreparedScene) {
-        val faceCount = scene.commands.size
+    private fun uploadTexIndexBuffer(scene: PreparedScene, faceCount: Int) {
         if (faceCount == 0) return
 
-        // Ensure GPU buffer capacity
+        // Ensure GPU buffer capacity (x2 growth to avoid per-frame reallocation)
         if (faceCount > texIndexCapacity) {
             texIndexGpuBuffer?.close()
+            val newCapacity = maxOf(faceCount, faceCount * 2)
             texIndexGpuBuffer = ctx.device.createBuffer(
                 GPUBufferDescriptor(
                     usage = BufferUsage.Storage or BufferUsage.CopyDst,
-                    size = (faceCount * 4).toLong(),
+                    size = (newCapacity * 4).toLong(),
                 )
             ).also { it.setLabel("IsometricTexIndices") }
-            texIndexCapacity = faceCount
+            texIndexCapacity = newCapacity
         }
 
-        // Ensure CPU staging buffer capacity
+        // Ensure CPU staging buffer capacity (x2 growth to avoid per-frame allocateDirect)
         val requiredBytes = faceCount * 4
         val cpu = texIndexCpuBuffer
         if (cpu == null || cpu.capacity() < requiredBytes) {
-            texIndexCpuBuffer = ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.nativeOrder())
+            val newSize = maxOf(requiredBytes, requiredBytes * 2)
+            texIndexCpuBuffer = ByteBuffer.allocateDirect(newSize).order(ByteOrder.nativeOrder())
         }
 
         SceneDataPacker.packTexIndicesInto(scene.commands, texIndexCpuBuffer!!)
@@ -417,8 +434,7 @@ internal class GpuFullPipeline(
         ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
 
         // Revert to fallback texture bind group
-        _textureBindGroup?.close()
-        _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
+        rebuildBindGroup(textureStore.fallbackTextureView)
     }
 
     // ── Per-frame dispatch ────────────────────────────────────────────────────
@@ -511,7 +527,7 @@ internal class GpuFullPipeline(
         _textureBindGroup?.close()
         _textureBindGroup = null
         releaseUploadedTexture()
-        textureBinder.close()
+        if (::textureBinder.isInitialized) textureBinder.close()
         textureStore.close()
 
         // Close tex-index buffer

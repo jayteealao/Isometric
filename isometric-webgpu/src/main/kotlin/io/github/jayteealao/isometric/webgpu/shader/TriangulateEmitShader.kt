@@ -226,11 +226,6 @@ internal object TriangulateEmitShader {
             // Read per-face texture index from compact buffer
             let texIdx = sceneTexIndices[key.originalIndex];
 
-            // Clear the slot first, then overwrite only the real triangles.
-            for (var j = 0u; j < 12u; j++) {
-                writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
-            }
-
             let nx0 = (v01.x / wF) * 2.0 - 1.0;
             let ny0 = 1.0 - (v01.y / hF) * 2.0;
             let nx1 = (v01.z / wF) * 2.0 - 1.0;
@@ -249,32 +244,43 @@ internal object TriangulateEmitShader {
             let b = clr.z;
             let a = clr.w;
 
-            // Standard Prism quad UV constants: (0,0)(1,0)(1,1)(0,1)
-            // For triangle fan: pivot=v0 UV=(0,0)
-            // Triangle 0: (s0, s1, s2) → UV: (0,0), (1,0), (1,1)
+            // Write real triangles first, then fill remaining slots with degenerates.
+            // This avoids the previous pattern of clearing all 12 slots then overwriting,
+            // reducing storage writes by ~33% for the common quad case.
+
+            // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
             writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
             writeVertex((base + 1u) * 9u, nx1, ny1, r, g, b, a, 1.0, 0.0, texIdx);
             writeVertex((base + 2u) * 9u, nx2, ny2, r, g, b, a, 1.0, 1.0, texIdx);
 
-            // Triangle 1: (s0, s2, s3) → UV: (0,0), (1,1), (0,1)
-            if (vertexCount >= 4u) {
+            // Compute how many real triangles we have (1–4 based on vertexCount 3–6)
+            let triCount = vertexCount - 2u;
+
+            // Triangle 1: (s0, s2, s3)
+            if (triCount >= 2u) {
                 writeVertex((base + 3u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
                 writeVertex((base + 4u) * 9u, nx2, ny2, r, g, b, a, 1.0, 1.0, texIdx);
                 writeVertex((base + 5u) * 9u, nx3, ny3, r, g, b, a, 0.0, 1.0, texIdx);
             }
 
-            // Triangle 2: (s0, s3, s4) → UV: (0,0), degenerate
-            if (vertexCount >= 5u) {
+            // Triangle 2: (s0, s3, s4)
+            if (triCount >= 3u) {
                 writeVertex((base + 6u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
                 writeVertex((base + 7u) * 9u, nx3, ny3, r, g, b, a, 0.5, 0.5, texIdx);
                 writeVertex((base + 8u) * 9u, nx4, ny4, r, g, b, a, 0.5, 0.5, texIdx);
             }
 
-            // Triangle 3: (s0, s4, s5) → UV: (0,0), degenerate
-            if (vertexCount >= 6u) {
+            // Triangle 3: (s0, s4, s5)
+            if (triCount >= 4u) {
                 writeVertex((base + 9u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
                 writeVertex((base + 10u) * 9u, nx4, ny4, r, g, b, a, 0.5, 0.5, texIdx);
                 writeVertex((base + 11u) * 9u, nx5, ny5, r, g, b, a, 0.5, 0.5, texIdx);
+            }
+
+            // Fill remaining degenerate slots (from triCount*3 to 11)
+            let firstDegen = triCount * 3u;
+            for (var j = firstDegen; j < 12u; j++) {
+                writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
             }
         }
     """.trimIndent()
