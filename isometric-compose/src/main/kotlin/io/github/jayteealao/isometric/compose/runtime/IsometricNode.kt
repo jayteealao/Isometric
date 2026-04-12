@@ -213,7 +213,18 @@ class GroupNode : IsometricNode() {
 }
 
 /**
- * Node representing a 3D shape
+ * Node representing a 3D shape.
+ *
+ * @property color Base color for this shape. When [material] is null, this is the fill
+ *   color (flat-color rendering). When [material] is non-null, this serves as the base
+ *   tint — textured renderers multiply the sampled texture color by this value
+ *   (e.g., `textureSample * color` in the GPU fragment shader). The `isometric-shader`
+ *   module's overloaded `Shape()` composable derives this color from the material
+ *   (e.g., `FlatColor.color` for flat materials, `LocalDefaultColor` for textured).
+ * @property material Optional material data for textured or per-face rendering. When null,
+ *   the renderer uses [color] for flat-color fill. When non-null, the renderer interprets
+ *   the material to determine how each face is painted. Set by the `isometric-shader`
+ *   module's composable overloads — not typically set directly.
  */
 class ShapeNode(
     var shape: Shape,
@@ -258,7 +269,10 @@ class ShapeNode(
 }
 
 /**
- * Node representing a raw 2D path
+ * Node representing a raw 2D path.
+ *
+ * @property color Base color / tint. See [ShapeNode] for the color/material contract.
+ * @property material Optional material data. See [ShapeNode] for the color/material contract.
  */
 class PathNode(
     var path: Path,

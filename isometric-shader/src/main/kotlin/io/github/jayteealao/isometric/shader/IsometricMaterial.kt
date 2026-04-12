@@ -56,7 +56,16 @@ sealed interface IsometricMaterial : MaterialData {
     data class PerFace(
         val faceMap: Map<Int, IsometricMaterial>,
         val default: IsometricMaterial,
-    ) : IsometricMaterial
+    ) : IsometricMaterial {
+        init {
+            require(faceMap.values.none { it is PerFace }) {
+                "PerFace materials cannot be nested — each face must be FlatColor or Textured"
+            }
+            require(default !is PerFace) {
+                "PerFace default cannot itself be PerFace"
+            }
+        }
+    }
 }
 
 // -- DSL builders -------------------------------------------------------------
@@ -75,35 +84,37 @@ fun flatColor(color: IsoColor): IsometricMaterial.FlatColor =
  * Creates a [IsometricMaterial.Textured] material from a drawable resource.
  *
  * ```kotlin
- * Shape(Prism(origin), material = textured(R.drawable.brick) {
- *     tint = IsoColor.WHITE
- *     uvScale(2f, 2f)
- * })
+ * Shape(Prism(origin), material = textured(R.drawable.brick))
+ * Shape(Prism(origin), material = textured(R.drawable.brick, tint = IsoColor.RED))
+ * Shape(Prism(origin), material = textured(R.drawable.brick, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f)))
  * ```
  */
 fun textured(
     @DrawableRes resId: Int,
-    block: TexturedBuilder.() -> Unit = {},
+    tint: IsoColor = IsoColor.WHITE,
+    uvTransform: UvTransform = UvTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    TexturedBuilder(TextureSource.Resource(resId)).apply(block).build()
+    IsometricMaterial.Textured(source = TextureSource.Resource(resId), tint = tint, uvTransform = uvTransform)
 
 /**
  * Creates a [IsometricMaterial.Textured] material from an asset path.
  */
 fun texturedAsset(
     path: String,
-    block: TexturedBuilder.() -> Unit = {},
+    tint: IsoColor = IsoColor.WHITE,
+    uvTransform: UvTransform = UvTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    TexturedBuilder(TextureSource.Asset(path)).apply(block).build()
+    IsometricMaterial.Textured(source = TextureSource.Asset(path), tint = tint, uvTransform = uvTransform)
 
 /**
  * Creates a [IsometricMaterial.Textured] material from a [Bitmap].
  */
 fun texturedBitmap(
     bitmap: Bitmap,
-    block: TexturedBuilder.() -> Unit = {},
+    tint: IsoColor = IsoColor.WHITE,
+    uvTransform: UvTransform = UvTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    TexturedBuilder(TextureSource.BitmapSource(bitmap)).apply(block).build()
+    IsometricMaterial.Textured(source = TextureSource.BitmapSource(bitmap), tint = tint, uvTransform = uvTransform)
 
 /**
  * Creates a [IsometricMaterial.PerFace] material via a builder.
@@ -123,31 +134,6 @@ fun perFace(
 
 // -- Builder classes ----------------------------------------------------------
 
-@IsometricMaterialDsl
-class TexturedBuilder internal constructor(private val source: TextureSource) {
-    var tint: IsoColor = IsoColor.WHITE
-    private var uvTransform: UvTransform = UvTransform.IDENTITY
-
-    /** Sets the UV scale. Values > 1 tile the texture; values < 1 show a sub-region. */
-    fun uvScale(scaleU: Float, scaleV: Float) {
-        uvTransform = uvTransform.copy(scaleU = scaleU, scaleV = scaleV)
-    }
-
-    /** Sets the UV offset in texture coordinate space. */
-    fun uvOffset(offsetU: Float, offsetV: Float) {
-        uvTransform = uvTransform.copy(offsetU = offsetU, offsetV = offsetV)
-    }
-
-    /** Sets the UV rotation in degrees. */
-    fun uvRotate(degrees: Float) {
-        uvTransform = uvTransform.copy(rotationDegrees = degrees)
-    }
-
-    internal fun build(): IsometricMaterial.Textured =
-        IsometricMaterial.Textured(source = source, tint = tint, uvTransform = uvTransform)
-}
-
-@IsometricMaterialDsl
 class PerFaceBuilder internal constructor(private val default: IsometricMaterial) {
     private val faceMap = mutableMapOf<Int, IsometricMaterial>()
 
@@ -160,7 +146,3 @@ class PerFaceBuilder internal constructor(private val default: IsometricMaterial
     internal fun build(): IsometricMaterial.PerFace =
         IsometricMaterial.PerFace(faceMap = faceMap.toMap(), default = default)
 }
-
-/** DSL marker preventing scope leakage between nested builders (guideline Section 10). */
-@DslMarker
-annotation class IsometricMaterialDsl

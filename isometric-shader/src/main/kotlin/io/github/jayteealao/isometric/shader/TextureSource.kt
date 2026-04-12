@@ -16,7 +16,11 @@ sealed interface TextureSource {
      *
      * @property resId Android drawable resource identifier (e.g., `R.drawable.brick`)
      */
-    data class Resource(@DrawableRes val resId: Int) : TextureSource
+    data class Resource(@DrawableRes val resId: Int) : TextureSource {
+        init {
+            require(resId > 0) { "Resource ID must be positive, got $resId" }
+        }
+    }
 
     /**
      * A file in the app's `assets/` directory.
@@ -26,6 +30,11 @@ sealed interface TextureSource {
     data class Asset(val path: String) : TextureSource {
         init {
             require(path.isNotBlank()) { "Asset path must not be blank" }
+            require(!path.startsWith("/")) { "Asset path must be relative, got '$path'" }
+            require(".." !in path.split("/", "\\")) {
+                "Asset path must not contain '..' components, got '$path'"
+            }
+            require('\u0000' !in path) { "Asset path must not contain null bytes" }
         }
     }
 

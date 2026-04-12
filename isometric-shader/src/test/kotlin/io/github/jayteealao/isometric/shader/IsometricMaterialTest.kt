@@ -33,24 +33,23 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `textured builder applies uvScale`() {
-        val mat = textured(42) { uvScale(2f, 3f) }
+    fun `textured named params apply uvTransform`() {
+        val mat = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 3f))
         assertEquals(2f, mat.uvTransform.scaleU)
         assertEquals(3f, mat.uvTransform.scaleV)
     }
 
     @Test
-    fun `textured builder applies tint`() {
-        val mat = textured(42) { tint = IsoColor.RED }
+    fun `textured named params apply tint`() {
+        val mat = textured(42, tint = IsoColor.RED)
         assertEquals(IsoColor.RED, mat.tint)
     }
 
     @Test
-    fun `textured builder applies uvOffset and uvRotate`() {
-        val mat = textured(42) {
-            uvOffset(0.5f, 0.25f)
-            uvRotate(45f)
-        }
+    fun `textured named params apply full uvTransform`() {
+        val mat = textured(42, uvTransform = UvTransform(
+            offsetU = 0.5f, offsetV = 0.25f, rotationDegrees = 45f
+        ))
         assertEquals(0.5f, mat.uvTransform.offsetU)
         assertEquals(0.25f, mat.uvTransform.offsetV)
         assertEquals(45f, mat.uvTransform.rotationDegrees)
@@ -118,6 +117,53 @@ class IsometricMaterialTest {
     }
 
     @Test
+    fun `TextureSource Asset rejects path traversal`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureSource.Asset("../../databases/app.db")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TextureSource.Asset("textures/../../../etc/passwd")
+        }
+    }
+
+    @Test
+    fun `TextureSource Asset rejects absolute path`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureSource.Asset("/etc/passwd")
+        }
+    }
+
+    @Test
+    fun `TextureSource Asset accepts valid relative path`() {
+        val asset = TextureSource.Asset("textures/grass.png")
+        assertEquals("textures/grass.png", asset.path)
+    }
+
+    @Test
+    fun `TextureSource Resource rejects non-positive resId`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureSource.Resource(0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            TextureSource.Resource(-1)
+        }
+    }
+
+    @Test
+    fun `PerFace rejects nested PerFace in faceMap`() {
+        val inner = IsometricMaterial.PerFace(
+            faceMap = mapOf(0 to flatColor(IsoColor.RED)),
+            default = flatColor(IsoColor.GRAY)
+        )
+        assertFailsWith<IllegalArgumentException> {
+            IsometricMaterial.PerFace(
+                faceMap = mapOf(0 to inner),
+                default = flatColor(IsoColor.GRAY)
+            )
+        }
+    }
+
+    @Test
     fun `PerFaceBuilder rejects negative face index`() {
         assertFailsWith<IllegalArgumentException> {
             perFace { face(-1, flatColor(IsoColor.RED)) }
@@ -143,8 +189,8 @@ class IsometricMaterialTest {
 
     @Test
     fun `data class equality works for Textured`() {
-        val a = textured(42) { uvScale(2f, 2f) }
-        val b = textured(42) { uvScale(2f, 2f) }
+        val a = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f))
+        val b = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f))
         assertEquals(a, b)
     }
 }

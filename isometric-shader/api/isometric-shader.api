@@ -49,19 +49,16 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterialCompos
 	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/shader/IsometricMaterial;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
 }
 
-public abstract interface annotation class io/github/jayteealao/isometric/shader/IsometricMaterialDsl : java/lang/annotation/Annotation {
-}
-
 public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
 	public static final fun flatColor (Lio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$FlatColor;
 	public static final fun perFace (Lio/github/jayteealao/isometric/shader/IsometricMaterial;Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace;
 	public static synthetic fun perFace$default (Lio/github/jayteealao/isometric/shader/IsometricMaterial;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace;
-	public static final fun textured (ILkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
-	public static synthetic fun textured$default (ILkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
-	public static final fun texturedAsset (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
-	public static synthetic fun texturedAsset$default (Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
-	public static final fun texturedBitmap (Landroid/graphics/Bitmap;Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
-	public static synthetic fun texturedBitmap$default (Landroid/graphics/Bitmap;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static final fun textured (ILio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static synthetic fun textured$default (ILio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static final fun texturedAsset (Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static synthetic fun texturedAsset$default (Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static final fun texturedBitmap (Landroid/graphics/Bitmap;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
+	public static synthetic fun texturedBitmap$default (Landroid/graphics/Bitmap;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/UvTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
 }
 
 public final class io/github/jayteealao/isometric/shader/PerFaceBuilder {
@@ -106,15 +103,6 @@ public final class io/github/jayteealao/isometric/shader/TextureSource$Resource 
 	public final fun getResId ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class io/github/jayteealao/isometric/shader/TexturedBuilder {
-	public static final field $stable I
-	public final fun getTint ()Lio/github/jayteealao/isometric/IsoColor;
-	public final fun setTint (Lio/github/jayteealao/isometric/IsoColor;)V
-	public final fun uvOffset (FF)V
-	public final fun uvRotate (F)V
-	public final fun uvScale (FF)V
 }
 
 public final class io/github/jayteealao/isometric/shader/UvCoord {

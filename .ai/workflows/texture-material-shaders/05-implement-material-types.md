@@ -11,8 +11,8 @@ metric-files-changed: 8
 metric-lines-added: 190
 metric-lines-removed: 30
 metric-deviations-from-plan: 0
-metric-review-fixes-applied: 0
-commit-sha: ""
+metric-review-fixes-applied: 5
+commit-sha: "6ba078f"
 tags: [texture, material, module]
 refs:
   index: 00-index.md
@@ -94,6 +94,18 @@ None. All rework steps (8-12) executed as specified in rev 3.
 - `isometric-shader` now has Compose Runtime as a dependency (heavier than before)
 - Overload resolution: `Shape(geo, IsoColor)` vs `Shape(geo, IsometricMaterial)` — types
   are unrelated, Kotlin resolves unambiguously
+
+## Review Fixes Applied
+
+| ID | Severity | Status | Change |
+|----|----------|--------|--------|
+| SEC-1 | HIGH | Fixed | `TextureSource.Asset` init: reject `..`, leading `/`, null bytes |
+| CS-1 | MED | Fixed | Replaced `TexturedBuilder` with named params on `textured()`/`texturedAsset()`/`texturedBitmap()`. Removed `@IsometricMaterialDsl` annotation class. |
+| SEC-2 | MED | Fixed | `TextureSource.Resource` init: `require(resId > 0)` |
+| API-1 | MED | Fixed | `PerFace` init: reject nested PerFace in `faceMap` and `default` |
+| API-2 | MED | Fixed | KDoc on `ShapeNode`/`PathNode` documenting color/material contract |
+
+New tests added: path traversal (2), absolute path (1), valid path (1), resource ID (1), nested PerFace (1).
 
 ## Freshness Research
 No external dependency changes.
