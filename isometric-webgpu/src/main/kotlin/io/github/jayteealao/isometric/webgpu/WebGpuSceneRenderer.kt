@@ -274,10 +274,9 @@ internal class WebGpuSceneRenderer : AutoCloseable {
 
         context.withGpu {
             configureSurface(width, height)
-            // Create render pipeline first — it auto-derives the @group(0) bind group layout
             val rp = GpuRenderPipeline(context.device, surfaceFormat)
+            rp.ensurePipeline()
             renderPipeline = rp
-            // Create full compute pipeline and wire the auto-derived texture bind group layout
             val gp = GpuFullPipeline(context)
             gp.textureBinder.bindGroupLayout = rp.textureBindGroupLayout
             gp.ensurePipelines()
@@ -455,7 +454,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         )
                     )
 
-                    pass.setPipeline(pipeline.pipeline)
+                    pass.setPipeline(pipeline.pipeline!!)
                     if (shouldDraw) {
                         // Bind texture + sampler at @group(0) for the fragment shader.
                         pass.setBindGroup(0, gp!!.textureBindGroup)

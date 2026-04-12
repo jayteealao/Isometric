@@ -15,11 +15,13 @@ internal object IsometricFragmentShader {
 
         @fragment
         fn ${ENTRY_POINT}(in: FragmentInput) -> @location(0) vec4<f32> {
-            if (in.textureIndex == 0xFFFFFFFFu) {
-                return in.color;
-            }
+            // Always sample to satisfy Dawn's uniform control flow requirement.
+            // For NO_TEXTURE faces, the fallback checkerboard is bound but the
+            // result is discarded via select — zero visual cost since the sampler
+            // fetch is the same for all fragments in the draw call.
             let sampled = textureSample(diffuseTexture, diffuseSampler, in.uv);
-            return sampled * in.color;
+            let textured = sampled * in.color;
+            return select(textured, in.color, in.textureIndex == 0xFFFFFFFFu);
         }
     """.trimIndent()
 }

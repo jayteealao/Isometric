@@ -23,26 +23,38 @@ import io.github.jayteealao.isometric.webgpu.shader.IsometricVertexShader
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
 
 /**
- * Creates the render pipeline with auto-derived layout. The fragment shader declares
- * `@group(0)` bindings for texture + sampler; Dawn auto-derives the bind group layout.
- * Use [textureBindGroupLayout] to create compatible bind groups.
+ * Creates the render pipeline with auto-derived layout via the async API
+ * (`createRenderPipelineAndAwait`). The sync `createRenderPipeline` triggers a
+ * Scudo double-free on Adreno 750 (Dawn alpha04) when the fragment shader declares
+ * texture/sampler bindings.
+ *
+ * Use [textureBindGroupLayout] to create compatible bind groups after [ensurePipeline].
  */
 internal class GpuRenderPipeline(
-    device: GPUDevice,
-    @TextureFormat surfaceFormat: Int,
+    private val device: GPUDevice,
+    @TextureFormat private val surfaceFormat: Int,
 ) : AutoCloseable {
-    val pipeline: GPURenderPipeline
+
+    var pipeline: GPURenderPipeline? = null
+        private set
 
     /**
      * Auto-derived bind group layout for `@group(0)` (texture + sampler).
-     * Use this to create bind groups via [GpuTextureBinder.buildBindGroup].
+     * Available after [ensurePipeline] completes.
      */
-    val textureBindGroupLayout: GPUBindGroupLayout
+    var textureBindGroupLayout: GPUBindGroupLayout? = null
+        private set
 
-    private val vertexModule: GPUShaderModule
-    private val fragmentModule: GPUShaderModule
+    private var vertexModule: GPUShaderModule? = null
+    private var fragmentModule: GPUShaderModule? = null
 
-    init {
+    /**
+     * Create the render pipeline asynchronously if not already built.
+     * Must be called from the GPU thread (`ctx.withGpu { ... }`).
+     */
+    suspend fun ensurePipeline() {
+        if (pipeline != null) return
+
         vertexModule = device.createShaderModule(
             GPUShaderModuleDescriptor(
                 label = "IsometricVertexShader",
@@ -57,32 +69,28 @@ internal class GpuRenderPipeline(
         )
 
         val vertexState = GPUVertexState(
-            module = vertexModule,
+            module = vertexModule!!,
             entryPoint = IsometricVertexShader.ENTRY_POINT,
             buffers = arrayOf(
                 GPUVertexBufferLayout(
                     arrayStride = RenderCommandTriangulator.BYTES_PER_VERTEX.toLong(),
                     stepMode = VertexStepMode.Vertex,
                     attributes = arrayOf(
-                        // location 0: position vec2<f32> at offset 0
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
                             offset = 0L,
                             shaderLocation = 0,
                         ),
-                        // location 1: color vec4<f32> at offset 8
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x4,
                             offset = 8L,
                             shaderLocation = 1,
                         ),
-                        // location 2: uv vec2<f32> at offset 24
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
                             offset = 24L,
                             shaderLocation = 2,
                         ),
-                        // location 3: textureIndex u32 at offset 32
                         GPUVertexAttribute(
                             format = VertexFormat.Uint32,
                             offset = 32L,
@@ -94,39 +102,41 @@ internal class GpuRenderPipeline(
         )
 
         val fragmentState = GPUFragmentState(
-            module = fragmentModule,
+            module = fragmentModule!!,
             entryPoint = IsometricFragmentShader.ENTRY_POINT,
             targets = arrayOf(
                 GPUColorTargetState(format = surfaceFormat)
             ),
         )
 
-        // Use auto-derived layout (layout = null). Dawn creates the pipeline layout
-        // from the shader's @group/@binding declarations. This avoids a Scudo
-        // double-free in Dawn alpha04 when using explicit GPUPipelineLayout.
-        pipeline = device.createRenderPipeline(
-            GPURenderPipelineDescriptor(
-                label = "IsometricRenderPipeline",
-                vertex = vertexState,
-                primitive = GPUPrimitiveState(
-                    topology = PrimitiveTopology.TriangleList,
-                    cullMode = CullMode.None,
-                ),
-                fragment = fragmentState,
-            )
-        ).also {
-            it.setLabel("IsometricRenderPipeline")
-        }
+        val descriptor = GPURenderPipelineDescriptor(
+            label = "IsometricRenderPipeline",
+            vertex = vertexState,
+            primitive = GPUPrimitiveState(
+                topology = PrimitiveTopology.TriangleList,
+                cullMode = CullMode.None,
+            ),
+            fragment = fragmentState,
+        )
+
+        // Use async API — the sync createRenderPipeline triggers a Scudo double-free
+        // on Adreno 750 (Dawn alpha04) when the fragment shader declares texture bindings.
+        val rp = device.createRenderPipelineAndAwait(descriptor)
+        rp.setLabel("IsometricRenderPipeline")
+        pipeline = rp
 
         // Extract the auto-derived bind group layout for @group(0).
-        // GpuTextureBinder uses this to create compatible bind groups.
-        textureBindGroupLayout = pipeline.getBindGroupLayout(0)
+        textureBindGroupLayout = rp.getBindGroupLayout(0)
     }
 
     override fun close() {
-        textureBindGroupLayout.close()
-        pipeline.close()
-        vertexModule.close()
-        fragmentModule.close()
+        textureBindGroupLayout?.close()
+        textureBindGroupLayout = null
+        pipeline?.close()
+        pipeline = null
+        vertexModule?.close()
+        vertexModule = null
+        fragmentModule?.close()
+        fragmentModule = null
     }
 }
