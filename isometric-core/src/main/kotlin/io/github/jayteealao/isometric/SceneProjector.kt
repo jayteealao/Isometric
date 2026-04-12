@@ -34,7 +34,9 @@ interface SceneProjector {
         color: IsoColor,
         originalShape: Shape? = null,
         id: String? = null,
-        ownerNodeId: String? = null
+        ownerNodeId: String? = null,
+        material: MaterialData? = null,
+        uvCoords: FloatArray? = null,
     )
 
     /**

@@ -20,8 +20,9 @@ class TextureRenderUtilsTest {
     }
 
     @Test
-    fun `toColorFilterOrNull returns null for near-white`() {
-        assertNull(IsoColor(254.0, 255.0, 255.0).toColorFilterOrNull())
+    fun `toColorFilterOrNull returns filter for near-white`() {
+        // 254 is not white — MULTIPLY with 254/255 has a measurable effect
+        assertNotNull(IsoColor(254.0, 255.0, 255.0).toColorFilterOrNull())
     }
 
     @Test

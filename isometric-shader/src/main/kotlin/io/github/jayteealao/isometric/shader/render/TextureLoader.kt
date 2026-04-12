@@ -27,11 +27,15 @@ internal class TextureLoader(private val context: Context) {
         }
     }
 
-    private fun loadResource(resId: Int): Bitmap? = runCatching {
+    private fun loadResource(resId: Int): Bitmap? = try {
         BitmapFactory.decodeResource(context.resources, resId)
-    }.getOrNull()
+    } catch (_: Exception) {
+        null
+    }
 
-    private fun loadAsset(path: String): Bitmap? = runCatching {
+    private fun loadAsset(path: String): Bitmap? = try {
         context.assets.open(path).use { BitmapFactory.decodeStream(it) }
-    }.getOrNull()
+    } catch (_: Exception) {
+        null
+    }
 }

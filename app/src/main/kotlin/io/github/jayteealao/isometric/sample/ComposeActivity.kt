@@ -14,6 +14,10 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.TapEvent
+import android.graphics.Bitmap
+import io.github.jayteealao.isometric.shader.Shape as MaterialShape
+import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
+import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 
@@ -68,6 +72,11 @@ fun IsometricSamplesScreen() {
                 onClick = { selectedSample = 4 },
                 text = { Text("Interactive") }
             )
+            Tab(
+                selected = selectedSample == 5,
+                onClick = { selectedSample = 5 },
+                text = { Text("Textured") }
+            )
         }
 
         // Sample content
@@ -78,6 +87,7 @@ fun IsometricSamplesScreen() {
                 2 -> ComplexSceneSample()
                 3 -> AnimatedSample()
                 4 -> InteractiveSample()
+                5 -> TexturedSample()
             }
         }
     }
@@ -200,6 +210,42 @@ fun InteractiveSample() {
             Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
             Shape(geometry = Pyramid(position = Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
             Shape(geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), color = IsoColor(0.0, 200.0, 100.0))
+        }
+    }
+}
+
+@Composable
+fun TexturedSample() {
+    val checkerboard = remember {
+        val size = 16
+        val cellSize = 8
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                val isMagenta = ((x / cellSize) + (y / cellSize)) % 2 == 0
+                pixels[y * size + x] = if (isMagenta) 0xFFFF00FF.toInt() else 0xFF000000.toInt()
+            }
+        }
+        Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+    }
+
+    ProvideTextureRendering {
+        IsometricScene(modifier = Modifier.fillMaxSize()) {
+            // Textured prism (checkerboard)
+            MaterialShape(
+                geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                material = texturedBitmap(checkerboard),
+            )
+            // Flat-color prism for comparison (backward compat)
+            Shape(
+                geometry = Prism(position = Point(2.0, 0.0, 0.0)),
+                color = IsoColor(33.0, 150.0, 243.0),
+            )
+            // Another textured prism (cache reuse)
+            MaterialShape(
+                geometry = Prism(position = Point(4.0, 0.0, 0.0)),
+                material = texturedBitmap(checkerboard),
+            )
         }
     }
 }

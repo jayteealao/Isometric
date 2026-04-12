@@ -12,7 +12,7 @@ metric-lines-added: 300
 metric-lines-removed: 19
 metric-deviations-from-plan: 2
 metric-review-fixes-applied: 0
-commit-sha: ""
+commit-sha: "e123cb6"
 tags: [canvas, texture, rendering, bitmapshader]
 refs:
   index: 00-index.md

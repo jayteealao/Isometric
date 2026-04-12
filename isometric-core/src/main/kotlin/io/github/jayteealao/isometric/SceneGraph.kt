@@ -5,12 +5,14 @@ package io.github.jayteealao.isometric
  * Accumulates items via [add] and provides them for projection via [items].
  */
 internal class SceneGraph {
-    internal data class SceneItem(
+    internal class SceneItem(
         val path: Path,
         val baseColor: IsoColor,
         val originalShape: Shape?,
         val id: String,
-        val ownerNodeId: String? = null
+        val ownerNodeId: String? = null,
+        val material: MaterialData? = null,
+        val uvCoords: FloatArray? = null,
     )
 
     private val _items = mutableListOf<SceneItem>()
@@ -30,9 +32,11 @@ internal class SceneGraph {
         color: IsoColor,
         originalShape: Shape? = null,
         id: String? = null,
-        ownerNodeId: String? = null
+        ownerNodeId: String? = null,
+        material: MaterialData? = null,
+        uvCoords: FloatArray? = null,
     ) {
-        _items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId))
+        _items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId, material, uvCoords))
     }
 
     fun clear() {

@@ -179,8 +179,10 @@ class IsometricEngine @JvmOverloads constructor(
         color: IsoColor,
         originalShape: Shape?,
         id: String?,
-        ownerNodeId: String?
-    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId)
+        ownerNodeId: String?,
+        material: MaterialData?,
+        uvCoords: FloatArray?,
+    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId, material, uvCoords)
 
     /**
      * Removes all items from the scene graph.
@@ -231,6 +233,8 @@ class IsometricEngine @JvmOverloads constructor(
                 originalShape = transformedItem.item.originalShape,
                 ownerNodeId = transformedItem.item.ownerNodeId,
                 baseColor = transformedItem.item.baseColor,
+                material = transformedItem.item.material,
+                uvCoords = transformedItem.item.uvCoords,
             )
         }
 
@@ -343,6 +347,8 @@ class IsometricEngine @JvmOverloads constructor(
                     originalShape = transformedItem.item.originalShape,
                     ownerNodeId = transformedItem.item.ownerNodeId,
                     baseColor = transformedItem.item.baseColor,
+                    material = transformedItem.item.material,
+                    uvCoords = transformedItem.item.uvCoords,
                 )
             )
         }

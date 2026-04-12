@@ -23,6 +23,12 @@ internal data class CachedTexture(val bitmap: Bitmap, val shader: BitmapShader)
  * Thread safety: intended for main-thread use only. Canvas draw path runs on the
  * main thread so no concurrent access is expected.
  *
+ * **Cache key identity:** Keys are [TextureSource] instances. [TextureSource.Resource]
+ * and [TextureSource.Asset] are data classes with structural equality. However,
+ * [TextureSource.BitmapSource] uses `Bitmap` reference identity (since `Bitmap` does
+ * not override `equals`). Callers using `BitmapSource` should `remember { }` their
+ * bitmaps to avoid creating new cache entries on every recomposition.
+ *
  * @param maxSize Maximum number of textures to keep in memory. Default: 20
  *   (covers typical isometric tile sets).
  */

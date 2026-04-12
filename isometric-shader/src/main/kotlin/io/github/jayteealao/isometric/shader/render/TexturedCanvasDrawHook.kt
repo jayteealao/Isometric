@@ -34,6 +34,10 @@ internal class TexturedCanvasDrawHook(
     private val texturedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val affineMatrix = Matrix()
     private val checkerboard: Bitmap by lazy { createCheckerboardBitmap() }
+    private val checkerboardCached: CachedTexture by lazy {
+        val bmp = checkerboard
+        CachedTexture(bmp, android.graphics.BitmapShader(bmp, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP))
+    }
 
     override fun draw(
         nativeCanvas: android.graphics.Canvas,
@@ -74,19 +78,24 @@ internal class TexturedCanvasDrawHook(
 
         texturedPaint.shader = cached.shader
         texturedPaint.colorFilter = material.tint.toColorFilterOrNull()
-
-        nativeCanvas.drawPath(nativePath, texturedPaint)
-
-        texturedPaint.shader = null
-        texturedPaint.colorFilter = null
+        try {
+            nativeCanvas.drawPath(nativePath, texturedPaint)
+        } finally {
+            texturedPaint.shader = null
+            texturedPaint.colorFilter = null
+        }
 
         return true
     }
 
     private fun resolveTexture(source: TextureSource): CachedTexture {
-        return cache.get(source) ?: run {
-            val bitmap = loader.load(source) ?: checkerboard
+        cache.get(source)?.let { return it }
+        val bitmap = loader.load(source)
+        return if (bitmap != null) {
             cache.put(source, bitmap)
+        } else {
+            // Don't cache checkerboard under the source key — allows retry on next frame.
+            checkerboardCached
         }
     }
 }
@@ -114,6 +123,10 @@ internal fun computeAffineMatrix(
     texHeight: Int,
     outMatrix: Matrix,
 ) {
+    if (screenPoints.size < 6) {
+        outMatrix.reset()
+        return
+    }
     val src = floatArrayOf(
         uvCoords[0] * texWidth, uvCoords[1] * texHeight,
         uvCoords[2] * texWidth, uvCoords[3] * texHeight,
@@ -155,7 +168,7 @@ internal fun createCheckerboardBitmap(): Bitmap {
  * tint is applied.
  */
 internal fun IsoColor.toColorFilterOrNull(): PorterDuffColorFilter? {
-    if (r >= 254.0 && g >= 254.0 && b >= 254.0) return null
+    if (r >= 255.0 && g >= 255.0 && b >= 255.0) return null
     return PorterDuffColorFilter(
         android.graphics.Color.argb(
             255,

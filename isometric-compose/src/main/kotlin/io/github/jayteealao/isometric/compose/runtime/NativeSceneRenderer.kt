@@ -112,18 +112,29 @@ internal class NativeSceneRenderer {
  * TODO(KMP): Move to androidMain source set.
  */
 internal fun RenderCommand.toNativePath(): android.graphics.Path {
-    return android.graphics.Path().apply {
-        val pts = points
-        if (pts.isEmpty()) return@apply
+    return android.graphics.Path().apply { fillNativePathImpl(this) }
+}
 
-        moveTo(pts[0].toFloat(), pts[1].toFloat())
-        var i = 2
-        while (i < pts.size) {
-            lineTo(pts[i].toFloat(), pts[i + 1].toFloat())
-            i += 2
-        }
-        close()
+/**
+ * Fill an existing [android.graphics.Path] from this command's [points],
+ * reusing the path object to avoid per-frame allocation.
+ */
+internal fun RenderCommand.fillNativePath(target: android.graphics.Path) {
+    target.reset()
+    fillNativePathImpl(target)
+}
+
+private fun RenderCommand.fillNativePathImpl(target: android.graphics.Path) {
+    val pts = points
+    if (pts.isEmpty()) return
+
+    target.moveTo(pts[0].toFloat(), pts[1].toFloat())
+    var i = 2
+    while (i < pts.size) {
+        target.lineTo(pts[i].toFloat(), pts[i + 1].toFloat())
+        i += 2
     }
+    target.close()
 }
 
 /**
