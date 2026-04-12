@@ -1,13 +1,15 @@
 package io.github.jayteealao.isometric.webgpu.triangulation
 
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 internal class RenderCommandTriangulator {
     companion object {
-        const val FLOATS_PER_VERTEX = 8
-        const val BYTES_PER_VERTEX = FLOATS_PER_VERTEX * 4
+        /** u32 slots per vertex: pos(2) + color(4) + uv(2) + textureIndex(1) = 9. */
+        const val U32S_PER_VERTEX = 9
+        const val BYTES_PER_VERTEX = U32S_PER_VERTEX * 4  // 36 bytes
     }
 
     data class PackedVertices(
@@ -86,6 +88,9 @@ internal class RenderCommandTriangulator {
         g: Float,
         b: Float,
         a: Float,
+        u: Float = 0f,
+        v: Float = 0f,
+        textureIndex: Int = SceneDataLayout.NO_TEXTURE,
     ) {
         buffer.putFloat(x)
         buffer.putFloat(y)
@@ -93,8 +98,9 @@ internal class RenderCommandTriangulator {
         buffer.putFloat(g)
         buffer.putFloat(b)
         buffer.putFloat(a)
-        buffer.putFloat(0f)
-        buffer.putFloat(0f)
+        buffer.putFloat(u)
+        buffer.putFloat(v)
+        buffer.putInt(textureIndex)
     }
 
     private fun toNdcX(x: Double, width: Int): Float =

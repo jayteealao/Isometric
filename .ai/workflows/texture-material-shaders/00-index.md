@@ -7,8 +7,8 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-12T15:00:38Z"
-selected-slice: "canvas-textures"
+updated-at: "2026-04-12T16:27:39Z"
+selected-slice: "webgpu-textures"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -16,8 +16,8 @@ pr-url: ""
 pr-number: 0
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders reviews"
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders webgpu-textures"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -54,6 +54,7 @@ workflow-files:
   - 07-review-security.md
   - 07-review-code-simplification.md
   - 07-review-architecture.md
+  - 05-implement-webgpu-textures.md
   - po-answers.md
 progress:
   intake: complete

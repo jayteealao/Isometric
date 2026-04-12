@@ -24,6 +24,12 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * 5. Screen-space to NDC: `ndcX = (sx / viewportWidth) * 2 - 1`,
  *    `ndcY = 1 - (sy / viewportHeight) * 2`. Matches [RenderCommandTriangulator] exactly.
  *
+ * ## UV coordinates
+ *
+ * Standard Prism quad UVs are emitted as constants: `(0,0)(1,0)(1,1)(0,1)` for the
+ * 4-vertex fan. This matches the CPU-side uv-generation output for all standard Prism
+ * faces. Custom UV transforms require a GPU-side UV buffer in a future slice.
+ *
  * ## Why fixed stride (no atomicAdd)?
  *
  * `atomicAdd(&vertexCursor, vertCount)` with ~290 concurrent threads contending on a
@@ -43,7 +49,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *
  * ## Vertex buffer layout
  *
- * Vertices are written as a flat `array<u32>` (8 × u32 = 32 bytes per vertex) to
+ * Vertices are written as a flat `array<u32>` (9 × u32 = 36 bytes per vertex) to
  * avoid WGSL storage-buffer alignment constraints that would otherwise insert padding
  * between `position: vec2<f32>` (offset 0) and `color: vec4<f32>` (offset 8), since
  * `vec4` requires 16-byte alignment in WGSL structs but the render pipeline expects
@@ -51,18 +57,20 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *
  * ```
  *  u32 offset  bytes  field
- *       0-1      8    position  vec2<f32>  (vertex attribute location 0)
- *       2-5     16    color     vec4<f32>  (vertex attribute location 1)
- *       6-7      8    uv        vec2<f32>  (vertex attribute location 2, always zero)
+ *       0-1      8    position      vec2<f32>  (vertex attribute location 0)
+ *       2-5     16    color         vec4<f32>  (vertex attribute location 1)
+ *       6-7      8    uv            vec2<f32>  (vertex attribute location 2)
+ *         8       4    textureIndex  u32        (vertex attribute location 3)
  * ```
  *
  * ## Bindings
  *
  * ```wgsl
- * @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>
- * @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>
- * @group(0) @binding(2) var<storage, read_write>  vertices:    array<u32>
- * @group(0) @binding(3) var<uniform>              params:      EmitUniforms
+ * @group(0) @binding(0) var<storage, read>       transformed:      array<TransformedFace>
+ * @group(0) @binding(1) var<storage, read>        sortedKeys:       array<SortKey>
+ * @group(0) @binding(2) var<storage, read_write>  vertices:         array<u32>
+ * @group(0) @binding(3) var<uniform>              params:           EmitUniforms
+ * @group(0) @binding(4) var<storage, read>        sceneTexIndices:  array<u32>
  * ```
  *
  * ## Struct compatibility
@@ -153,25 +161,30 @@ internal object TriangulateEmitShader {
         //   raw[i*6+5] = (depthKey, bitcast faceIndex, bitcast visible, _p4)
         @group(0) @binding(0) var<storage, read>       transformedRaw: array<vec4<f32>>;
         @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>;
-        // Flat u32 array: 8 u32 per vertex (32 bytes), written via bitcast<u32>(f32) to
+        // Flat u32 array: 9 u32 per vertex (36 bytes), written via bitcast<u32>(f32) to
         // preserve the render pipeline's vertex layout without WGSL struct-alignment gaps.
         @group(0) @binding(2) var<storage, read_write>  vertices:    array<u32>;
         @group(0) @binding(3) var<uniform>              params:      EmitUniforms;
+        // Compact per-face texture index buffer, indexed by originalIndex.
+        @group(0) @binding(4) var<storage, read>        sceneTexIndices: array<u32>;
 
-        // Writes one vertex at flat u32 offset [base] (base must be a multiple of 8).
-        // Vertex layout (32 bytes, 8 × u32, matches GpuRenderPipeline vertex attributes):
-        //   u32[0-1] position vec2<f32>  (location 0, offset  0)
-        //   u32[2-5] color    vec4<f32>  (location 1, offset  8)
-        //   u32[6-7] uv       vec2<f32>  (location 2, offset 24, always 0)
-        fn writeVertex(base: u32, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32) {
+        // Writes one vertex at flat u32 offset [base] (base must be a multiple of 9).
+        // Vertex layout (36 bytes, 9 × u32, matches GpuRenderPipeline vertex attributes):
+        //   u32[0-1] position     vec2<f32>  (location 0, offset  0)
+        //   u32[2-5] color        vec4<f32>  (location 1, offset  8)
+        //   u32[6-7] uv           vec2<f32>  (location 2, offset 24)
+        //   u32[8]   textureIndex u32        (location 3, offset 32)
+        fn writeVertex(base: u32, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32,
+                       u: f32, v: f32, texIdx: u32) {
             vertices[base + 0u] = bitcast<u32>(x);
             vertices[base + 1u] = bitcast<u32>(y);
             vertices[base + 2u] = bitcast<u32>(r);
             vertices[base + 3u] = bitcast<u32>(g);
             vertices[base + 4u] = bitcast<u32>(b);
             vertices[base + 5u] = bitcast<u32>(a);
-            vertices[base + 6u] = 0u;
-            vertices[base + 7u] = 0u;
+            vertices[base + 6u] = bitcast<u32>(u);
+            vertices[base + 7u] = bitcast<u32>(v);
+            vertices[base + 8u] = texIdx;
         }
 
         @compute @workgroup_size(${WORKGROUP_SIZE})
@@ -185,7 +198,7 @@ internal object TriangulateEmitShader {
             let key = sortedKeys[i];
             if (key.originalIndex == 0xFFFFFFFFu) {
                 for (var j = 0u; j < 12u; j++) {
-                    writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                    writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
@@ -205,14 +218,17 @@ internal object TriangulateEmitShader {
             let visible = bitcast<u32>(tail.z);
             if (visible == 0u || vertexCount < 3u) {
                 for (var j = 0u; j < 12u; j++) {
-                    writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                    writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
 
+            // Read per-face texture index from compact buffer
+            let texIdx = sceneTexIndices[key.originalIndex];
+
             // Clear the slot first, then overwrite only the real triangles.
             for (var j = 0u; j < 12u; j++) {
-                writeVertex((base + j) * 8u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+                writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
             }
 
             let nx0 = (v01.x / wF) * 2.0 - 1.0;
@@ -233,30 +249,32 @@ internal object TriangulateEmitShader {
             let b = clr.z;
             let a = clr.w;
 
-            // Triangle 0: (s0, s1, s2)
-            writeVertex((base + 0u) * 8u, nx0, ny0, r, g, b, a);
-            writeVertex((base + 1u) * 8u, nx1, ny1, r, g, b, a);
-            writeVertex((base + 2u) * 8u, nx2, ny2, r, g, b, a);
+            // Standard Prism quad UV constants: (0,0)(1,0)(1,1)(0,1)
+            // For triangle fan: pivot=v0 UV=(0,0)
+            // Triangle 0: (s0, s1, s2) → UV: (0,0), (1,0), (1,1)
+            writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
+            writeVertex((base + 1u) * 9u, nx1, ny1, r, g, b, a, 1.0, 0.0, texIdx);
+            writeVertex((base + 2u) * 9u, nx2, ny2, r, g, b, a, 1.0, 1.0, texIdx);
 
-            // Triangle 1: (s0, s2, s3)
+            // Triangle 1: (s0, s2, s3) → UV: (0,0), (1,1), (0,1)
             if (vertexCount >= 4u) {
-                writeVertex((base + 3u) * 8u, nx0, ny0, r, g, b, a);
-                writeVertex((base + 4u) * 8u, nx2, ny2, r, g, b, a);
-                writeVertex((base + 5u) * 8u, nx3, ny3, r, g, b, a);
+                writeVertex((base + 3u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
+                writeVertex((base + 4u) * 9u, nx2, ny2, r, g, b, a, 1.0, 1.0, texIdx);
+                writeVertex((base + 5u) * 9u, nx3, ny3, r, g, b, a, 0.0, 1.0, texIdx);
             }
 
-            // Triangle 2: (s0, s3, s4)
+            // Triangle 2: (s0, s3, s4) → UV: (0,0), degenerate
             if (vertexCount >= 5u) {
-                writeVertex((base + 6u) * 8u, nx0, ny0, r, g, b, a);
-                writeVertex((base + 7u) * 8u, nx3, ny3, r, g, b, a);
-                writeVertex((base + 8u) * 8u, nx4, ny4, r, g, b, a);
+                writeVertex((base + 6u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
+                writeVertex((base + 7u) * 9u, nx3, ny3, r, g, b, a, 0.5, 0.5, texIdx);
+                writeVertex((base + 8u) * 9u, nx4, ny4, r, g, b, a, 0.5, 0.5, texIdx);
             }
 
-            // Triangle 3: (s0, s4, s5)
+            // Triangle 3: (s0, s4, s5) → UV: (0,0), degenerate
             if (vertexCount >= 6u) {
-                writeVertex((base + 9u) * 8u, nx0, ny0, r, g, b, a);
-                writeVertex((base + 10u) * 8u, nx4, ny4, r, g, b, a);
-                writeVertex((base + 11u) * 8u, nx5, ny5, r, g, b, a);
+                writeVertex((base + 9u) * 9u, nx0, ny0, r, g, b, a, 0.0, 0.0, texIdx);
+                writeVertex((base + 10u) * 9u, nx4, ny4, r, g, b, a, 0.5, 0.5, texIdx);
+                writeVertex((base + 11u) * 9u, nx5, ny5, r, g, b, a, 0.5, 0.5, texIdx);
             }
         }
     """.trimIndent()

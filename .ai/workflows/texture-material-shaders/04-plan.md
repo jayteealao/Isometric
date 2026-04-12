@@ -51,13 +51,17 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   in shader. `BitmapShader` + 3-point affine `Matrix.setPolyToPoly`.
 - **Key risk:** Paparazzi rendering of native `BitmapShader` draw (LayoutLib limitation).
 
-### `webgpu-textures` (rev 1)
-- **Files:** 10 modified + 2 new (added `build.gradle.kts` for shader dep)
-- **Steps:** 11 (added Step 0: add `:isometric-shader` dep to webgpu)
-- **Strategy:** Vertex stride grows 32→36 bytes (new `textureIndex` attribute at location 3).
-  `GpuTextureStore` uploads bitmaps to `GPUTexture`. Fragment shader: `if (textureIndex == NO_TEXTURE) return color; else textureSample`. Bind group 1 for texture+sampler.
-  `SceneDataPacker` writes real `textureIndex` from `RenderCommand.material`. Emit shader
-  writes actual UVs (not zeros).
+### `webgpu-textures` (rev 2)
+- **Files:** 9 existing modified + 2 new
+- **Steps:** 11 (Step 0: add `:isometric-shader` dep to webgpu)
+- **Strategy:** Vertex stride grows 32->36 bytes (new `textureIndex` u32 at location 3,
+  `@interpolate(flat)`). `GpuTextureStore` uploads bitmaps as `BGRA8Unorm` (matches Android
+  native byte order — no CPU swizzle). Fragment shader: `if (textureIndex == NO_TEXTURE)
+  return color; else textureSample` at **`@group(0)`** (render pipeline's only bind group).
+  `SceneDataPacker` writes real `textureIndex` from `RenderCommand.material` (including
+  `PerFace.default` unwrapping). Emit shader writes constant UV for standard Prism quads
+  (identical to CPU-side uv-generation output). Compact per-face `texIndexBuffer` at
+  emit shader binding 4.
 - **Key risk:** Vertex stride change cascades to emit shader, render pipeline layout, and
   CPU-side triangulator. Must coordinate carefully.
 

@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
 import io.github.jayteealao.isometric.RenderCommand
+import io.github.jayteealao.isometric.shader.IsometricMaterial
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
@@ -145,8 +146,8 @@ internal object SceneDataPacker {
             buffer.putFloat(ny)
             buffer.putFloat(nz)
 
-            // textureIndex: u32 — NO_TEXTURE sentinel for now (Phase 3 texture work: M9+)
-            buffer.putInt(SceneDataLayout.NO_TEXTURE)
+            // textureIndex: u32 — resolved from cmd.material
+            buffer.putInt(resolveTextureIndex(cmd))
 
             // faceIndex: u32 — original command list index (used in sort + emit passes)
             buffer.putInt(index)
@@ -171,6 +172,38 @@ internal object SceneDataPacker {
      * @return A rewound direct [ByteBuffer] of size `commands.size × FACE_DATA_BYTES`.
      *   Returns an empty (zero-capacity) buffer if [commands] is empty.
      */
+    /**
+     * Pack a compact `u32` array of texture indices for the M5 emit shader's
+     * `sceneTexIndices` binding. One `u32` per command (4 bytes each).
+     *
+     * Buffer size must be `≥ commands.size × 4`.
+     */
+    fun packTexIndicesInto(commands: List<RenderCommand>, buffer: ByteBuffer) {
+        buffer.rewind()
+        buffer.limit(commands.size * 4)
+        for (cmd in commands) {
+            buffer.putInt(resolveTextureIndex(cmd))
+        }
+        buffer.rewind()
+    }
+
+    /**
+     * Resolve the GPU texture index for a render command's material.
+     *
+     * For this slice, there is a single texture slot (index 0). Commands with
+     * `IsometricMaterial.Textured` material get index 0; all others get [SceneDataLayout.NO_TEXTURE].
+     * `PerFace` resolves via its `.default` sub-material.
+     */
+    private fun resolveTextureIndex(cmd: RenderCommand): Int {
+        return when (val m = cmd.material) {
+            is IsometricMaterial.Textured -> 0
+            is IsometricMaterial.PerFace -> {
+                if (m.default is IsometricMaterial.Textured) 0 else SceneDataLayout.NO_TEXTURE
+            }
+            else -> SceneDataLayout.NO_TEXTURE
+        }
+    }
+
     fun pack(commands: List<RenderCommand>): ByteBuffer {
         if (commands.isEmpty()) {
             return ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())

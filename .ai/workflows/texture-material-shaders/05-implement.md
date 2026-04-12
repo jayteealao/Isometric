@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-12T10:49:14Z"
-slices-implemented: 3
+updated-at: "2026-04-12T16:27:39Z"
+slices-implemented: 4
 slices-total: 6
-metric-total-files-changed: 20
-metric-total-lines-added: 490
-metric-total-lines-removed: 49
+metric-total-files-changed: 30
+metric-total-lines-added: 1137
+metric-total-lines-removed: 240
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders canvas-textures"
+next-invocation: "/wf-verify texture-material-shaders webgpu-textures"
 ---
 
 # Implement Index
@@ -38,7 +38,11 @@ next-invocation: "/wf-verify texture-material-shaders canvas-textures"
 - Summary: MaterialDrawHook strategy injection in compose, TexturedCanvasDrawHook with BitmapShader + affine matrix in shader, ProvideTextureRendering composable, TextureCache LRU, TextureLoader
 - Record: [05-implement-canvas-textures.md](05-implement-canvas-textures.md)
 
-### `webgpu-textures` — not started
+### `webgpu-textures` — complete
+- Files: 10 (2 new, 8 modified)
+- Summary: GPU texture upload (BGRA8Unorm), @group(0) bind group, fragment shader textureSample with NO_TEXTURE fast path, emit shader real UVs + textureIndex, vertex stride 32→36, SceneDataPacker material resolution
+- Record: [05-implement-webgpu-textures.md](05-implement-webgpu-textures.md)
+
 ### `per-face-materials` — not started
 ### `sample-demo` — not started
 
@@ -50,5 +54,5 @@ next-invocation: "/wf-verify texture-material-shaders canvas-textures"
 - `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders canvas-textures`
+- **Option A (default):** `/wf-verify texture-material-shaders webgpu-textures`
 - **Option B:** `/compact` then Option A — clear implementation context

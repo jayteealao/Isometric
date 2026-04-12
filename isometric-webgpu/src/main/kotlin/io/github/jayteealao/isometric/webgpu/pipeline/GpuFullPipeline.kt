@@ -1,13 +1,23 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
 import android.util.Log
+import androidx.webgpu.BufferUsage
+import androidx.webgpu.GPUBindGroup
 import androidx.webgpu.GPUBuffer
+import androidx.webgpu.GPUBufferDescriptor
 import androidx.webgpu.GPUCommandEncoder
+import androidx.webgpu.GPUTexture
+import androidx.webgpu.GPUTextureView
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
+import io.github.jayteealao.isometric.webgpu.texture.GpuTextureBinder
+import io.github.jayteealao.isometric.webgpu.texture.GpuTextureStore
+import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
@@ -20,6 +30,8 @@ import java.nio.ByteOrder
  * - [GpuBitonicSort]           — M4b:   GPU-only bitonic depth sort
  * - [GpuSortKeyPacker]         — M4a:   pack sort keys from transformed faces
  * - [GpuTriangulateEmitPipeline] — M5:  triangulate + emit + write indirect args
+ * - [GpuTextureStore]          — GPU texture upload (BGRA8Unorm)
+ * - [GpuTextureBinder]         — sampler + @group(0) bind group
  *
  * ## Per-frame call sequence
  *
@@ -31,6 +43,7 @@ import java.nio.ByteOrder
  * val encoder = device.createCommandEncoder()
  * fullPipeline.dispatch(encoder)              // encodes M3 → M4 → M5 compute passes
  * // ... begin render pass ...
+ * pass.setBindGroup(0, fullPipeline.textureBindGroup)
  * pass.setVertexBuffer(0, fullPipeline.vertexBuffer)
  * pass.drawIndirect(fullPipeline.indirectArgsBuffer, 0L)
  * // ... end render pass ...
@@ -82,6 +95,40 @@ internal class GpuFullPipeline(
     private val sort       = GpuBitonicSort(ctx)
     private val packer     = GpuSortKeyPacker(ctx)
     private val emit       = GpuTriangulateEmitPipeline(ctx)
+
+    // ── Texture components ───────────────────────────────────────────────────
+
+    val textureStore  = GpuTextureStore(ctx)
+    val textureBinder = GpuTextureBinder(ctx)
+
+
+
+    // ── Texture state ────────────────────────────────────────────────────────
+
+    /** Currently uploaded GPU texture (null if using fallback). */
+    private var uploadedTexture: GPUTexture? = null
+    private var uploadedTextureView: GPUTextureView? = null
+
+    /** Cached bitmap identity to avoid re-uploading on every frame. */
+    private var lastUploadedBitmapIdentity: Any? = null
+
+    /** Current texture bind group for the render pass. */
+    private var _textureBindGroup: GPUBindGroup? = null
+
+    /** The texture bind group to set on the render pass at `@group(0)`. */
+    val textureBindGroup: GPUBindGroup
+        get() = _textureBindGroup ?: run {
+            // Lazily build fallback bind group on first access
+            val bg = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
+            _textureBindGroup = bg
+            bg
+        }
+
+    // ── Tex-index buffer ─────────────────────────────────────────────────────
+
+    private var texIndexGpuBuffer: GPUBuffer? = null
+    private var texIndexCpuBuffer: ByteBuffer? = null
+    private var texIndexCapacity: Int = 0
 
     // ── Reusable indirect-args staging buffer ─────────────────────────────────
 
@@ -192,6 +239,12 @@ internal class GpuFullPipeline(
             faceCount      = faceCount,
         )
 
+        // ── Texture upload ───────────────────────────────────────────────────
+        uploadTextures(scene)
+
+        // ── Compact tex-index buffer ─────────────────────────────────────────
+        uploadTexIndexBuffer(scene)
+
         // paddedCount must be a power of two for the bitonic sort network to be correct.
         // nextPowerOfTwo(faceCount) ≤ capacity (since capacity is always a power-of-two
         // multiple of INITIAL_CAPACITY_FACES and capacity ≥ faceCount by construction).
@@ -220,6 +273,7 @@ internal class GpuFullPipeline(
             viewportHeight    = viewportHeight,
             transformedBuffer = transform.transformedBuffer,
             sortedKeysBuffer  = sort.resultBuffer,
+            texIndexBuffer    = texIndexGpuBuffer!!,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
@@ -234,6 +288,114 @@ internal class GpuFullPipeline(
         indirectArgsStagingBuf.putInt(0)   // firstInstance
         indirectArgsStagingBuf.rewind()
         ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
+    }
+
+    /**
+     * Scan the scene for textured materials and upload the first texture found to the GPU.
+     * Caches the uploaded texture by bitmap identity to avoid re-upload every frame.
+     */
+    private fun uploadTextures(scene: PreparedScene) {
+        // Find the first Textured material in the scene
+        var texturedMaterial: IsometricMaterial.Textured? = null
+        for (cmd in scene.commands) {
+            when (val m = cmd.material) {
+                is IsometricMaterial.Textured -> { texturedMaterial = m; break }
+                is IsometricMaterial.PerFace -> {
+                    if (m.default is IsometricMaterial.Textured) {
+                        texturedMaterial = m.default as IsometricMaterial.Textured; break
+                    }
+                }
+                else -> {}
+            }
+        }
+
+        if (texturedMaterial == null) {
+            // No textures in scene — use fallback
+            if (lastUploadedBitmapIdentity != null) {
+                releaseUploadedTexture()
+            }
+            _textureBindGroup?.close()
+            _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
+            return
+        }
+
+        // Resolve TextureSource to Bitmap.
+        // For this slice, only BitmapSource is supported directly in the GPU pipeline.
+        // Resource/Asset loading requires an Android Context, which is wired in the
+        // sample-demo slice via ProvideTextureRendering.
+        val bitmap = when (val src = texturedMaterial.source) {
+            is TextureSource.BitmapSource -> {
+                src.ensureNotRecycled()
+                src.bitmap
+            }
+            else -> {
+                Log.w(TAG, "TextureSource ${src::class.simpleName} not yet supported in WebGPU — using fallback")
+                null
+            }
+        }
+
+        if (bitmap == null) {
+            // Failed to load — use fallback
+            _textureBindGroup?.close()
+            _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
+            lastUploadedBitmapIdentity = null
+            return
+        }
+
+        // Cache check: avoid re-uploading the same bitmap
+        val identity = System.identityHashCode(bitmap)
+        if (identity == lastUploadedBitmapIdentity) return
+
+        // Upload new texture
+        releaseUploadedTexture()
+        val gpuTex = textureStore.uploadBitmap(bitmap)
+        uploadedTexture = gpuTex
+        val view = gpuTex.createView()
+        uploadedTextureView = view
+        lastUploadedBitmapIdentity = identity
+
+        _textureBindGroup?.close()
+        _textureBindGroup = textureBinder.buildBindGroup(view)
+    }
+
+    private fun releaseUploadedTexture() {
+        uploadedTextureView?.close()
+        uploadedTextureView = null
+        if (uploadedTexture != null) {
+            textureStore.releaseTexture(uploadedTexture!!)
+            uploadedTexture = null
+        }
+        lastUploadedBitmapIdentity = null
+    }
+
+    /**
+     * Pack and upload the compact per-face texture index buffer for the emit shader.
+     */
+    private fun uploadTexIndexBuffer(scene: PreparedScene) {
+        val faceCount = scene.commands.size
+        if (faceCount == 0) return
+
+        // Ensure GPU buffer capacity
+        if (faceCount > texIndexCapacity) {
+            texIndexGpuBuffer?.close()
+            texIndexGpuBuffer = ctx.device.createBuffer(
+                GPUBufferDescriptor(
+                    usage = BufferUsage.Storage or BufferUsage.CopyDst,
+                    size = (faceCount * 4).toLong(),
+                )
+            ).also { it.setLabel("IsometricTexIndices") }
+            texIndexCapacity = faceCount
+        }
+
+        // Ensure CPU staging buffer capacity
+        val requiredBytes = faceCount * 4
+        val cpu = texIndexCpuBuffer
+        if (cpu == null || cpu.capacity() < requiredBytes) {
+            texIndexCpuBuffer = ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.nativeOrder())
+        }
+
+        SceneDataPacker.packTexIndicesInto(scene.commands, texIndexCpuBuffer!!)
+        ctx.queue.writeBuffer(texIndexGpuBuffer!!, 0L, texIndexCpuBuffer!!)
     }
 
     /**
@@ -253,6 +415,10 @@ internal class GpuFullPipeline(
         indirectArgsStagingBuf.putInt(0)
         indirectArgsStagingBuf.rewind()
         ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
+
+        // Revert to fallback texture bind group
+        _textureBindGroup?.close()
+        _textureBindGroup = textureBinder.buildBindGroup(textureStore.fallbackTextureView)
     }
 
     // ── Per-frame dispatch ────────────────────────────────────────────────────
@@ -341,6 +507,18 @@ internal class GpuFullPipeline(
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun close() {
+        // Close texture resources
+        _textureBindGroup?.close()
+        _textureBindGroup = null
+        releaseUploadedTexture()
+        textureBinder.close()
+        textureStore.close()
+
+        // Close tex-index buffer
+        texIndexGpuBuffer?.close()
+        texIndexGpuBuffer = null
+        texIndexCapacity = 0
+
         // Close in reverse-dependency order: consumers before producers.
         emit.close()
         packer.close()

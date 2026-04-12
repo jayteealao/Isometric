@@ -1,9 +1,12 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
 import androidx.webgpu.CullMode
+import androidx.webgpu.GPUBindGroupLayout
 import androidx.webgpu.GPUColorTargetState
 import androidx.webgpu.GPUDevice
 import androidx.webgpu.GPUFragmentState
+import androidx.webgpu.GPUPipelineLayout
+import androidx.webgpu.GPUPipelineLayoutDescriptor
 import androidx.webgpu.GPUPrimitiveState
 import androidx.webgpu.GPURenderPipeline
 import androidx.webgpu.GPURenderPipelineDescriptor
@@ -24,11 +27,13 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
 internal class GpuRenderPipeline(
     device: GPUDevice,
     @TextureFormat surfaceFormat: Int,
+    textureBindGroupLayout: GPUBindGroupLayout,
 ) : AutoCloseable {
     val pipeline: GPURenderPipeline
 
     private val vertexModule: GPUShaderModule
     private val fragmentModule: GPUShaderModule
+    private val pipelineLayout: GPUPipelineLayout
 
     init {
         vertexModule = device.createShaderModule(
@@ -44,6 +49,13 @@ internal class GpuRenderPipeline(
             )
         )
 
+        // Explicit pipeline layout: @group(0) = texture + sampler
+        pipelineLayout = device.createPipelineLayout(
+            GPUPipelineLayoutDescriptor(
+                bindGroupLayouts = arrayOf(textureBindGroupLayout),
+            )
+        )
+
         val vertexState = GPUVertexState(
             module = vertexModule,
             entryPoint = IsometricVertexShader.ENTRY_POINT,
@@ -52,20 +64,29 @@ internal class GpuRenderPipeline(
                     arrayStride = RenderCommandTriangulator.BYTES_PER_VERTEX.toLong(),
                     stepMode = VertexStepMode.Vertex,
                     attributes = arrayOf(
+                        // location 0: position vec2<f32> at offset 0
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
                             offset = 0L,
                             shaderLocation = 0,
                         ),
+                        // location 1: color vec4<f32> at offset 8
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x4,
                             offset = 8L,
                             shaderLocation = 1,
                         ),
+                        // location 2: uv vec2<f32> at offset 24
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
                             offset = 24L,
                             shaderLocation = 2,
+                        ),
+                        // location 3: textureIndex u32 at offset 32
+                        GPUVertexAttribute(
+                            format = VertexFormat.Uint32,
+                            offset = 32L,
+                            shaderLocation = 3,
                         ),
                     ),
                 )
@@ -89,6 +110,7 @@ internal class GpuRenderPipeline(
                     cullMode = CullMode.None,
                 ),
                 fragment = fragmentState,
+                layout = pipelineLayout,
             )
         ).also {
             it.setLabel("IsometricRenderPipeline")
@@ -97,6 +119,7 @@ internal class GpuRenderPipeline(
 
     override fun close() {
         pipeline.close()
+        pipelineLayout.close()
         vertexModule.close()
         fragmentModule.close()
     }

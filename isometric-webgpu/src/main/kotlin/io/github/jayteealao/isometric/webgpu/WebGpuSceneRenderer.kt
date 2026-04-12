@@ -274,10 +274,14 @@ internal class WebGpuSceneRenderer : AutoCloseable {
 
         context.withGpu {
             configureSurface(width, height)
-            renderPipeline = GpuRenderPipeline(context.device, surfaceFormat)
             val gp = GpuFullPipeline(context)
             gp.ensurePipelines()
             fullPipeline = gp
+            renderPipeline = GpuRenderPipeline(
+                context.device,
+                surfaceFormat,
+                gp.textureBinder.bindGroupLayout,
+            )
         }
 
         Log.d(TAG, "Initialized surface ${currentWidth}x${currentHeight} format=$surfaceFormat owned=$ownsContext")
@@ -453,10 +457,12 @@ internal class WebGpuSceneRenderer : AutoCloseable {
 
                     pass.setPipeline(pipeline.pipeline)
                     if (shouldDraw) {
+                        // Bind texture + sampler at @group(0) for the fragment shader.
+                        pass.setBindGroup(0, gp!!.textureBindGroup)
                         // Vertex buffer written by M5a; vertex count written by M5b.
                         // drawIndirect reads the vertex count from indirectArgsBuffer without
                         // any CPU readback — the count stays entirely on the GPU.
-                        pass.setVertexBuffer(0, gp!!.vertexBuffer)
+                        pass.setVertexBuffer(0, gp.vertexBuffer)
                         pass.drawIndirect(gp.indirectArgsBuffer, 0L)
                     }
                     pass.end()
