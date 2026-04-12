@@ -58,11 +58,14 @@ fun IsometricScope.Shape(
         is IsometricMaterial.FlatColor -> material.color
         else -> LocalDefaultColor.current
     }
-    // UV provider: generates per-face UVs when material is Textured and geometry is a Prism
+    // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
+    // Closes over the original Prism reference (model-space dimensions) rather than
+    // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
+    val prism = geometry as? Prism
     val uvProvider: ((Shape, Int) -> FloatArray?)? = if (
-        material is IsometricMaterial.Textured && geometry is Prism
+        material is IsometricMaterial.Textured && prism != null
     ) {
-        { shape, faceIndex -> UvGenerator.forPrismFace(shape as Prism, faceIndex) }
+        { _, faceIndex -> UvGenerator.forPrismFace(prism, faceIndex) }
     } else null
 
     ReusableComposeNode<ShapeNode, IsometricApplier>(
