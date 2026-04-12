@@ -45,6 +45,10 @@ import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
 import io.github.jayteealao.isometric.webgpu.WebGpuProviderImpl
+import io.github.jayteealao.isometric.shader.Shape as MaterialShape
+import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
+import io.github.jayteealao.isometric.shader.texturedBitmap
+import android.graphics.Bitmap
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
@@ -97,6 +101,11 @@ private fun WebGpuSamplesScreen() {
                 onClick = { selectedTab = 2 },
                 text = { Text("Dense Grid") }
             )
+            Tab(
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 },
+                text = { Text("Textured") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -104,6 +113,7 @@ private fun WebGpuSamplesScreen() {
                 0 -> AnimatedTowersBackendSample()
                 1 -> WebGpuSmokeSample()
                 2 -> WebGpuDenseGridSample()
+                3 -> WebGpuTexturedSample()
             }
         }
     }
@@ -397,6 +407,84 @@ private fun WebGpuGridScene(
                     ),
                     color = IsoColor(245.0, 245.0, 255.0)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WebGpuTexturedSample() {
+    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu()) }
+
+    val checkerboard = remember {
+        val size = 16
+        val cellSize = 8
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                val isMagenta = ((x / cellSize) + (y / cellSize)) % 2 == 0
+                pixels[y * size + x] = if (isMagenta) 0xFFFF00FF.toInt() else 0xFF000000.toInt()
+            }
+        }
+        Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            elevation = 2.dp
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = "Textured Prisms", style = MaterialTheme.typography.subtitle1)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Render mode", style = MaterialTheme.typography.caption)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TogglePill(
+                        label = "Canvas",
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.Cpu,
+                        onClick = { renderMode = RenderMode.Canvas() }
+                    )
+                    TogglePill(
+                        label = "Canvas + GPU Sort",
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.WebGpu,
+                        onClick = { renderMode = RenderMode.Canvas(compute = RenderMode.Canvas.Compute.WebGpu) }
+                    )
+                    TogglePill(
+                        label = "Full WebGPU",
+                        selected = renderMode is RenderMode.WebGpu,
+                        onClick = { renderMode = RenderMode.WebGpu() }
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            ProvideTextureRendering {
+                IsometricScene(
+                    modifier = Modifier.fillMaxSize(),
+                    config = SceneConfig(
+                        renderMode = renderMode,
+                        gestures = GestureConfig.Disabled,
+                    )
+                ) {
+                    // Textured prism (checkerboard)
+                    MaterialShape(
+                        geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                        material = texturedBitmap(checkerboard),
+                    )
+                    // Flat-color prism (backward compat — should stay blue)
+                    Shape(
+                        geometry = Prism(position = Point(2.0, 0.0, 0.0)),
+                        color = IsoColor(33.0, 150.0, 243.0),
+                    )
+                    // Another textured prism (cache reuse)
+                    MaterialShape(
+                        geometry = Prism(position = Point(4.0, 0.0, 0.0)),
+                        material = texturedBitmap(checkerboard),
+                    )
+                }
             }
         }
     }
