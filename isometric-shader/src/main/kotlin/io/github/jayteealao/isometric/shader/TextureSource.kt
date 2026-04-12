@@ -50,5 +50,18 @@ sealed interface TextureSource {
         init {
             require(!bitmap.isRecycled) { "Bitmap must not be recycled" }
         }
+
+        /**
+         * Verifies the bitmap is still usable. Call this before accessing [bitmap]
+         * pixels in a renderer — catches bitmaps recycled after construction.
+         *
+         * @throws IllegalStateException if the bitmap has been recycled since construction
+         */
+        fun ensureNotRecycled() {
+            check(!bitmap.isRecycled) {
+                "Bitmap was recycled after BitmapSource was created. " +
+                    "Do not recycle a bitmap while any material referencing it is active."
+            }
+        }
     }
 }

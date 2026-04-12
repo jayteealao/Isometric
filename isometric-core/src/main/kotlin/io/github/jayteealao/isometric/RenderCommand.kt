@@ -53,7 +53,7 @@ class RenderCommand(
             originalShape == other.originalShape &&
             ownerNodeId == other.ownerNodeId &&
             material == other.material &&
-            (uvCoords contentEquals other.uvCoords)
+            uvCoords.contentEqualsNullable(other.uvCoords)
 
     override fun hashCode(): Int {
         var result = commandId.hashCode()
@@ -70,4 +70,11 @@ class RenderCommand(
 
     override fun toString(): String =
         "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }})"
+}
+
+/** Null-safe contentEquals for nullable FloatArrays. Both null → true. */
+private fun FloatArray?.contentEqualsNullable(other: FloatArray?): Boolean = when {
+    this === other -> true          // both null, or same reference
+    this == null || other == null -> false
+    else -> contentEquals(other)
 }

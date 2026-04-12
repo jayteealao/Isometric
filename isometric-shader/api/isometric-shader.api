@@ -87,6 +87,7 @@ public final class io/github/jayteealao/isometric/shader/TextureSource$BitmapSou
 	public final fun component1 ()Landroid/graphics/Bitmap;
 	public final fun copy (Landroid/graphics/Bitmap;)Lio/github/jayteealao/isometric/shader/TextureSource$BitmapSource;
 	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/shader/TextureSource$BitmapSource;Landroid/graphics/Bitmap;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/TextureSource$BitmapSource;
+	public final fun ensureNotRecycled ()V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBitmap ()Landroid/graphics/Bitmap;
 	public fun hashCode ()I
