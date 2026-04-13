@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-12T23:26:45Z"
-slices-implemented: 5
+updated-at: "2026-04-13T08:07:24Z"
+slices-implemented: 6
 slices-total: 6
-metric-total-files-changed: 45
-metric-total-lines-added: 1764
+metric-total-files-changed: 49
+metric-total-lines-added: 1979
 metric-total-lines-removed: 470
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders per-face-materials"
+next-invocation: "/wf-verify texture-material-shaders sample-demo"
 ---
 
 # Implement Index
@@ -48,7 +48,10 @@ next-invocation: "/wf-verify texture-material-shaders per-face-materials"
 - Summary: PerFace uses PrismFace keys + resolve() method, PerFaceMaterialScope DSL, faceType on RenderCommand, Canvas per-face resolution, TextureAtlasManager for WebGPU multi-texture, FaceData 144→160 bytes, emit shader UV transform
 - Record: [05-implement-per-face-materials.md](05-implement-per-face-materials.md)
 
-### `sample-demo` — not started
+### `sample-demo` — complete
+- Files: 4 (2 new, 2 modified)
+- Summary: TextureAssets (procedural grass/dirt bitmaps), TexturedDemoActivity (render mode toggle + 4x4 perFace prism grid), manifest + MainActivity entries
+- Record: [05-implement-sample-demo.md](05-implement-sample-demo.md)
 
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`
@@ -58,5 +61,5 @@ next-invocation: "/wf-verify texture-material-shaders per-face-materials"
 - `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders per-face-materials`
+- **Option A (default):** `/wf-verify texture-material-shaders sample-demo`
 - **Option B:** `/compact` then Option A — clear implementation context

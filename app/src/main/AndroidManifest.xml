@@ -27,6 +27,9 @@
         <activity android:name=".InteractionSamplesActivity"
             android:label="Interaction API"
             android:exported="true" />
+        <activity android:name=".TexturedDemoActivity"
+            android:label="Textured Materials"
+            android:exported="true" />
     </application>
 
 </manifest>
