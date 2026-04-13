@@ -72,6 +72,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * @group(0) @binding(3) var<uniform>              params:           EmitUniforms
  * @group(0) @binding(4) var<storage, read>        sceneTexIndices:  array<u32>
  * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<vec4<f32>>
+ * @group(0) @binding(6) var<storage, read>        sceneUvCoords:    array<vec4<f32>>
  * ```
  *
  * ## Struct compatibility
@@ -171,6 +172,8 @@ internal object TriangulateEmitShader {
         // Compact per-face UV region buffer, indexed by originalIndex.
         // Each vec4 = (uvOffsetU, uvOffsetV, uvScaleU, uvScaleV).
         @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<vec4<f32>>;
+        // Per-vertex UV coordinates: 3 × vec4 per face = (u0,v0,u1,v1)(u2,v2,u3,v3)(u4,v4,u5,v5)
+        @group(0) @binding(6) var<storage, read>        sceneUvCoords: array<vec4<f32>>;
 
         // Writes one vertex at flat u32 offset [base] (base must be a multiple of 9).
         // Vertex layout (36 bytes, 9 × u32, matches GpuRenderPipeline vertex attributes):
@@ -255,42 +258,46 @@ internal object TriangulateEmitShader {
             // This avoids the previous pattern of clearing all 12 slots then overwriting,
             // reducing storage writes by ~33% for the common quad case.
 
-            // Base UVs for quad fan: (0,0)(1,0)(1,1)(0,1)
+            // Per-vertex UVs from UvGenerator, packed as 3 × vec4 per face.
             // Atlas transform: atlasUV = baseUV * uvScale + uvOffset
-            let uv00 = vec2<f32>(0.0, 0.0) * uvSc + uvOff;
-            let uv10 = vec2<f32>(1.0, 0.0) * uvSc + uvOff;
-            let uv11 = vec2<f32>(1.0, 1.0) * uvSc + uvOff;
-            let uv01 = vec2<f32>(0.0, 1.0) * uvSc + uvOff;
+            let uvBase = key.originalIndex * 3u;
+            let uvPack0 = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
+            let uvPack1 = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
+            let uvPack2 = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
+            let uv0 = vec2<f32>(uvPack0.x, uvPack0.y) * uvSc + uvOff;
+            let uv1 = vec2<f32>(uvPack0.z, uvPack0.w) * uvSc + uvOff;
+            let uv2 = vec2<f32>(uvPack1.x, uvPack1.y) * uvSc + uvOff;
+            let uv3 = vec2<f32>(uvPack1.z, uvPack1.w) * uvSc + uvOff;
+            let uv4 = vec2<f32>(uvPack2.x, uvPack2.y) * uvSc + uvOff;
+            let uv5 = vec2<f32>(uvPack2.z, uvPack2.w) * uvSc + uvOff;
 
             // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
-            writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, uv00.x, uv00.y, texIdx);
-            writeVertex((base + 1u) * 9u, nx1, ny1, r, g, b, a, uv10.x, uv10.y, texIdx);
-            writeVertex((base + 2u) * 9u, nx2, ny2, r, g, b, a, uv11.x, uv11.y, texIdx);
+            writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
+            writeVertex((base + 1u) * 9u, nx1, ny1, r, g, b, a, uv1.x, uv1.y, texIdx);
+            writeVertex((base + 2u) * 9u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, texIdx);
 
             // Compute how many real triangles we have (1–4 based on vertexCount 3–6)
             let triCount = vertexCount - 2u;
 
             // Triangle 1: (s0, s2, s3)
             if (triCount >= 2u) {
-                writeVertex((base + 3u) * 9u, nx0, ny0, r, g, b, a, uv00.x, uv00.y, texIdx);
-                writeVertex((base + 4u) * 9u, nx2, ny2, r, g, b, a, uv11.x, uv11.y, texIdx);
-                writeVertex((base + 5u) * 9u, nx3, ny3, r, g, b, a, uv01.x, uv01.y, texIdx);
+                writeVertex((base + 3u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
+                writeVertex((base + 4u) * 9u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, texIdx);
+                writeVertex((base + 5u) * 9u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, texIdx);
             }
 
             // Triangle 2: (s0, s3, s4) — for 5+ vertex faces (pentagon)
             if (triCount >= 3u) {
-                let uvMid = vec2<f32>(0.5, 0.5) * uvSc + uvOff;
-                writeVertex((base + 6u) * 9u, nx0, ny0, r, g, b, a, uv00.x, uv00.y, texIdx);
-                writeVertex((base + 7u) * 9u, nx3, ny3, r, g, b, a, uvMid.x, uvMid.y, texIdx);
-                writeVertex((base + 8u) * 9u, nx4, ny4, r, g, b, a, uvMid.x, uvMid.y, texIdx);
+                writeVertex((base + 6u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
+                writeVertex((base + 7u) * 9u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, texIdx);
+                writeVertex((base + 8u) * 9u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, texIdx);
             }
 
             // Triangle 3: (s0, s4, s5) — for 6-vertex faces (hexagon)
             if (triCount >= 4u) {
-                let uvMid = vec2<f32>(0.5, 0.5) * uvSc + uvOff;
-                writeVertex((base + 9u) * 9u, nx0, ny0, r, g, b, a, uv00.x, uv00.y, texIdx);
-                writeVertex((base + 10u) * 9u, nx4, ny4, r, g, b, a, uvMid.x, uvMid.y, texIdx);
-                writeVertex((base + 11u) * 9u, nx5, ny5, r, g, b, a, uvMid.x, uvMid.y, texIdx);
+                writeVertex((base + 9u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
+                writeVertex((base + 10u) * 9u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, texIdx);
+                writeVertex((base + 11u) * 9u, nx5, ny5, r, g, b, a, uv5.x, uv5.y, texIdx);
             }
 
             // Fill remaining degenerate slots (from triCount*3 to 11)

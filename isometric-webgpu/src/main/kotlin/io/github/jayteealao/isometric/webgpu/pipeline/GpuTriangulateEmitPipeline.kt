@@ -139,6 +139,7 @@ internal class GpuTriangulateEmitPipeline(
     private var lastSortedKeysBuffer: GPUBuffer? = null
     private var lastTexIndexBuffer: GPUBuffer? = null
     private var lastUvRegionBuffer: GPUBuffer? = null
+    private var lastUvCoordsBuffer: GPUBuffer? = null
 
     // ── Exposed buffers ───────────────────────────────────────────────────────
 
@@ -228,6 +229,12 @@ internal class GpuTriangulateEmitPipeline(
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
                     ),
+                    // binding 6 — per-vertex UV coordinates (read-only, 3 × vec4 per face)
+                    GPUBindGroupLayoutEntry(
+                        binding = 6,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
+                    ),
                 )
             )
         )
@@ -270,6 +277,8 @@ internal class GpuTriangulateEmitPipeline(
      * @param texIndexBuffer    Compact per-face texture index buffer (binding 4).
      * @param uvRegionBuffer   Compact per-face UV region buffer (binding 5). Each entry
      *                         is 4 floats: [uvOffsetU, uvOffsetV, uvScaleU, uvScaleV].
+     * @param uvCoordsBuffer   Per-vertex UV coordinates buffer (binding 6). Each face
+     *                         gets 3 × vec4<f32> = 48 bytes: [(u0,v0,u1,v1),(u2,v2,u3,v3),(u4,v4,u5,v5)].
      */
     fun ensureBuffers(
         paddedCount: Int,
@@ -279,6 +288,7 @@ internal class GpuTriangulateEmitPipeline(
         sortedKeysBuffer: GPUBuffer,
         texIndexBuffer: GPUBuffer,
         uvRegionBuffer: GPUBuffer,
+        uvCoordsBuffer: GPUBuffer,
     ) {
         require(paddedCount > 0) { "paddedCount must be > 0, got $paddedCount" }
 
@@ -288,7 +298,8 @@ internal class GpuTriangulateEmitPipeline(
             transformedBuffer        === lastTransformedBuffer &&
             sortedKeysBuffer         === lastSortedKeysBuffer &&
             texIndexBuffer           === lastTexIndexBuffer &&
-            uvRegionBuffer           === lastUvRegionBuffer
+            uvRegionBuffer           === lastUvRegionBuffer &&
+            uvCoordsBuffer           === lastUvCoordsBuffer
         if (same) return
 
         // Release stale bind group before rebuilding.
@@ -357,6 +368,7 @@ internal class GpuTriangulateEmitPipeline(
                     GPUBindGroupEntry(binding = 3, buffer = paramsBuffer!!),
                     GPUBindGroupEntry(binding = 4, buffer = texIndexBuffer),
                     GPUBindGroupEntry(binding = 5, buffer = uvRegionBuffer),
+                    GPUBindGroupEntry(binding = 6, buffer = uvCoordsBuffer),
                 )
             )
         )
@@ -368,6 +380,7 @@ internal class GpuTriangulateEmitPipeline(
         lastSortedKeysBuffer  = sortedKeysBuffer
         lastTexIndexBuffer    = texIndexBuffer
         lastUvRegionBuffer    = uvRegionBuffer
+        lastUvCoordsBuffer    = uvCoordsBuffer
 
         Log.d(
             TAG,
@@ -453,5 +466,6 @@ internal class GpuTriangulateEmitPipeline(
         lastSortedKeysBuffer  = null
         lastTexIndexBuffer    = null
         lastUvRegionBuffer    = null
+        lastUvCoordsBuffer    = null
     }
 }

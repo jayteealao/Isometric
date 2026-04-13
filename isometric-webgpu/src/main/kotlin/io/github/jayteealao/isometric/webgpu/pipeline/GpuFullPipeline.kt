@@ -242,6 +242,7 @@ internal class GpuFullPipeline(
             sortedKeysBuffer  = sort.resultBuffer,
             texIndexBuffer    = textureManager.texIndexGpuBuffer!!,
             uvRegionBuffer    = textureManager.uvRegionGpuBuffer!!,
+            uvCoordsBuffer    = textureManager.uvCoordsGpuBuffer!!,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
