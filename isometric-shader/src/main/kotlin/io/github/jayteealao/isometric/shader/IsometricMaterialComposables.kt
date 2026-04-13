@@ -57,8 +57,8 @@ fun IsometricScope.Shape(
 ) {
     val color = when (material) {
         is IsometricMaterial.FlatColor -> material.color
-        is IsometricMaterial.Textured -> IsoColor.WHITE
-        is IsometricMaterial.PerFace -> IsoColor.WHITE
+        is IsometricMaterial.Textured -> material.tint
+        is IsometricMaterial.PerFace -> LocalDefaultColor.current
     }
     // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
     // Closes over the original Prism reference (model-space dimensions) rather than
@@ -144,8 +144,8 @@ fun IsometricScope.Path(
 ) {
     val color = when (material) {
         is IsometricMaterial.FlatColor -> material.color
-        is IsometricMaterial.Textured -> IsoColor.WHITE
-        is IsometricMaterial.PerFace -> IsoColor.WHITE
+        is IsometricMaterial.Textured -> material.tint
+        is IsometricMaterial.PerFace -> LocalDefaultColor.current
     }
     ReusableComposeNode<PathNode, IsometricApplier>(
         factory = { PathNode(path, color).also { it.material = material } },

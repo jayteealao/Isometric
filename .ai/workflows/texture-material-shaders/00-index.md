@@ -7,7 +7,7 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-13T08:07:24Z"
+updated-at: "2026-04-13T18:07:17Z"
 selected-slice: "sample-demo"
 current-stage-status: active
 branch-strategy: dedicated
@@ -17,8 +17,8 @@ pr-url: ""
 pr-number: 0
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders sample-demo"
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders sample-demo reviews"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -58,6 +58,13 @@ workflow-files:
   - 05-implement-webgpu-textures.md
   - 05-implement-per-face-materials.md
   - 05-implement-sample-demo.md
+  - 06-verify-sample-demo.md
+  - 07-review-sample-demo.md
+  - 07-review-sample-demo-correctness.md
+  - 07-review-sample-demo-security.md
+  - 07-review-sample-demo-code-simplification.md
+  - 07-review-sample-demo-performance.md
+  - 07-review-sample-demo-architecture.md
   - 06-verify-per-face-materials.md
   - 06-verify-per-face-materials.md
   - 06-verify-webgpu-textures.md
@@ -82,6 +89,7 @@ progress:
   plan: complete
   implement: complete
   verify: complete
+  sample-demo-verify: complete
   review: in-progress
   handoff: not-started
   ship: not-started

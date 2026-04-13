@@ -38,19 +38,19 @@ internal class GrowableGpuStagingBuffer(
     fun ensureCapacity(entryCount: Int, entryBytes: Int) {
         if (entryCount > capacity) {
             gpuBuffer?.close()
-            val newCapacity = entryCount * 2
+            val newCapacity = entryCount.toLong() * 2L
             gpuBuffer = ctx.device.createBuffer(
                 GPUBufferDescriptor(
                     usage = usage,
-                    size = (newCapacity * entryBytes).toLong(),
+                    size = newCapacity * entryBytes.toLong(),
                 )
             ).also { it.setLabel(label) }
-            capacity = newCapacity
+            capacity = newCapacity.toInt()
         }
-        val requiredBytes = entryCount * entryBytes
+        val requiredBytes = entryCount.toLong() * entryBytes.toLong()
         val cpu = cpuBuffer
-        if (cpu == null || cpu.capacity() < requiredBytes) {
-            cpuBuffer = ByteBuffer.allocateDirect(requiredBytes * 2).order(ByteOrder.nativeOrder())
+        if (cpu == null || cpu.capacity().toLong() < requiredBytes) {
+            cpuBuffer = ByteBuffer.allocateDirect((requiredBytes * 2L).toInt()).order(ByteOrder.nativeOrder())
         }
     }
 

@@ -190,6 +190,17 @@ internal class GpuTriangulateEmitPipeline(
             )
         )
 
+        // Storage-buffer slot usage (WebGPU limit: maxStorageBuffersPerShaderStage = 8):
+        //   binding 0 — transformed    (ReadOnlyStorage)
+        //   binding 1 — sortedKeys     (ReadOnlyStorage)
+        //   binding 2 — vertices       (Storage, read_write)
+        //   binding 4 — sceneTexIndices (ReadOnlyStorage)
+        //   binding 5 — sceneUvRegions  (ReadOnlyStorage)
+        //   binding 6 — sceneUvCoords   (ReadOnlyStorage)
+        // Total: 6 of 8 storage-buffer slots used; 2 slots remain.
+        // Binding 3 is a Uniform buffer and does not count against this limit.
+        // If approaching the limit, consider consolidating sceneTexIndices + sceneUvRegions
+        // into a single interleaved buffer (5 u32 per face, ~20 bytes, still < 32 b alignment).
         val bgl = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(
                 entries = arrayOf(

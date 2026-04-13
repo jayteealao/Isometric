@@ -12,7 +12,7 @@ metric-lines-added: 215
 metric-lines-removed: 0
 metric-deviations-from-plan: 0
 metric-review-fixes-applied: 0
-commit-sha: ""
+commit-sha: "a73d6fe"
 tags: [sample, demo, texture, per-face]
 refs:
   index: 00-index.md

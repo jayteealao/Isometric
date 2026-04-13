@@ -29,7 +29,7 @@
             android:exported="true" />
         <activity android:name=".TexturedDemoActivity"
             android:label="Textured Materials"
-            android:exported="true" />
+            android:exported="false" />
     </application>
 
 </manifest>

@@ -26,9 +26,10 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *
  * ## UV coordinates
  *
- * Standard Prism quad UVs are emitted as constants: `(0,0)(1,0)(1,1)(0,1)` for the
- * 4-vertex fan. This matches the CPU-side uv-generation output for all standard Prism
- * faces. Custom UV transforms require a GPU-side UV buffer in a future slice.
+ * Per-vertex UVs are read from `sceneUvCoords` (binding 6), packed as 3 × vec4 per face.
+ * An atlas transform (`atlasUV = baseUV * uvScale + uvOffset`) is applied using the region
+ * from `sceneUvRegions` (binding 5). Faces without UV data receive default quad UVs
+ * `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex slots by the CPU-side packer.
  *
  * ## Why fixed stride (no atomicAdd)?
  *

@@ -90,6 +90,10 @@ internal class GpuFullPipeline(
 
     private val textureManager = GpuTextureManager(ctx)
 
+    // ── Per-vertex UV coords (geometry concern, separate from atlas) ──────────
+
+    private val uvCoordsBuffer = GpuUvCoordsBuffer(ctx)
+
     // ── Reusable indirect-args staging buffer ─────────────────────────────────
 
     /**
@@ -213,6 +217,8 @@ internal class GpuFullPipeline(
 
         // ── Texture upload (atlas + tex-index + UV region) ───────────────────
         textureManager.uploadTextures(scene, faceCount)
+        // ── Per-vertex UV coords (geometry concern, separate from atlas) ─────
+        uvCoordsBuffer.upload(scene, faceCount)
 
         // paddedCount must be a power of two for the bitonic sort network to be correct.
         val paddedCount = BitonicSortNetwork.nextPowerOfTwo(faceCount)
@@ -242,7 +248,7 @@ internal class GpuFullPipeline(
             sortedKeysBuffer  = sort.resultBuffer,
             texIndexBuffer    = textureManager.texIndexGpuBuffer!!,
             uvRegionBuffer    = textureManager.uvRegionGpuBuffer!!,
-            uvCoordsBuffer    = textureManager.uvCoordsGpuBuffer!!,
+            uvCoordsBuffer    = uvCoordsBuffer.gpuBuffer!!,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
@@ -363,6 +369,7 @@ internal class GpuFullPipeline(
     override fun close() {
         // Close texture manager (atlas, bind group, tex-index, UV region)
         textureManager.close()
+        uvCoordsBuffer.close()
 
         // Close compute sub-pipelines in reverse-dependency order.
         emit.close()

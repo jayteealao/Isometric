@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-12T23:35:33Z"
-slices-verified: 5
+updated-at: "2026-04-13T17:57:30Z"
+slices-verified: 6
 slices-total: 6
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders per-face-materials"
+next-invocation: "/wf-review texture-material-shaders sample-demo"
 ---
 
 # Verify Index
@@ -47,15 +47,23 @@ next-invocation: "/wf-review texture-material-shaders per-face-materials"
 - Issues: 0
 - Record: [06-verify-webgpu-textures.md](06-verify-webgpu-textures.md)
 
-### `per-face-materials` — PARTIAL (automated pass, visual deferred)
-- Checks: 3/3 passed (build, tests, apiCheck)
+### `per-face-materials` — PARTIAL (automated pass, visual deferred, post-review-fix)
+- Checks: 3/3 passed (build, tests, apiCheck) — re-verified after 8 review fixes
 - Acceptance: 1/3 met (AC3 via unit tests), 2/3 deferred (AC1, AC2 need sample scene)
 - Interactive: 0 runs — sample app lacks perFace {} scene (sample-demo slice)
-- Code path review: 5/5 integration points verified structurally correct
+- Review fixes: 8/8 applied and verified (PF-1 through PF-9)
 - Issues: 0
 - Record: [06-verify-per-face-materials.md](06-verify-per-face-materials.md)
 
+### `sample-demo` — PASS (after 4 bugfixes)
+- Checks: 3/3 passed (build, tests, apiCheck)
+- Acceptance: 3/3 met
+- Interactive: 4 runs (Canvas, Canvas+GPU Sort, Full WebGPU, mode cycling) — all pass
+- Issues: 4 found (VF-1 through VF-4) — all fixed and committed
+- Evidence: `verify-evidence/v-canvas-final-sm.png`, `verify-evidence/v-webgpu-uv-sm.png`
+- Record: [06-verify-sample-demo.md](06-verify-sample-demo.md)
+
 ## Recommended Next Stage
-- **Option A (default):** `/wf-review texture-material-shaders per-face-materials` — all automated checks pass
-- **Option B:** `/wf-implement texture-material-shaders sample-demo` — implement sample-demo first, verify both visually
-- **Option C:** `/compact` then Option A
+- **Option A (default):** `/wf-review texture-material-shaders sample-demo` — all checks pass, all ACs met
+- **Option B:** `/compact` then Option A — clear verification context (recommended)
+- **Option C:** `/wf-handoff texture-material-shaders sample-demo` — skip review

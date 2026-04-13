@@ -46,6 +46,14 @@ internal class GpuTextureManager(
     /** Signature of the last atlas build, to detect changes. */
     private var lastAtlasSignature: Set<TextureSource>? = null
 
+    /**
+     * Combined hash of [PreparedScene.commands.size] and [PreparedScene.commands.hashCode]
+     * at the last [uploadTextures] call. Used to skip redundant [writeBuffer] calls when
+     * the command list is unchanged between frames. Note: [uploadAtlasAndBindGroup] has
+     * its own cache ([lastAtlasSignature]) and is not guarded by this hash.
+     */
+    private var lastUploadedCommandsHash: Int = Int.MIN_VALUE
+
     /** Current texture bind group for the render pass. */
     private var _textureBindGroup: GPUBindGroup? = null
 
@@ -60,16 +68,12 @@ internal class GpuTextureManager(
 
     private val texIndexBuf = GrowableGpuStagingBuffer(ctx, label = "IsometricTexIndices")
     private val uvRegionBuf = GrowableGpuStagingBuffer(ctx, label = "IsometricUvRegions")
-    private val uvCoordsBuf = GrowableGpuStagingBuffer(ctx, label = "IsometricUvCoords")
 
     /** The backing [GPUBuffer] for per-face texture indices. Null until first [uploadTextures]. */
     val texIndexGpuBuffer: GPUBuffer? get() = texIndexBuf.gpuBuffer
 
     /** The backing [GPUBuffer] for per-face UV regions. Null until first [uploadTextures]. */
     val uvRegionGpuBuffer: GPUBuffer? get() = uvRegionBuf.gpuBuffer
-
-    /** The backing [GPUBuffer] for per-vertex UV coordinates. Null until first [uploadTextures]. */
-    val uvCoordsGpuBuffer: GPUBuffer? get() = uvCoordsBuf.gpuBuffer
 
     // ── Initialisation ────────────────────────────────────────────────────────
 
@@ -102,10 +106,16 @@ internal class GpuTextureManager(
      * @param faceCount Number of faces to pack (must match the scene's command count).
      */
     fun uploadTextures(scene: PreparedScene, faceCount: Int) {
+        // Atlas rebuild has its own cache (lastAtlasSignature) — always run it independently.
         uploadAtlasAndBindGroup(scene)
+
+        // Skip the three writeBuffer calls when the command list is identical to last frame.
+        val commandsHash = 31 * scene.commands.size + scene.commands.hashCode()
+        if (commandsHash == lastUploadedCommandsHash) return
+        lastUploadedCommandsHash = commandsHash
+
         uploadTexIndexBuffer(scene, faceCount)
         uploadUvRegionBuffer(scene, faceCount)
-        uploadUvCoordsBuffer(scene, faceCount)
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -205,9 +215,14 @@ internal class GpuTextureManager(
      */
     private fun uploadTexIndexBuffer(scene: PreparedScene, faceCount: Int) {
         if (faceCount == 0) return
+        val requiredBytes = faceCount * 4
         texIndexBuf.ensureCapacity(faceCount, entryBytes = 4)
-        SceneDataPacker.packTexIndicesInto(scene.commands, texIndexBuf.cpuBuffer!!, faceCount)
-        ctx.queue.writeBuffer(texIndexBuf.gpuBuffer!!, 0L, texIndexBuf.cpuBuffer!!)
+        val buf = texIndexBuf.cpuBuffer!!
+        buf.rewind()
+        buf.limit(requiredBytes)
+        SceneDataPacker.packTexIndicesInto(scene.commands, buf, faceCount)
+        buf.rewind()
+        ctx.queue.writeBuffer(texIndexBuf.gpuBuffer!!, 0L, buf)
     }
 
     /**
@@ -246,41 +261,6 @@ internal class GpuTextureManager(
     }
 
     /**
-     * Pack and upload per-vertex UV coordinates for the emit shader.
-     * Each face gets 3 × vec4<f32> = 48 bytes, packing up to 6 UV pairs:
-     * `(u0,v0,u1,v1)`, `(u2,v2,u3,v3)`, `(u4,v4,u5,v5)`.
-     * Faces without UV data get identity quad UVs `(0,0)(1,0)(1,1)(0,1)(0,0)(0,0)`.
-     */
-    private fun uploadUvCoordsBuffer(scene: PreparedScene, faceCount: Int) {
-        if (faceCount == 0) return
-
-        val entryBytes = 48 // 3 × vec4<f32> = 12 floats × 4 bytes
-        uvCoordsBuf.ensureCapacity(faceCount, entryBytes)
-
-        val requiredBytes = faceCount * entryBytes
-        val buf = uvCoordsBuf.cpuBuffer!!
-        buf.rewind()
-        buf.limit(requiredBytes)
-        for (i in 0 until faceCount) {
-            val uv = scene.commands[i].uvCoords
-            if (uv != null && uv.size >= 8) {
-                // Pack available UV pairs, pad remaining with (0,0)
-                for (j in 0 until 12) {
-                    buf.putFloat(if (j < uv.size) uv[j] else 0f)
-                }
-            } else {
-                // Default quad UVs: (0,0)(1,0)(1,1)(0,1)(0,0)(0,0)
-                buf.putFloat(0f); buf.putFloat(0f); buf.putFloat(1f); buf.putFloat(0f)
-                buf.putFloat(1f); buf.putFloat(1f); buf.putFloat(0f); buf.putFloat(1f)
-                buf.putFloat(0f); buf.putFloat(0f); buf.putFloat(0f); buf.putFloat(0f)
-            }
-        }
-        buf.rewind()
-
-        ctx.queue.writeBuffer(uvCoordsBuf.gpuBuffer!!, 0L, buf)
-    }
-
-    /**
      * Resolve the atlas region for a command's effective texture. Returns null for
      * non-textured faces. Expands [IsometricMaterial.PerFace] using the command's
      * [RenderCommand.faceType].
@@ -315,6 +295,7 @@ internal class GpuTextureManager(
             atlasManager.destroy()
             lastAtlasSignature = null
         }
+        lastUploadedCommandsHash = Int.MIN_VALUE
         rebuildBindGroup(textureStore.fallbackTextureView)
     }
 
@@ -325,10 +306,10 @@ internal class GpuTextureManager(
         _textureBindGroup = null
         if (::atlasManager.isInitialized) atlasManager.destroy()
         lastAtlasSignature = null
+        lastUploadedCommandsHash = Int.MIN_VALUE
         if (::textureBinder.isInitialized) textureBinder.close()
         textureStore.close()
         texIndexBuf.close()
         uvRegionBuf.close()
-        uvCoordsBuf.close()
     }
 }

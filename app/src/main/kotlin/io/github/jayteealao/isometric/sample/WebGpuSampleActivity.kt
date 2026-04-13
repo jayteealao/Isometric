@@ -310,29 +310,6 @@ private fun AnimatedTowersBackendSample() {
 }
 
 @Composable
-private fun TogglePill(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Card(
-        backgroundColor = if (selected) MaterialTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent,
-        elevation = 0.dp,
-        modifier = Modifier
-            .padding(top = 2.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            color = if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
-            style = MaterialTheme.typography.body2,
-        )
-    }
-}
-
-@Composable
 private fun AnimatedTowersScene(
     phase: Double,
     renderMode: RenderMode,
