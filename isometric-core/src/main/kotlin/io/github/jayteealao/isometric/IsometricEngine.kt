@@ -352,6 +352,7 @@ class IsometricEngine @JvmOverloads constructor(
                     baseColor = transformedItem.item.baseColor,
                     material = transformedItem.item.material,
                     uvCoords = transformedItem.item.uvCoords,
+                    faceType = transformedItem.item.faceType,
                 )
             )
         }
