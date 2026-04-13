@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.PrismFace
+
 /**
  * Abstraction over the isometric projection pipeline.
  *
@@ -37,6 +39,7 @@ interface SceneProjector {
         ownerNodeId: String? = null,
         material: MaterialData? = null,
         uvCoords: FloatArray? = null,
+        faceType: PrismFace? = null,
     )
 
     /**

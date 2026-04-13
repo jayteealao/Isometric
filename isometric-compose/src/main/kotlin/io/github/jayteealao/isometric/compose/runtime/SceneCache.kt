@@ -116,6 +116,7 @@ internal class SceneCache(
                     ownerNodeId = command.ownerNodeId,
                     material = command.material,
                     uvCoords = command.uvCoords,
+                    faceType = command.faceType,
                 )
             }
 
@@ -185,6 +186,7 @@ internal class SceneCache(
                     ownerNodeId = command.ownerNodeId,
                     material = command.material,
                     uvCoords = command.uvCoords,
+                    faceType = command.faceType,
                 )
             }
 

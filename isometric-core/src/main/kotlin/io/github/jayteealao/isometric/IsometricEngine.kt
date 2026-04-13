@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.PrismFace
 import kotlin.math.PI
 
 /**
@@ -182,7 +183,8 @@ class IsometricEngine @JvmOverloads constructor(
         ownerNodeId: String?,
         material: MaterialData?,
         uvCoords: FloatArray?,
-    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId, material, uvCoords)
+        faceType: PrismFace?,
+    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId, material, uvCoords, faceType)
 
     /**
      * Removes all items from the scene graph.
@@ -235,6 +237,7 @@ class IsometricEngine @JvmOverloads constructor(
                 baseColor = transformedItem.item.baseColor,
                 material = transformedItem.item.material,
                 uvCoords = transformedItem.item.uvCoords,
+                faceType = transformedItem.item.faceType,
             )
         }
 

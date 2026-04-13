@@ -76,7 +76,7 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 	public fun <init> (DDD)V
 	public fun <init> (DDDLio/github/jayteealao/isometric/IsoColor;)V
 	public synthetic fun <init> (DDDLio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[F)V
+	public fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;)V
 	public fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public fun clear ()V
 	public fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
@@ -265,7 +265,7 @@ public final class io/github/jayteealao/isometric/RenderOptions$Companion {
 
 public abstract interface class io/github/jayteealao/isometric/SceneProjector {
 	public static final field Companion Lio/github/jayteealao/isometric/SceneProjector$Companion;
-	public abstract fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[F)V
+	public abstract fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;)V
 	public abstract fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public abstract fun clear ()V
 	public abstract fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
@@ -279,7 +279,7 @@ public final class io/github/jayteealao/isometric/SceneProjector$Companion {
 }
 
 public final class io/github/jayteealao/isometric/SceneProjector$DefaultImpls {
-	public static synthetic fun add$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FILjava/lang/Object;)V
+	public static synthetic fun add$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;ILjava/lang/Object;)V
 	public static synthetic fun findItemAt$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;DILjava/lang/Object;)Lio/github/jayteealao/isometric/RenderCommand;
 	public static fun getProjectionVersion (Lio/github/jayteealao/isometric/SceneProjector;)J
 	public static synthetic fun projectScene$default (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;ILjava/lang/Object;)Lio/github/jayteealao/isometric/PreparedScene;
