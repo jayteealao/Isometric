@@ -442,7 +442,7 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         GPURenderPassDescriptor(
                             colorAttachments = arrayOf(
                                 GPURenderPassColorAttachment(
-                                    clearValue = GPUColor(0.0, 0.0, 0.0, 0.0),
+                                    clearValue = GPUColor(1.0, 1.0, 1.0, 1.0),
                                     view = textureView,
                                     loadOp = LoadOp.Clear,
                                     storeOp = StoreOp.Store,

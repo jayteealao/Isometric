@@ -19,8 +19,8 @@ import java.nio.ByteOrder
  *
  * Creates a 2×2 magenta/black checkerboard fallback texture on init (used when no
  * texture is loaded). Provides [uploadBitmap] to upload Android [Bitmap] data as
- * `BGRA8Unorm` GPU textures — matching Android's native `ARGB_8888` byte order on
- * little-endian without CPU-side channel swizzle.
+ * `RGBA8Unorm` GPU textures — matching Android's `Bitmap.copyPixelsToBuffer()`
+ * output which writes pixels as R,G,B,A bytes.
  */
 internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
@@ -39,11 +39,11 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
     init {
         ctx.assertGpuThread()
-        // 2×2 BGRA8Unorm checkerboard: magenta, black, black, magenta
+        // 2×2 RGBA8Unorm checkerboard: magenta, black, black, magenta
         val pixels = ByteBuffer.allocateDirect(2 * 2 * 4).order(ByteOrder.nativeOrder())
-        // pixel (0,0): magenta — BGRA = (255, 0, 255, 255)
+        // pixel (0,0): magenta — RGBA = (255, 0, 255, 255)
         pixels.put(0xFF.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte())
-        // pixel (1,0): black — BGRA = (0, 0, 0, 255)
+        // pixel (1,0): black — RGBA = (0, 0, 0, 255)
         pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte())
         // pixel (0,1): black
         pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte())
@@ -65,8 +65,8 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
     /**
      * Upload an Android [Bitmap] to a new GPU texture.
      *
-     * The bitmap must be [Bitmap.Config.ARGB_8888]. On little-endian (all Android devices),
-     * this stores bytes as BGRA in memory — matching [TextureFormat.BGRA8Unorm] exactly.
+     * The bitmap must be [Bitmap.Config.ARGB_8888]. [Bitmap.copyPixelsToBuffer] writes
+     * pixels as R,G,B,A bytes — matching [TextureFormat.RGBA8Unorm].
      *
      * @return The created [GPUTexture]. Caller should call [releaseTexture] when done, or
      *         rely on [close] to release all owned textures.
@@ -111,7 +111,7 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
             GPUTextureDescriptor(
                 usage = TextureUsage.TextureBinding or TextureUsage.CopyDst,
                 size = GPUExtent3D(width = w, height = h),
-                format = TextureFormat.BGRA8Unorm,
+                format = TextureFormat.RGBA8Unorm,
             )
         )
 
