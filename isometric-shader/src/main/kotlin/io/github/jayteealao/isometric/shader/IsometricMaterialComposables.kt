@@ -58,7 +58,14 @@ fun IsometricScope.Shape(
     val color = when (material) {
         is IsometricMaterial.FlatColor -> material.color
         is IsometricMaterial.Textured -> material.tint
-        is IsometricMaterial.PerFace -> LocalDefaultColor.current
+        // PerFace: use WHITE because the GPU lighting shader multiplies baseColor
+        // into litColor, which the fragment shader then multiplies with the texture
+        // sample. Any non-white base color would tint all textured faces. Per-face
+        // material resolution (which face gets which texture) happens at render time,
+        // not here. Canvas flat-color fallback faces also work: TexturedCanvasDrawHook
+        // returns false for FlatColor sub-materials, and the standard paint path uses
+        // the PerFace.default color directly.
+        is IsometricMaterial.PerFace -> IsoColor.WHITE
     }
     // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
     // Closes over the original Prism reference (model-space dimensions) rather than
@@ -145,7 +152,14 @@ fun IsometricScope.Path(
     val color = when (material) {
         is IsometricMaterial.FlatColor -> material.color
         is IsometricMaterial.Textured -> material.tint
-        is IsometricMaterial.PerFace -> LocalDefaultColor.current
+        // PerFace: use WHITE because the GPU lighting shader multiplies baseColor
+        // into litColor, which the fragment shader then multiplies with the texture
+        // sample. Any non-white base color would tint all textured faces. Per-face
+        // material resolution (which face gets which texture) happens at render time,
+        // not here. Canvas flat-color fallback faces also work: TexturedCanvasDrawHook
+        // returns false for FlatColor sub-materials, and the standard paint path uses
+        // the PerFace.default color directly.
+        is IsometricMaterial.PerFace -> IsoColor.WHITE
     }
     ReusableComposeNode<PathNode, IsometricApplier>(
         factory = { PathNode(path, color).also { it.material = material } },

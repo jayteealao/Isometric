@@ -442,7 +442,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                         GPURenderPassDescriptor(
                             colorAttachments = arrayOf(
                                 GPURenderPassColorAttachment(
-                                    clearValue = GPUColor(0.0, 0.0, 0.0, 0.0),
+                                    // White clear so the WebGPU surface matches the Compose
+                                    // Surface background. Transparent (0,0,0,0) composites as
+                                    // black because the SurfaceView is not alpha-composited.
+                                    clearValue = GPUColor(1.0, 1.0, 1.0, 1.0),
                                     view = textureView,
                                     loadOp = LoadOp.Clear,
                                     storeOp = StoreOp.Store,
