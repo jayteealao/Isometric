@@ -12,7 +12,7 @@ import kotlin.math.sqrt
  * These values must match the WGSL struct definitions in `transform_cull_light.wgsl` exactly.
  * Any change here requires a matching change to the shader.
  *
- * ## FaceData memory layout (160 bytes per face)
+ * ## FaceData memory layout (144 bytes per face)
  *
  * ```
  *  offset  size  field
@@ -32,17 +32,13 @@ import kotlin.math.sqrt
  *  112      12   normal      (vec3<f32>)
  *  124       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
  *  128       4   faceIndex   (u32)
- *  132       4   uvOffsetU   (f32 — atlas sub-region U offset)
- *  136       4   uvOffsetV   (f32 — atlas sub-region V offset)
- *  140       4   uvScaleU    (f32 — atlas sub-region U scale)
- *  144       4   uvScaleV    (f32 — atlas sub-region V scale)
- *  148      12   _padding    (3 × u32, to reach 160 = 10 × 16-byte alignment)
- * 160  →   160
+ *  132      12   _padding    (3 × u32, to reach 144 = 9 × 16-byte alignment)
+ * 144  →   144
  * ```
  */
 internal object SceneDataLayout {
     /** Bytes per FaceData struct in the GPU scene-data storage buffer. */
-    const val FACE_DATA_BYTES = 160
+    const val FACE_DATA_BYTES = 144
 
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
     const val TRANSFORMED_FACE_BYTES = 96
@@ -156,15 +152,7 @@ internal object SceneDataPacker {
             // faceIndex: u32 — original command list index (used in sort + emit passes)
             buffer.putInt(index)
 
-            // uvOffset: 2 × f32 — atlas sub-region offset for this face
-            buffer.putFloat(cmd.uvOffset?.get(0) ?: 0f)
-            buffer.putFloat(cmd.uvOffset?.get(1) ?: 0f)
-
-            // uvScale: 2 × f32 — atlas sub-region scale for this face
-            buffer.putFloat(cmd.uvScale?.get(0) ?: 1f)
-            buffer.putFloat(cmd.uvScale?.get(1) ?: 1f)
-
-            // _padding: 12 bytes to reach 160 (16-byte aligned struct size)
+            // _padding: 12 bytes to reach 144 (16-byte aligned struct size)
             buffer.putInt(0)
             buffer.putInt(0)
             buffer.putInt(0)
@@ -188,13 +176,16 @@ internal object SceneDataPacker {
      * Pack a compact `u32` array of texture indices for the M5 emit shader's
      * `sceneTexIndices` binding. One `u32` per command (4 bytes each).
      *
-     * Buffer size must be `≥ commands.size × 4`.
+     * Only the first [faceCount] entries of [commands] are packed, so writes never
+     * exceed the GPU buffer that was sized for exactly [faceCount] entries.
+     *
+     * Buffer size must be `≥ faceCount × 4`.
      */
-    fun packTexIndicesInto(commands: List<RenderCommand>, buffer: ByteBuffer) {
+    fun packTexIndicesInto(commands: List<RenderCommand>, buffer: ByteBuffer, faceCount: Int = commands.size) {
         buffer.rewind()
-        buffer.limit(commands.size * 4)
-        for (cmd in commands) {
-            buffer.putInt(resolveTextureIndex(cmd))
+        buffer.limit(faceCount * 4)
+        for (i in 0 until faceCount) {
+            buffer.putInt(resolveTextureIndex(commands[i]))
         }
         buffer.rewind()
     }

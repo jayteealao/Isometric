@@ -215,8 +215,8 @@ public final class io/github/jayteealao/isometric/ProjectionParams {
 }
 
 public final class io/github/jayteealao/isometric/RenderCommand {
-	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;[F[F)V
-	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;[F[FILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;)V
+	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/PrismFace;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBaseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
@@ -229,8 +229,6 @@ public final class io/github/jayteealao/isometric/RenderCommand {
 	public final fun getPointCount ()I
 	public final fun getPoints ()[D
 	public final fun getUvCoords ()[F
-	public final fun getUvOffset ()[F
-	public final fun getUvScale ()[F
 	public fun hashCode ()I
 	public final fun pointX (I)D
 	public final fun pointY (I)D

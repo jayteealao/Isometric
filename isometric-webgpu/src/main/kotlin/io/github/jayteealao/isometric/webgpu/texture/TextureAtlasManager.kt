@@ -98,6 +98,10 @@ internal class TextureAtlasManager(
 
         // Compute atlas dimensions using shelf packing simulation
         val layout = computeShelfLayout(sorted.map { it.value.width to it.value.height })
+        if (layout == null) {
+            Log.e(TAG, "Atlas overflow: ${entries.size} textures exceed ${maxAtlasSizePx}x${maxAtlasSizePx}px atlas — using fallback texture")
+            return false
+        }
 
         atlasWidth = layout.atlasWidth
         atlasHeight = layout.atlasHeight
@@ -170,9 +174,10 @@ internal class TextureAtlasManager(
 
     /**
      * Simulate shelf packing for the given sizes (sorted by height descending).
-     * Returns atlas dimensions and placement coordinates for each entry.
+     * Returns atlas dimensions and placement coordinates for each entry, or null
+     * if the textures cannot fit within [maxAtlasSizePx]x[maxAtlasSizePx].
      */
-    private fun computeShelfLayout(sizes: List<Pair<Int, Int>>): ShelfLayout {
+    private fun computeShelfLayout(sizes: List<Pair<Int, Int>>): ShelfLayout? {
         if (sizes.isEmpty()) return ShelfLayout(0, 0, emptyList())
 
         // Start with the smallest power-of-two that fits the widest texture
@@ -186,9 +191,8 @@ internal class TextureAtlasManager(
             atlasW *= 2
         }
 
-        // Fallback: pack at max size, clamp height
+        // Final attempt at max size; return null on overflow to signal failure
         return tryPack(sizes, maxAtlasSizePx)
-            ?: ShelfLayout(maxAtlasSizePx, maxAtlasSizePx, sizes.map { Placement(0, 0) })
     }
 
     private fun tryPack(sizes: List<Pair<Int, Int>>, atlasW: Int): ShelfLayout? {

@@ -27,12 +27,6 @@ import io.github.jayteealao.isometric.shapes.PrismFace
  * @property faceType Identifies which face of a Prism this command represents (null for
  *   non-Prism shapes). Used by per-face material resolution to look up the correct
  *   sub-material from [IsometricMaterial.PerFace.faceMap].
- * @property uvOffset Atlas sub-region UV offset `[u0, v0]` for WebGPU texture atlas mapping.
- *   Null means identity (no atlas transform). Set by the WebGPU pipeline during per-face
- *   material resolution.
- * @property uvScale Atlas sub-region UV scale `[uScale, vScale]` for WebGPU texture atlas
- *   mapping. Null means identity (1.0, 1.0). Set by the WebGPU pipeline during per-face
- *   material resolution.
  */
 class RenderCommand(
     val commandId: String,
@@ -45,8 +39,6 @@ class RenderCommand(
     val material: MaterialData? = null,
     val uvCoords: FloatArray? = null,
     val faceType: PrismFace? = null,
-    val uvOffset: FloatArray? = null,
-    val uvScale: FloatArray? = null,
 ) {
     /** Number of 2D vertices in [points]. */
     val pointCount: Int get() = points.size / 2
@@ -68,9 +60,7 @@ class RenderCommand(
             ownerNodeId == other.ownerNodeId &&
             material == other.material &&
             uvCoords.contentEqualsNullable(other.uvCoords) &&
-            faceType == other.faceType &&
-            uvOffset.contentEqualsNullable(other.uvOffset) &&
-            uvScale.contentEqualsNullable(other.uvScale)
+            faceType == other.faceType
 
     override fun hashCode(): Int {
         var result = commandId.hashCode()
@@ -83,8 +73,6 @@ class RenderCommand(
         result = 31 * result + (material?.hashCode() ?: 0)
         result = 31 * result + (uvCoords?.contentHashCode() ?: 0)
         result = 31 * result + (faceType?.hashCode() ?: 0)
-        result = 31 * result + (uvOffset?.contentHashCode() ?: 0)
-        result = 31 * result + (uvScale?.contentHashCode() ?: 0)
         return result
     }
 

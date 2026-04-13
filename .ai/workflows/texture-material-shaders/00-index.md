@@ -7,7 +7,7 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-12T23:26:45Z"
+updated-at: "2026-04-13T00:43:35Z"
 selected-slice: "per-face-materials"
 branch-strategy: dedicated
 branch: "feat/texture"
@@ -56,7 +56,15 @@ workflow-files:
   - 07-review-architecture.md
   - 05-implement-webgpu-textures.md
   - 05-implement-per-face-materials.md
+  - 06-verify-per-face-materials.md
+  - 06-verify-per-face-materials.md
   - 06-verify-webgpu-textures.md
+  - 07-review-per-face-materials.md
+  - 07-review-per-face-materials-correctness.md
+  - 07-review-per-face-materials-security.md
+  - 07-review-per-face-materials-code-simplification.md
+  - 07-review-per-face-materials-architecture.md
+  - 07-review-per-face-materials-performance.md
   - 07-review-webgpu-textures.md
   - 07-review-webgpu-textures-correctness.md
   - 07-review-webgpu-textures-security.md
@@ -72,7 +80,7 @@ progress:
   plan: complete
   implement: in-progress
   verify: complete
-  review: complete
+  review: in-progress
   handoff: not-started
   ship: not-started
   retro: not-started

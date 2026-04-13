@@ -6,12 +6,12 @@ slice-slug: per-face-materials
 status: complete
 stage-number: 5
 created-at: "2026-04-12T23:26:45Z"
-updated-at: "2026-04-12T23:26:45Z"
+updated-at: "2026-04-13T00:43:35Z"
 metric-files-changed: 15
 metric-lines-added: 627
 metric-lines-removed: 230
 metric-deviations-from-plan: 3
-metric-review-fixes-applied: 0
+metric-review-fixes-applied: 8
 commit-sha: "5917113"
 tags: [material, per-face, atlas, webgpu, canvas]
 refs:
@@ -130,10 +130,27 @@ Key additions:
   warning and uses fallback coordinates.
 - `faceType` is null for non-Prism shapes — `PerFace.default` is always the fallback.
 
+## Review Fixes Applied
+
+| ID | Severity | Status | Change |
+|----|----------|--------|--------|
+| PF-1 | HIGH | Fixed | Removed uvOffset/uvScale from RenderCommand, reverted FaceData to 144 bytes, updated WGSL structs |
+| PF-2 | HIGH | Fixed | Atlas overflow logs error and returns false instead of silent corruption |
+| PF-3 | HIGH | Fixed | Buffer loops capped to faceCount; packTexIndicesInto takes faceCount param |
+| PF-4 | HIGH | Fixed | Added hasTextured early-out in uploadTextures; removed dead faceType param |
+| PF-6 | MED | Fixed | Replaced redundant maxOf(x, x*2) with x*2 in 4 locations |
+| PF-7 | MED | Fixed | Extracted GrowableGpuStagingBuffer helper (new file) |
+| PF-8 | MED | Fixed | Extracted GpuTextureManager from GpuFullPipeline (new file) |
+| PF-9 | LOW | Fixed | Removed dead faceType parameter from collectTextureSources |
+
+Files added: `GrowableGpuStagingBuffer.kt`, `GpuTextureManager.kt`
+Files modified: `RenderCommand.kt`, `SceneDataPacker.kt`, `TransformCullLightShader.kt`,
+`TextureAtlasManager.kt`, `GpuFullPipeline.kt`, `SceneDataPackerTest.kt`, `isometric-core.api`
+
 ## Freshness Research
 
 No external dependency changes since webgpu-textures slice.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders per-face-materials` — build, test, on-device visual verification
-- **Option B:** `/compact` then Option A — recommended to clear implementation context
+- **Option A (default):** `/wf-verify texture-material-shaders per-face-materials` — re-verify after review fixes
+- **Option B:** `/compact` then Option A — clear fix context before re-verification
