@@ -4,21 +4,21 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: review
-stage-number: 7
+current-stage: implement
+stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-13T18:07:17Z"
-selected-slice: "sample-demo"
-current-stage-status: active
+updated-at: "2026-04-14T06:46:32Z"
+selected-slice: "api-design-fixes"
+current-stage-status: complete
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
-pr-url: ""
-pr-number: 0
+pr-url: "https://github.com/jayteealao/Isometric/pull/8"
+pr-number: 8
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders sample-demo reviews"
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -82,6 +82,10 @@ workflow-files:
   - 07-review-webgpu-textures-performance.md
   - 07-review-webgpu-textures-architecture.md
   - po-answers.md
+  - 03-slice-api-design-fixes.md
+  - 07-review-webgpu-textures-api.md
+  - 04-plan-api-design-fixes.md
+  - 05-implement-api-design-fixes.md
 progress:
   intake: complete
   shape: complete
@@ -91,7 +95,8 @@ progress:
   verify: complete
   sample-demo-verify: complete
   review: in-progress
-  handoff: not-started
-  ship: not-started
-  retro: not-started
+  handoff: complete
+  ship: skipped
+  retro: complete
+  api-design-fixes: implement-complete
 ---

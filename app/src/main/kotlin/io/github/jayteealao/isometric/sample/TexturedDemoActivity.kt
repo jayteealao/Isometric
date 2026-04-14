@@ -36,7 +36,7 @@ import io.github.jayteealao.isometric.shader.perFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shapes.Prism
-import io.github.jayteealao.isometric.shader.Shape as MaterialShape
+import io.github.jayteealao.isometric.shader.Shape
 
 class TexturedDemoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,7 +130,7 @@ private fun TexturedPrismGridScene(
         ) {
             ForEach((0 until 4).toList()) { col ->
                 ForEach((0 until 4).toList()) { row ->
-                    MaterialShape(
+                    Shape(
                         geometry = Prism(
                             position = Point(
                                 (col - 1.5) * 1.05,

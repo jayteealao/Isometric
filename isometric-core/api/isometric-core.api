@@ -19,7 +19,7 @@ public final class io/github/jayteealao/isometric/IntersectionUtils {
 	public final fun isPointInPoly ([DDD)Z
 }
 
-public final class io/github/jayteealao/isometric/IsoColor {
+public final class io/github/jayteealao/isometric/IsoColor : io/github/jayteealao/isometric/MaterialData {
 	public static final field BLACK Lio/github/jayteealao/isometric/IsoColor;
 	public static final field BLUE Lio/github/jayteealao/isometric/IsoColor;
 	public static final field BROWN Lio/github/jayteealao/isometric/IsoColor;

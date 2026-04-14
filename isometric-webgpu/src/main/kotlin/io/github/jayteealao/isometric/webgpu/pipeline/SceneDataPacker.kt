@@ -202,7 +202,7 @@ internal object SceneDataPacker {
         val effective = when (val m = cmd.material) {
             is IsometricMaterial.PerFace -> {
                 val face = cmd.faceType
-                if (face != null) m.resolve(face) else m.default
+                if (face != null) m.faceMap[face] ?: m.default else m.default
             }
             else -> m
         }

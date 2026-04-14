@@ -7,8 +7,12 @@ import androidx.annotation.DrawableRes
  * Describes where a texture's pixel data comes from.
  *
  * Sealed to prevent invalid combinations at compile time (guideline Section 6).
- * Use the DSL functions [textured], [texturedAsset], [texturedBitmap] from
+ * Use the DSL functions [texturedResource], [texturedAsset], [texturedBitmap] from
  * [IsometricMaterial] builders to construct instances idiomatically.
+ *
+ * **Evolution note:** Adding a new subtype in a future version is a breaking change
+ * for consumers using exhaustive `when` expressions. Use an `else` branch in `when`
+ * if forward compatibility is needed.
  */
 sealed interface TextureSource {
     /**
@@ -46,7 +50,7 @@ sealed interface TextureSource {
      *
      * @property bitmap The source bitmap. Must not be recycled.
      */
-    data class BitmapSource(val bitmap: Bitmap) : TextureSource {
+    data class Bitmap(val bitmap: android.graphics.Bitmap) : TextureSource {
         init {
             require(!bitmap.isRecycled) { "Bitmap must not be recycled" }
         }
@@ -59,7 +63,7 @@ sealed interface TextureSource {
          */
         fun ensureNotRecycled() {
             check(!bitmap.isRecycled) {
-                "Bitmap was recycled after BitmapSource was created. " +
+                "Bitmap was recycled after TextureSource.Bitmap was created. " +
                     "Do not recycle a bitmap while any material referencing it is active."
             }
         }

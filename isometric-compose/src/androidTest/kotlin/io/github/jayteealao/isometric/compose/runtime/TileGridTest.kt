@@ -67,7 +67,7 @@ class TileGridTest {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(width = 3, height = 3) { coord ->
                     visited.add(coord)
-                    Shape(geometry = Prism(), color = IsoColor(33.0, 150.0, 243.0))
+                    Shape(geometry = Prism(), material = IsoColor(33.0, 150.0, 243.0))
                 }
             }
         }

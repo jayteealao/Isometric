@@ -5,12 +5,12 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-13T08:07:24Z"
-slices-implemented: 6
-slices-total: 6
-metric-total-files-changed: 49
-metric-total-lines-added: 1979
-metric-total-lines-removed: 470
+updated-at: "2026-04-14T06:46:32Z"
+slices-implemented: 7
+slices-total: 7
+metric-total-files-changed: 72
+metric-total-lines-added: 2599
+metric-total-lines-removed: 860
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
@@ -52,6 +52,11 @@ next-invocation: "/wf-verify texture-material-shaders sample-demo"
 - Files: 4 (2 new, 2 modified)
 - Summary: TextureAssets (procedural grass/dirt bitmaps), TexturedDemoActivity (render mode toggle + 4x4 perFace prism grid), manifest + MainActivity entries
 - Record: [05-implement-sample-demo.md](05-implement-sample-demo.md)
+
+### `api-design-fixes` — complete
+- Files: 23 modified/created (including API dumps)
+- Summary: 25 API design findings resolved: FlatColor removed, IsoColor:MaterialData, UvTransform→TextureTransform, BitmapSource→Bitmap, textured→texturedResource, TextureLoader fun interface, TextureCacheConfig, @DslMarker, PerFace.of() factory, Shape(material:MaterialData), TileMode per-draw shader cache
+- Record: [05-implement-api-design-fixes.md](05-implement-api-design-fixes.md)
 
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`

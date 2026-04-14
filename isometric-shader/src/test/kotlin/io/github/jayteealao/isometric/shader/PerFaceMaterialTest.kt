@@ -8,13 +8,13 @@ import kotlin.test.assertIs
 
 class PerFaceMaterialTest {
 
-    private val grass = textured(1)
-    private val dirt = textured(2)
-    private val gray = flatColor(IsoColor.GRAY)
+    private val grass = texturedResource(1)
+    private val dirt = texturedResource(2)
+    private val gray = IsoColor.GRAY
 
     @Test
     fun `resolve returns face material when present in faceMap`() {
-        val mat = IsometricMaterial.PerFace(
+        val mat = IsometricMaterial.PerFace.of(
             faceMap = mapOf(PrismFace.TOP to grass, PrismFace.FRONT to dirt),
             default = gray,
         )
@@ -24,7 +24,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `resolve returns default for faces not in faceMap`() {
-        val mat = IsometricMaterial.PerFace(
+        val mat = IsometricMaterial.PerFace.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
@@ -38,9 +38,9 @@ class PerFaceMaterialTest {
     @Test
     fun `resolve for all 6 PrismFace values`() {
         val materials = PrismFace.values().associateWith {
-            flatColor(IsoColor(it.ordinal.toDouble() * 40, 0.0, 0.0, 255.0))
+            IsoColor(it.ordinal.toDouble() * 40, 0.0, 0.0, 255.0)
         }
-        val mat = IsometricMaterial.PerFace(faceMap = materials, default = gray)
+        val mat = IsometricMaterial.PerFace.of(faceMap = materials, default = gray)
         for (face in PrismFace.values()) {
             assertEquals(materials.getValue(face), mat.resolve(face))
         }
@@ -57,10 +57,10 @@ class PerFaceMaterialTest {
     }
 
     @Test
-    fun `perFace DSL default is transparent`() {
+    fun `perFace DSL default is mid-gray`() {
         val mat = perFace { }
-        assertIs<IsometricMaterial.FlatColor>(mat.default)
-        assertEquals(IsoColor(0, 0, 0, 0), (mat.default as IsometricMaterial.FlatColor).color)
+        assertIs<IsoColor>(mat.default)
+        assertEquals(UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
     @Test
@@ -78,7 +78,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `individual face overrides sides`() {
-        val stone = flatColor(IsoColor.BLUE)
+        val stone = IsoColor.BLUE
         val mat = perFace {
             sides = dirt
             front = stone  // overrides sides for FRONT

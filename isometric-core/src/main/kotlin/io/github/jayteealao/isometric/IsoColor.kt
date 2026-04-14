@@ -24,7 +24,7 @@ data class IsoColor @JvmOverloads constructor(
     val g: Double,
     val b: Double,
     val a: Double = 255.0
-) {
+) : MaterialData {
     @JvmOverloads
     constructor(r: Int, g: Int, b: Int, a: Int = 255) : this(
         r.toDouble(),

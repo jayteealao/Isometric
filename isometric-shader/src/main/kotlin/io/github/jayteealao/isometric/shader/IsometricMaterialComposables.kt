@@ -3,6 +3,7 @@ package io.github.jayteealao.isometric.shader
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReusableComposeNode
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.Path
@@ -16,16 +17,33 @@ import io.github.jayteealao.isometric.compose.runtime.PathNode
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 
 /**
+ * Extracts a representative [IsoColor] from any [MaterialData] for use as the base color
+ * in the GPU lighting pipeline.
+ *
+ * - [IsoColor]: returned as-is (flat-color rendering)
+ * - [IsometricMaterial.Textured]: returns [IsometricMaterial.Textured.tint]
+ * - [IsometricMaterial.PerFace]: returns [IsoColor.WHITE] (per-face color resolved at render time)
+ * - Unknown: returns [IsoColor.WHITE]
+ */
+internal fun MaterialData.toBaseColor(): IsoColor = when (this) {
+    is IsoColor -> this
+    is IsometricMaterial.Textured -> tint
+    is IsometricMaterial.PerFace -> IsoColor.WHITE
+    else -> IsoColor.WHITE
+}
+
+/**
  * Add a 3D shape with a material to the isometric scene.
  *
  * This overload accepts an [IsometricMaterial] instead of an [IsoColor].
- * For [IsometricMaterial.FlatColor], the color is extracted from the material.
  * For textured or per-face materials, [LocalDefaultColor] is used as the
  * base color and the material is set on the node for the renderer to interpret.
  *
  * @param geometry The 3D shape to render
  * @param material The material describing how faces should be painted
- * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque).
+ *   Applied to the shape's overall opacity. For textured materials, `alpha` scales the
+ *   composite opacity; tint alpha is controlled via [IsometricMaterial.Textured.tint].
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
@@ -55,18 +73,7 @@ fun IsometricScope.Shape(
     testTag: String? = null,
     nodeId: String? = null,
 ) {
-    val color = when (material) {
-        is IsometricMaterial.FlatColor -> material.color
-        is IsometricMaterial.Textured -> material.tint
-        // PerFace: use WHITE because the GPU lighting shader multiplies baseColor
-        // into litColor, which the fragment shader then multiplies with the texture
-        // sample. Any non-white base color would tint all textured faces. Per-face
-        // material resolution (which face gets which texture) happens at render time,
-        // not here. Canvas flat-color fallback faces also work: TexturedCanvasDrawHook
-        // returns false for FlatColor sub-materials, and the standard paint path uses
-        // the PerFace.default color directly.
-        is IsometricMaterial.PerFace -> IsoColor.WHITE
-    }
+    val color = material.toBaseColor()
     // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
     // Closes over the original Prism reference (model-space dimensions) rather than
     // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
@@ -115,11 +122,14 @@ fun IsometricScope.Shape(
 /**
  * Add a raw path with a material to the isometric scene.
  *
- * This overload accepts an [IsometricMaterial] instead of an [IsoColor].
+ * **Note:** Only [IsoColor] (flat-color) materials are supported for paths.
+ * Textured and per-face materials require 3D geometry (use [Shape] with a [Prism]).
  *
  * @param path The 2D path to render
- * @param material The material describing how the path should be painted
- * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
+ * @param material The material describing how the path should be painted.
+ *   Must not be [IsometricMaterial.Textured] or [IsometricMaterial.PerFace].
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque).
+ *   Applied to the path's overall opacity.
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
@@ -130,6 +140,7 @@ fun IsometricScope.Shape(
  * @param onLongClick Callback invoked when this path is long-pressed
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
+ * @throws IllegalArgumentException if [material] is [IsometricMaterial.Textured] or [IsometricMaterial.PerFace]
  * @see io.github.jayteealao.isometric.compose.runtime.Path
  */
 @IsometricComposable
@@ -149,18 +160,10 @@ fun IsometricScope.Path(
     testTag: String? = null,
     nodeId: String? = null,
 ) {
-    val color = when (material) {
-        is IsometricMaterial.FlatColor -> material.color
-        is IsometricMaterial.Textured -> material.tint
-        // PerFace: use WHITE because the GPU lighting shader multiplies baseColor
-        // into litColor, which the fragment shader then multiplies with the texture
-        // sample. Any non-white base color would tint all textured faces. Per-face
-        // material resolution (which face gets which texture) happens at render time,
-        // not here. Canvas flat-color fallback faces also work: TexturedCanvasDrawHook
-        // returns false for FlatColor sub-materials, and the standard paint path uses
-        // the PerFace.default color directly.
-        is IsometricMaterial.PerFace -> IsoColor.WHITE
+    require(material !is IsometricMaterial.Textured && material !is IsometricMaterial.PerFace) {
+        "Path() does not support textured materials — use Shape() with a Prism for texture rendering"
     }
+    val color = material.toBaseColor()
     ReusableComposeNode<PathNode, IsometricApplier>(
         factory = { PathNode(path, color).also { it.material = material } },
         update = {

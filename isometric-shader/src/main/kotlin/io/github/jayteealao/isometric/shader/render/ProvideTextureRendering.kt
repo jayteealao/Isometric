@@ -5,6 +5,25 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.compose.runtime.LocalMaterialDrawHook
+import io.github.jayteealao.isometric.shader.TextureSource
+
+/**
+ * Configuration for the texture LRU cache used by [ProvideTextureRendering].
+ *
+ * @param maxSize Maximum number of distinct [TextureSource]s to keep decoded in memory.
+ *   When the cache is full, the least-recently-used entry is evicted synchronously.
+ *   On a cache miss the texture is decoded synchronously on the first draw frame that
+ *   needs it.
+ *
+ *   **Sizing guidance:** count distinct [TextureSource] keys your scene uses. 20 covers
+ *   most isometric tile sets (e.g., a 4×4 grid of 3 distinct textures uses 3 slots).
+ *   Increase for large tile sets with many unique textures.
+ */
+data class TextureCacheConfig(val maxSize: Int = 20) {
+    init {
+        require(maxSize > 0) { "maxSize must be positive, got $maxSize" }
+    }
+}
 
 /**
  * Enables textured Canvas rendering for any `IsometricScene` in [content].
@@ -13,28 +32,52 @@ import io.github.jayteealao.isometric.compose.runtime.LocalMaterialDrawHook
  * and draws them with `BitmapShader` + affine matrix mapping. Flat-color commands are
  * unaffected.
  *
- * Usage:
+ * **Scoping rules:** Install one `ProvideTextureRendering` per composable subtree.
+ * A provider does not share its cache with sibling or parent providers — nest providers
+ * only if subtrees intentionally need independent caches. A single top-level provider
+ * covering all scenes is the typical usage:
+ *
  * ```kotlin
  * ProvideTextureRendering {
  *     IsometricScene {
- *         Shape(Prism(origin), material = textured(R.drawable.brick))
+ *         Shape(Prism(origin), material = texturedResource(R.drawable.brick))
  *     }
  * }
  * ```
  *
- * @param maxCacheSize Maximum number of textures to keep in the LRU cache. Default: 20.
+ * **Custom loader:**
+ * ```kotlin
+ * ProvideTextureRendering(loader = TextureLoader { source ->
+ *     myImageLoader.loadSync(source)
+ * }) { ... }
+ * ```
+ *
+ * **Error callback:**
+ * ```kotlin
+ * ProvideTextureRendering(onTextureLoadError = { source ->
+ *     analytics.logEvent("texture_load_failed", source.toString())
+ * }) { ... }
+ * ```
+ *
+ * @param cacheConfig LRU cache configuration. Controls max in-memory texture count.
+ * @param loader Custom texture loader. Override to intercept or transform bitmaps at load
+ *   time. When `null`, the default Android resource/asset loader is used.
+ * @param onTextureLoadError Called when a texture fails to load. Receives the [TextureSource]
+ *   that failed. Use for analytics, user-visible error feedback, or retry logic.
  * @param content The composable tree containing `IsometricScene`(s).
  */
 @Composable
 fun ProvideTextureRendering(
-    maxCacheSize: Int = 20,
+    cacheConfig: TextureCacheConfig = TextureCacheConfig(),
+    loader: TextureLoader? = null,
+    onTextureLoadError: ((TextureSource) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val hook = remember(context, maxCacheSize) {
-        val cache = TextureCache(maxCacheSize)
-        val loader = TextureLoader(context.applicationContext)
-        TexturedCanvasDrawHook(cache, loader)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val hook = remember(context, cacheConfig, loader) {
+        val cache = TextureCache(cacheConfig.maxSize)
+        val effectiveLoader = loader ?: defaultTextureLoader(context.applicationContext)
+        TexturedCanvasDrawHook(cache, effectiveLoader, onTextureLoadError)
     }
     CompositionLocalProvider(LocalMaterialDrawHook provides hook) {
         content()

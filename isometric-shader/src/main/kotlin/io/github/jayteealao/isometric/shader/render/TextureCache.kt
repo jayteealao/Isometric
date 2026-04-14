@@ -1,36 +1,32 @@
 package io.github.jayteealao.isometric.shader.render
 
 import android.graphics.Bitmap
-import android.graphics.BitmapShader
-import android.graphics.Shader
 import io.github.jayteealao.isometric.shader.TextureSource
 
 /**
- * Cached texture entry holding both the decoded [Bitmap] and its pre-built [BitmapShader].
+ * Cached texture entry holding the decoded [Bitmap].
  *
- * The shader is created once and reused across frames; only the local matrix changes
- * per draw call.
+ * [android.graphics.BitmapShader] creation is deferred to the draw hook so that
+ * the correct [android.graphics.Shader.TileMode] (CLAMP vs REPEAT) can be chosen
+ * based on the [io.github.jayteealao.isometric.shader.TextureTransform] at draw time.
  */
-internal data class CachedTexture(val bitmap: Bitmap, val shader: BitmapShader)
+internal data class CachedTexture(val bitmap: Bitmap)
 
 /**
  * LRU cache mapping [TextureSource] keys to [CachedTexture] entries.
  *
  * Uses `LinkedHashMap` with `accessOrder = true` for O(1) LRU eviction.
- * Each entry holds both the decoded [Bitmap] and a pre-built [BitmapShader]
- * with `CLAMP/CLAMP` tile mode (faces map exactly to texture bounds via UV coords).
  *
  * Thread safety: intended for main-thread use only. Canvas draw path runs on the
  * main thread so no concurrent access is expected.
  *
  * **Cache key identity:** Keys are [TextureSource] instances. [TextureSource.Resource]
  * and [TextureSource.Asset] are data classes with structural equality. However,
- * [TextureSource.BitmapSource] uses `Bitmap` reference identity (since `Bitmap` does
- * not override `equals`). Callers using `BitmapSource` should `remember { }` their
+ * [TextureSource.Bitmap] uses `Bitmap` reference identity (since `Bitmap` does
+ * not override `equals`). Callers using `TextureSource.Bitmap` should `remember { }` their
  * bitmaps to avoid creating new cache entries on every recomposition.
  *
- * @param maxSize Maximum number of textures to keep in memory. Default: 20
- *   (covers typical isometric tile sets).
+ * @param maxSize Maximum number of textures to keep in memory.
  */
 internal class TextureCache(val maxSize: Int = 20) {
 
@@ -48,8 +44,7 @@ internal class TextureCache(val maxSize: Int = 20) {
     fun get(source: TextureSource): CachedTexture? = cache[source]
 
     fun put(source: TextureSource, bitmap: Bitmap): CachedTexture {
-        val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-        val entry = CachedTexture(bitmap, shader)
+        val entry = CachedTexture(bitmap)
         cache[source] = entry
         return entry
     }

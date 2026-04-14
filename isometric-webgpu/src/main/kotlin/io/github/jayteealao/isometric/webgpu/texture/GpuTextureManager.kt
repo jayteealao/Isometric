@@ -161,7 +161,7 @@ internal class GpuTextureManager(
         val entries = mutableMapOf<TextureSource, android.graphics.Bitmap>()
         for (source in textureSources) {
             val bitmap = when (source) {
-                is TextureSource.BitmapSource -> {
+                is TextureSource.Bitmap -> {
                     source.ensureNotRecycled()
                     source.bitmap
                 }
@@ -269,7 +269,7 @@ internal class GpuTextureManager(
         val effective = when (val m = cmd.material) {
             is IsometricMaterial.PerFace -> {
                 val face = cmd.faceType
-                if (face != null) m.resolve(face) else m.default
+                if (face != null) m.faceMap[face] ?: m.default else m.default
             }
             else -> m
         }

@@ -5,7 +5,7 @@ import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 
 /**
- * Generates per-vertex UV coordinates for [Prism] faces.
+ * Generates per-vertex UV coordinates for [Prism] faces. Internal implementation detail.
  *
  * UV coordinates are computed in 3D space (before isometric projection). Affine
  * mapping in screen space is correct for orthographic projection — no foreshortening
@@ -14,7 +14,7 @@ import io.github.jayteealao.isometric.shapes.PrismFace
  * Output is a [FloatArray] of 8 floats: `[u0,v0, u1,v1, u2,v2, u3,v3]` matching the
  * vertex order of [Prism.paths] at the given face index.
  */
-object UvGenerator {
+internal object UvGenerator {
 
     /**
      * Generates UV coordinates for a single Prism face identified by its 0-based
@@ -23,11 +23,21 @@ object UvGenerator {
      * @param prism The source Prism (provides dimensional extents for normalization)
      * @param faceIndex 0-based index into [Prism.paths] (0=FRONT, 1=BACK, 2=LEFT, 3=RIGHT, 4=BOTTOM, 5=TOP)
      * @return [FloatArray] of 8 floats `[u0,v0, u1,v1, u2,v2, u3,v3]`
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until prism.paths.size`
      */
     fun forPrismFace(prism: Prism, faceIndex: Int): FloatArray {
-        val face = PrismFace.fromPathIndex(faceIndex)
-        val path = prism.paths[faceIndex]
-        return computeUvs(prism, face, path)
+        require(faceIndex in prism.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Prism with ${prism.paths.size} faces (valid range: 0 until ${prism.paths.size})"
+        }
+        return try {
+            val face = PrismFace.fromPathIndex(faceIndex)
+            val path = prism.paths[faceIndex]
+            computeUvs(prism, face, path)
+        } catch (e: Exception) {
+            throw IllegalArgumentException(
+                "UV generation failed for Prism at ${prism.position}, faceIndex=$faceIndex", e
+            )
+        }
     }
 
     /**

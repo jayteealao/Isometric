@@ -12,48 +12,41 @@ import kotlin.test.assertTrue
 class IsometricMaterialTest {
 
     @Test
-    fun `flatColor creates FlatColor material`() {
-        val mat = flatColor(IsoColor.BLUE)
-        assertEquals(IsoColor.BLUE, mat.color)
-        assertIs<IsometricMaterial.FlatColor>(mat)
-    }
-
-    @Test
-    fun `FlatColor implements MaterialData`() {
-        val mat: MaterialData = flatColor(IsoColor.RED)
+    fun `IsoColor implements MaterialData`() {
+        val mat: MaterialData = IsoColor.BLUE
         assertIs<MaterialData>(mat)
     }
 
     @Test
-    fun `textured with resource creates Textured with defaults`() {
-        val mat = textured(42)
+    fun `texturedResource with resource creates Textured with defaults`() {
+        val mat = texturedResource(42)
         assertIs<IsometricMaterial.Textured>(mat)
         assertEquals(TextureSource.Resource(42), mat.source)
         assertEquals(IsoColor.WHITE, mat.tint)
-        assertEquals(UvTransform.IDENTITY, mat.uvTransform)
+        assertEquals(TextureTransform.IDENTITY, mat.transform)
     }
 
     @Test
-    fun `textured named params apply uvTransform`() {
-        val mat = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 3f))
-        assertEquals(2f, mat.uvTransform.scaleU)
-        assertEquals(3f, mat.uvTransform.scaleV)
+    fun `texturedResource named params apply transform`() {
+        val mat = texturedResource(42, transform = TextureTransform(scaleU = 2f, scaleV = 3f))
+        assertEquals(2f, mat.transform.scaleU)
+        assertEquals(3f, mat.transform.scaleV)
     }
 
     @Test
-    fun `textured named params apply tint`() {
-        val mat = textured(42, tint = IsoColor.RED)
+    fun `texturedResource named params apply tint`() {
+        val mat = texturedResource(42, tint = IsoColor.RED)
         assertEquals(IsoColor.RED, mat.tint)
     }
 
     @Test
-    fun `textured named params apply full uvTransform`() {
-        val mat = textured(42, uvTransform = UvTransform(
+    fun `texturedResource named params apply full transform`() {
+        val mat = texturedResource(42, transform = TextureTransform(
             offsetU = 0.5f, offsetV = 0.25f, rotationDegrees = 45f
         ))
-        assertEquals(0.5f, mat.uvTransform.offsetU)
-        assertEquals(0.25f, mat.uvTransform.offsetV)
-        assertEquals(45f, mat.uvTransform.rotationDegrees)
+        assertEquals(0.5f, mat.transform.offsetU)
+        assertEquals(0.25f, mat.transform.offsetV)
+        assertEquals(45f, mat.transform.rotationDegrees)
     }
 
     @Test
@@ -65,8 +58,8 @@ class IsometricMaterialTest {
 
     @Test
     fun `perFace creates PerFace with face map and default`() {
-        val green = flatColor(IsoColor.GREEN)
-        val gray = flatColor(IsoColor.GRAY)
+        val green = IsoColor.GREEN
+        val gray = IsoColor.GRAY
         val mat = perFace {
             top = green
             default = gray
@@ -78,9 +71,9 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `perFace default is transparent FlatColor`() {
-        val mat = perFace { top = flatColor(IsoColor.BLUE) }
-        assertEquals(IsoColor(0, 0, 0, 0), (mat.default as IsometricMaterial.FlatColor).color)
+    fun `perFace default is mid-gray`() {
+        val mat = perFace { top = IsoColor.BLUE }
+        assertEquals(UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
     @Test
@@ -99,13 +92,27 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `UvTransform IDENTITY has all defaults`() {
-        val id = UvTransform.IDENTITY
+    fun `TextureTransform IDENTITY has all defaults`() {
+        val id = TextureTransform.IDENTITY
         assertEquals(1f, id.scaleU)
         assertEquals(1f, id.scaleV)
         assertEquals(0f, id.offsetU)
         assertEquals(0f, id.offsetV)
         assertEquals(0f, id.rotationDegrees)
+    }
+
+    @Test
+    fun `TextureTransform rejects NaN scaleU`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleU = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `TextureTransform rejects zero scaleV`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleV = 0f)
+        }
     }
 
     @Test
@@ -150,21 +157,21 @@ class IsometricMaterialTest {
 
     @Test
     fun `PerFace rejects nested PerFace in faceMap`() {
-        val inner = IsometricMaterial.PerFace(
-            faceMap = mapOf(PrismFace.TOP to flatColor(IsoColor.RED)),
-            default = flatColor(IsoColor.GRAY)
+        val inner = IsometricMaterial.PerFace.of(
+            faceMap = mapOf(PrismFace.TOP to IsoColor.RED),
+            default = IsoColor.GRAY,
         )
         assertFailsWith<IllegalArgumentException> {
-            IsometricMaterial.PerFace(
+            IsometricMaterial.PerFace.of(
                 faceMap = mapOf(PrismFace.FRONT to inner),
-                default = flatColor(IsoColor.GRAY)
+                default = IsoColor.GRAY,
             )
         }
     }
 
     @Test
     fun `perFace sides sets all four side faces`() {
-        val dirt = flatColor(IsoColor.RED)
+        val dirt = IsoColor.RED
         val mat = perFace { sides = dirt }
         assertEquals(dirt, mat.faceMap[PrismFace.FRONT])
         assertEquals(dirt, mat.faceMap[PrismFace.BACK])
@@ -175,9 +182,9 @@ class IsometricMaterialTest {
 
     @Test
     fun `PerFace resolve returns face material or default`() {
-        val grass = flatColor(IsoColor.GREEN)
-        val gray = flatColor(IsoColor.GRAY)
-        val mat = IsometricMaterial.PerFace(
+        val grass = IsoColor.GREEN
+        val gray = IsoColor.GRAY
+        val mat = IsometricMaterial.PerFace.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
@@ -188,25 +195,24 @@ class IsometricMaterialTest {
 
     @Test
     fun `sealed interface exhaustive when works`() {
-        val mat: IsometricMaterial = flatColor(IsoColor.BLUE)
+        val mat: IsometricMaterial = texturedResource(42)
         val result = when (mat) {
-            is IsometricMaterial.FlatColor -> "flat"
             is IsometricMaterial.Textured -> "textured"
             is IsometricMaterial.PerFace -> "perface"
         }
-        assertEquals("flat", result)
+        assertEquals("textured", result)
     }
 
     @Test
-    fun `data class equality works for FlatColor`() {
-        assertEquals(flatColor(IsoColor.BLUE), flatColor(IsoColor.BLUE))
-        assertTrue(flatColor(IsoColor.BLUE) != flatColor(IsoColor.RED))
+    fun `IsoColor equality works`() {
+        assertEquals(IsoColor.BLUE, IsoColor.BLUE)
+        assertTrue(IsoColor.BLUE != IsoColor.RED)
     }
 
     @Test
     fun `data class equality works for Textured`() {
-        val a = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f))
-        val b = textured(42, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f))
+        val a = texturedResource(42, transform = TextureTransform(scaleU = 2f, scaleV = 2f))
+        val b = texturedResource(42, transform = TextureTransform(scaleU = 2f, scaleV = 2f))
         assertEquals(a, b)
     }
 }

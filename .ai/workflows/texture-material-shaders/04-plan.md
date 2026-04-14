@@ -5,11 +5,11 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-12T10:19:40Z"
+updated-at: "2026-04-13T23:17:09Z"
 planning-mode: all
-slices-planned: 6
-slices-total: 6
-implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo]
+slices-planned: 7
+slices-total: 7
+implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes]
 conflicts-found: 0
 tags: [texture, material, shader, canvas, webgpu]
 refs:
@@ -82,6 +82,22 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   grass/dirt textures (64x64 bitmaps, no external assets needed). Three-button render
   mode toggle (Canvas / Canvas+GPU Sort / WebGPU). Added to `MainActivity` chooser.
 - **Key risk:** Minimal — integration only.
+
+### `api-design-fixes`
+- **Files:** 16 (15 production, 3 androidTest files — unit test ShapeNode constructor calls are unchanged)
+- **Steps:** 16
+- **Strategy:** 25 findings from `07-review-webgpu-textures-api.md`. `IsoColor : MaterialData`
+  (one-line change in core). `Shape(material: MaterialData)` in compose replaces `Shape(color: IsoColor)`.
+  Shader `Shape(IsometricMaterial)` overload kept for UV provider setup — Kotlin picks it automatically
+  for `IsometricMaterial` values. `IsometricMaterial.FlatColor` removed. `UvTransform` renamed to
+  `TextureTransform` with factory companions and `init` validation. `TextureTransform` applied in
+  `computeAffineMatrix` using `preConcat(T^-1)`. `TextureCache.CachedTexture` decoupled from
+  `BitmapShader` (creation moves to hook, enabling per-material REPEAT/CLAMP tile mode).
+  `BitmapSource` renamed `Bitmap`. `UvGenerator` and `UvCoord` made `internal`.
+- **Key risk:** `PerFace.faceMap` type widens from `Map<PrismFace, IsometricMaterial>` to
+  `Map<PrismFace, MaterialData>` — all per-face renderer when-switches must handle `is IsoColor`
+  as a valid face material. TM-API-24 must land before TM-API-2 (REPEAT tile mode needed for
+  TextureTransform tiling to render correctly).
 
 ## Cross-Cutting Concerns
 

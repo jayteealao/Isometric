@@ -6,6 +6,9 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.shapes.PrismFace
 
+/** Mid-gray fallback for unassigned [IsometricMaterial.PerFace] faces (visible, not transparent). */
+internal val UNASSIGNED_FACE_DEFAULT: IsoColor = IsoColor(128, 128, 128, 255)
+
 /**
  * Describes how a face should be painted.
  *
@@ -14,13 +17,13 @@ import io.github.jayteealao.isometric.shapes.PrismFace
  *
  * ## Progressive disclosure (guideline Section 2)
  *
- * - **Simple:** `flatColor(IsoColor.BLUE)` — zero overhead, identical to existing color path
- * - **Configurable:** `textured(R.drawable.brick) { uvScale(2f, 2f) }` — bitmap texture
- * - **Advanced:** `perFace(default = flatColor(IsoColor.GRAY)) { face(0, textured(...)) }` — per-face control
+ * - **Simple:** `Shape(Prism(origin), IsoColor.BLUE)` — zero overhead, flat color via core
+ * - **Configurable:** `texturedResource(R.drawable.brick)` — bitmap texture
+ * - **Advanced:** `perFace { top = texturedResource(...) }` — per-face control
  *
  * ## Sealed interface (guideline Section 6)
  *
- * Subtypes are exhaustive — renderers `when`-match without an else branch.
+ * Subtypes are `Textured` and `PerFace` only — flat-color rendering uses [IsoColor] directly.
  * **Evolution note:** Adding a new subtype in a future version is a breaking change
  * for consumers using exhaustive `when` expressions. Use an `else` branch in `when`
  * if forward compatibility is needed.
@@ -28,22 +31,19 @@ import io.github.jayteealao.isometric.shapes.PrismFace
 sealed interface IsometricMaterial : MaterialData {
 
     /**
-     * Renders the face with a solid [IsoColor]. Zero texture overhead.
-     * This is the default when no material is specified (backward compatible path).
-     */
-    data class FlatColor(val color: IsoColor) : IsometricMaterial
-
-    /**
      * Renders the face with a [TextureSource] bitmap, optionally tinted and transformed.
+     *
+     * Requires [io.github.jayteealao.isometric.shader.render.ProvideTextureRendering] in the
+     * composition or textures will not be rendered.
      *
      * @property source Where to load the bitmap from
      * @property tint Multiplicative color tint applied over the texture (WHITE = no tint)
-     * @property uvTransform Affine UV transform (scale, offset, rotation)
+     * @property transform Affine UV transform (scale, offset, rotation). Defaults to identity.
      */
     data class Textured(
         val source: TextureSource,
         val tint: IsoColor = IsoColor.WHITE,
-        val uvTransform: UvTransform = UvTransform.IDENTITY,
+        val transform: TextureTransform = TextureTransform.IDENTITY,
     ) : IsometricMaterial
 
     /**
@@ -51,16 +51,21 @@ sealed interface IsometricMaterial : MaterialData {
      *
      * Faces not covered by [faceMap] fall back to [default].
      *
+     * Use [perFace] DSL to construct instances. For advanced callers needing direct
+     * map construction, use [PerFace.of].
+     *
      * @property faceMap Map from [PrismFace] role to material for that face
-     * @property default Material used for faces not present in [faceMap]
+     * @property default Material used for faces not present in [faceMap].
+     *   Defaults to mid-gray ([UNASSIGNED_FACE_DEFAULT]) so unassigned faces are visible.
      */
-    data class PerFace(
-        val faceMap: Map<PrismFace, IsometricMaterial>,
-        val default: IsometricMaterial = FlatColor(IsoColor(0, 0, 0, 0)),
+    @ConsistentCopyVisibility
+    data class PerFace private constructor(
+        val faceMap: Map<PrismFace, MaterialData>,
+        val default: MaterialData = UNASSIGNED_FACE_DEFAULT,
     ) : IsometricMaterial {
         init {
             require(faceMap.values.none { it is PerFace }) {
-                "PerFace materials cannot be nested — each face must be FlatColor or Textured"
+                "PerFace materials cannot be nested — each face must be IsoColor or Textured"
             }
             require(default !is PerFace) {
                 "PerFace default cannot itself be PerFace"
@@ -68,74 +73,89 @@ sealed interface IsometricMaterial : MaterialData {
         }
 
         /** Resolve the effective material for [face], falling back to [default]. */
-        fun resolve(face: PrismFace): IsometricMaterial = faceMap[face] ?: default
+        internal fun resolve(face: PrismFace): MaterialData = faceMap[face] ?: default
+
+        companion object {
+            /**
+             * Factory for callers who need direct map construction (advanced use case).
+             *
+             * Prefer the [perFace] DSL for typical usage.
+             *
+             * @param faceMap Map from [PrismFace] to material for that face
+             * @param default Fallback material for faces absent from [faceMap]
+             */
+            fun of(
+                faceMap: Map<PrismFace, MaterialData>,
+                default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+            ) = PerFace(faceMap, default)
+        }
     }
 }
 
 // -- DSL builders -------------------------------------------------------------
 
 /**
- * Creates a [IsometricMaterial.FlatColor] material.
+ * Creates an [IsometricMaterial.Textured] material from a drawable resource.
+ *
+ * Requires [io.github.jayteealao.isometric.shader.render.ProvideTextureRendering] in the
+ * composition or textures will not be rendered.
  *
  * ```kotlin
- * Shape(Prism(origin), material = flatColor(IsoColor.BLUE))
+ * Shape(Prism(origin), material = texturedResource(R.drawable.brick))
+ * Shape(Prism(origin), material = texturedResource(R.drawable.brick, tint = IsoColor.RED))
+ * Shape(Prism(origin), material = texturedResource(R.drawable.brick,
+ *     transform = TextureTransform.tiling(2f, 2f)))
  * ```
  */
-fun flatColor(color: IsoColor): IsometricMaterial.FlatColor =
-    IsometricMaterial.FlatColor(color)
-
-/**
- * Creates a [IsometricMaterial.Textured] material from a drawable resource.
- *
- * ```kotlin
- * Shape(Prism(origin), material = textured(R.drawable.brick))
- * Shape(Prism(origin), material = textured(R.drawable.brick, tint = IsoColor.RED))
- * Shape(Prism(origin), material = textured(R.drawable.brick, uvTransform = UvTransform(scaleU = 2f, scaleV = 2f)))
- * ```
- */
-fun textured(
+fun texturedResource(
     @DrawableRes resId: Int,
     tint: IsoColor = IsoColor.WHITE,
-    uvTransform: UvTransform = UvTransform.IDENTITY,
+    transform: TextureTransform = TextureTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    IsometricMaterial.Textured(source = TextureSource.Resource(resId), tint = tint, uvTransform = uvTransform)
+    IsometricMaterial.Textured(source = TextureSource.Resource(resId), tint = tint, transform = transform)
 
 /**
- * Creates a [IsometricMaterial.Textured] material from an asset path.
+ * Creates an [IsometricMaterial.Textured] material from an asset path.
+ *
+ * Requires [io.github.jayteealao.isometric.shader.render.ProvideTextureRendering] in the
+ * composition or textures will not be rendered.
  */
 fun texturedAsset(
     path: String,
     tint: IsoColor = IsoColor.WHITE,
-    uvTransform: UvTransform = UvTransform.IDENTITY,
+    transform: TextureTransform = TextureTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    IsometricMaterial.Textured(source = TextureSource.Asset(path), tint = tint, uvTransform = uvTransform)
+    IsometricMaterial.Textured(source = TextureSource.Asset(path), tint = tint, transform = transform)
 
 /**
- * Creates a [IsometricMaterial.Textured] material from a [Bitmap].
+ * Creates an [IsometricMaterial.Textured] material from a [Bitmap].
+ *
+ * Requires [io.github.jayteealao.isometric.shader.render.ProvideTextureRendering] in the
+ * composition or textures will not be rendered.
  */
 fun texturedBitmap(
     bitmap: Bitmap,
     tint: IsoColor = IsoColor.WHITE,
-    uvTransform: UvTransform = UvTransform.IDENTITY,
+    transform: TextureTransform = TextureTransform.IDENTITY,
 ): IsometricMaterial.Textured =
-    IsometricMaterial.Textured(source = TextureSource.BitmapSource(bitmap), tint = tint, uvTransform = uvTransform)
+    IsometricMaterial.Textured(source = TextureSource.Bitmap(bitmap), tint = tint, transform = transform)
 
 /**
- * Creates a [IsometricMaterial.PerFace] material via a builder with named face properties.
+ * Creates an [IsometricMaterial.PerFace] material via a builder with named face properties.
  *
  * ```kotlin
  * // Simple: grass top, dirt sides
  * Shape(Prism(origin), material = perFace {
- *     top = textured(R.drawable.grass)
- *     sides = textured(R.drawable.dirt)
+ *     top = texturedResource(R.drawable.grass)
+ *     sides = texturedResource(R.drawable.dirt)
  * })
  *
  * // Fine-grained: different materials per side
  * Shape(Prism(origin), material = perFace {
- *     top = textured(R.drawable.grass)
- *     front = textured(R.drawable.dirt_shadow)
- *     left = textured(R.drawable.dirt_light)
- *     default = flatColor(IsoColor.GRAY)
+ *     top = texturedResource(R.drawable.grass)
+ *     front = texturedResource(R.drawable.dirt_shadow)
+ *     left = texturedResource(R.drawable.dirt_light)
+ *     default = IsoColor.GRAY
  * })
  * ```
  */
@@ -146,20 +166,25 @@ fun perFace(
 
 // -- Builder classes ----------------------------------------------------------
 
+/** DSL marker that prevents nesting [PerFaceMaterialScope] calls inadvertently. */
+@DslMarker
+annotation class IsometricMaterialDsl
+
+@IsometricMaterialDsl
 class PerFaceMaterialScope internal constructor() {
-    var top: IsometricMaterial? = null
-    var bottom: IsometricMaterial? = null
-    var front: IsometricMaterial? = null
-    var back: IsometricMaterial? = null
-    var left: IsometricMaterial? = null
-    var right: IsometricMaterial? = null
-    var default: IsometricMaterial = IsometricMaterial.FlatColor(IsoColor(0, 0, 0, 0))
+    var top: MaterialData? = null
+    var bottom: MaterialData? = null
+    var front: MaterialData? = null
+    var back: MaterialData? = null
+    var left: MaterialData? = null
+    var right: MaterialData? = null
+    var default: MaterialData = UNASSIGNED_FACE_DEFAULT
 
     /**
      * Convenience: sets [front], [back], [left], [right] to the same material.
      * Write-only — later individual assignments override.
      */
-    var sides: IsometricMaterial?
+    var sides: MaterialData?
         @Deprecated("sides is write-only", level = DeprecationLevel.ERROR)
         get() = error("sides is write-only")
         set(value) { front = value; back = value; left = value; right = value }
@@ -173,6 +198,6 @@ class PerFaceMaterialScope internal constructor() {
             left?.let { put(PrismFace.LEFT, it) }
             right?.let { put(PrismFace.RIGHT, it) }
         }
-        return IsometricMaterial.PerFace(faceMap = map, default = default)
+        return IsometricMaterial.PerFace.of(faceMap = map, default = default)
     }
 }
