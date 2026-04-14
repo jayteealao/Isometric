@@ -5,7 +5,7 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-14T07:00:31Z"
+updated-at: "2026-04-14T21:41:49Z"
 slices-verified: 7
 slices-total: 7
 tags: [texture, material, shader, canvas, webgpu]
@@ -63,14 +63,14 @@ next-invocation: "/wf-review texture-material-shaders sample-demo"
 - Evidence: `verify-evidence/v-canvas-final-sm.png`, `verify-evidence/v-webgpu-uv-sm.png`
 - Record: [06-verify-sample-demo.md](06-verify-sample-demo.md)
 
-### `api-design-fixes` — PARTIAL (1 LOW issue found)
-- Checks: 3/3 passed (build, apiCheck ×3, unit tests 90/90)
+### `api-design-fixes` — PARTIAL Round 2 (post-review-fixes, 1 LOW carry-forward)
+- Checks: 3/3 passed (build, apiCheck ×3, unit tests 68/68 — 19 review-fix tests included)
 - Acceptance: 12/13 met (AC4 NOT MET: isometric-shader.Shape(IsometricMaterial) not deleted)
 - Interactive: 0 runs (AC1 tiling deferred to device)
-- Issues: 1 found (ISSUE-1 LOW: two Shape() overloads exist; shader overload not deleted)
+- Issues: 2 found — ISSUE-1 (LOW carry-forward: two Shape() overloads), ISSUE-2 (LOW corrected: MED-13 `PerFaceMaterialScope internal class` reverted to `class ... internal constructor()`)
 - Record: [06-verify-api-design-fixes.md](06-verify-api-design-fixes.md)
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-implement texture-material-shaders api-design-fixes` — fix ISSUE-1: delete `isometric-shader.Shape(IsometricMaterial)`, then re-verify
-- **Option B:** `/wf-review texture-material-shaders api-design-fixes` — proceed to review with ISSUE-1 as a known LOW finding
+- **Option A (default):** `/wf-review texture-material-shaders api-design-fixes` — all 19 review findings fixed; proceed with ISSUE-1 as known LOW finding
+- **Option B:** `/wf-implement texture-material-shaders api-design-fixes` — fix ISSUE-1 first (delete `isometric-shader.Shape(IsometricMaterial)`), then re-verify
 - **Option C:** `/wf-handoff texture-material-shaders api-design-fixes` — skip review (solo / trivial)

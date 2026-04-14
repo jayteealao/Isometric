@@ -186,7 +186,7 @@ fun perFace(
 annotation class IsometricMaterialDsl
 
 @IsometricMaterialDsl
-internal class PerFaceMaterialScope internal constructor() {
+class PerFaceMaterialScope internal constructor() {
     var top: MaterialData? = null
     var bottom: MaterialData? = null
     var front: MaterialData? = null

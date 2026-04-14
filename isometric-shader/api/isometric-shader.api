@@ -58,6 +58,25 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
 	public static synthetic fun texturedResource$default (ILio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
 }
 
+public final class io/github/jayteealao/isometric/shader/PerFaceMaterialScope {
+	public static final field $stable I
+	public final fun getBack ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getBottom ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getFront ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getLeft ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getRight ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getSides ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getTop ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun setBack (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setBottom (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setDefault (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setFront (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setLeft (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setRight (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setSides (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setTop (Lio/github/jayteealao/isometric/MaterialData;)V
+}
 
 public abstract interface class io/github/jayteealao/isometric/shader/TextureSource {
 }

@@ -14,7 +14,7 @@ metric-deviations-from-plan: 2
 metric-review-fixes-applied: 19
 metric-review-fixes-original-slice: 25
 commit-sha: "1eb8f19"
-commit-sha-review-fixes: ""
+commit-sha-review-fixes: "379ab2b"
 tags: [api-design, texture, material, shader]
 refs:
   index: 00-index.md

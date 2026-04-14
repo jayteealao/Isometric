@@ -4,14 +4,14 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: implement
-stage-number: 5
+current-stage: verify
+stage-number: 6
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-14T21:25:24Z"
+updated-at: "2026-04-14T21:41:49Z"
 selected-slice: "api-design-fixes"
-current-stage-status: complete
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
+current-stage-status: partial
+next-command: wf-review
+next-invocation: "/wf-review texture-material-shaders api-design-fixes"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -117,7 +117,7 @@ progress:
   handoff: complete
   ship: skipped
   retro: complete
-  api-design-fixes: review-fixes-complete
+  api-design-fixes: verify-round2-partial
   webgpu-uv-transforms: not-started
   webgpu-texture-error-callback: not-started
   uv-generation-cylinder: not-started
