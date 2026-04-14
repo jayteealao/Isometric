@@ -1,10 +1,15 @@
 public abstract interface class io/github/jayteealao/isometric/shader/IsometricMaterial : io/github/jayteealao/isometric/MaterialData {
 }
 
+public final class io/github/jayteealao/isometric/shader/IsometricMaterial$DefaultImpls {
+	public static fun baseColor (Lio/github/jayteealao/isometric/shader/IsometricMaterial;)Lio/github/jayteealao/isometric/IsoColor;
+}
+
 public final class io/github/jayteealao/isometric/shader/IsometricMaterial$PerFace : io/github/jayteealao/isometric/shader/IsometricMaterial {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Companion;
 	public synthetic fun <init> (Ljava/util/Map;Lio/github/jayteealao/isometric/MaterialData;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun component1 ()Ljava/util/Map;
 	public final fun component2 ()Lio/github/jayteealao/isometric/MaterialData;
 	public fun equals (Ljava/lang/Object;)Z
@@ -23,6 +28,7 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterial$Textu
 	public static final field $stable I
 	public fun <init> (Lio/github/jayteealao/isometric/shader/TextureSource;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;)V
 	public synthetic fun <init> (Lio/github/jayteealao/isometric/shader/TextureSource;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun component1 ()Lio/github/jayteealao/isometric/shader/TextureSource;
 	public final fun component2 ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun component3 ()Lio/github/jayteealao/isometric/shader/TextureTransform;

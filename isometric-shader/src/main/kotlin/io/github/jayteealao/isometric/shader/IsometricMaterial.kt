@@ -44,7 +44,9 @@ sealed interface IsometricMaterial : MaterialData {
         val source: TextureSource,
         val tint: IsoColor = IsoColor.WHITE,
         val transform: TextureTransform = TextureTransform.IDENTITY,
-    ) : IsometricMaterial
+    ) : IsometricMaterial {
+        override fun baseColor(): IsoColor = tint
+    }
 
     /**
      * Assigns different materials to different faces of a Prism shape.

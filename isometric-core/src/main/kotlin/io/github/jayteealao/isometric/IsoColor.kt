@@ -33,6 +33,8 @@ data class IsoColor @JvmOverloads constructor(
         a.toDouble()
     )
 
+    override fun baseColor(): IsoColor = this
+
     private val hsl: Triple<Double, Double, Double> by lazy(LazyThreadSafetyMode.NONE) { computeHsl() }
 
     /** Hue component in 0&ndash;1 (normalized; multiply by 360 for degrees). */

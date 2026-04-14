@@ -9,4 +9,17 @@ package io.github.jayteealao.isometric
  * `isometric-core` remains free of Android dependencies while still
  * providing compile-time safety for the material field.
  */
-interface MaterialData
+interface MaterialData {
+    /**
+     * Returns a representative flat color for this material.
+     *
+     * Used by renderers that do not support full material rendering — for example,
+     * the base color pass for lighting, or a fallback when no texture hook is installed.
+     *
+     * - [IsoColor]: returns itself
+     * - Textured materials: returns the tint color
+     * - Per-face materials: returns [IsoColor.WHITE] (face color resolved at render time)
+     * - Unknown implementors: returns [IsoColor.WHITE]
+     */
+    fun baseColor(): IsoColor = IsoColor.WHITE
+}

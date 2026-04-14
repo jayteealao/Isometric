@@ -40,6 +40,7 @@ public final class io/github/jayteealao/isometric/IsoColor : io/github/jayteeala
 	public fun <init> (III)V
 	public fun <init> (IIII)V
 	public synthetic fun <init> (IIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun component1 ()D
 	public final fun component2 ()D
 	public final fun component3 ()D
@@ -97,6 +98,11 @@ public final class io/github/jayteealao/isometric/IsometricEngine$Companion {
 }
 
 public abstract interface class io/github/jayteealao/isometric/MaterialData {
+	public abstract fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
+}
+
+public final class io/github/jayteealao/isometric/MaterialData$DefaultImpls {
+	public static fun baseColor (Lio/github/jayteealao/isometric/MaterialData;)Lio/github/jayteealao/isometric/IsoColor;
 }
 
 public class io/github/jayteealao/isometric/Path {

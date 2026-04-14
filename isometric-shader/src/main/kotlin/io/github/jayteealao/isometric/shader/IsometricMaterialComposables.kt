@@ -2,8 +2,6 @@ package io.github.jayteealao.isometric.shader
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReusableComposeNode
-import io.github.jayteealao.isometric.IsoColor
-import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.Path
@@ -16,21 +14,6 @@ import io.github.jayteealao.isometric.compose.runtime.ShapeNode
 import io.github.jayteealao.isometric.compose.runtime.PathNode
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 
-/**
- * Extracts a representative [IsoColor] from any [MaterialData] for use as the base color
- * in the GPU lighting pipeline.
- *
- * - [IsoColor]: returned as-is (flat-color rendering)
- * - [IsometricMaterial.Textured]: returns [IsometricMaterial.Textured.tint]
- * - [IsometricMaterial.PerFace]: returns [IsoColor.WHITE] (per-face color resolved at render time)
- * - Unknown: returns [IsoColor.WHITE]
- */
-internal fun MaterialData.toBaseColor(): IsoColor = when (this) {
-    is IsoColor -> this
-    is IsometricMaterial.Textured -> tint
-    is IsometricMaterial.PerFace -> IsoColor.WHITE
-    else -> IsoColor.WHITE
-}
 
 /**
  * Add a 3D shape with a material to the isometric scene.
@@ -73,7 +56,7 @@ fun IsometricScope.Shape(
     testTag: String? = null,
     nodeId: String? = null,
 ) {
-    val color = material.toBaseColor()
+    val color = material.baseColor()
     // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
     // Closes over the original Prism reference (model-space dimensions) rather than
     // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
@@ -163,7 +146,7 @@ fun IsometricScope.Path(
     require(material !is IsometricMaterial.Textured && material !is IsometricMaterial.PerFace) {
         "Path() does not support textured materials — use Shape() with a Prism for texture rendering"
     }
-    val color = material.toBaseColor()
+    val color = material.baseColor()
     ReusableComposeNode<PathNode, IsometricApplier>(
         factory = { PathNode(path, color).also { it.material = material } },
         update = {

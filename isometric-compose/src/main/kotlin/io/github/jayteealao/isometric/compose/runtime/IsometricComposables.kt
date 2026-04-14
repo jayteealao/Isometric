@@ -68,7 +68,7 @@ fun IsometricScope.Shape(
     testTag: String? = null,
     nodeId: String? = null
 ) {
-    val color = (material as? IsoColor) ?: IsoColor.WHITE
+    val color = material.baseColor()
     ReusableComposeNode<ShapeNode, IsometricApplier>(
         factory = { ShapeNode(geometry, color).also { it.material = material } },
         update = {
