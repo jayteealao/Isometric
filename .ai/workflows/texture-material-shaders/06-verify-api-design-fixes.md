@@ -17,7 +17,8 @@ metric-acceptance-total: 13
 metric-interactive-checks-run: 0
 metric-interactive-checks-passed: 0
 metric-issues-found: 0
-commit-sha: "cd6689d"
+commit-sha-review-fixes: "cd6689d"
+commit-sha: "9fd5443"
 evidence-dir: ".ai/workflows/texture-material-shaders/verify-evidence/"
 tags: [api-design, texture, material, shader]
 refs:
