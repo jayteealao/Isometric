@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import android.util.Log
@@ -368,7 +368,7 @@ private fun WebGpuGridScene(
                         depth = 1.0,
                         height = baseHeight
                     ),
-                    color = IsoColor(
+                    material = IsoColor(
                         clampRgb(60.0 + x * 14.0),
                         clampRgb(80.0 + y * 16.0),
                         clampRgb(220.0 - y * 9.0)
@@ -382,7 +382,7 @@ private fun WebGpuGridScene(
                         depth = 0.68,
                         height = 0.22
                     ),
-                    color = IsoColor(245.0, 245.0, 255.0)
+                    material = IsoColor(245.0, 245.0, 255.0)
                 )
             }
         }
@@ -454,7 +454,7 @@ private fun WebGpuTexturedSample() {
                     // Flat-color prism (backward compat — should stay blue)
                     Shape(
                         geometry = Prism(position = Point(2.0, 0.0, 0.0)),
-                        color = IsoColor(33.0, 150.0, 243.0),
+                        material = IsoColor(33.0, 150.0, 243.0),
                     )
                     // Another textured prism (cache reuse)
                     MaterialShape(

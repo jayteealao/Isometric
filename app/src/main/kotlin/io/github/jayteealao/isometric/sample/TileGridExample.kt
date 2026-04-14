@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -34,7 +34,7 @@ fun TileGridExample() {
         ) { coord ->
             Shape(
                 geometry = Prism(),
-                color = if (coord == selectedTile) IsoColor(33.0, 150.0, 243.0) else IsoColor(120.0, 144.0, 156.0)
+                material = if (coord == selectedTile) IsoColor(33.0, 150.0, 243.0) else IsoColor(120.0, 144.0, 156.0)
             )
         }
     }

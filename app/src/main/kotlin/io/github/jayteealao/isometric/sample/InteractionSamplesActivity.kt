@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -134,7 +134,7 @@ fun OnClickSample() {
                     position = Point(-1.0, -1.0, 0.0),
                     width = 10.0, depth = 6.0, height = 0.1
                 ),
-                color = IsoColor.LIGHT_GRAY
+                material = IsoColor.LIGHT_GRAY
             )
 
             // Row of tappable shapes — each with its own onClick
@@ -146,7 +146,7 @@ fun OnClickSample() {
                         width = 1.0, depth = 1.0,
                         height = if (isSelected) 2.0 else 1.0
                     ),
-                    color = if (isSelected) IsoColor.YELLOW else color,
+                    material = if (isSelected) IsoColor.YELLOW else color,
                     nodeId = name,
                     onClick = { selectedShape = if (selectedShape == name) null else name }
                 )
@@ -180,7 +180,7 @@ fun LongPressSample() {
                     position = Point(-1.0, -1.0, 0.0),
                     width = 8.0, depth = 6.0, height = 0.1
                 ),
-                color = IsoColor.LIGHT_GRAY
+                material = IsoColor.LIGHT_GRAY
             )
 
             // Grid of shapes
@@ -194,7 +194,7 @@ fun LongPressSample() {
                         position = Point(col * 1.8, row * 1.8, 0.1),
                         width = 1.2, depth = 1.2, height = 1.0
                     ),
-                    color = IsoColor(
+                    material = IsoColor(
                         (col + 1) * 80.0,
                         (row + 1) * 80.0,
                         150.0
@@ -275,7 +275,7 @@ fun AlphaSample() {
                     position = Point(-1.0, -1.0, 0.0),
                     width = 8.0, depth = 6.0, height = 0.1
                 ),
-                color = IsoColor.DARK_GRAY
+                material = IsoColor.DARK_GRAY
             )
 
             // Shape with controllable alpha
@@ -284,7 +284,7 @@ fun AlphaSample() {
                     position = Point(0.0, 0.0, 0.1),
                     width = 2.0, depth = 2.0, height = 2.0
                 ),
-                color = IsoColor.BLUE,
+                material = IsoColor.BLUE,
                 alpha = alphaValue,
                 testTag = "alpha-box"
             )
@@ -295,7 +295,7 @@ fun AlphaSample() {
                     position = Point(3.0, 0.0, 0.1),
                     radius = 0.8, height = 2.5, vertices = 20
                 ),
-                color = IsoColor.RED,
+                material = IsoColor.RED,
                 alpha = 0.4f,
                 testTag = "semi-transparent-cylinder"
             )
@@ -303,7 +303,7 @@ fun AlphaSample() {
             // Fully opaque reference shape
             Shape(
                 geometry = Pyramid(position = Point(0.0, 3.0, 0.1)),
-                color = IsoColor.GREEN,
+                material = IsoColor.GREEN,
                 alpha = 1f,
                 testTag = "opaque-pyramid"
             )
@@ -379,7 +379,7 @@ fun NodeIdSample() {
                     position = Point(-1.0, -1.0, 0.0),
                     width = 10.0, depth = 6.0, height = 0.1
                 ),
-                color = IsoColor.LIGHT_GRAY,
+                material = IsoColor.LIGHT_GRAY,
                 nodeId = "ground",
                 testTag = "ground-plane"
             )
@@ -393,7 +393,7 @@ fun NodeIdSample() {
                         width = 1.5, depth = 1.5,
                         height = building.height
                     ),
-                    color = if (isSelected) IsoColor.YELLOW else building.color,
+                    material = if (isSelected) IsoColor.YELLOW else building.color,
                     nodeId = building.id,
                     testTag = "building-${building.id}",
                     onClick = {
@@ -476,7 +476,7 @@ fun CombinedSample() {
                     position = Point(-1.0, -1.0, 0.0),
                     width = 8.0, depth = 6.0, height = 0.1
                 ),
-                color = IsoColor.LIGHT_GRAY,
+                material = IsoColor.LIGHT_GRAY,
                 nodeId = "city-ground"
             )
 
@@ -492,7 +492,7 @@ fun CombinedSample() {
                             width = 1.5, depth = 1.5,
                             height = slot.height
                         ),
-                        color = when {
+                        material = when {
                             isSelected -> IsoColor.YELLOW
                             else -> slot.color
                         },

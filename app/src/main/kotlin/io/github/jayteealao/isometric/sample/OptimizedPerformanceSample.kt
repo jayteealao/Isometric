@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
@@ -162,7 +162,7 @@ fun OptimizedPerformanceSample() {
                             depth = 1.0,
                             height = height
                         ),
-                        color = IsoColor(
+                        material = IsoColor(
                             (x.toDouble() / gridSize) * 255,
                             (y.toDouble() / gridSize) * 255,
                             150.0
@@ -310,7 +310,7 @@ private fun IsometricScope.LargeAnimatedGrid(wave: Double) {
                     depth = 1.0,
                     height = height
                 ),
-                color = IsoColor(
+                material = IsoColor(
                     (x / 7.0) * 255,
                     (y / 7.0) * 255,
                     150.0

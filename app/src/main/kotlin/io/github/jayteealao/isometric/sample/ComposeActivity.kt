@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,6 +15,7 @@ import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.TapEvent
 import android.graphics.Bitmap
+import io.github.jayteealao.isometric.shader.*
 import io.github.jayteealao.isometric.shader.Shape as MaterialShape
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
@@ -103,37 +104,37 @@ fun SimpleCubeSample() {
 @Composable
 fun MultipleShapesSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
-        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 2.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 2.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 2.0, depth = 1.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
     }
 }
 
 @Composable
 fun ComplexSceneSample() {
     IsometricScene(modifier = Modifier.fillMaxSize()) {
-        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), material = IsoColor(33.0, 150.0, 243.0))
         Shape(
             geometry = Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
-        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
         Shape(
             geometry = Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
-        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 180.0, 0.0))
-        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 0.0, 180.0))
-        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), color = IsoColor(0.0, 180.0, 180.0))
-        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), color = IsoColor(40.0, 180.0, 40.0))
-        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), color = IsoColor(50.0, 50.0, 50.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), material = IsoColor(180.0, 180.0, 0.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), material = IsoColor(180.0, 0.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), material = IsoColor(0.0, 180.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), material = IsoColor(40.0, 180.0, 40.0))
+        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), material = IsoColor(50.0, 50.0, 50.0))
         Shape(
             geometry = Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), 0.0),
-            color = IsoColor(0.0, 180.0, 180.0)
+            material = IsoColor(0.0, 180.0, 180.0)
         )
     }
 }
@@ -151,28 +152,28 @@ fun AnimatedSample() {
     }
 
     IsometricScene(modifier = Modifier.fillMaxSize()) {
-        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10), material = IsoColor(33.0, 150.0, 243.0))
         Shape(
             geometry = Stairs(position = Point(0.0, 3.0, 1.0), stepCount = 10).rotateZ(Point(0.5, 3.5, 1.0), -PI / 2),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
-        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
-        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(3.0, 0.0, 2.0), width = 2.0, depth = 4.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
+        Shape(geometry = Prism(position = Point(2.0, 1.0, 2.0), width = 1.0, depth = 3.0, height = 1.0), material = IsoColor(33.0, 150.0, 243.0))
         Shape(
             geometry = Stairs(position = Point(2.0, 0.0, 2.0), stepCount = 10).rotateZ(Point(2.5, 0.5, 0.0), -PI / 2),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
-        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 180.0, 0.0))
-        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), color = IsoColor(180.0, 0.0, 180.0))
-        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), color = IsoColor(0.0, 180.0, 180.0))
-        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), color = IsoColor(40.0, 180.0, 40.0))
-        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), color = IsoColor(50.0, 50.0, 50.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 3.0, 3.0)).scale(Point(2.0, 4.0, 3.0), 0.5), material = IsoColor(180.0, 180.0, 0.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 3.0, 3.0)).scale(Point(5.0, 4.0, 3.0), 0.5), material = IsoColor(180.0, 0.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(4.0, 1.0, 3.0)).scale(Point(5.0, 1.0, 3.0), 0.5), material = IsoColor(0.0, 180.0, 180.0))
+        Shape(geometry = Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), material = IsoColor(40.0, 180.0, 40.0))
+        Shape(geometry = Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), material = IsoColor(50.0, 50.0, 50.0))
         Shape(
             geometry = Octahedron(position = Point(3.0, 2.0, 3.2)).rotateZ(Point(3.5, 2.5, 0.0), angle),
-            color = IsoColor(0.0, 180.0, 180.0)
+            material = IsoColor(0.0, 180.0, 180.0)
         )
     }
 }
@@ -207,9 +208,9 @@ fun InteractiveSample() {
                 )
             )
         ) {
-            Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
-            Shape(geometry = Pyramid(position = Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
-            Shape(geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), color = IsoColor(0.0, 200.0, 100.0))
+            Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0)), material = IsoColor(33.0, 150.0, 243.0))
+            Shape(geometry = Pyramid(position = Point(2.0, 0.0, 0.0)), material = IsoColor(255.0, 100.0, 0.0))
+            Shape(geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20), material = IsoColor(0.0, 200.0, 100.0))
         }
     }
 }
@@ -239,7 +240,7 @@ fun TexturedSample() {
             // Flat-color prism for comparison (backward compat)
             Shape(
                 geometry = Prism(position = Point(2.0, 0.0, 0.0)),
-                color = IsoColor(33.0, 150.0, 243.0),
+                material = IsoColor(33.0, 150.0, 243.0),
             )
             // Another textured prism (cache reuse)
             MaterialShape(

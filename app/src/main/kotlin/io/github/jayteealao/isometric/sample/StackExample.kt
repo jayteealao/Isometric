@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -37,21 +37,21 @@ fun StackExample() {
         // 1. Vertical tower — 4 floors stacked along Z (hero scenario)
         Group(position = Point(1.0, 1.0, 0.0)) {
             Stack(count = 4, axis = StackAxis.Z, gap = 1.0) { floor ->
-                Shape(geometry = Prism(), color = floorColors[floor])
+                Shape(geometry = Prism(), material = floorColors[floor])
             }
         }
 
         // 2. Horizontal row — 4 prisms along X, spaced 1.5 world units
         Group(position = Point(-1.0, 4.0, 0.0)) {
             Stack(count = 4, axis = StackAxis.X, gap = 1.5) { _ ->
-                Shape(geometry = Prism(), color = IsoColor(120.0, 144.0, 156.0))
+                Shape(geometry = Prism(), material = IsoColor(120.0, 144.0, 156.0))
             }
         }
 
         // 3. Depth row — 3 pyramids along Y, spaced 1.5 world units
         Group(position = Point(4.0, 0.0, 0.0)) {
             Stack(count = 3, axis = StackAxis.Y, gap = 1.5) { _ ->
-                Shape(geometry = Pyramid(), color = IsoColor(156.0, 39.0, 176.0))
+                Shape(geometry = Pyramid(), material = IsoColor(156.0, 39.0, 176.0))
             }
         }
     }
@@ -71,7 +71,7 @@ fun GridStackExample() {
         ) { coord ->
             val towerHeight = coord.x + coord.y + 1
             Stack(count = towerHeight, axis = StackAxis.Z, gap = 0.5) { _ ->
-                Shape(geometry = Prism(height = 0.4), color = IsoColor(0.0, 188.0, 212.0))
+                Shape(geometry = Prism(height = 0.4), material = IsoColor(0.0, 188.0, 212.0))
             }
         }
     }

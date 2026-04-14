@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -137,12 +137,12 @@ fun SimpleSample() {
 
         Shape(
             geometry = Pyramid(position = Point(3.0, 0.0, 0.0)),
-            color = IsoColor(255.0, 100.0, 0.0)
+            material = IsoColor(255.0, 100.0, 0.0)
         )
 
         Shape(
             geometry = Cylinder(position = Point(-3.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
-            color = IsoColor(0.0, 200.0, 100.0)
+            material = IsoColor(0.0, 200.0, 100.0)
         )
     }
 }
@@ -171,7 +171,7 @@ fun HierarchySample() {
         // Static base
         Shape(
             geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 4.0, depth = 4.0, height = 0.5),
-            color = IsoColor(100.0, 100.0, 100.0)
+            material = IsoColor(100.0, 100.0, 100.0)
         )
 
         // Rotating group — centered on the base
@@ -183,22 +183,22 @@ fun HierarchySample() {
             // These all rotate together (local coords relative to group center)
             Shape(
                 geometry = Prism(position = Point(-1.5, 0.0, 0.0), width = 1.0, depth = 1.0, height = 2.0),
-                color = IsoColor(255.0, 0.0, 0.0)
+                material = IsoColor(255.0, 0.0, 0.0)
             )
 
             Shape(
                 geometry = Prism(position = Point(1.5, 0.0, 0.0), width = 1.0, depth = 1.0, height = 2.0),
-                color = IsoColor(0.0, 255.0, 0.0)
+                material = IsoColor(0.0, 255.0, 0.0)
             )
 
             Shape(
                 geometry = Prism(position = Point(0.0, -1.5, 0.0), width = 1.0, depth = 1.0, height = 2.0),
-                color = IsoColor(0.0, 0.0, 255.0)
+                material = IsoColor(0.0, 0.0, 255.0)
             )
 
             Shape(
                 geometry = Prism(position = Point(0.0, 1.5, 0.0), width = 1.0, depth = 1.0, height = 2.0),
-                color = IsoColor(255.0, 255.0, 0.0)
+                material = IsoColor(255.0, 255.0, 0.0)
             )
 
             // Nested group with additional counter-rotation
@@ -208,7 +208,7 @@ fun HierarchySample() {
             ) {
                 Shape(
                     geometry = Octahedron(position = Point(0.0, 0.0, 0.0)),
-                    color = IsoColor(255.0, 0.0, 255.0)
+                    material = IsoColor(255.0, 0.0, 255.0)
                 )
             }
         }
@@ -241,17 +241,17 @@ fun AnimationSample() {
         // Static scene (never recomposes)
         Shape(
             geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
 
         Shape(
             geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
 
         Shape(
             geometry = Stairs(position = Point(-1.0, 0.0, 0.0), stepCount = 10),
-            color = IsoColor(33.0, 150.0, 243.0)
+            material = IsoColor(33.0, 150.0, 243.0)
         )
 
         // Animated group (only this recomposes!)
@@ -262,7 +262,7 @@ fun AnimationSample() {
         ) {
             Shape(
                 geometry = Octahedron(position = Point(0.0, 0.0, 0.0)),
-                color = IsoColor(0.0, 180.0, 180.0)
+                material = IsoColor(0.0, 180.0, 180.0)
             )
         }
 
@@ -276,7 +276,7 @@ fun AnimationSample() {
                         depth = 1.0,
                         height = 1.0
                     ),
-                    color = IsoColor(
+                    material = IsoColor(
                         ((sin(wave + i * PI / 3) + 1.0) * 0.5) * 255.0,
                         150.0,
                         ((cos(wave + i * PI / 3) + 1.0) * 0.5) * 255.0
@@ -331,17 +331,17 @@ fun RuntimeInteractiveSample() {
             Group(position = dragOffset) {
                 Shape(
                     geometry = Prism(position = Point(0.0, 0.0, 0.0)),
-                    color = IsoColor(33.0, 150.0, 243.0)
+                    material = IsoColor(33.0, 150.0, 243.0)
                 )
 
                 Shape(
                     geometry = Pyramid(position = Point(2.0, 0.0, 0.0)),
-                    color = IsoColor(255.0, 100.0, 0.0)
+                    material = IsoColor(255.0, 100.0, 0.0)
                 )
 
                 Shape(
                     geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
-                    color = IsoColor(0.0, 200.0, 100.0)
+                    material = IsoColor(0.0, 200.0, 100.0)
                 )
             }
         }
@@ -397,7 +397,7 @@ fun ConditionalSample() {
             // Base always visible
             Shape(
                 geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 8.0, depth = 8.0, height = 0.2),
-                color = IsoColor(150.0, 150.0, 150.0)
+                material = IsoColor(150.0, 150.0, 150.0)
             )
 
             // Conditional pyramids — positioned on the base
@@ -405,7 +405,7 @@ fun ConditionalSample() {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
                         geometry = Pyramid(position = Point(1.0 + i * 1.5, 2.0, 0.2)),
-                        color = IsoColor(255.0, 100.0 + i * 15.0, 0.0)
+                        material = IsoColor(255.0, 100.0 + i * 15.0, 0.0)
                     )
                 }
             }
@@ -415,7 +415,7 @@ fun ConditionalSample() {
                 ForEach((0 until count).toList()) { i ->
                     Shape(
                         geometry = Cylinder(position = Point(1.0 + i * 1.5, 5.0, 0.2), radius = 0.4, height = 1.5, vertices = 20),
-                        color = IsoColor(0.0, 150.0 + i * 10.0, 255.0)
+                        material = IsoColor(0.0, 150.0 + i * 10.0, 255.0)
                     )
                 }
             }
@@ -496,7 +496,7 @@ fun PerformanceSample() {
                             depth = 1.0,
                             height = height
                         ),
-                        color = IsoColor(
+                        material = IsoColor(
                             (x.toDouble() / gridSize) * 255,
                             (y.toDouble() / gridSize) * 255,
                             150.0
