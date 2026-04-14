@@ -70,9 +70,6 @@ sealed interface IsometricMaterial : MaterialData {
             }
         }
 
-        /** Resolve the effective material for [face], falling back to [default]. */
-        internal fun resolve(face: PrismFace): MaterialData = faceMap[face] ?: default
-
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is PerFace) return false
@@ -85,6 +82,8 @@ sealed interface IsometricMaterial : MaterialData {
             return result
         }
 
+        override fun baseColor(): IsoColor = default.baseColor()
+
         override fun toString(): String = "PerFace(faceMap=$faceMap, default=$default)"
 
         companion object {
@@ -92,12 +91,18 @@ sealed interface IsometricMaterial : MaterialData {
             internal val UNASSIGNED_FACE_DEFAULT: IsoColor = IsoColor(128, 128, 128, 255)
 
             /**
-             * Factory for callers who need direct map construction (advanced use case).
+             * Creates a [PerFace] material that maps different materials to each face of a prism.
+             *
+             * This factory function exists because [PerFace] uses an `internal constructor` to satisfy
+             * Kotlin's `explicitApi()` requirement: the class itself must be `public` (so it can appear
+             * in public function signatures), but direct construction is locked down so callers cannot
+             * bypass the [default]-must-not-be-[PerFace] invariant enforced here.
              *
              * Prefer the [perFace] DSL for typical usage.
              *
              * @param faceMap Map from [PrismFace] to material for that face
-             * @param default Fallback material for faces absent from [faceMap]
+             * @param default The material to use for faces not explicitly assigned. Must not itself be
+             *   a [PerFace] instance.
              */
             fun of(
                 faceMap: Map<PrismFace, MaterialData>,
@@ -200,6 +205,7 @@ class PerFaceMaterialScope internal constructor() {
      * Write-only — later individual assignments override.
      */
     var sides: MaterialData?
+        @get:JvmSynthetic
         @Deprecated("sides is write-only", level = DeprecationLevel.ERROR)
         get() = error("sides is write-only")
         set(value) { front = value; back = value; left = value; right = value }

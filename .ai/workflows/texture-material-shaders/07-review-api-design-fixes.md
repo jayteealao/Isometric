@@ -300,6 +300,35 @@ shaderCache[key]?.let { return it }                 // line 124
 - **Option A (default):** `/wf-implement texture-material-shaders reviews` — fix 22 Must Fix findings sequentially; most are xs/s size and concentrated in `TexturedCanvasDrawHook.kt` + test files. Run `/compact` first — review dispatch context is noise for implementation.
 - **Option B:** `/wf-review texture-material-shaders triage` — re-examine deferred findings at a later point.
 
+## Fix Status (Round 2)
+
+| ID | Severity | Status | Notes |
+|----|----------|--------|-------|
+| CR-1 | HIGH | Fixed | Removed unusable Path(IsometricMaterial) overload + 2 dead imports from IsometricMaterialComposables.kt |
+| CR-2 | HIGH | Fixed | Shader cache key changed from Triple(TextureSource,…) to Triple(Bitmap,…) in TexturedCanvasDrawHook.kt |
+| REL-01 | HIGH | Fixed | catch(Exception) narrowed to IOException + OutOfMemoryError; RuntimeExceptions now propagate; @throws KDoc added |
+| REL-02 | HIGH | Fixed | Checkerboard no longer cached on failure; returned direct for current frame; next frame retries load |
+| ARCH-01 | HIGH | Fixed | PerFace.resolve() deleted; 19 test call sites updated to faceMap[face] ?: default; TexturedCanvasDrawHook was already using inline form |
+| AC-1 | HIGH | Fixed | CHANGELOG.md ## [Unreleased] section added with Breaking Changes entry for Shape() parameter rename |
+| AC-2 | HIGH | Fixed | TextureLoader.load() @return KDoc expanded with null failure semantics for Java consumers |
+| CR-3 | MED | Fixed (prior round) | Already fixed in commit 379ab2b — REPEAT when transform != IDENTITY |
+| CR-4 | MED | Fixed (prior round) | Already implemented — colorFilterFor() with cachedTintColor + cachedColorFilter fields |
+| REL-03 | MED | Fixed | rememberUpdatedState removed; loader + onTextureLoadError added as remember() keys in ProvideTextureRendering |
+| REL-04 | MED | Fixed | KDoc nesting note added to ProvideTextureRendering: inner provider replaces outer, no merging |
+| REL-05 | MED | Fixed | isWhite() extracted as private top-level function; both colorFilterFor + toColorFilterOrNull delegate to it |
+| AC-5 | MED | Fixed | @get:JvmSynthetic added to PerFaceMaterialScope.sides getter; getSides() now invisible to Java |
+| TST-01 | MED | Fixed | 3 -Infinity tests added to IsometricMaterialTest.kt for offsetU, offsetV, rotationDegrees |
+| TST-02 | MED | Fixed | 3 factory companion tests added: tiling(), rotated(), offset() all verified |
+| TST-03 | MED | Fixed | require(default !is PerFace) guard test added to PerFaceMaterialTest.kt |
+| TST-06 | MED | Fixed | TexturedCanvasDrawHookTest.kt created (7 tests); resolveToCache widened to internal for testability |
+| SEC-1 | MED | Fixed | URLDecoder.decode() applied before .. check in TextureSource.Asset.init (minSdk=24; NIO Path unavailable) |
+| PERF-8 | MED | Fixed | matrixSrc + matrixDst pre-allocated as class fields; computeAffineMatrix accepts defaulted params |
+| ARCH-02 | MED | Fixed | PerFace.baseColor() override added: returns default.baseColor() instead of inherited WHITE |
+| CS-2 | MED | Fixed | Duplicate require(maxSize > 0) removed from TextureCache.init; remains only in TextureCacheConfig.init |
+| MNT-04 | MED | Fixed | PerFace.of() KDoc updated: explains internal constructor pattern + explicitApi() rationale |
+
+**Round 2 total: 22 fixed (7 HIGH + 15 MED). 2 of 15 MED were already fixed in prior round (CR-3, CR-4).**
+
 ## Round History
 
 | Round | Date | Commands | Raw Findings | Deduped | Must Fix | Fixed |

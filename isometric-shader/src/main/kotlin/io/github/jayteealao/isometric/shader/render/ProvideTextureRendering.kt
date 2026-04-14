@@ -2,9 +2,7 @@ package io.github.jayteealao.isometric.shader.render
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.compose.runtime.LocalMaterialDrawHook
 import io.github.jayteealao.isometric.shader.TextureSource
@@ -61,6 +59,10 @@ data class TextureCacheConfig(val maxSize: Int = 20) {
  * }) { ... }
  * ```
  *
+ * **Nesting:** If `ProvideTextureRendering` is nested, the innermost provider wins — it
+ * completely replaces the outer provider for the subtree it wraps. There is no merging
+ * of loaders or caches between nested providers.
+ *
  * @param cacheConfig LRU cache configuration. Controls max in-memory texture count.
  * @param loader Custom texture loader. Override to intercept or transform bitmaps at load
  *   time. When `null`, the default Android resource/asset loader is used.
@@ -76,12 +78,10 @@ fun ProvideTextureRendering(
     content: @Composable () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val currentLoader by rememberUpdatedState(loader)
-    val currentOnError by rememberUpdatedState(onTextureLoadError)
-    val hook = remember(context, cacheConfig) {
+    val hook = remember(context, cacheConfig, loader, onTextureLoadError) {
         val cache = TextureCache(cacheConfig.maxSize)
-        val effectiveLoader = currentLoader ?: defaultTextureLoader(context.applicationContext)
-        TexturedCanvasDrawHook(cache, effectiveLoader, currentOnError)
+        val effectiveLoader = loader ?: defaultTextureLoader(context.applicationContext)
+        TexturedCanvasDrawHook(cache, effectiveLoader, onTextureLoadError)
     }
     CompositionLocalProvider(LocalMaterialDrawHook provides hook) {
         content()

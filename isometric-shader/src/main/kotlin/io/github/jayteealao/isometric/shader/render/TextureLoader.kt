@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import io.github.jayteealao.isometric.shader.TextureSource
+import java.io.IOException
 
 private const val TAG = "IsometricShader"
 
@@ -29,8 +30,15 @@ fun interface TextureLoader {
     /**
      * Loads the given [source] and returns a decoded [Bitmap], or `null` on failure.
      *
+     * Implementations may return `null` for recoverable failures such as a missing resource,
+     * a decode error, or [OutOfMemoryError]. Unrecoverable programming errors (e.g.
+     * [NullPointerException]) are **not** caught and will propagate to the caller.
+     *
      * @param source The texture source to load
-     * @return the loaded [Bitmap], or null if the source could not be loaded
+     * @return [Bitmap] if the texture was loaded successfully, or null if the load failed
+     *   (e.g. source not found, I/O error, or out of memory). Callers must handle null by
+     *   providing a fallback.
+     * @throws IOException if an I/O error occurs while reading the texture data
      */
     fun load(source: TextureSource): Bitmap?
 }
@@ -55,15 +63,21 @@ private class DefaultTextureLoader(private val context: Context) : TextureLoader
 
     private fun loadResource(resId: Int): Bitmap? = try {
         BitmapFactory.decodeResource(context.resources, resId)
-    } catch (e: Exception) {
+    } catch (e: IOException) {
         Log.w(TAG, "Failed to load texture resource: Resource(id=$resId)", e)
+        null
+    } catch (e: OutOfMemoryError) {
+        Log.w(TAG, "OOM loading texture resource: Resource(id=$resId)", e)
         null
     }
 
     private fun loadAsset(path: String): Bitmap? = try {
         context.assets.open(path).use { BitmapFactory.decodeStream(it) }
-    } catch (e: Exception) {
+    } catch (e: IOException) {
         Log.w(TAG, "Failed to load texture asset: Asset(path=<redacted>)", e)
+        null
+    } catch (e: OutOfMemoryError) {
+        Log.w(TAG, "OOM loading texture asset: Asset(path=<redacted>)", e)
         null
     }
 }

@@ -18,7 +18,7 @@ interface MaterialData {
      *
      * - [IsoColor]: returns itself
      * - Textured materials: returns the tint color
-     * - Per-face materials: returns [IsoColor.WHITE] (face color resolved at render time)
+     * - Per-face materials: returns the base color of the `default` face material
      * - Unknown implementors: returns [IsoColor.WHITE]
      */
     fun baseColor(): IsoColor = IsoColor.WHITE

@@ -189,6 +189,13 @@ class IsometricMaterialTest {
     }
 
     @Test
+    fun `textureTransform_negativeInfinityOffsetU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetU = Float.NEGATIVE_INFINITY)
+        }
+    }
+
+    @Test
     fun `textureTransform_nanOffsetV_throws`() {
         assertFailsWith<IllegalArgumentException> {
             TextureTransform(offsetV = Float.NaN)
@@ -199,6 +206,13 @@ class IsometricMaterialTest {
     fun `textureTransform_infinityOffsetV_throws`() {
         assertFailsWith<IllegalArgumentException> {
             TextureTransform(offsetV = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_negativeInfinityOffsetV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetV = Float.NEGATIVE_INFINITY)
         }
     }
 
@@ -217,6 +231,13 @@ class IsometricMaterialTest {
     }
 
     @Test
+    fun `textureTransform_negativeInfinityRotationDegrees_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(rotationDegrees = Float.NEGATIVE_INFINITY)
+        }
+    }
+
+    @Test
     fun `textureTransform_validParams_doesNotThrow`() {
         // Positive confirmation: a fully-specified finite, non-zero transform constructs successfully
         val t = TextureTransform(
@@ -231,6 +252,38 @@ class IsometricMaterialTest {
         assertEquals(0.5f, t.offsetU)
         assertEquals(-0.25f, t.offsetV)
         assertEquals(90f, t.rotationDegrees)
+    }
+
+    // --- TextureTransform companion factory methods ---
+
+    @Test
+    fun `textureTransform_tiling_setsScaleUV_andZeroOffsetAndRotation`() {
+        val t = TextureTransform.tiling(2f, 3f)
+        assertEquals(2f, t.scaleU)
+        assertEquals(3f, t.scaleV)
+        assertEquals(0f, t.offsetU)
+        assertEquals(0f, t.offsetV)
+        assertEquals(0f, t.rotationDegrees)
+    }
+
+    @Test
+    fun `textureTransform_rotated_setsRotation_andIdentityScaleAndOffset`() {
+        val t = TextureTransform.rotated(45f)
+        assertEquals(1f, t.scaleU)
+        assertEquals(1f, t.scaleV)
+        assertEquals(0f, t.offsetU)
+        assertEquals(0f, t.offsetV)
+        assertEquals(45f, t.rotationDegrees)
+    }
+
+    @Test
+    fun `textureTransform_offset_setsOffsetUV_andIdentityScaleAndZeroRotation`() {
+        val t = TextureTransform.offset(0.1f, 0.2f)
+        assertEquals(1f, t.scaleU)
+        assertEquals(1f, t.scaleV)
+        assertEquals(0.1f, t.offsetU)
+        assertEquals(0.2f, t.offsetV)
+        assertEquals(0f, t.rotationDegrees)
     }
 
     @Test
@@ -299,16 +352,16 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `PerFace resolve returns face material or default`() {
+    fun `PerFace faceMap lookup returns face material or default`() {
         val grass = IsoColor.GREEN
         val gray = IsoColor.GRAY
         val mat = IsometricMaterial.PerFace.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
-        assertEquals(grass, mat.resolve(PrismFace.TOP))
-        assertEquals(gray, mat.resolve(PrismFace.FRONT))
-        assertEquals(gray, mat.resolve(PrismFace.BOTTOM))
+        assertEquals(grass, mat.faceMap[PrismFace.TOP] ?: mat.default)
+        assertEquals(gray, mat.faceMap[PrismFace.FRONT] ?: mat.default)
+        assertEquals(gray, mat.faceMap[PrismFace.BOTTOM] ?: mat.default)
     }
 
     @Test

@@ -6,12 +6,12 @@ slice-slug: api-design-fixes
 status: complete
 stage-number: 5
 created-at: "2026-04-14T06:46:32Z"
-updated-at: "2026-04-14T21:25:24Z"
+updated-at: "2026-04-14T23:27:20Z"
 metric-files-changed: 23
 metric-lines-added: 620
 metric-lines-removed: 390
 metric-deviations-from-plan: 2
-metric-review-fixes-applied: 19
+metric-review-fixes-applied: 41
 metric-review-fixes-original-slice: 25
 commit-sha: "1eb8f19"
 commit-sha-review-fixes: "379ab2b"

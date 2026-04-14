@@ -42,15 +42,21 @@ internal class TexturedCanvasDrawHook(
     private val affineMatrix = Matrix()
     private val transformMatrix = Matrix()
     private val transformMatrixInv = Matrix()
+    private val matrixSrc = FloatArray(6)
+    private val matrixDst = FloatArray(6)
     private val checkerboard: Bitmap by lazy { createCheckerboardBitmap() }
 
     /**
-     * Per-[Shader.TileMode] BitmapShader cache. Keyed by `(TextureSource, tileU, tileV)`.
+     * Per-[Shader.TileMode] BitmapShader cache. Keyed by `(Bitmap, tileU, tileV)`.
+     * Using the [Bitmap] instance (rather than [TextureSource]) as the first key component
+     * ensures a cache miss whenever [TextureCache] evicts and reloads a texture — the new
+     * [Bitmap] instance will not match the old key, so a fresh [BitmapShader] is created
+     * from the new bitmap instead of returning a shader backed by a recycled/evicted bitmap.
      * Both tile modes are included in the key so that asymmetric tiling (tileU != tileV)
      * never collides with a uniformly-tiled shader.
      */
-    private val shaderCache = object : LinkedHashMap<Triple<TextureSource, Shader.TileMode, Shader.TileMode>, BitmapShader>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<Triple<TextureSource, Shader.TileMode, Shader.TileMode>, BitmapShader>): Boolean {
+    private val shaderCache = object : LinkedHashMap<Triple<Bitmap, Shader.TileMode, Shader.TileMode>, BitmapShader>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<Triple<Bitmap, Shader.TileMode, Shader.TileMode>, BitmapShader>): Boolean {
             return size > cache.maxSize * 2
         }
     }
@@ -75,7 +81,7 @@ internal class TexturedCanvasDrawHook(
      */
     private fun colorFilterFor(tint: IsoColor): PorterDuffColorFilter? {
         // White tint is a no-op; skip the cache entirely.
-        if (tint.r >= 255.0 && tint.g >= 255.0 && tint.b >= 255.0) return null
+        if (isWhite(tint)) return null
         if (tint == cachedTintColor) return cachedColorFilter
         val filter = tint.toColorFilterOrNull()
         cachedTintColor = tint
@@ -120,12 +126,12 @@ internal class TexturedCanvasDrawHook(
         val tileMode = if (material.transform != TextureTransform.IDENTITY) Shader.TileMode.REPEAT else Shader.TileMode.CLAMP
         val tileU = tileMode
         val tileV = tileMode
-        val shaderKey = Triple(material.source, tileU, tileV)
+        val shaderKey = Triple(cached.bitmap, tileU, tileV)
         val shader = shaderCache.getOrPut(shaderKey) {
             BitmapShader(cached.bitmap, tileU, tileV)
         }
 
-        computeAffineMatrix(uvCoords, command.points, texW, texH, material.transform, affineMatrix, transformMatrix, transformMatrixInv)
+        computeAffineMatrix(uvCoords, command.points, texW, texH, material.transform, affineMatrix, transformMatrix, transformMatrixInv, matrixSrc, matrixDst)
         shader.setLocalMatrix(affineMatrix)
 
         texturedPaint.shader = shader
@@ -140,15 +146,16 @@ internal class TexturedCanvasDrawHook(
         return true
     }
 
-    private fun resolveToCache(source: TextureSource): CachedTexture {
+    internal fun resolveToCache(source: TextureSource): CachedTexture {
         cache.get(source)?.let { return it }
         val bitmap = loader.load(source)
         return if (bitmap != null) {
             cache.put(source, bitmap)
         } else {
             onTextureLoadError?.invoke(source)
-            // Cache the checkerboard under the failed source key to avoid repeated load attempts.
-            cache.put(source, checkerboard)
+            // Do NOT insert into cache on failure — the next frame will retry the load.
+            // Return the checkerboard directly for this frame only so the UI doesn't crash.
+            CachedTexture(checkerboard)
         }
     }
 }
@@ -176,6 +183,8 @@ internal class TexturedCanvasDrawHook(
  * @param outMatrix The matrix to write into (reused across calls — no allocation).
  * @param workMatrix Scratch matrix for the UV transform T (pre-allocated by caller — no allocation).
  * @param workMatrixInv Scratch matrix for T⁻¹ (pre-allocated by caller — no allocation).
+ * @param workSrc Scratch [FloatArray] of length ≥ 6 for UV source points (pre-allocated by caller — no allocation).
+ * @param workDst Scratch [FloatArray] of length ≥ 6 for screen destination points (pre-allocated by caller — no allocation).
  */
 internal fun computeAffineMatrix(
     uvCoords: FloatArray,
@@ -186,22 +195,20 @@ internal fun computeAffineMatrix(
     outMatrix: Matrix,
     workMatrix: Matrix = Matrix(),
     workMatrixInv: Matrix = Matrix(),
+    workSrc: FloatArray = FloatArray(6),
+    workDst: FloatArray = FloatArray(6),
 ) {
     if (screenPoints.size < 6) {
         outMatrix.reset()
         return
     }
-    val src = floatArrayOf(
-        uvCoords[0] * texWidth, uvCoords[1] * texHeight,
-        uvCoords[2] * texWidth, uvCoords[3] * texHeight,
-        uvCoords[4] * texWidth, uvCoords[5] * texHeight,
-    )
-    val dst = floatArrayOf(
-        screenPoints[0].toFloat(), screenPoints[1].toFloat(),
-        screenPoints[2].toFloat(), screenPoints[3].toFloat(),
-        screenPoints[4].toFloat(), screenPoints[5].toFloat(),
-    )
-    outMatrix.setPolyToPoly(src, 0, dst, 0, 3)
+    workSrc[0] = uvCoords[0] * texWidth;  workSrc[1] = uvCoords[1] * texHeight
+    workSrc[2] = uvCoords[2] * texWidth;  workSrc[3] = uvCoords[3] * texHeight
+    workSrc[4] = uvCoords[4] * texWidth;  workSrc[5] = uvCoords[5] * texHeight
+    workDst[0] = screenPoints[0].toFloat(); workDst[1] = screenPoints[1].toFloat()
+    workDst[2] = screenPoints[2].toFloat(); workDst[3] = screenPoints[3].toFloat()
+    workDst[4] = screenPoints[4].toFloat(); workDst[5] = screenPoints[5].toFloat()
+    outMatrix.setPolyToPoly(workSrc, 0, workDst, 0, 3)
 
     if (transform != TextureTransform.IDENTITY) {
         // Build T in texture-pixel space: scale (around center) → rotate (around center) → translate
@@ -247,13 +254,22 @@ internal fun createCheckerboardBitmap(): Bitmap {
 }
 
 /**
+ * Returns `true` if [color] is white (all RGB components ≥ 255.0), meaning it is a no-op tint.
+ *
+ * Centralising this predicate here ensures that if [IsoColor.WHITE] is ever redefined
+ * (e.g. using 1.0f float components), only this one place needs to change.
+ */
+private fun isWhite(color: IsoColor): Boolean =
+    color.r >= 255.0 && color.g >= 255.0 && color.b >= 255.0
+
+/**
  * Returns a multiplicative color filter for the given tint, or `null` for white (no-op).
  *
  * Returning `null` for white avoids a GPU state change on the common case where no
  * tint is applied.
  */
 internal fun IsoColor.toColorFilterOrNull(): PorterDuffColorFilter? {
-    if (r >= 255.0 && g >= 255.0 && b >= 255.0) return null
+    if (isWhite(this)) return null
     return PorterDuffColorFilter(
         android.graphics.Color.argb(
             255,

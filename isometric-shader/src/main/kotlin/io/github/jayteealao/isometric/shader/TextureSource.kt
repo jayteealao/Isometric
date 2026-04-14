@@ -37,15 +37,20 @@ sealed interface TextureSource {
             // Reject null bytes early — they can bypass string comparisons on some runtimes.
             require('\u0000' !in path) { "Asset path must not contain null bytes" }
             require(!path.startsWith("/")) { "Asset path must be relative, got '$path'" }
+            // SEC-1: Decode URL-encoded sequences (e.g. %2e%2e → ..) before any path checks.
+            // java.net.URLDecoder is available on all Android API levels (minSdk = 24 here, so
+            // java.nio.file.Paths which requires API 26 cannot be used).
+            // This prevents bypassing the ".." check via encodings like %2e%2e or %2E%2E.
+            val decodedPath = java.net.URLDecoder.decode(path, "UTF-8")
             // Baseline: reject any path segment that is literally "..".
-            require(".." !in path.split("/", "\\")) {
+            require(".." !in decodedPath.split("/", "\\")) {
                 "Asset path must not contain '..' components, got '$path'"
             }
             // Defense-in-depth: normalize via java.io.File (available on all Android API levels)
             // to collapse encoded or obfuscated traversal sequences, then re-validate.
             // File.normalize() (Kotlin stdlib) resolves ".", "..", and redundant separators
             // without touching the filesystem, making it safe for pure string validation.
-            val normalizedPath = java.io.File(path).normalize().path.replace('\\', '/')
+            val normalizedPath = java.io.File(decodedPath).normalize().path.replace('\\', '/')
             require(!normalizedPath.startsWith("..")) {
                 "Asset path must not traverse above the assets root after normalization, got '$path'"
             }

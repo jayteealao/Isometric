@@ -4,14 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReusableComposeNode
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
-import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.compose.runtime.IsometricApplier
 import io.github.jayteealao.isometric.compose.runtime.IsometricComposable
 import io.github.jayteealao.isometric.compose.runtime.IsometricScope
 import io.github.jayteealao.isometric.compose.runtime.LocalDefaultColor
 import io.github.jayteealao.isometric.compose.runtime.ShapeNode
-import io.github.jayteealao.isometric.compose.runtime.PathNode
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 
 
@@ -102,74 +100,3 @@ fun IsometricScope.Shape(
     )
 }
 
-/**
- * Add a raw path with a material to the isometric scene.
- *
- * **Note:** Only [IsoColor] (flat-color) materials are supported for paths.
- * Textured and per-face materials require 3D geometry (use [Shape] with a [Prism]).
- *
- * @param path The 2D path to render
- * @param material The material describing how the path should be painted.
- *   Must not be [IsometricMaterial.Textured] or [IsometricMaterial.PerFace].
- * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque).
- *   Applied to the path's overall opacity.
- * @param position Local position offset
- * @param rotation Local rotation around Z axis
- * @param scale Local scale factor
- * @param rotationOrigin Origin point for rotation
- * @param scaleOrigin Origin point for scaling
- * @param visible Whether the path is visible
- * @param onClick Callback invoked when this path is tapped
- * @param onLongClick Callback invoked when this path is long-pressed
- * @param testTag Optional tag for testing and diagnostics
- * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
- * @throws IllegalArgumentException if [material] is [IsometricMaterial.Textured] or [IsometricMaterial.PerFace]
- * @see io.github.jayteealao.isometric.compose.runtime.Path
- */
-@IsometricComposable
-@Composable
-fun IsometricScope.Path(
-    path: Path,
-    material: IsometricMaterial,
-    alpha: Float = 1f,
-    position: Point = Point(0.0, 0.0, 0.0),
-    rotation: Double = 0.0,
-    scale: Double = 1.0,
-    rotationOrigin: Point? = null,
-    scaleOrigin: Point? = null,
-    visible: Boolean = true,
-    onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null,
-    testTag: String? = null,
-    nodeId: String? = null,
-) {
-    require(material !is IsometricMaterial.Textured && material !is IsometricMaterial.PerFace) {
-        "Path() does not support textured materials — use Shape() with a Prism for texture rendering"
-    }
-    val color = material.baseColor()
-    ReusableComposeNode<PathNode, IsometricApplier>(
-        factory = { PathNode(path, color).also { it.material = material } },
-        update = {
-            set(path) { this.path = it; markDirty() }
-            set(color) { this.color = it; markDirty() }
-            set(material) { this.material = it; markDirty() }
-            set(alpha) { this.alpha = it; markDirty() }
-            set(position) { this.position = it; markDirty() }
-            set(rotation) {
-                require(it.isFinite()) { "rotation must be finite, got $it" }
-                this.rotation = it; markDirty()
-            }
-            set(scale) {
-                require(it.isFinite() && it > 0.0) { "scale must be positive and finite, got $it" }
-                this.scale = it; markDirty()
-            }
-            set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
-            set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
-            set(visible) { this.isVisible = it; markDirty() }
-            set(onClick) { this.onClick = it }
-            set(onLongClick) { this.onLongClick = it }
-            set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
-        }
-    )
-}
