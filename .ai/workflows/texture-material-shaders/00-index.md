@@ -4,14 +4,14 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: verify
-stage-number: 6
+current-stage: review
+stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-14T21:41:49Z"
+updated-at: "2026-04-14T22:30:00Z"
 selected-slice: "api-design-fixes"
-current-stage-status: partial
-next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders api-design-fixes"
+current-stage-status: complete
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders reviews"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -97,6 +97,7 @@ workflow-files:
   - 07-review-api-design-fixes-architecture.md
   - 07-review-api-design-fixes-refactor-safety.md
   - 07-review-api-design-fixes-backend-concurrency.md
+  - 07-review-api-design-fixes-reliability.md
   - 07-review-api-design-fixes-performance.md
   - 03-slice-webgpu-uv-transforms.md
   - 03-slice-webgpu-texture-error-callback.md
@@ -105,6 +106,7 @@ workflow-files:
   - 03-slice-uv-generation-stairs.md
   - 03-slice-uv-generation-knot.md
   - 03-slice-uv-generation-octahedron.md
+  - 00-sync.md
 progress:
   intake: complete
   shape: complete
@@ -117,7 +119,7 @@ progress:
   handoff: complete
   ship: skipped
   retro: complete
-  api-design-fixes: verify-round2-partial
+  api-design-fixes: review-round2-complete
   webgpu-uv-transforms: not-started
   webgpu-texture-error-callback: not-started
   uv-generation-cylinder: not-started
