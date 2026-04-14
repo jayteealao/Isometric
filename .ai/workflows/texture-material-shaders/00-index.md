@@ -4,10 +4,10 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: implement
-stage-number: 5
+current-stage: verify
+stage-number: 6
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-14T06:46:32Z"
+updated-at: "2026-04-14T07:00:31Z"
 selected-slice: "api-design-fixes"
 current-stage-status: complete
 branch-strategy: dedicated
@@ -17,8 +17,8 @@ pr-url: "https://github.com/jayteealao/Isometric/pull/8"
 pr-number: 8
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders api-design-fixes"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -86,6 +86,7 @@ workflow-files:
   - 07-review-webgpu-textures-api.md
   - 04-plan-api-design-fixes.md
   - 05-implement-api-design-fixes.md
+  - 06-verify-api-design-fixes.md
 progress:
   intake: complete
   shape: complete
@@ -98,5 +99,5 @@ progress:
   handoff: complete
   ship: skipped
   retro: complete
-  api-design-fixes: implement-complete
+  api-design-fixes: verify-partial
 ---
