@@ -205,7 +205,6 @@ class PerFaceMaterialScope internal constructor() {
      * Write-only — later individual assignments override.
      */
     var sides: MaterialData?
-        @get:JvmSynthetic
         @Deprecated("sides is write-only", level = DeprecationLevel.ERROR)
         get() = error("sides is write-only")
         set(value) { front = value; back = value; left = value; right = value }

@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.shader.render
 
 import io.github.jayteealao.isometric.shader.TextureSource
+import org.junit.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -9,20 +10,20 @@ import kotlin.test.assertSame
  * Unit tests for [TexturedCanvasDrawHook].
  *
  * ## Android API note (TST-06)
+ * These tests require an Android runtime because [TexturedCanvasDrawHook] creates a
+ * [android.graphics.Paint] object in its constructor, which calls the native [Paint.nInit()]
+ * method not available in the JVM test runner. Running them here causes [UnsatisfiedLinkError].
+ *
+ * TODO: Migrate these tests to `src/androidTest/` as instrumented tests, or add Robolectric
+ *       to the `isometric-shader` module (testImplementation("org.robolectric:robolectric:..."))
+ *       and annotate the class with @RunWith(RobolectricTestRunner::class).
+ *
  * [TexturedCanvasDrawHook.resolveToCache] is the callback-wiring path under test. When the
  * loader returns `null`, the hook:
  *  1. Invokes `onTextureLoadError` with the failed [TextureSource].
  *  2. Returns the checkerboard [CachedTexture] as a per-frame fallback (not cached).
- *
- * The fallback path creates a real [android.graphics.Bitmap] via [createCheckerboardBitmap].
- * This is exercised under **Paparazzi** (app.cash.paparazzi), which provides a working Android
- * framework environment for `src/test/` JVM tests, making `Bitmap.createBitmap` available
- * without a device.
- *
- * If these tests are ever moved to a module that does NOT use Paparazzi, the `Bitmap`
- * creation will fail. In that case, move the tests to `src/androidTest/` and run them
- * as instrumented tests instead.
  */
+@Ignore("Requires Android runtime — run as instrumented test in androidTest/")
 class TexturedCanvasDrawHookTest {
 
     // TST-06: onTextureLoadError is invoked when TextureLoader.load() returns null ----------

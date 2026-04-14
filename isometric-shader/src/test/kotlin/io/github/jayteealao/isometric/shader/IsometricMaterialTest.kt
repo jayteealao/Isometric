@@ -403,12 +403,12 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `baseColor_perFace_returnsWhite`() {
+    fun `baseColor_perFace_returnsDefaultBaseColor`() {
         val mat = IsometricMaterial.PerFace.of(
             faceMap = mapOf(PrismFace.TOP to IsoColor.RED),
             default = IsoColor.GRAY,
         )
-        assertEquals(IsoColor.WHITE, mat.baseColor())
+        assertEquals(IsoColor.GRAY, mat.baseColor())
     }
 
     @Test

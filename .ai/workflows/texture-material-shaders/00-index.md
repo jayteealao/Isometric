@@ -7,11 +7,11 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-14T23:27:20Z"
+updated-at: "2026-04-14T23:41:28Z"
 selected-slice: "api-design-fixes"
-current-stage-status: review-fixes-applied
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
+current-stage-status: verify-complete
+next-command: wf-handoff
+next-invocation: "/wf-handoff texture-material-shaders api-design-fixes"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -119,7 +119,7 @@ progress:
   handoff: complete
   ship: skipped
   retro: complete
-  api-design-fixes: review-fixes-applied
+  api-design-fixes: verify-complete
   webgpu-uv-transforms: not-started
   webgpu-texture-error-callback: not-started
   uv-generation-cylinder: not-started

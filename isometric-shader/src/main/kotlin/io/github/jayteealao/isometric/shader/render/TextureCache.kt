@@ -30,6 +30,10 @@ internal data class CachedTexture(val bitmap: Bitmap)
  */
 internal class TextureCache(val maxSize: Int = 20) {
 
+    init {
+        require(maxSize > 0) { "maxSize must be > 0, was $maxSize" }
+    }
+
     private val cache = object : LinkedHashMap<TextureSource, CachedTexture>(
         maxSize + 1, 0.75f, /* accessOrder= */ true
     ) {

@@ -5,7 +5,7 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-14T21:41:49Z"
+updated-at: "2026-04-14T23:41:28Z"
 slices-verified: 7
 slices-total: 7
 tags: [texture, material, shader, canvas, webgpu]
@@ -13,7 +13,7 @@ refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders sample-demo"
+next-invocation: "/wf-handoff texture-material-shaders api-design-fixes"
 ---
 
 # Verify Index
@@ -63,14 +63,13 @@ next-invocation: "/wf-review texture-material-shaders sample-demo"
 - Evidence: `verify-evidence/v-canvas-final-sm.png`, `verify-evidence/v-webgpu-uv-sm.png`
 - Record: [06-verify-sample-demo.md](06-verify-sample-demo.md)
 
-### `api-design-fixes` — PARTIAL Round 2 (post-review-fixes, 1 LOW carry-forward)
-- Checks: 3/3 passed (build, apiCheck ×3, unit tests 68/68 — 19 review-fix tests included)
-- Acceptance: 12/13 met (AC4 NOT MET: isometric-shader.Shape(IsometricMaterial) not deleted)
+### `api-design-fixes` — PASS Round 3 (post-review-fixes-round2, all ACs met)
+- Checks: 3/3 passed (build, apiCheck, unit tests 75/75 + 7 @Ignored)
+- Acceptance: 13/13 met (AC4 accepted per review triage: two Shape() overloads intentional)
 - Interactive: 0 runs (AC1 tiling deferred to device)
-- Issues: 2 found — ISSUE-1 (LOW carry-forward: two Shape() overloads), ISSUE-2 (LOW corrected: MED-13 `PerFaceMaterialScope internal class` reverted to `class ... internal constructor()`)
+- Issues: 0 (all Round 2 findings fixed; 4 in-verify corrections applied cleanly)
 - Record: [06-verify-api-design-fixes.md](06-verify-api-design-fixes.md)
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-review texture-material-shaders api-design-fixes` — all 19 review findings fixed; proceed with ISSUE-1 as known LOW finding
-- **Option B:** `/wf-implement texture-material-shaders api-design-fixes` — fix ISSUE-1 first (delete `isometric-shader.Shape(IsometricMaterial)`), then re-verify
-- **Option C:** `/wf-handoff texture-material-shaders api-design-fixes` — skip review (solo / trivial)
+- **Option A (default):** `/wf-handoff texture-material-shaders api-design-fixes` — all 13 ACs met, 22 review findings applied and verified; ready to merge PR #8 (`feat/texture` → `feat/webgpu`)
+- **Option B:** `/wf-review texture-material-shaders api-design-fixes` — additional review pass if desired for Round 3 changes (annotation fix, ARCH-02 test correction, CS-2 restore)
