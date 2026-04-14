@@ -73,7 +73,7 @@ class IsometricMaterialTest {
     @Test
     fun `perFace default is mid-gray`() {
         val mat = perFace { top = IsoColor.BLUE }
-        assertEquals(UNASSIGNED_FACE_DEFAULT, mat.default)
+        assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
     @Test
@@ -113,6 +113,124 @@ class IsometricMaterialTest {
         assertFailsWith<IllegalArgumentException> {
             TextureTransform(scaleV = 0f)
         }
+    }
+
+    // --- TextureTransform.init validation — full coverage (H-08) ---
+
+    @Test
+    fun `textureTransform_infinityScaleU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleU = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_negativeInfinityScaleU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleU = Float.NEGATIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_zeroScaleU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleU = 0f)
+        }
+    }
+
+    @Test
+    fun `textureTransform_negativeZeroScaleU_throws`() {
+        // IEEE 754: -0f == 0f, so -0f must also be rejected by the non-zero guard
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleU = -0f)
+        }
+    }
+
+    @Test
+    fun `textureTransform_nanScaleV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleV = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `textureTransform_infinityScaleV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleV = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_negativeInfinityScaleV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleV = Float.NEGATIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_negativeZeroScaleV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(scaleV = -0f)
+        }
+    }
+
+    @Test
+    fun `textureTransform_nanOffsetU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetU = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `textureTransform_infinityOffsetU_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetU = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_nanOffsetV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetV = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `textureTransform_infinityOffsetV_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(offsetV = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_nanRotationDegrees_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(rotationDegrees = Float.NaN)
+        }
+    }
+
+    @Test
+    fun `textureTransform_infinityRotationDegrees_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureTransform(rotationDegrees = Float.POSITIVE_INFINITY)
+        }
+    }
+
+    @Test
+    fun `textureTransform_validParams_doesNotThrow`() {
+        // Positive confirmation: a fully-specified finite, non-zero transform constructs successfully
+        val t = TextureTransform(
+            scaleU = 2f,
+            scaleV = -3f,
+            offsetU = 0.5f,
+            offsetV = -0.25f,
+            rotationDegrees = 90f,
+        )
+        assertEquals(2f, t.scaleU)
+        assertEquals(-3f, t.scaleV)
+        assertEquals(0.5f, t.offsetU)
+        assertEquals(-0.25f, t.offsetV)
+        assertEquals(90f, t.rotationDegrees)
     }
 
     @Test
@@ -214,5 +332,37 @@ class IsometricMaterialTest {
         val a = texturedResource(42, transform = TextureTransform(scaleU = 2f, scaleV = 2f))
         val b = texturedResource(42, transform = TextureTransform(scaleU = 2f, scaleV = 2f))
         assertEquals(a, b)
+    }
+
+    // --- baseColor() branch coverage (H-09) ---
+
+    @Test
+    fun `baseColor_isoColor_returnsSelf`() {
+        val color = IsoColor(255, 0, 0)
+        assertEquals(color, color.baseColor())
+    }
+
+    @Test
+    fun `baseColor_textured_returnsTint`() {
+        val tint = IsoColor(0, 128, 255)
+        val mat = texturedResource(42, tint = tint)
+        assertEquals(tint, mat.baseColor())
+    }
+
+    @Test
+    fun `baseColor_perFace_returnsWhite`() {
+        val mat = IsometricMaterial.PerFace.of(
+            faceMap = mapOf(PrismFace.TOP to IsoColor.RED),
+            default = IsoColor.GRAY,
+        )
+        assertEquals(IsoColor.WHITE, mat.baseColor())
+    }
+
+    @Test
+    fun `baseColor_unknown_returnsWhite`() {
+        // An arbitrary MaterialData implementor that does not override baseColor()
+        // exercises the interface default branch (returns IsoColor.WHITE).
+        val unknown = object : io.github.jayteealao.isometric.MaterialData {}
+        assertEquals(IsoColor.WHITE, unknown.baseColor())
     }
 }

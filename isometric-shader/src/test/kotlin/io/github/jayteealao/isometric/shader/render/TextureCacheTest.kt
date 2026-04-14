@@ -2,6 +2,8 @@ package io.github.jayteealao.isometric.shader.render
 
 import io.github.jayteealao.isometric.IsoColor
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 
@@ -28,5 +30,27 @@ class TextureRenderUtilsTest {
     @Test
     fun `toColorFilterOrNull returns filter for non-white`() {
         assertNotNull(IsoColor(200.0, 100.0, 50.0).toColorFilterOrNull())
+    }
+
+    // --- TextureCache constructor validation (MED-09) ---
+
+    @Test
+    fun `textureCacheConfig_defaultMaxSize_is20`() {
+        val cache = TextureCache()
+        assertEquals(20, cache.maxSize)
+    }
+
+    @Test
+    fun `textureCacheConfig_zeroMaxSize_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureCache(maxSize = 0)
+        }
+    }
+
+    @Test
+    fun `textureCacheConfig_negativeMaxSize_throws`() {
+        assertFailsWith<IllegalArgumentException> {
+            TextureCache(maxSize = -1)
+        }
     }
 }

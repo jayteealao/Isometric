@@ -40,14 +40,48 @@ internal class TexturedCanvasDrawHook(
 
     private val texturedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val affineMatrix = Matrix()
+    private val transformMatrix = Matrix()
+    private val transformMatrixInv = Matrix()
     private val checkerboard: Bitmap by lazy { createCheckerboardBitmap() }
 
     /**
-     * Per-[Shader.TileMode] BitmapShader cache. Keyed by `(TextureSource, tileU)`.
-     * Using tileU as the representative tile mode is valid for the common case where
-     * tileU == tileV (uniform tiling). Asymmetric tiling is a documented future enhancement.
+     * Per-[Shader.TileMode] BitmapShader cache. Keyed by `(TextureSource, tileU, tileV)`.
+     * Both tile modes are included in the key so that asymmetric tiling (tileU != tileV)
+     * never collides with a uniformly-tiled shader.
      */
-    private val shaderCache = LinkedHashMap<Pair<TextureSource, Shader.TileMode>, BitmapShader>()
+    private val shaderCache = object : LinkedHashMap<Triple<TextureSource, Shader.TileMode, Shader.TileMode>, BitmapShader>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<Triple<TextureSource, Shader.TileMode, Shader.TileMode>, BitmapShader>): Boolean {
+            return size > cache.maxSize * 2
+        }
+    }
+
+    /**
+     * Cached tint color from the last [colorFilterFor] call.
+     * Initialized to WHITE so the first non-white tint always triggers a cache miss.
+     */
+    private var cachedTintColor: IsoColor = IsoColor.WHITE
+
+    /**
+     * Cached [PorterDuffColorFilter] matching [cachedTintColor].
+     * `null` when [cachedTintColor] is white (no-op filter).
+     */
+    private var cachedColorFilter: PorterDuffColorFilter? = null
+
+    /**
+     * Returns a [PorterDuffColorFilter] for [tint], reusing the previously created filter
+     * when the tint color has not changed between frames.
+     *
+     * White is the common case and always short-circuits before checking the cache.
+     */
+    private fun colorFilterFor(tint: IsoColor): PorterDuffColorFilter? {
+        // White tint is a no-op; skip the cache entirely.
+        if (tint.r >= 255.0 && tint.g >= 255.0 && tint.b >= 255.0) return null
+        if (tint == cachedTintColor) return cachedColorFilter
+        val filter = tint.toColorFilterOrNull()
+        cachedTintColor = tint
+        cachedColorFilter = filter
+        return filter
+    }
 
     override fun draw(
         nativeCanvas: android.graphics.Canvas,
@@ -60,7 +94,7 @@ internal class TexturedCanvasDrawHook(
             is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, material)
             is IsometricMaterial.PerFace -> {
                 val face = command.faceType
-                val sub = if (face != null) material.resolve(face) else material.default
+                val sub = material.faceMap[face] ?: material.default
                 when (sub) {
                     is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
                     // IsoColor or other MaterialData — delegate to the flat-color draw path
@@ -83,18 +117,19 @@ internal class TexturedCanvasDrawHook(
         val texW = cached.bitmap.width
         val texH = cached.bitmap.height
 
-        val tileU = if (material.transform.scaleU != 1f) Shader.TileMode.REPEAT else Shader.TileMode.CLAMP
-        val tileV = if (material.transform.scaleV != 1f) Shader.TileMode.REPEAT else Shader.TileMode.CLAMP
-        val shaderKey = material.source to tileU
+        val tileMode = if (material.transform != TextureTransform.IDENTITY) Shader.TileMode.REPEAT else Shader.TileMode.CLAMP
+        val tileU = tileMode
+        val tileV = tileMode
+        val shaderKey = Triple(material.source, tileU, tileV)
         val shader = shaderCache.getOrPut(shaderKey) {
             BitmapShader(cached.bitmap, tileU, tileV)
         }
 
-        computeAffineMatrix(uvCoords, command.points, texW, texH, material.transform, affineMatrix)
+        computeAffineMatrix(uvCoords, command.points, texW, texH, material.transform, affineMatrix, transformMatrix, transformMatrixInv)
         shader.setLocalMatrix(affineMatrix)
 
         texturedPaint.shader = shader
-        texturedPaint.colorFilter = material.tint.toColorFilterOrNull()
+        texturedPaint.colorFilter = colorFilterFor(material.tint)
         try {
             nativeCanvas.drawPath(nativePath, texturedPaint)
         } finally {
@@ -139,6 +174,8 @@ internal class TexturedCanvasDrawHook(
  * @param texHeight Height of the source bitmap in pixels.
  * @param transform UV transform to composite into the matrix.
  * @param outMatrix The matrix to write into (reused across calls — no allocation).
+ * @param workMatrix Scratch matrix for the UV transform T (pre-allocated by caller — no allocation).
+ * @param workMatrixInv Scratch matrix for T⁻¹ (pre-allocated by caller — no allocation).
  */
 internal fun computeAffineMatrix(
     uvCoords: FloatArray,
@@ -147,6 +184,8 @@ internal fun computeAffineMatrix(
     texHeight: Int,
     transform: TextureTransform,
     outMatrix: Matrix,
+    workMatrix: Matrix = Matrix(),
+    workMatrixInv: Matrix = Matrix(),
 ) {
     if (screenPoints.size < 6) {
         outMatrix.reset()
@@ -168,18 +207,18 @@ internal fun computeAffineMatrix(
         // Build T in texture-pixel space: scale (around center) → rotate (around center) → translate
         val cx = texWidth / 2f
         val cy = texHeight / 2f
-        val t = Matrix()
-        t.setScale(transform.scaleU, transform.scaleV, cx, cy)
+        workMatrix.reset()
+        workMatrix.setScale(transform.scaleU, transform.scaleV, cx, cy)
         if (transform.rotationDegrees != 0f) {
-            t.postRotate(transform.rotationDegrees, cx, cy)
+            workMatrix.postRotate(transform.rotationDegrees, cx, cy)
         }
         if (transform.offsetU != 0f || transform.offsetV != 0f) {
-            t.postTranslate(transform.offsetU * texWidth, transform.offsetV * texHeight)
+            workMatrix.postTranslate(transform.offsetU * texWidth, transform.offsetV * texHeight)
         }
         // Pre-concat T^-1: M_final = M_poly * T^-1
-        val tInv = Matrix()
-        if (t.invert(tInv)) {
-            outMatrix.preConcat(tInv)
+        workMatrixInv.reset()
+        if (workMatrix.invert(workMatrixInv)) {
+            outMatrix.preConcat(workMatrixInv)
         }
         // If inversion fails (degenerate transform), the identity transform is used instead.
         // TextureTransform.init ensures scaleU/scaleV are non-zero, so this should not occur.

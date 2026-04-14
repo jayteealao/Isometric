@@ -6,11 +6,11 @@ slice-slug: sample-demo
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-11T22:49:12Z"
-metric-files-to-touch: 8
-metric-step-count: 10
+updated-at: "2026-04-13T07:39:43Z"
+metric-files-to-touch: 5
+metric-step-count: 8
 has-blockers: false
-revision-count: 1
+revision-count: 2
 tags: [sample, demo]
 refs:
   index: 00-index.md
@@ -156,13 +156,12 @@ positions : (col - 1.5) * spacing, (row - 1.5) * spacing, 0.0
 Material applied to every prism:
 
 ```kotlin
-val grassMat = textured(TextureSource.Bitmap(TextureAssets.grassTop))
-val dirtMat  = textured(TextureSource.Bitmap(TextureAssets.dirtSide))
+val grassMat = texturedBitmap(TextureAssets.grassTop)
+val dirtMat  = texturedBitmap(TextureAssets.dirtSide)
 
 val tileMaterial = perFace {
     top    = grassMat
     sides  = dirtMat
-    // bottom unset → uses default (falls back to dirtMat via `default = dirtMat`)
     default = dirtMat
 }
 ```
@@ -189,7 +188,7 @@ IsometricScene(
 ```kotlin
 ForEach((0 until 4).toList()) { col ->
     ForEach((0 until 4).toList()) { row ->
-        Shape(
+        MaterialShape(
             geometry = Prism(
                 position = Point(
                     (col - 1.5) * 1.05,
@@ -214,37 +213,22 @@ ForEach((0 until 4).toList()) { col ->
 | 2 | `app/src/main/kotlin/.../sample/TexturedDemoActivity.kt` | **NEW** — activity + screen composables |
 | 3 | `app/src/main/AndroidManifest.xml` | Add `TexturedDemoActivity` entry |
 | 4 | `app/src/main/kotlin/.../sample/MainActivity.kt` | Add `SampleCard` entry |
-| 5 | `app/src/main/res/values/strings.xml` | Add string `textured_demo_label` (optional, manifest uses inline label) |
-
-Optional (if snapshot tests are added):
-
-| 6 | `app/src/test/.../TexturedDemoScreenshotTest.kt` | **NEW** — Paparazzi canvas-mode snapshot |
-| 7 | `app/src/test/.../TextureAssetsTest.kt` | **NEW** — unit test: bitmap dimensions, non-null pixels |
+| 5 | `app/src/main/kotlin/.../sample/MainActivity.kt` | Add `SampleCard` entry (if using card pattern) |
 
 ## Step-by-Step Implementation
 
-### Step 0 — Add `isometric-shader` dependency to the app module
+### Step 1 — Texture assets helper
 
-**File to modify:** `app/build.gradle.kts`
-
-The app module currently depends on `:isometric-compose` and `:isometric-webgpu` but NOT
-on `:isometric-shader`. The textured demo uses the shader module's overloaded `Shape()`
-composable, `textured()`, `perFace {}` DSL, and `TextureSource`. Add:
-
-```kotlin
-implementation(project(":isometric-shader"))
-```
+**Note:** `app/build.gradle.kts` already has `implementation(project(":isometric-shader"))`.
+No gradle changes needed.
 
 **Imports needed in `TexturedDemoActivity.kt`:**
 ```kotlin
-import io.github.jayteealao.isometric.shader.Shape  // overloaded composable
-import io.github.jayteealao.isometric.shader.textured
+import io.github.jayteealao.isometric.shader.Shape as MaterialShape  // alias to avoid collision
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shader.perFace
-import io.github.jayteealao.isometric.shader.TextureSource
+import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 ```
-
-### Step 1 — Texture assets helper
 
 Create `TextureAssets.kt`. Implement `buildGrassTop()` and `buildDirtSide()` using the
 bitmap recipes above. Both methods allocate a 64×64 ARGB_8888 bitmap, fill with
@@ -285,21 +269,27 @@ In the composable (or in a `remember` block to avoid re-allocation):
 ```kotlin
 val tileMaterial = remember {
     perFace {
-        top     = textured(TextureSource.Bitmap(TextureAssets.grassTop))
-        sides   = textured(TextureSource.Bitmap(TextureAssets.dirtSide))
-        default = textured(TextureSource.Bitmap(TextureAssets.dirtSide))
+        top     = texturedBitmap(TextureAssets.grassTop)
+        sides   = texturedBitmap(TextureAssets.dirtSide)
+        default = texturedBitmap(TextureAssets.dirtSide)
     }
 }
 ```
 
 `TextureAssets.grassTop` / `.dirtSide` are lazy vals so the bitmaps are not re-allocated
-across recompositions.
+across recompositions. Use `texturedBitmap(bitmap)` — this wraps the bitmap in
+`TextureSource.BitmapSource` internally.
 
 ### Step 6 — `TexturedPrismGridScene` composable
 
 Implement the 4×4 grid scene as described in "Scene Composition" above. Pass `renderMode`
 from state into `SceneConfig`. Keep the composable stateless: it takes `renderMode` as a
 parameter.
+
+**IMPORTANT:** Wrap the `IsometricScene` in `ProvideTextureRendering { }` — this installs
+the `TexturedCanvasDrawHook` and `TextureCache` needed for Canvas-mode texture rendering.
+Without this wrapper, Canvas mode will render flat colors instead of textures. Use the
+`MaterialShape(geometry, material)` alias for the shader's `Shape()` overload.
 
 ### Step 7 — Register in manifest
 
@@ -353,3 +343,16 @@ Canvas + GPU Sort, WebGPU. Verify:
      compose-module `Shape`. Fix: added explicit imports in Step 0.
   3. **MED:** `textured()`, `perFace {}`, `TextureSource` not attributed to shader module.
      Fix: addressed by Step 0 imports.
+
+### 2026-04-13 — Auto-Review (rev 2)
+- Mode: Auto-Review (post-sibling implementation)
+- Issues found: 5
+  1. **Step 0 no-op:** `isometric-shader` dependency already in `app/build.gradle.kts` (added
+     during canvas-textures slice). Fix: removed Step 0, renumbered steps 1-8.
+  2. **Wrong API: `TextureSource.Bitmap`:** Class doesn't exist — it's `TextureSource.BitmapSource`.
+     Fix: replaced with `texturedBitmap(bitmap)` builder which wraps BitmapSource internally.
+  3. **Missing `ProvideTextureRendering`:** Canvas mode requires this wrapper to install
+     `TexturedCanvasDrawHook` + `TextureCache`. Fix: added to Step 6 instructions.
+  4. **Import alias:** Must use `Shape as MaterialShape` to avoid collision with compose-module
+     `Shape`. Fix: updated imports and ForEach code.
+  5. **Metric update:** Files to touch reduced from 8 to 5, steps from 10 to 8.

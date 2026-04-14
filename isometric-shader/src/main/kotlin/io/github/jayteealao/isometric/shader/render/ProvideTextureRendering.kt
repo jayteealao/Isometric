@@ -2,7 +2,9 @@ package io.github.jayteealao.isometric.shader.render
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.compose.runtime.LocalMaterialDrawHook
 import io.github.jayteealao.isometric.shader.TextureSource
@@ -74,10 +76,12 @@ fun ProvideTextureRendering(
     content: @Composable () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val hook = remember(context, cacheConfig, loader) {
+    val currentLoader by rememberUpdatedState(loader)
+    val currentOnError by rememberUpdatedState(onTextureLoadError)
+    val hook = remember(context, cacheConfig) {
         val cache = TextureCache(cacheConfig.maxSize)
-        val effectiveLoader = loader ?: defaultTextureLoader(context.applicationContext)
-        TexturedCanvasDrawHook(cache, effectiveLoader, onTextureLoadError)
+        val effectiveLoader = currentLoader ?: defaultTextureLoader(context.applicationContext)
+        TexturedCanvasDrawHook(cache, effectiveLoader, currentOnError)
     }
     CompositionLocalProvider(LocalMaterialDrawHook provides hook) {
         content()

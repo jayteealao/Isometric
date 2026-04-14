@@ -60,7 +60,7 @@ class PerFaceMaterialTest {
     fun `perFace DSL default is mid-gray`() {
         val mat = perFace { }
         assertIs<IsoColor>(mat.default)
-        assertEquals(UNASSIGNED_FACE_DEFAULT, mat.default)
+        assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
     @Test
@@ -87,6 +87,14 @@ class PerFaceMaterialTest {
         assertEquals(dirt, mat.resolve(PrismFace.BACK))
         assertEquals(dirt, mat.resolve(PrismFace.LEFT))
         assertEquals(dirt, mat.resolve(PrismFace.RIGHT))
+    }
+
+    @Test
+    fun `perFace_of_noDefault_usesFallback`() {
+        val mat = IsometricMaterial.PerFace.of(
+            faceMap = mapOf(PrismFace.TOP to grass),
+        )
+        assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.resolve(PrismFace.FRONT))
     }
 
     @Test

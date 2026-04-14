@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric.shader
 
+import kotlin.math.absoluteValue
+
 /**
  * A texture coordinate. Internal — not part of the public API.
  *
@@ -44,8 +46,10 @@ data class TextureTransform(
     val rotationDegrees: Float = 0f,
 ) {
     init {
-        require(scaleU.isFinite() && scaleU != 0f) { "scaleU must be finite and non-zero, got $scaleU" }
-        require(scaleV.isFinite() && scaleV != 0f) { "scaleV must be finite and non-zero, got $scaleV" }
+        require(scaleU.isFinite()) { "scaleU must be finite, got $scaleU" }
+        require(scaleU.absoluteValue > 0f) { "scaleU must be non-zero, got $scaleU" }
+        require(scaleV.isFinite()) { "scaleV must be finite, got $scaleV" }
+        require(scaleV.absoluteValue > 0f) { "scaleV must be non-zero, got $scaleV" }
         require(offsetU.isFinite()) { "offsetU must be finite, got $offsetU" }
         require(offsetV.isFinite()) { "offsetV must be finite, got $offsetV" }
         require(rotationDegrees.isFinite()) { "rotationDegrees must be finite, got $rotationDegrees" }

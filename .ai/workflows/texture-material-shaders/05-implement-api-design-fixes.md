@@ -6,13 +6,15 @@ slice-slug: api-design-fixes
 status: complete
 stage-number: 5
 created-at: "2026-04-14T06:46:32Z"
-updated-at: "2026-04-14T06:46:32Z"
+updated-at: "2026-04-14T21:25:24Z"
 metric-files-changed: 23
 metric-lines-added: 620
 metric-lines-removed: 390
 metric-deviations-from-plan: 2
-metric-review-fixes-applied: 25
-commit-sha: ""
+metric-review-fixes-applied: 19
+metric-review-fixes-original-slice: 25
+commit-sha: "1eb8f19"
+commit-sha-review-fixes: ""
 tags: [api-design, texture, material, shader]
 refs:
   index: 00-index.md
@@ -28,6 +30,7 @@ refs:
   verify: 06-verify-api-design-fixes.md
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
+review-fixes-status: complete
 ---
 
 # Implement: API Design Fixes (TM-API-1 through TM-API-25)
@@ -128,19 +131,21 @@ to bring the `isometric-shader` module into full compliance with `docs/internal/
 (`GpuTextureManager`, `SceneDataPacker`) were updated to inline `faceMap[face] ?: default` — the
 full body of `resolve()`. This avoids a public API surface for an implementation detail.
 
-**`@ConsistentCopyVisibility` on `PerFace`:** The `private constructor` + `data class` combination
-triggers a Kotlin 2.0 warning that `copy()` leaks the private constructor. Adding the annotation
-makes `copy()` consistently `private`, reinforcing the invariant that only `PerFace.of()` can
-construct or clone the object. This is a behaviour change but desirable.
+**`PerFace` converted from `data class` to `class` (review fix MED-14):** The post-review fix
+converted `PerFace` from a `data class` to a regular `class` with manual `equals`/`hashCode`/`toString`.
+This removes the auto-generated `component1()`/`component2()` functions that leaked internal fields.
+The `@ConsistentCopyVisibility` annotation was removed along with the `data` modifier.
+`copy()` was not added since no call sites existed.
 
 **`T^-1` pre-concat for `TextureTransform`:** The `BitmapShader.setLocalMatrix(M)` contract means
 the matrix maps from _screen_ to _bitmap_ coordinates. Applying `T^-1` (the inverse of the UV
 transform) before the poly-to-poly mapping correctly applies tiling/offset/rotation in UV space,
 not in screen space.
 
-**`TileMode` selected per-draw:** Shader is created in `shaderCache` on first draw for a given
-`(source, TileMode)` pair. `REPEAT` is used when `scaleU != 1f || scaleV != 1f`; `CLAMP` otherwise.
-The key includes `TileMode` so toggling a transform flips the shader without a stale-cache bug.
+**`TileMode` selected per-draw (corrected post-review):** After review fix H-01, `REPEAT` is now
+selected when `transform != TextureTransform.IDENTITY` (covers rotation/offset, not just scale).
+After H-02, `shaderCache` key is `Triple(source, tileU, tileV)` — both tile modes are included.
+After H-03, `transformMatrix`/`transformMatrixInv` are pre-allocated fields (no per-draw allocation).
 
 ## Deviations from Plan
 
@@ -176,7 +181,36 @@ No external API freshness research was needed — this slice is an internal API 
 library dependencies. The `@ConsistentCopyVisibility` annotation was verified against Kotlin 2.0
 release notes (project uses Kotlin 2.0.21).
 
+## Review Fixes Applied
+
+Applied after `wf-review` verdict (ship-with-caveats). All 8 HIGH + 11 MED triaged findings fixed.
+
+| ID | Sev | File(s) | Fix Summary | Status |
+|----|-----|---------|-------------|--------|
+| H-01 | HIGH | TexturedCanvasDrawHook.kt:86 | TileMode REPEAT condition → `transform != TextureTransform.IDENTITY`; also resolves MED-02 | Fixed |
+| H-02 | HIGH | TexturedCanvasDrawHook.kt | shaderCache key `Pair<src,tile>` → `Triple<src,tileU,tileV>` | Fixed |
+| H-03 | HIGH | TexturedCanvasDrawHook.kt | Pre-allocate `transformMatrix`/`transformMatrixInv` as class fields; defaulted params for test compatibility | Fixed |
+| H-04 | HIGH | IsometricMaterial.kt | `UNASSIGNED_FACE_DEFAULT` moved from package level → `PerFace.Companion` | Fixed |
+| H-05 | HIGH | TextureLoader.kt | Added `@return the loaded [Bitmap], or null if the source could not be loaded` KDoc | Fixed |
+| H-07 | HIGH | TexturedCanvasDrawHook.kt:65 | `material.resolve(face)` → `material.faceMap[face] ?: material.default` | Fixed |
+| H-08 | HIGH | IsometricMaterialTest.kt | 15 new tests covering all TextureTransform.init require() paths (Infinity, NaN, zero, -0f, offsets, rotation) | Fixed |
+| H-09 | HIGH | IsometricMaterialTest.kt | 4 new tests for baseColor() branches (IsoColor, Textured, PerFace, anonymous MaterialData) | Fixed |
+| MED-01 | MED | UvCoord.kt | Split combined require → separate `isFinite()` + `absoluteValue > 0f` checks for -0f robustness | Fixed |
+| MED-02 | MED | TexturedCanvasDrawHook.kt | Corollary of H-01 — resolved as part of same change | Fixed |
+| MED-03 | MED | ProvideTextureRendering.kt | `rememberUpdatedState(loader)` — loader removed from remember() key | Fixed |
+| MED-04 | MED | TextureSource.kt | Defense-in-depth: null-byte check + literal `..` check + `File.normalize()` post-normalization | Fixed |
+| MED-05 | MED | TextureLoader.kt | Asset path redacted in logs (`Asset(path=<redacted>)`); resource logs show integer ID only | Fixed |
+| MED-08 | MED | PerFaceMaterialTest.kt | `perFace_of_noDefault_usesFallback` — verifies unmapped faces return `UNASSIGNED_FACE_DEFAULT` | Fixed |
+| MED-09 | MED | TextureCacheTest.kt | 3 tests: default maxSize=20, require fires for maxSize=0 and maxSize=-1 | Fixed |
+| MED-13 | MED | IsometricMaterial.kt + api dump | `PerFaceMaterialScope` made `internal`; removed from API dump | Fixed |
+| MED-14 | MED | IsometricMaterial.kt + api dump | `data class PerFace` → `class PerFace`; manual equals/hashCode/toString; componentN() removed from dump | Fixed |
+| MED-15 | MED | TexturedCanvasDrawHook.kt | `shaderCache` LRU via `LinkedHashMap(accessOrder=true)` + `removeEldestEntry` at `cache.maxSize * 2` | Fixed |
+| MED-17 | MED | ProvideTextureRendering.kt | `rememberUpdatedState(onTextureLoadError)` — same pattern as MED-03 | Fixed |
+| MED-19 | MED | TexturedCanvasDrawHook.kt | `colorFilterFor(tint)` caches `PorterDuffColorFilter` by last tint color; white short-circuits to null | Fixed |
+
+Total fixed: 19 (8 HIGH + 11 MED including MED-02). MED-16 deferred by PO decision.
+
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders api-design-fixes` — run unit tests
-  (`IsometricMaterialTest`, `PerFaceMaterialTest`) and apiCheck to confirm all 25 fixes hold
-- **Option B:** `/compact` then Option A — clear implementation context before verification
+- **Option A (default):** `/wf-verify texture-material-shaders api-design-fixes` — re-run unit tests
+  to confirm review fixes hold; apiCheck to verify API dump changes are consistent
+- **Option B:** `/compact` then Option A — clear review context before re-verification

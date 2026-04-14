@@ -2,43 +2,49 @@
 schema: sdlc/v1
 type: routing
 slug: texture-material-shaders
-updated-at: "2026-04-12T19:12:05Z"
-current-stage: verify
-stage-number: 6
+updated-at: "2026-04-13T23:17:09Z"
+current-stage: plan
+stage-number: 4
 status: active
-selected-slice: "webgpu-textures"
+selected-slice: "api-design-fixes"
 branch-strategy: dedicated
 branch: "feat/texture"
 on-correct-branch: true
 is-blocked: false
 open-questions: []
-remaining-slices: [per-face-materials, sample-demo]
-next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders webgpu-textures"
+remaining-slices: [api-design-fixes]
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders api-design-fixes"
 refs:
   index: 00-index.md
+  plan: 04-plan-api-design-fixes.md
+  slice: 03-slice-api-design-fixes.md
 ---
 
 # Next
 
+## Situation
+
+Plan for `api-design-fixes` complete (`04-plan-api-design-fixes.md`). 16 steps across 19 files.
+All 25 findings from `07-review-webgpu-textures-api.md` have concrete fix paths.
+
+Key sequencing constraint: Step 10 (TM-API-24: decouple CachedTexture from BitmapShader)
+must land before Step 11 (TM-API-2: apply TextureTransform with REPEAT TileMode).
+
 ## Progress
 
-| Slice | Implement | Verify | Review | Status |
-|-------|-----------|--------|--------|--------|
-| material-types | done | done | done | Complete |
-| uv-generation | done | done | done | Complete |
-| canvas-textures | done | done | done (9 fixes) | Complete |
-| webgpu-textures | done | partial (auto pass, interactive pending) | — | **Verify complete, ready for review** |
-| per-face-materials | — | — | — | Pending |
-| sample-demo | — | — | — | Pending |
-
-## Post-Verify Fixes Applied (not yet in verify record)
-- Dawn Scudo crash: switched to async `createRenderPipelineAndAwait` + auto-derived layout
-- Dawn uniformity error: replaced `if/textureSample` with unconditional `textureSample` + `select()`
-- Added "Textured" tab to `WebGpuSampleActivity` for on-device verification
+| Slice | Plan | Implement | Verify | Review | Status |
+|-------|------|-----------|--------|--------|--------|
+| material-types | ✅ | ✅ | ✅ | ✅ | Complete |
+| uv-generation | ✅ | ✅ | ✅ | ✅ | Complete |
+| canvas-textures | ✅ | ✅ | ✅ | ✅ | Complete |
+| webgpu-textures | ✅ | ✅ | ✅ | ✅ | Complete |
+| per-face-materials | ✅ | ✅ | ✅ | ✅ | Complete |
+| sample-demo | ✅ | ✅ | ✅ | ✅ | Complete |
+| **api-design-fixes** | ✅ | — | — | — | **Plan complete — ready to implement** |
 
 ## All Options
-- **Option A (default):** `/wf-review texture-material-shaders webgpu-textures` — code review; all automated checks pass, two runtime fixes applied
-- **Option B:** `/compact` then Option A — recommended to clear implementation/debugging context before review dispatch
-- **Option C:** `/wf-implement texture-material-shaders per-face-materials` — skip review, move to next slice
-- **Option D:** `/wf-implement texture-material-shaders webgpu-textures` — if more on-device issues are found during manual testing
+
+- **Option A (default):** `/wf-implement texture-material-shaders api-design-fixes` —
+  implement all 16 steps. **Run `/compact` first** to prevent context overflow during
+  the 19-file implementation session.

@@ -34,11 +34,27 @@ sealed interface TextureSource {
     data class Asset(val path: String) : TextureSource {
         init {
             require(path.isNotBlank()) { "Asset path must not be blank" }
+            // Reject null bytes early — they can bypass string comparisons on some runtimes.
+            require('\u0000' !in path) { "Asset path must not contain null bytes" }
             require(!path.startsWith("/")) { "Asset path must be relative, got '$path'" }
+            // Baseline: reject any path segment that is literally "..".
             require(".." !in path.split("/", "\\")) {
                 "Asset path must not contain '..' components, got '$path'"
             }
-            require('\u0000' !in path) { "Asset path must not contain null bytes" }
+            // Defense-in-depth: normalize via java.io.File (available on all Android API levels)
+            // to collapse encoded or obfuscated traversal sequences, then re-validate.
+            // File.normalize() (Kotlin stdlib) resolves ".", "..", and redundant separators
+            // without touching the filesystem, making it safe for pure string validation.
+            val normalizedPath = java.io.File(path).normalize().path.replace('\\', '/')
+            require(!normalizedPath.startsWith("..")) {
+                "Asset path must not traverse above the assets root after normalization, got '$path'"
+            }
+            require("/../" !in "/$normalizedPath/") {
+                "Asset path must not contain traversal components after normalization, got '$path'"
+            }
+            require(!normalizedPath.startsWith("/")) {
+                "Asset path must remain relative after normalization, got '$path'"
+            }
         }
     }
 

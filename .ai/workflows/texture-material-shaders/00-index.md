@@ -4,12 +4,14 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: verify
-stage-number: 6
+current-stage: implement
+stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-14T07:00:31Z"
+updated-at: "2026-04-14T21:25:24Z"
 selected-slice: "api-design-fixes"
 current-stage-status: complete
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders api-design-fixes"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -17,8 +19,6 @@ pr-url: "https://github.com/jayteealao/Isometric/pull/8"
 pr-number: 8
 open-questions: []
 tags: [texture, material, shader, canvas, webgpu]
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders api-design-fixes"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -87,6 +87,24 @@ workflow-files:
   - 04-plan-api-design-fixes.md
   - 05-implement-api-design-fixes.md
   - 06-verify-api-design-fixes.md
+  - 07-review-api-design-fixes.md
+  - 07-review-api-design-fixes-correctness.md
+  - 07-review-api-design-fixes-security.md
+  - 07-review-api-design-fixes-code-simplification.md
+  - 07-review-api-design-fixes-testing.md
+  - 07-review-api-design-fixes-maintainability.md
+  - 07-review-api-design-fixes-api-contracts.md
+  - 07-review-api-design-fixes-architecture.md
+  - 07-review-api-design-fixes-refactor-safety.md
+  - 07-review-api-design-fixes-backend-concurrency.md
+  - 07-review-api-design-fixes-performance.md
+  - 03-slice-webgpu-uv-transforms.md
+  - 03-slice-webgpu-texture-error-callback.md
+  - 03-slice-uv-generation-cylinder.md
+  - 03-slice-uv-generation-pyramid.md
+  - 03-slice-uv-generation-stairs.md
+  - 03-slice-uv-generation-knot.md
+  - 03-slice-uv-generation-octahedron.md
 progress:
   intake: complete
   shape: complete
@@ -95,9 +113,16 @@ progress:
   implement: complete
   verify: complete
   sample-demo-verify: complete
-  review: in-progress
+  review: complete
   handoff: complete
   ship: skipped
   retro: complete
-  api-design-fixes: verify-partial
+  api-design-fixes: review-fixes-complete
+  webgpu-uv-transforms: not-started
+  webgpu-texture-error-callback: not-started
+  uv-generation-cylinder: not-started
+  uv-generation-pyramid: not-started
+  uv-generation-stairs: not-started
+  uv-generation-knot: not-started
+  uv-generation-octahedron: not-started
 ---

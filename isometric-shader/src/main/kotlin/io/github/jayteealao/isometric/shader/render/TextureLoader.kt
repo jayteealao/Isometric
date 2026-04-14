@@ -30,7 +30,7 @@ fun interface TextureLoader {
      * Loads the given [source] and returns a decoded [Bitmap], or `null` on failure.
      *
      * @param source The texture source to load
-     * @return Decoded bitmap, or `null` if loading failed
+     * @return the loaded [Bitmap], or null if the source could not be loaded
      */
     fun load(source: TextureSource): Bitmap?
 }
@@ -56,14 +56,14 @@ private class DefaultTextureLoader(private val context: Context) : TextureLoader
     private fun loadResource(resId: Int): Bitmap? = try {
         BitmapFactory.decodeResource(context.resources, resId)
     } catch (e: Exception) {
-        Log.w(TAG, "Failed to load texture resource: $resId", e)
+        Log.w(TAG, "Failed to load texture resource: Resource(id=$resId)", e)
         null
     }
 
     private fun loadAsset(path: String): Bitmap? = try {
         context.assets.open(path).use { BitmapFactory.decodeStream(it) }
     } catch (e: Exception) {
-        Log.w(TAG, "Failed to load texture asset: $path", e)
+        Log.w(TAG, "Failed to load texture asset: Asset(path=<redacted>)", e)
         null
     }
 }

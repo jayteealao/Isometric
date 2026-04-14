@@ -70,3 +70,37 @@ Shape() consolidation approach in po-answers 2026-04-11 plan entry:**
 lives its entire life as `MaterialData?` in `RenderCommand` and `Shape()` parameters.
 Boxing happens either way — `data class` gives `copy()` and `equals()` for free.
 
+## 2026-04-14 — Extend (webgpu-uv-transforms slice)
+
+**Transform operations in scope:** All three — scale/tiling (`scaleU`/`scaleV`), offset
+(`offsetU`/`offsetV`), and rotation (`rotationDegrees`). Full `TextureTransform` parity
+with the Canvas path.
+
+**Per-face independent transforms:** In scope. Each face carries its own `TextureTransform`
+in the GPU buffer.
+
+**Dependency:** After `api-design-fixes` completes. Picks up the final `TextureTransform`
+API (renamed fields, factory companions, `IDENTITY` constant) so no mid-flight reconciliation.
+
+**Acceptance bar:** Visual parity with Canvas — same `TextureTransform` produces matching
+output in both render modes, verified by side-by-side screenshot.
+
+**Explicitly out of scope:** `onTextureLoadError` plumbing into `GpuTextureManager`;
+UV gen for non-Prism shapes; animated per-frame transforms.
+
+## 2026-04-14 — Extend round 2 (error callback + UV gen shape slices)
+
+**onTextureLoadError WebGPU plumbing:** Unified — forward the existing callback from
+`ProvideTextureRendering` into `GpuTextureManager`. No new API surface; same callback
+covers both render paths.
+
+**UV gen shapes in scope:** All non-Prism shapes — Cylinder, Pyramid, Stairs, Knot,
+Octahedron.
+
+**UV gen slice split:** One slice per shape (incremental delivery; shapes with complex
+UV don't block simpler ones).
+
+**Dependencies:** Both `webgpu-texture-error-callback` and all UV gen slices depend on
+`api-design-fixes` completing first. UV gen slices also depend on `uv-generation` (the
+original Prism UV system they extend).
+

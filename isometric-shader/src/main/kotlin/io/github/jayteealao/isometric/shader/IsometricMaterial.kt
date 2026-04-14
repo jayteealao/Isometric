@@ -6,9 +6,6 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.shapes.PrismFace
 
-/** Mid-gray fallback for unassigned [IsometricMaterial.PerFace] faces (visible, not transparent). */
-internal val UNASSIGNED_FACE_DEFAULT: IsoColor = IsoColor(128, 128, 128, 255)
-
 /**
  * Describes how a face should be painted.
  *
@@ -58,10 +55,9 @@ sealed interface IsometricMaterial : MaterialData {
      *
      * @property faceMap Map from [PrismFace] role to material for that face
      * @property default Material used for faces not present in [faceMap].
-     *   Defaults to mid-gray ([UNASSIGNED_FACE_DEFAULT]) so unassigned faces are visible.
+     *   Defaults to mid-gray ([PerFace.Companion.UNASSIGNED_FACE_DEFAULT]) so unassigned faces are visible.
      */
-    @ConsistentCopyVisibility
-    data class PerFace private constructor(
+    class PerFace private constructor(
         val faceMap: Map<PrismFace, MaterialData>,
         val default: MaterialData = UNASSIGNED_FACE_DEFAULT,
     ) : IsometricMaterial {
@@ -77,7 +73,24 @@ sealed interface IsometricMaterial : MaterialData {
         /** Resolve the effective material for [face], falling back to [default]. */
         internal fun resolve(face: PrismFace): MaterialData = faceMap[face] ?: default
 
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is PerFace) return false
+            return faceMap == other.faceMap && default == other.default
+        }
+
+        override fun hashCode(): Int {
+            var result = faceMap.hashCode()
+            result = 31 * result + default.hashCode()
+            return result
+        }
+
+        override fun toString(): String = "PerFace(faceMap=$faceMap, default=$default)"
+
         companion object {
+            /** Mid-gray fallback for unassigned [PerFace] faces (visible, not transparent). */
+            internal val UNASSIGNED_FACE_DEFAULT: IsoColor = IsoColor(128, 128, 128, 255)
+
             /**
              * Factory for callers who need direct map construction (advanced use case).
              *
@@ -173,14 +186,14 @@ fun perFace(
 annotation class IsometricMaterialDsl
 
 @IsometricMaterialDsl
-class PerFaceMaterialScope internal constructor() {
+internal class PerFaceMaterialScope internal constructor() {
     var top: MaterialData? = null
     var bottom: MaterialData? = null
     var front: MaterialData? = null
     var back: MaterialData? = null
     var left: MaterialData? = null
     var right: MaterialData? = null
-    var default: MaterialData = UNASSIGNED_FACE_DEFAULT
+    var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
 
     /**
      * Convenience: sets [front], [back], [left], [right] to the same material.
