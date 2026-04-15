@@ -110,9 +110,16 @@ internal class GpuRenderPipeline(
                             shaderLocation = 2,
                         ),
                         GPUVertexAttribute(
-                            format = VertexFormat.Uint32,
+                            // atlasRegion: (scaleU, scaleV, offsetU, offsetV) flat per face.
+                            // Fragment shader applies fract(uv) * atlasRegion.xy + atlasRegion.zw
+                            format = VertexFormat.Float32x4,
                             offset = 32L,
                             shaderLocation = 3,
+                        ),
+                        GPUVertexAttribute(
+                            format = VertexFormat.Uint32,
+                            offset = 48L,
+                            shaderLocation = 4,
                         ),
                     ),
                 )

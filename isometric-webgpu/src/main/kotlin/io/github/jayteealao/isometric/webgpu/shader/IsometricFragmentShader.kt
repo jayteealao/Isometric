@@ -10,16 +10,22 @@ internal object IsometricFragmentShader {
         struct FragmentInput {
             @location(0) color: vec4<f32>,
             @location(1) uv: vec2<f32>,
-            @location(2) @interpolate(flat) textureIndex: u32,
+            // atlasRegion: (scaleU, scaleV, offsetU, offsetV) flat-interpolated from the compute pass.
+            // Apply fract() here (per-fragment) so tiling wraps correctly within the atlas sub-region.
+            // Per-vertex fract() fails because fract(1.0) = 0.0 collapses face corners to one texel.
+            @location(2) @interpolate(flat) atlasRegion: vec4<f32>,
+            @location(3) @interpolate(flat) textureIndex: u32,
         }
 
         @fragment
         fn ${ENTRY_POINT}(in: FragmentInput) -> @location(0) vec4<f32> {
+            // Apply fract() per-fragment to the pre-atlas UV, then map into the atlas sub-region.
+            // fract() wraps tiling UVs back into [0,1) before the atlas scale+offset is applied,
+            // so tiles wrap within the sub-region rather than bleeding to the atlas origin.
             // Always sample to satisfy Dawn's uniform control flow requirement.
-            // For NO_TEXTURE faces, the fallback checkerboard is bound but the
-            // result is discarded via select — zero visual cost since the sampler
-            // fetch is the same for all fragments in the draw call.
-            let sampled = textureSample(diffuseTexture, diffuseSampler, in.uv);
+            // For NO_TEXTURE faces the result is discarded via select.
+            let atlasUV = fract(in.uv) * in.atlasRegion.xy + in.atlasRegion.zw;
+            let sampled = textureSample(diffuseTexture, diffuseSampler, atlasUV);
             let textured = sampled * in.color;
             return select(textured, in.color, in.textureIndex == 0xFFFFFFFFu);
         }

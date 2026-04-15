@@ -27,12 +27,14 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * ## UV coordinates
  *
  * Per-vertex UVs are read from `sceneUvCoords` (binding 6), packed as 3 × vec4 per face.
- * A two-step atlas-safe transform is applied using the `UvRegion` from `sceneUvRegions`
- * (binding 5): first `localUV = userMatrix * vec3(baseUV, 1.0)`, then
- * `atlasUV = fract(localUV) * atlasScale + atlasOffset`. The `fract()` wraps tiling UVs
- * back into [0,1) before atlas mapping so tiles wrap within the sub-region rather than
- * bleeding into adjacent atlas tiles. Faces without UV data receive default quad UVs
- * `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex slots by the CPU-side packer.
+ * The user transform is applied per-vertex (`rawUV = userMatrix * vec3(baseUV, 1.0)`)
+ * without `fract()`. The atlas region (scaleU, scaleV, offsetU, offsetV) from `sceneUvRegions`
+ * (binding 5) is emitted as a flat `vec4<f32>` vertex attribute. The fragment shader applies
+ * `atlasUV = fract(rawUV) * atlasScale + atlasOffset` per-fragment. Applying `fract()`
+ * per-fragment (rather than per-vertex) is required for correct tiling: per-vertex fract
+ * collapses all corners with UV=1.0 to UV=0.0, making the entire face sample one texel.
+ * Faces without UV data receive default quad UVs `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex
+ * slots by the CPU-side packer.
  *
  * ## Why fixed stride (no atomicAdd)?
  *
@@ -53,7 +55,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *
  * ## Vertex buffer layout
  *
- * Vertices are written as a flat `array<u32>` (9 × u32 = 36 bytes per vertex) to
+ * Vertices are written as a flat `array<u32>` (14 × u32 = 56 bytes per vertex) to
  * avoid WGSL storage-buffer alignment constraints that would otherwise insert padding
  * between `position: vec2<f32>` (offset 0) and `color: vec4<f32>` (offset 8), since
  * `vec4` requires 16-byte alignment in WGSL structs but the render pipeline expects
@@ -63,8 +65,10 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *  u32 offset  bytes  field
  *       0-1      8    position      vec2<f32>  (vertex attribute location 0)
  *       2-5     16    color         vec4<f32>  (vertex attribute location 1)
- *       6-7      8    uv            vec2<f32>  (vertex attribute location 2)
- *         8       4    textureIndex  u32        (vertex attribute location 3)
+ *       6-7      8    rawUV         vec2<f32>  (vertex attribute location 2, pre-atlas UV)
+ *      8-11     16    atlasRegion   vec4<f32>  (vertex attribute location 3, flat: scaleU,scaleV,offsetU,offsetV)
+ *        12      4    textureIndex  u32        (vertex attribute location 4)
+ *        13      4    _padding      u32
  * ```
  *
  * ## Bindings
@@ -190,23 +194,30 @@ internal object TriangulateEmitShader {
         // Per-vertex UV coordinates: 3 × vec4 per face = (u0,v0,u1,v1)(u2,v2,u3,v3)(u4,v4,u5,v5)
         @group(0) @binding(6) var<storage, read>        sceneUvCoords: array<vec4<f32>>;
 
-        // Writes one vertex at flat u32 offset [base] (base must be a multiple of 9).
-        // Vertex layout (36 bytes, 9 × u32, matches GpuRenderPipeline vertex attributes):
-        //   u32[0-1] position     vec2<f32>  (location 0, offset  0)
-        //   u32[2-5] color        vec4<f32>  (location 1, offset  8)
-        //   u32[6-7] uv           vec2<f32>  (location 2, offset 24)
-        //   u32[8]   textureIndex u32        (location 3, offset 32)
+        // Writes one vertex at flat u32 offset [base] (base must be a multiple of 14).
+        // Vertex layout (56 bytes, 14 × u32, matches GpuRenderPipeline vertex attributes):
+        //   u32[0-1]  position     vec2<f32>  (location 0, offset  0)
+        //   u32[2-5]  color        vec4<f32>  (location 1, offset  8)
+        //   u32[6-7]  rawUV        vec2<f32>  (location 2, offset 24) — pre-atlas UV after user matrix
+        //   u32[8-11] atlasRegion  vec4<f32>  (location 3, offset 32) — flat: scaleU,scaleV,offsetU,offsetV
+        //   u32[12]   textureIndex u32        (location 4, offset 48)
+        //   u32[13]   _padding     u32
         fn writeVertex(base: u32, x: f32, y: f32, r: f32, g: f32, b: f32, a: f32,
-                       u: f32, v: f32, texIdx: u32) {
-            vertices[base + 0u] = bitcast<u32>(x);
-            vertices[base + 1u] = bitcast<u32>(y);
-            vertices[base + 2u] = bitcast<u32>(r);
-            vertices[base + 3u] = bitcast<u32>(g);
-            vertices[base + 4u] = bitcast<u32>(b);
-            vertices[base + 5u] = bitcast<u32>(a);
-            vertices[base + 6u] = bitcast<u32>(u);
-            vertices[base + 7u] = bitcast<u32>(v);
-            vertices[base + 8u] = texIdx;
+                       u: f32, v: f32, asU: f32, asV: f32, aoU: f32, aoV: f32, texIdx: u32) {
+            vertices[base + 0u]  = bitcast<u32>(x);
+            vertices[base + 1u]  = bitcast<u32>(y);
+            vertices[base + 2u]  = bitcast<u32>(r);
+            vertices[base + 3u]  = bitcast<u32>(g);
+            vertices[base + 4u]  = bitcast<u32>(b);
+            vertices[base + 5u]  = bitcast<u32>(a);
+            vertices[base + 6u]  = bitcast<u32>(u);
+            vertices[base + 7u]  = bitcast<u32>(v);
+            vertices[base + 8u]  = bitcast<u32>(asU);
+            vertices[base + 9u]  = bitcast<u32>(asV);
+            vertices[base + 10u] = bitcast<u32>(aoU);
+            vertices[base + 11u] = bitcast<u32>(aoV);
+            vertices[base + 12u] = texIdx;
+            vertices[base + 13u] = 0u;
         }
 
         @compute @workgroup_size(${WORKGROUP_SIZE})
@@ -220,7 +231,7 @@ internal object TriangulateEmitShader {
             let key = sortedKeys[i];
             if (key.originalIndex == 0xFFFFFFFFu) {
                 for (var j = 0u; j < 12u; j++) {
-                    writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
+                    writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
@@ -240,7 +251,7 @@ internal object TriangulateEmitShader {
             let visible = bitcast<u32>(tail.z);
             if (visible == 0u || vertexCount < 3u) {
                 for (var j = 0u; j < 12u; j++) {
-                    writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
+                    writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
@@ -272,52 +283,58 @@ internal object TriangulateEmitShader {
             // reducing storage writes by ~33% for the common quad case.
 
             // Per-vertex UVs from UvGenerator, packed as 3 × vec4 per face.
-            // Two-step transform: apply user matrix, fract() to wrap tiling, then atlas region.
-            // fract() ensures tiling wraps within the atlas sub-region, not to the atlas origin.
+            // Apply user matrix per-vertex without fract(). fract() must happen per-fragment in
+            // the render pass because fract(1.0) == 0.0 — applying it per-vertex collapses all
+            // face corners (UV = 1.0) to UV = 0.0, making the entire face sample one texel.
+            // The atlas region is emitted as a flat vertex attribute for the fragment shader.
             let uvBase   = key.originalIndex * 3u;
             let uvPack0  = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
             let uvPack1  = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
             let uvPack2  = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
-            let uv0 = fract(uvRegion.userMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
-            let uv1 = fract(uvRegion.userMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
-            let uv2 = fract(uvRegion.userMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
-            let uv3 = fract(uvRegion.userMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
-            let uv4 = fract(uvRegion.userMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
-            let uv5 = fract(uvRegion.userMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv0 = uvRegion.userMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0);
+            let uv1 = uvRegion.userMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0);
+            let uv2 = uvRegion.userMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0);
+            let uv3 = uvRegion.userMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0);
+            let uv4 = uvRegion.userMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0);
+            let uv5 = uvRegion.userMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0);
+            let asU = uvRegion.atlasScale.x;
+            let asV = uvRegion.atlasScale.y;
+            let aoU = uvRegion.atlasOffset.x;
+            let aoV = uvRegion.atlasOffset.y;
 
             // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
-            writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
-            writeVertex((base + 1u) * 9u, nx1, ny1, r, g, b, a, uv1.x, uv1.y, texIdx);
-            writeVertex((base + 2u) * 9u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, texIdx);
+            writeVertex((base + 0u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
+            writeVertex((base + 1u) * 14u, nx1, ny1, r, g, b, a, uv1.x, uv1.y, asU, asV, aoU, aoV, texIdx);
+            writeVertex((base + 2u) * 14u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, asU, asV, aoU, aoV, texIdx);
 
             // Compute how many real triangles we have (1–4 based on vertexCount 3–6)
             let triCount = vertexCount - 2u;
 
             // Triangle 1: (s0, s2, s3)
             if (triCount >= 2u) {
-                writeVertex((base + 3u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
-                writeVertex((base + 4u) * 9u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, texIdx);
-                writeVertex((base + 5u) * 9u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, texIdx);
+                writeVertex((base + 3u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 4u) * 14u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 5u) * 14u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, asU, asV, aoU, aoV, texIdx);
             }
 
             // Triangle 2: (s0, s3, s4) — for 5+ vertex faces (pentagon)
             if (triCount >= 3u) {
-                writeVertex((base + 6u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
-                writeVertex((base + 7u) * 9u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, texIdx);
-                writeVertex((base + 8u) * 9u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, texIdx);
+                writeVertex((base + 6u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 7u) * 14u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 8u) * 14u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, asU, asV, aoU, aoV, texIdx);
             }
 
             // Triangle 3: (s0, s4, s5) — for 6-vertex faces (hexagon)
             if (triCount >= 4u) {
-                writeVertex((base + 9u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);
-                writeVertex((base + 10u) * 9u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, texIdx);
-                writeVertex((base + 11u) * 9u, nx5, ny5, r, g, b, a, uv5.x, uv5.y, texIdx);
+                writeVertex((base + 9u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 10u) * 14u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex((base + 11u) * 14u, nx5, ny5, r, g, b, a, uv5.x, uv5.y, asU, asV, aoU, aoV, texIdx);
             }
 
             // Fill remaining degenerate slots (from triCount*3 to 11)
             let firstDegen = triCount * 3u;
             for (var j = firstDegen; j < 12u; j++) {
-                writeVertex((base + j) * 9u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
+                writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
             }
         }
     """.trimIndent()

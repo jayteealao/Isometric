@@ -229,8 +229,9 @@ internal class GpuTextureManager(
 
     /**
      * Pack and upload the compact per-face UV region buffer for the emit shader.
-     * Each face gets one `mat3x2<f32>` = 6 floats = [SceneDataLayout.UV_REGION_STRIDE] = 24 bytes.
-     * The matrix composes the user [TextureTransform] with the atlas sub-region.
+     * Each face gets one `UvRegion` = 10 floats = [SceneDataLayout.UV_REGION_STRIDE] = 40 bytes.
+     * Stores the user [TextureTransform] and atlas region separately (not composed).
+     * The fragment shader applies `fract(rawUV) * atlasScale + atlasOffset` per-fragment.
      */
     private fun uploadUvRegionBuffer(scene: PreparedScene, faceCount: Int) {
         if (faceCount == 0) return

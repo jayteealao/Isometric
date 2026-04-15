@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-14T23:41:28Z"
-slices-verified: 7
-slices-total: 7
+updated-at: "2026-04-15T12:53:42Z"
+slices-verified: 8
+slices-total: 8
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-handoff texture-material-shaders api-design-fixes"
+next-invocation: "/wf-review texture-material-shaders webgpu-uv-transforms"
 ---
 
 # Verify Index
@@ -70,6 +70,14 @@ next-invocation: "/wf-handoff texture-material-shaders api-design-fixes"
 - Issues: 0 (all Round 2 findings fixed; 4 in-verify corrections applied cleanly)
 - Record: [06-verify-api-design-fixes.md](06-verify-api-design-fixes.md)
 
+### `webgpu-uv-transforms` — PARTIAL (4/6 ACs met on device; AC2/AC3 unit-test only)
+- Checks: 4/4 passed (build, test 22/22 pre- and post-fix)
+- Acceptance: 4/6 fully met (AC1 tiling ✓, AC4 per-face ✓, AC5 IDENTITY ✓, AC6 automated ✓); 2/6 partial (AC2 offset, AC3 rotation — math only)
+- Interactive: 7 screenshots — IDENTITY (3 modes) + tiling-fix (Canvas, WebGPU, Canvas+GPU Sort, cycle-back) all PASS
+- Issues: 2 found and fixed — atlas tiling bug (HIGH, `fract()` + UvRegion) + no tiling demo (LOW, extended demo)
+- Evidence: `verify-evidence/tiling_fix_canvas_baseline.png`, `verify-evidence/tiling_fix_webgpu.png`, `verify-evidence/tiling_fix_canvas_gpu_sort.png`
+- Record: [06-verify-webgpu-uv-transforms.md](06-verify-webgpu-uv-transforms.md)
+
 ## Recommended Next Stage
-- **Option A (default):** `/wf-handoff texture-material-shaders api-design-fixes` — all 13 ACs met, 22 review findings applied and verified; ready to merge PR #8 (`feat/texture` → `feat/webgpu`)
-- **Option B:** `/wf-review texture-material-shaders api-design-fixes` — additional review pass if desired for Round 3 changes (annotation fix, ARCH-02 test correction, CS-2 restore)
+- **Option A (default):** `/wf-review texture-material-shaders webgpu-uv-transforms` — math correct, IDENTITY regression confirmed, ready for code review
+- **Option B:** `/wf-handoff texture-material-shaders api-design-fixes` — merge PR #8 first, then review this slice

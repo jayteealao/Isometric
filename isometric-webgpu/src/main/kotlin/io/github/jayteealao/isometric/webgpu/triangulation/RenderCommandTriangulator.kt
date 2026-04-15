@@ -7,9 +7,14 @@ import java.nio.ByteOrder
 
 internal class RenderCommandTriangulator {
     companion object {
-        /** u32 slots per vertex: pos(2) + color(4) + uv(2) + textureIndex(1) = 9. */
-        const val U32S_PER_VERTEX = 9
-        const val BYTES_PER_VERTEX = U32S_PER_VERTEX * 4  // 36 bytes
+        /**
+         * u32 slots per vertex: pos(2) + color(4) + rawUV(2) + atlasRegion(4) + textureIndex(1) + pad(1) = 14.
+         * rawUV is the pre-atlas UV (after user transform, before fract). atlasRegion is
+         * (scaleU, scaleV, offsetU, offsetV) as a flat attribute. The fragment shader applies
+         * `fract(rawUV) * atlasRegion.xy + atlasRegion.zw` per-fragment.
+         */
+        const val U32S_PER_VERTEX = 14
+        const val BYTES_PER_VERTEX = U32S_PER_VERTEX * 4  // 56 bytes
     }
 
     data class PackedVertices(
@@ -90,6 +95,10 @@ internal class RenderCommandTriangulator {
         a: Float,
         u: Float = 0f,
         v: Float = 0f,
+        atlasScaleU: Float = 0f,
+        atlasScaleV: Float = 0f,
+        atlasOffsetU: Float = 0f,
+        atlasOffsetV: Float = 0f,
         textureIndex: Int = SceneDataLayout.NO_TEXTURE,
     ) {
         buffer.putFloat(x)
@@ -100,7 +109,12 @@ internal class RenderCommandTriangulator {
         buffer.putFloat(a)
         buffer.putFloat(u)
         buffer.putFloat(v)
+        buffer.putFloat(atlasScaleU)
+        buffer.putFloat(atlasScaleV)
+        buffer.putFloat(atlasOffsetU)
+        buffer.putFloat(atlasOffsetV)
         buffer.putInt(textureIndex)
+        buffer.putInt(0)  // padding to reach 56 bytes / 14 u32s
     }
 
     private fun toNdcX(x: Double, width: Int): Float =
