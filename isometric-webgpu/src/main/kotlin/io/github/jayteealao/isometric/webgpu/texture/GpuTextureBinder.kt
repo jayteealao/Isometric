@@ -37,8 +37,8 @@ internal class GpuTextureBinder(
             magFilter = FilterMode.Linear,
             minFilter = FilterMode.Linear,
             mipmapFilter = MipmapFilterMode.Nearest,
-            addressModeU = AddressMode.Repeat,
-            addressModeV = AddressMode.Repeat,
+            addressModeU = AddressMode.ClampToEdge,
+            addressModeV = AddressMode.ClampToEdge,
         )
     )
 

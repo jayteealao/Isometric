@@ -164,6 +164,7 @@ internal object TriangulateEmitShader {
         // 40 bytes per entry: user transform (mat3x2 = 24 bytes) + atlas region (2×vec2 = 16 bytes).
         // CPU layout: [col0.x, col0.y, col1.x, col1.y, col2.x, col2.y, scaleU, scaleV, offsetU, offsetV]
         // Apply as: atlasUV = fract(userMatrix * vec3(baseUV, 1.0)) * atlasScale + atlasOffset
+        // SYNC: struct size must equal SceneDataLayout.UV_REGION_STRIDE (40 bytes) and UvRegionPacker.pack() (10 floats)
         struct UvRegion {
             userMatrix  : mat3x2<f32>,
             atlasScale  : vec2<f32>,
@@ -181,7 +182,7 @@ internal object TriangulateEmitShader {
         //   raw[i*6+5] = (depthKey, bitcast faceIndex, bitcast visible, _p4)
         @group(0) @binding(0) var<storage, read>       transformedRaw: array<vec4<f32>>;
         @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>;
-        // Flat u32 array: 9 u32 per vertex (36 bytes), written via bitcast<u32>(f32) to
+        // Flat u32 array: 14 u32 per vertex (56 bytes), written via bitcast<u32>(f32) to
         // preserve the render pipeline's vertex layout without WGSL struct-alignment gaps.
         @group(0) @binding(2) var<storage, read_write>  vertices:    array<u32>;
         @group(0) @binding(3) var<uniform>              params:      EmitUniforms;

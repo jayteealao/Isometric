@@ -10,7 +10,7 @@ internal object IsometricVertexShader {
             @location(2) uv: vec2<f32>,
             // atlasRegion: (scaleU, scaleV, offsetU, offsetV) — same for all vertices in a face.
             // Fragment shader applies: fract(uv) * atlasRegion.xy + atlasRegion.zw
-            @location(3) @interpolate(flat) atlasRegion: vec4<f32>,
+            @location(3) atlasRegion: vec4<f32>,
             @location(4) textureIndex: u32,
         }
 

@@ -36,8 +36,21 @@ import kotlin.math.sin
  *
  * Extracted from [GpuTextureManager] so the math can be unit-tested on the JVM
  * without any Android context or GPU dependencies.
+ *
+ * ## Thread safety
+ *
+ * This object is stateless and therefore thread-safe in isolation. However, the
+ * [ByteBuffer] passed to [pack] is the CPU staging buffer owned by the render
+ * pipeline. That buffer **must only be written from the GPU/render thread** while
+ * it is inside the upload window (i.e. between [GpuTextureManager.uploadTextures]
+ * and the subsequent [androidx.webgpu.GPUQueue.writeBuffer] call). Callers are
+ * responsible for ensuring [pack] is invoked on the GPU thread; see
+ * `GpuContext.assertGpuThread()`.
  */
 internal object UvRegionPacker {
+
+    // sin/cos cache — rotationDegrees is typically static per material, so this eliminates redundant trig per frame
+    private val trigCache = java.util.concurrent.ConcurrentHashMap<Float, Pair<Float, Float>>()
 
     /**
      * Write 10 floats (40 bytes) into [buf]: user transform matrix followed by atlas region.
@@ -61,6 +74,11 @@ internal object UvRegionPacker {
         atlasOffsetV: Float,
         transform: TextureTransform,
     ) {
+        require(atlasScaleU.isFinite() && atlasScaleU > 0f) { "atlasScaleU must be finite and positive, got $atlasScaleU" }
+        require(atlasScaleV.isFinite() && atlasScaleV > 0f) { "atlasScaleV must be finite and positive, got $atlasScaleV" }
+        require(atlasOffsetU.isFinite()) { "atlasOffsetU must be finite, got $atlasOffsetU" }
+        require(atlasOffsetV.isFinite()) { "atlasOffsetV must be finite, got $atlasOffsetV" }
+
         if (transform == TextureTransform.IDENTITY) {
             // Fast path: identity user matrix (no trig), then atlas region
             buf.putFloat(1f); buf.putFloat(0f)   // col0
@@ -69,9 +87,10 @@ internal object UvRegionPacker {
         } else {
             // Full path: user transform only — rotation around UV center (0.5, 0.5).
             // Atlas region is written separately below; never multiplied in here.
-            val thetaRad = transform.rotationDegrees * PI.toFloat() / 180f
-            val cosA = cos(thetaRad)
-            val sinA = sin(thetaRad)
+            val (sinA, cosA) = trigCache.getOrPut(transform.rotationDegrees) {
+                val theta = transform.rotationDegrees * (PI / 180.0)
+                Pair(sin(theta).toFloat(), cos(theta).toFloat())
+            }
             val su = transform.scaleU
             val sv = transform.scaleV
             val du = transform.offsetU

@@ -1,10 +1,12 @@
 package io.github.jayteealao.isometric.webgpu.texture
 
 import io.github.jayteealao.isometric.shader.TextureTransform
+import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -199,5 +201,167 @@ class GpuTextureManagerUvTransformTest {
         // col2.x: top = −0.5 (center-based correction), side = 0.0
         assertApprox(-0.5f, top[4],  label = "top col2.x")
         assertApprox(0f,    side[4], label = "side col2.x")
+    }
+
+    /**
+     * Mirror (negative scaleU) flips the u-axis coefficient sign.
+     * scaleU=-1f, scaleV=1f, rotation=0, offset=(0,0), full-atlas region.
+     *
+     * cosA=1, sinA=0:
+     *   uc0x = su * cosA = -1 * 1 = -1.0   ← must be negative
+     *   uc0y = su * sinA = -1 * 0 =  0.0
+     *   uc1x = -sv * sinA = -1 * 0 =  0.0
+     *   uc1y =  sv * cosA =  1 * 1 =  1.0  ← v-axis must stay positive
+     *   tx = 0.5*(1 - (-1) - 0) + 0 = 1.0
+     *   ty = 0.5*(1 - 0 - 1) + 0   = 0.0
+     * Expected user matrix + atlas region (10 floats):
+     *   col0 = (-1.0, 0.0)   col1 = (0.0, 1.0)   col2 = (1.0, 0.0)
+     *   atlasScale=(1,1)   atlasOffset=(0,0)
+     *
+     * A bug such as using abs(su) instead of su in the matrix computation would
+     * produce col0.x = +1.0 and be caught here.
+     */
+    @Test
+    fun `mirror scale negates u coefficient`() {
+        val buf = makeBuffer()
+        UvRegionPacker.pack(
+            buf          = buf,
+            atlasScaleU  = 1f,
+            atlasScaleV  = 1f,
+            atlasOffsetU = 0f,
+            atlasOffsetV = 0f,
+            transform    = TextureTransform(scaleU = -1f, scaleV = 1f),
+        )
+        assertFloats(floatArrayOf(-1f, 0f, 0f, 1f, 1f, 0f, 1f, 1f, 0f, 0f), readFloats(buf))
+    }
+
+    /**
+     * Combined tiling (2×2), 45-degree rotation, and offset (0.1, 0.2) with identity atlas.
+     *
+     * This test exercises the interaction between all three transform parameters at once.
+     * The tx/ty translation column couples scale, rotation, and offset together:
+     *   tx = 0.5*(1 - uc0x - uc1x) + du
+     *   ty = 0.5*(1 - uc0y - uc1y) + dv
+     * A bug such as applying the pivot correction before vs. after combining scale and rotation
+     * would pass single-parameter tests but fail here.
+     *
+     * Pre-computed expected values (su=2, sv=2, rotationDegrees=45, du=0.1, dv=0.2):
+     *   cosA = cos(π/4) = √2/2 ≈ 0.70710678
+     *   sinA = sin(π/4) = √2/2 ≈ 0.70710678
+     *   uc0x = 2 * cosA ≈  1.41421356
+     *   uc0y = 2 * sinA ≈  1.41421356
+     *   uc1x = -2 * sinA ≈ -1.41421356
+     *   uc1y =  2 * cosA ≈  1.41421356
+     *   tx = 0.5*(1 - 1.41421356 - (-1.41421356)) + 0.1 = 0.5*(1.0) + 0.1 = 0.6
+     *   ty = 0.5*(1 - 1.41421356 - 1.41421356) + 0.2  = 0.5*(-1.82842712) + 0.2 ≈ -0.71421356
+     * Expected user matrix + atlas region (10 floats):
+     *   col0 = (1.41421356, 1.41421356)
+     *   col1 = (-1.41421356, 1.41421356)
+     *   col2 = (0.6, -0.71421356)
+     *   atlasScale=(1,1)   atlasOffset=(0,0)
+     */
+    @Test
+    fun `combined tiling rotation offset produces correct matrix`() {
+        val buf = makeBuffer()
+        UvRegionPacker.pack(
+            buf          = buf,
+            atlasScaleU  = 1f,
+            atlasScaleV  = 1f,
+            atlasOffsetU = 0f,
+            atlasOffsetV = 0f,
+            transform    = TextureTransform(
+                scaleU          = 2f,
+                scaleV          = 2f,
+                rotationDegrees = 45f,
+                offsetU         = 0.1f,
+                offsetV         = 0.2f,
+            ),
+        )
+        assertFloats(
+            floatArrayOf(
+                1.41421356f,  1.41421356f,   // col0 (u-axis)
+                -1.41421356f, 1.41421356f,   // col1 (v-axis)
+                0.6f,         -0.71421356f,  // col2 (translation)
+                1f, 1f, 0f, 0f,              // atlasScale, atlasOffset
+            ),
+            readFloats(buf),
+            eps = 1e-5f,
+        )
+    }
+
+    /**
+     * Large tiling (100×100) with full-atlas region verifies that the matrix coefficients
+     * remain finite and hold the correct values even at extreme scale factors.
+     *
+     * This acts as a regression guard against accidentally moving fract() back to the
+     * vertex shader (or removing it entirely): if that happened the solid-black artifact
+     * would have no failing test without this case.
+     *
+     * rotation=0, offset=(0,0), full-atlas region:
+     *   cosA=1, sinA=0
+     *   uc0x =  su * cosA =  100 * 1 = 100f
+     *   uc0y =  su * sinA =  100 * 0 =   0f
+     *   uc1x = -sv * sinA = -100 * 0 =   0f
+     *   uc1y =  sv * cosA =  100 * 1 = 100f
+     *   tx = 0.5*(1 - 100 - 0) + 0 = 0.5*(-99) = -49.5f
+     *   ty = 0.5*(1 -   0 - 100) + 0 = 0.5*(-99) = -49.5f
+     * Expected user matrix + atlas region (10 floats):
+     *   col0 = (100.0, 0.0)   col1 = (0.0, 100.0)   col2 = (-49.5, -49.5)
+     *   atlasScale=(1,1)   atlasOffset=(0,0)
+     */
+    @Test
+    fun `large tiling 100x produces finite matrix`() {
+        val buf = makeBuffer()
+        UvRegionPacker.pack(
+            buf          = buf,
+            atlasScaleU  = 1f,
+            atlasScaleV  = 1f,
+            atlasOffsetU = 0f,
+            atlasOffsetV = 0f,
+            transform    = TextureTransform.tiling(100f, 100f),
+        )
+        val floats = readFloats(buf)
+        // Verify all 6 user-matrix coefficients are finite before asserting exact values
+        for (i in 0..5) {
+            assertTrue(floats[i].isFinite(), "floats[$i] must be finite but was ${floats[i]}")
+        }
+        assertFloats(
+            floatArrayOf(
+                100f,   0f,      // col0: u-axis (scale, no rotation)
+                0f,   100f,      // col1: v-axis (scale, no rotation)
+                -49.5f, -49.5f, // col2: center-based pivot correction
+                1f, 1f, 0f, 0f, // atlasScale, atlasOffset
+            ),
+            floats,
+        )
+    }
+
+    /**
+     * Stride guard: pack() must write exactly [SceneDataLayout.UV_REGION_STRIDE] bytes.
+     *
+     * This assertion catches any drift between the number of putFloat() calls in
+     * [UvRegionPacker.pack] and the declared [SceneDataLayout.UV_REGION_STRIDE] constant
+     * (currently 40 bytes / 10 floats). If either side changes without the other,
+     * the GPU will silently read corrupted UvRegion data — this test surfaces that
+     * at compile/test time instead.
+     */
+    @Test
+    fun `pack writes exactly UV_REGION_STRIDE bytes`() {
+        val buf = ByteBuffer.allocateDirect(SceneDataLayout.UV_REGION_STRIDE)
+            .order(ByteOrder.nativeOrder())
+        val before = buf.position()
+        UvRegionPacker.pack(
+            buf          = buf,
+            atlasScaleU  = 0.5f,
+            atlasScaleV  = 0.5f,
+            atlasOffsetU = 0.1f,
+            atlasOffsetV = 0.2f,
+            transform    = TextureTransform.IDENTITY,
+        )
+        assertEquals(
+            SceneDataLayout.UV_REGION_STRIDE,
+            buf.position() - before,
+            "UvRegionPacker.pack() must write exactly SceneDataLayout.UV_REGION_STRIDE bytes"
+        )
     }
 }

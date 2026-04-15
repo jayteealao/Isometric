@@ -1,9 +1,18 @@
 package io.github.jayteealao.isometric.webgpu.triangulation
 
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
+import io.github.jayteealao.isometric.webgpu.texture.TextureAtlasManager
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+
+internal data class AtlasUv(
+    val scaleU: Float,
+    val scaleV: Float,
+    val offsetU: Float,
+    val offsetV: Float,
+)
 
 internal class RenderCommandTriangulator {
     companion object {
@@ -24,7 +33,21 @@ internal class RenderCommandTriangulator {
 
     private var stagingBuffer: ByteBuffer? = null
 
-    fun pack(scene: PreparedScene): PackedVertices {
+    /**
+     * Pack [scene] into a flat vertex buffer ready for the render pass.
+     *
+     * @param scene The prepared scene to triangulate.
+     * @param atlasRegionResolver Optional resolver that returns the [TextureAtlasManager.AtlasRegion]
+     *   for a given [RenderCommand]. When non-null, the atlas scale and offset are written into
+     *   each vertex so the fragment shader's `fract(rawUV) * atlasScale + atlasOffset` formula
+     *   samples the correct sub-region instead of collapsing to a single texel at the origin.
+     *   Pass null (or omit) for untextured scenes; all atlas fields default to identity
+     *   (scale=1, offset=0).
+     */
+    fun pack(
+        scene: PreparedScene,
+        atlasRegionResolver: ((RenderCommand) -> TextureAtlasManager.AtlasRegion?)? = null,
+    ): PackedVertices {
         val vertexCount = countVertices(scene)
         val requiredBytes = vertexCount * BYTES_PER_VERTEX
         val buffer = ensureBuffer(requiredBytes)
@@ -41,19 +64,29 @@ internal class RenderCommandTriangulator {
             val b = (command.color.b / 255.0).toFloat()
             val a = (command.color.a / 255.0).toFloat()
 
+            val region = atlasRegionResolver?.invoke(command)
+            val atlasUv = AtlasUv(
+                scaleU = region?.uvScale?.get(0) ?: 1f,
+                scaleV = region?.uvScale?.get(1) ?: 1f,
+                offsetU = region?.uvOffset?.get(0) ?: 0f,
+                offsetV = region?.uvOffset?.get(1) ?: 0f,
+            )
+
             for (i in 1 until pointCount - 1) {
-                writeVertex(buffer, x0, y0, r, g, b, a)
+                writeVertex(buffer, x0, y0, r, g, b, a, atlasUv = atlasUv)
                 writeVertex(
                     buffer,
                     toNdcX(command.pointX(i), scene.width),
                     toNdcY(command.pointY(i), scene.height),
-                    r, g, b, a
+                    r, g, b, a,
+                    atlasUv = atlasUv,
                 )
                 writeVertex(
                     buffer,
                     toNdcX(command.pointX(i + 1), scene.width),
                     toNdcY(command.pointY(i + 1), scene.height),
-                    r, g, b, a
+                    r, g, b, a,
+                    atlasUv = atlasUv,
                 )
             }
         }
@@ -95,10 +128,7 @@ internal class RenderCommandTriangulator {
         a: Float,
         u: Float = 0f,
         v: Float = 0f,
-        atlasScaleU: Float = 0f,
-        atlasScaleV: Float = 0f,
-        atlasOffsetU: Float = 0f,
-        atlasOffsetV: Float = 0f,
+        atlasUv: AtlasUv = AtlasUv(scaleU = 1f, scaleV = 1f, offsetU = 0f, offsetV = 0f),
         textureIndex: Int = SceneDataLayout.NO_TEXTURE,
     ) {
         buffer.putFloat(x)
@@ -109,10 +139,10 @@ internal class RenderCommandTriangulator {
         buffer.putFloat(a)
         buffer.putFloat(u)
         buffer.putFloat(v)
-        buffer.putFloat(atlasScaleU)
-        buffer.putFloat(atlasScaleV)
-        buffer.putFloat(atlasOffsetU)
-        buffer.putFloat(atlasOffsetV)
+        buffer.putFloat(atlasUv.scaleU)
+        buffer.putFloat(atlasUv.scaleV)
+        buffer.putFloat(atlasUv.offsetU)
+        buffer.putFloat(atlasUv.offsetV)
         buffer.putInt(textureIndex)
         buffer.putInt(0)  // padding to reach 56 bytes / 14 u32s
     }

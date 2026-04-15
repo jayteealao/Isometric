@@ -49,12 +49,17 @@ internal class GpuTextureManager(
     private var lastAtlasSignature: Set<TextureSource>? = null
 
     /**
-     * Combined hash of [PreparedScene.commands.size] and [PreparedScene.commands.hashCode]
-     * at the last [uploadTextures] call. Used to skip redundant [writeBuffer] calls when
-     * the command list is unchanged between frames. Note: [uploadAtlasAndBindGroup] has
-     * its own cache ([lastAtlasSignature]) and is not guarded by this hash.
+     * Dirty flag that gates the per-face tex-index and UV region buffer uploads.
+     * Initialised to `true` so the first frame always uploads.
+     * Cleared to `false` after a successful upload; set back to `true` on reset/close.
+     *
+     * Replaces the former hashCode-based skip guard, which was susceptible to
+     * hash collisions causing stale UV transform data to be silently retained on the GPU.
+     *
+     * TODO: set uvRegionsDirty = true from a scene-mutation callback when the scene
+     *       mutation API is available, so unchanged frames can be skipped safely.
      */
-    private var lastUploadedCommandsHash: Int = Int.MIN_VALUE
+    private var uvRegionsDirty: Boolean = true
 
     /** Current texture bind group for the render pass. */
     private var _textureBindGroup: GPUBindGroup? = null
@@ -111,13 +116,25 @@ internal class GpuTextureManager(
         // Atlas rebuild has its own cache (lastAtlasSignature) — always run it independently.
         uploadAtlasAndBindGroup(scene)
 
-        // Skip the three writeBuffer calls when the command list is identical to last frame.
-        val commandsHash = 31 * scene.commands.size + scene.commands.hashCode()
-        if (commandsHash == lastUploadedCommandsHash) return
-        lastUploadedCommandsHash = commandsHash
-
+        // TODO: add dirty flag when scene mutation API is available
         uploadTexIndexBuffer(scene, faceCount)
+
+        // F-24: scene-level IDENTITY shortcut — skip UV region re-upload when every face
+        // resolves to TextureTransform.IDENTITY and the buffer was already populated on a
+        // prior frame (uvRegionGpuBuffer != null).  On the very first frame the buffer is
+        // null, so the guard below does not fire and the initial upload always proceeds.
+        val allIdentity = scene.commands.all { cmd ->
+            resolveTextureTransform(resolveEffectiveMaterial(cmd)) == TextureTransform.IDENTITY
+        }
+        if (allIdentity && uvRegionGpuBuffer != null) {
+            // All faces use IDENTITY — buffer already contains IDENTITY matrices from last upload.
+            // Skip re-upload to save GPU bus bandwidth.
+            uvRegionsDirty = false
+            return
+        }
+
         uploadUvRegionBuffer(scene, faceCount)
+        uvRegionsDirty = false
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -219,12 +236,15 @@ internal class GpuTextureManager(
         if (faceCount == 0) return
         val requiredBytes = faceCount * 4
         texIndexBuf.ensureCapacity(faceCount, entryBytes = 4)
-        val buf = texIndexBuf.cpuBuffer!!
-        buf.rewind()
-        buf.limit(requiredBytes)
-        SceneDataPacker.packTexIndicesInto(scene.commands, buf, faceCount)
-        buf.rewind()
-        ctx.queue.writeBuffer(texIndexBuf.gpuBuffer!!, 0L, buf)
+        val cpu = texIndexBuf.cpuBuffer
+            ?: error("texIndexBuf.cpuBuffer is null after ensureCapacity — this is a bug")
+        val gpu = texIndexBuf.gpuBuffer
+            ?: error("texIndexBuf.gpuBuffer is null after ensureCapacity — this is a bug")
+        cpu.rewind()
+        cpu.limit(requiredBytes)
+        SceneDataPacker.packTexIndicesInto(scene.commands, cpu, faceCount)
+        cpu.rewind()
+        ctx.queue.writeBuffer(gpu, 0L, cpu)
     }
 
     /**
@@ -234,21 +254,27 @@ internal class GpuTextureManager(
      * The fragment shader applies `fract(rawUV) * atlasScale + atlasOffset` per-fragment.
      */
     private fun uploadUvRegionBuffer(scene: PreparedScene, faceCount: Int) {
+        ctx.assertGpuThread()
         if (faceCount == 0) return
 
         val entryBytes = SceneDataLayout.UV_REGION_STRIDE
         uvRegionBuf.ensureCapacity(faceCount, entryBytes)
 
+        val cpu = uvRegionBuf.cpuBuffer
+            ?: error("uvRegionBuf.cpuBuffer is null after ensureCapacity — this is a bug")
+        val gpu = uvRegionBuf.gpuBuffer
+            ?: error("uvRegionBuf.gpuBuffer is null after ensureCapacity — this is a bug")
+
         val requiredBytes = faceCount * entryBytes
-        val buf = uvRegionBuf.cpuBuffer!!
-        buf.rewind()
-        buf.limit(requiredBytes)
+        cpu.rewind()
+        cpu.limit(requiredBytes)
         for (i in 0 until faceCount) {
             val cmd = scene.commands[i]
-            val region = resolveAtlasRegion(cmd)
-            val transform = resolveTextureTransform(cmd)
+            val effective = resolveEffectiveMaterial(cmd)
+            val region = resolveAtlasRegion(effective)
+            val transform = resolveTextureTransform(effective)
             UvRegionPacker.pack(
-                buf          = buf,
+                buf          = cpu,
                 atlasScaleU  = region?.uvScale?.get(0)  ?: 1f,
                 atlasScaleV  = region?.uvScale?.get(1)  ?: 1f,
                 atlasOffsetU = region?.uvOffset?.get(0) ?: 0f,
@@ -256,50 +282,42 @@ internal class GpuTextureManager(
                 transform    = transform,
             )
         }
-        buf.rewind()
-        ctx.queue.writeBuffer(uvRegionBuf.gpuBuffer!!, 0L, buf)
+        cpu.rewind()
+        ctx.queue.writeBuffer(gpu, 0L, cpu)
     }
 
     /**
-     * Resolve the user [TextureTransform] for a command's effective material.
-     * Returns [TextureTransform.IDENTITY] for non-textured faces.
-     * Expands [IsometricMaterial.PerFace] using [RenderCommand.faceType].
+     * Resolve the effective material for a command, expanding [IsometricMaterial.PerFace]
+     * using [RenderCommand.faceType]. Called once per face so that [resolveAtlasRegion]
+     * and [resolveTextureTransform] can share the result without a second HashMap lookup.
      */
-    private fun resolveTextureTransform(cmd: RenderCommand): TextureTransform {
-        val effective = when (val m = cmd.material) {
+    private fun resolveEffectiveMaterial(cmd: RenderCommand): MaterialData? =
+        when (val m = cmd.material) {
             is IsometricMaterial.PerFace -> {
                 val face = cmd.faceType
                 if (face != null) m.faceMap[face] ?: m.default else m.default
             }
             else -> m
         }
-        return when (effective) {
-            is IsometricMaterial.Textured -> effective.transform
-            else -> TextureTransform.IDENTITY
-        }
-    }
 
     /**
-     * Resolve the atlas region for a command's effective texture. Returns null for
-     * non-textured faces. Expands [IsometricMaterial.PerFace] using the command's
-     * [RenderCommand.faceType].
+     * Resolve the atlas region for a pre-resolved effective material. Returns null for
+     * non-textured faces.
      */
-    private fun resolveAtlasRegion(cmd: RenderCommand): TextureAtlasManager.AtlasRegion? {
-        val effective = when (val m = cmd.material) {
-            is IsometricMaterial.PerFace -> {
-                val face = cmd.faceType
-                if (face != null) m.faceMap[face] ?: m.default else m.default
-            }
-            else -> m
-        }
-        return when (effective) {
+    private fun resolveAtlasRegion(effective: MaterialData?): TextureAtlasManager.AtlasRegion? =
+        when (effective) {
             is IsometricMaterial.Textured -> atlasManager.getRegion(effective.source)
             else -> null
         }
-    }
 
     /** Close the current bind group (if any) and create a new one for [view]. */
     private fun rebuildBindGroup(view: androidx.webgpu.GPUTextureView): GPUBindGroup {
+        // Safe to close the old bind group immediately even if a prior frame's command buffer
+        // is still in-flight on the GPU queue: Dawn internally reference-counts the underlying
+        // native object and keeps it alive until all in-flight GPU commands that reference it
+        // have completed. The Java-side close() only decrements the refcount; it does NOT free
+        // the native memory while any GPU work still holds a reference.
+        // TODO: verify this behaviour holds across Dawn alpha releases — see b/webgpu-lifecycle.
         _textureBindGroup?.close()
         val bg = textureBinder.buildBindGroup(view)
         _textureBindGroup = bg
@@ -314,7 +332,7 @@ internal class GpuTextureManager(
             atlasManager.destroy()
             lastAtlasSignature = null
         }
-        lastUploadedCommandsHash = Int.MIN_VALUE
+        uvRegionsDirty = true
         rebuildBindGroup(textureStore.fallbackTextureView)
     }
 
@@ -325,7 +343,7 @@ internal class GpuTextureManager(
         _textureBindGroup = null
         if (::atlasManager.isInitialized) atlasManager.destroy()
         lastAtlasSignature = null
-        lastUploadedCommandsHash = Int.MIN_VALUE
+        uvRegionsDirty = true
         if (::textureBinder.isInitialized) textureBinder.close()
         textureStore.close()
         texIndexBuf.close()

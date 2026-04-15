@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.webgpu.shader
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 // IsometricFragmentShader is in the same package — no import needed
@@ -26,13 +27,25 @@ class TriangulateEmitShaderUvTest {
     @Test
     fun `binding 5 uses UvRegion struct`() {
         val wgsl = TriangulateEmitShader.WGSL
-        assertTrue(
-            wgsl.contains("struct UvRegion"),
-            "WGSL must define a UvRegion struct"
+
+        // Matches "struct UvRegion {" — the token must open a struct declaration, not appear in a
+        // comment or an unrelated identifier. \s* allows any whitespace between the keyword and name.
+        val uvRegionStructDecl = Regex("""^\s*struct\s+UvRegion\s*\{""", RegexOption.MULTILINE)
+        assertNotNull(
+            uvRegionStructDecl.find(wgsl),
+            "WGSL must define a UvRegion struct declaration (struct UvRegion {)"
         )
-        assertTrue(
-            wgsl.contains("array<UvRegion>"),
-            "sceneUvRegions binding must be declared as array<UvRegion>"
+
+        // Matches the binding(5) storage declaration containing array<UvRegion> on the same
+        // logical line. DOT_MATCHES_ALL lets [^;]* skip any whitespace between @binding(5) and the
+        // type token, but the semicolon sentinel stops it from spanning multiple declarations.
+        val binding5AsUvRegionArray = Regex(
+            """@binding\(5\)[^;]*\barray<UvRegion>""",
+            setOf(RegexOption.DOT_MATCHES_ALL)
+        )
+        assertNotNull(
+            binding5AsUvRegionArray.find(wgsl),
+            "sceneUvRegions (@binding(5)) must be declared as array<UvRegion>"
         )
     }
 
@@ -44,17 +57,39 @@ class TriangulateEmitShaderUvTest {
     @Test
     fun `compute shader applies user matrix without fract`() {
         val wgsl = TriangulateEmitShader.WGSL
-        assertTrue(
-            wgsl.contains("uvRegion.userMatrix") && wgsl.contains("vec3<f32>") && wgsl.contains("1.0"),
+
+        // Matches the matrix-multiply expression "uvRegion.userMatrix * vec3<f32>(..., 1.0)"
+        // inside a let assignment. This anchors the check to the actual multiplication site
+        // rather than matching any occurrence of "vec3<f32>" or "1.0" in the shader.
+        val userMatrixMultiply = Regex(
+            """uvRegion\.userMatrix\s*\*\s*vec3<f32>\([^)]*,\s*1\.0\)"""
+        )
+        assertNotNull(
+            userMatrixMultiply.find(wgsl),
             "WGSL must multiply uvRegion.userMatrix against a homogeneous vec3(baseUV, 1.0)"
         )
+
+        // Absence check: fract must NOT be applied to the user-matrix result in the compute shader.
+        // A bare contains() is intentional here — for an absence check, a false positive (the token
+        // appears only in a comment) merely makes the test stricter, not incorrect.
         assertFalse(
             wgsl.contains("fract(uvRegion.userMatrix"),
             "Compute shader must NOT wrap userMatrix in fract() — fract must happen per-fragment"
         )
-        assertTrue(
-            wgsl.contains("uvRegion.atlasScale") && wgsl.contains("uvRegion.atlasOffset"),
-            "Compute shader must read atlasScale and atlasOffset to emit them as vertex attributes"
+
+        // Matches the atlas scale and offset field reads inside a let assignment inside the
+        // @compute entry point function body (after the opening brace of triangulateEmit).
+        // Anchoring to "uvRegion.atlasScale.x" and "uvRegion.atlasOffset.x" is sufficient
+        // because these dotted field paths are only valid inside the function body.
+        val atlasScaleRead  = Regex("""uvRegion\.atlasScale\s*\.""")
+        val atlasOffsetRead = Regex("""uvRegion\.atlasOffset\s*\.""")
+        assertNotNull(
+            atlasScaleRead.find(wgsl),
+            "Compute shader must read atlasScale fields to emit them as vertex attributes"
+        )
+        assertNotNull(
+            atlasOffsetRead.find(wgsl),
+            "Compute shader must read atlasOffset fields to emit them as vertex attributes"
         )
     }
 
@@ -66,20 +101,27 @@ class TriangulateEmitShaderUvTest {
     @Test
     fun `fragment shader applies per-fragment fract and atlas mapping`() {
         val wgsl = IsometricFragmentShader.WGSL
-        assertTrue(
-            wgsl.contains("fract(in.uv)"),
-            "Fragment shader must apply fract() to the interpolated UV per-fragment"
+
+        // Matches the combined atlas-UV expression that must appear in the @fragment function body:
+        //   fract(in.uv) * in.atlasRegion.xy + in.atlasRegion.zw
+        // Normalised-whitespace regex so reformatting the expression doesn't break the test.
+        val fractAtlasExpr = Regex(
+            """fract\(\s*in\.uv\s*\)\s*\*\s*in\.atlasRegion\.xy\s*\+\s*in\.atlasRegion\.zw"""
         )
-        assertTrue(
-            wgsl.contains("in.atlasRegion.xy") && wgsl.contains("in.atlasRegion.zw"),
-            "Fragment shader must apply atlasRegion scale (xy) and offset (zw) after fract()"
+        assertNotNull(
+            fractAtlasExpr.find(wgsl),
+            "Fragment shader must compute 'fract(in.uv) * in.atlasRegion.xy + in.atlasRegion.zw'"
         )
     }
 
     /**
      * Legacy per-component variables `uvSc` and `uvOff` must be absent.
      * Their presence would indicate the old `vec4` atlas-scale+offset approach
-     * is still in use instead of the composed `mat3x2` path.
+     * is still in use instead of the UvRegion struct path.
+     *
+     * Bare contains() is intentional for absence checks: a false positive (the name appears
+     * only in a comment) makes the test stricter rather than incorrect. If these names ever
+     * re-appear — even in a comment — the test will surface the regression for review.
      */
     @Test
     fun `old atlas var names uvSc and uvOff are absent`() {

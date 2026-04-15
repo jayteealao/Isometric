@@ -23,6 +23,38 @@ import io.github.jayteealao.isometric.webgpu.shader.IsometricFragmentShader
 import io.github.jayteealao.isometric.webgpu.shader.IsometricVertexShader
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
 
+// ---------------------------------------------------------------------------
+// Vertex attribute byte offsets — must stay in sync with the write order in
+// RenderCommandTriangulator.writeVertex(), which is authoritative.
+//
+// Layout (each field is 4 bytes wide):
+//   [0 ..  7]  position   : Float32x2  (x, y)
+//   [8 .. 23]  color      : Float32x4  (r, g, b, a)
+//   [24 .. 31] uv         : Float32x2  (u, v)
+//   [32 .. 47] atlasRegion: Float32x4  (scaleU, scaleV, offsetU, offsetV)
+//   [48 .. 51] textureIdx : Uint32
+//   [52 .. 55] padding    : (1 × u32, unused)
+// Total: 56 bytes == RenderCommandTriangulator.BYTES_PER_VERTEX
+// ---------------------------------------------------------------------------
+
+/** Byte offset of the position attribute (first field; nothing precedes it). */
+private const val ATTR_POSITION_OFFSET = 0L
+
+/** Byte offset of the color attribute — follows position: 2 × Float32 = 8 bytes. */
+private const val ATTR_COLOR_OFFSET = 8L
+
+/** Byte offset of the UV attribute — follows position (8 B) + color (16 B) = 24 bytes. */
+private const val ATTR_UV_OFFSET = 24L
+
+/** Byte offset of the atlasRegion attribute — follows position (8 B) + color (16 B) + uv (8 B) = 32 bytes. */
+private const val ATTR_ATLAS_REGION_OFFSET = 32L
+
+/** Byte offset of the textureIndex attribute — follows position (8 B) + color (16 B) + uv (8 B) + atlasRegion (16 B) = 48 bytes. */
+private const val ATTR_TEXTURE_INDEX_OFFSET = 48L
+
+// Increment VERTEX_FORMAT_VERSION whenever the vertex layout changes (stride, attributes, offsets) to force pipeline recompilation.
+private const val VERTEX_FORMAT_VERSION = 1
+
 /**
  * Creates the render pipeline with auto-derived layout via the async API
  * (`createRenderPipelineAndAwait`). The sync `createRenderPipeline` triggers a
@@ -62,6 +94,8 @@ internal class GpuRenderPipeline(
         return layout
     }
 
+    private var compiledFormatVersion: Int = -1
+
     private var vertexModule: GPUShaderModule? = null
     private var fragmentModule: GPUShaderModule? = null
 
@@ -71,7 +105,7 @@ internal class GpuRenderPipeline(
      */
     suspend fun ensurePipeline() {
         ctx.assertGpuThread()
-        if (pipeline != null) return
+        if (pipeline != null && compiledFormatVersion == VERTEX_FORMAT_VERSION) return
 
         vertexModule = device.createShaderModule(
             GPUShaderModuleDescriptor(
@@ -96,29 +130,29 @@ internal class GpuRenderPipeline(
                     attributes = arrayOf(
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
-                            offset = 0L,
+                            offset = ATTR_POSITION_OFFSET,
                             shaderLocation = 0,
                         ),
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x4,
-                            offset = 8L,
+                            offset = ATTR_COLOR_OFFSET,
                             shaderLocation = 1,
                         ),
                         GPUVertexAttribute(
                             format = VertexFormat.Float32x2,
-                            offset = 24L,
+                            offset = ATTR_UV_OFFSET,
                             shaderLocation = 2,
                         ),
                         GPUVertexAttribute(
                             // atlasRegion: (scaleU, scaleV, offsetU, offsetV) flat per face.
                             // Fragment shader applies fract(uv) * atlasRegion.xy + atlasRegion.zw
                             format = VertexFormat.Float32x4,
-                            offset = 32L,
+                            offset = ATTR_ATLAS_REGION_OFFSET,
                             shaderLocation = 3,
                         ),
                         GPUVertexAttribute(
                             format = VertexFormat.Uint32,
-                            offset = 48L,
+                            offset = ATTR_TEXTURE_INDEX_OFFSET,
                             shaderLocation = 4,
                         ),
                     ),
@@ -152,6 +186,7 @@ internal class GpuRenderPipeline(
 
         // Extract the auto-derived bind group layout for @group(0).
         textureBindGroupLayout = rp.getBindGroupLayout(0)
+        compiledFormatVersion = VERTEX_FORMAT_VERSION
     }
 
     override fun close() {

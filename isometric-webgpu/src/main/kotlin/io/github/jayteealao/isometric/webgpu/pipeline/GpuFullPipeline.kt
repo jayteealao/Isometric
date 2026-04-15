@@ -240,15 +240,25 @@ internal class GpuFullPipeline(
             transformedBuffer   = transform.transformedBuffer,
             sortKeyOutputBuffer = sort.primaryBuffer,
         )
+        val texIndexBuf  = textureManager.texIndexGpuBuffer
+        val uvRegionBuf  = textureManager.uvRegionGpuBuffer
+        val uvCoordsBuf  = uvCoordsBuffer.gpuBuffer
+        if (texIndexBuf == null || uvRegionBuf == null || uvCoordsBuf == null) {
+            // Buffers must be non-null when faceCount > 0 — this indicates a bug in
+            // uploadTextures(). Skip the emit setup and clear the scene defensively.
+            Log.e(TAG, "upload: GPU buffer unexpectedly null after uploadTextures (faceCount=$faceCount); clearing scene")
+            clearScene()
+            return
+        }
         emit.ensureBuffers(
             paddedCount       = paddedCount,
             viewportWidth     = viewportWidth,
             viewportHeight    = viewportHeight,
             transformedBuffer = transform.transformedBuffer,
             sortedKeysBuffer  = sort.resultBuffer,
-            texIndexBuffer    = textureManager.texIndexGpuBuffer!!,
-            uvRegionBuffer    = textureManager.uvRegionGpuBuffer!!,
-            uvCoordsBuffer    = uvCoordsBuffer.gpuBuffer!!,
+            texIndexBuffer    = texIndexBuf,
+            uvRegionBuffer    = uvRegionBuf,
+            uvCoordsBuffer    = uvCoordsBuf,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
