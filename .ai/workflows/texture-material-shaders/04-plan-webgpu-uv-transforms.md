@@ -1,0 +1,481 @@
+---
+schema: sdlc/v1
+type: plan
+slug: texture-material-shaders
+slice-slug: webgpu-uv-transforms
+status: complete
+stage-number: 4
+created-at: "2026-04-15T06:39:08Z"
+updated-at: "2026-04-15T06:39:08Z"
+metric-files-to-touch: 6
+metric-step-count: 7
+has-blockers: false
+revision-count: 0
+tags: [webgpu, texture, uv, transform, wgsl, mat3x2]
+refs:
+  index: 00-index.md
+  plan-index: 04-plan.md
+  slice-def: 03-slice-webgpu-uv-transforms.md
+  siblings:
+    - 04-plan-api-design-fixes.md
+    - 04-plan-webgpu-textures.md
+    - 04-plan-per-face-materials.md
+  implement: 05-implement-webgpu-uv-transforms.md
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders webgpu-uv-transforms"
+---
+
+# Plan: webgpu-uv-transforms
+
+## Current State
+
+`TextureTransform` (scale, offset, rotation) is fully implemented on the Canvas path via
+`BitmapShader.setLocalMatrix(T^-1)` in `TexturedCanvasDrawHook`. In the WebGPU path it is
+**silently discarded** — zero references to `TextureTransform` exist in `isometric-webgpu`.
+
+The WebGPU UV pipeline runs through the **M5 compute shader** (`TriangulateEmitShader`), not
+the fragment shader:
+
+1. `GpuTextureManager.uploadUvRegionBuffer()` packs `(uvOffsetU, uvOffsetV, uvScaleU, uvScaleV)` —
+   4 floats / 16 bytes per face — into the `sceneUvRegions` buffer (binding 5).
+   This is the **atlas region** only; no user transform.
+2. The M5 WGSL reads `sceneUvRegions[faceIdx]` as `vec4<f32>` and applies:
+   `atlasUV = baseUV * uvSc + uvOff`
+3. The vertex shader and fragment shader receive already-transformed UVs and call
+   `textureSample` directly — no UV work in the fragment shader.
+
+**Key invariant discovered:** `minBindingSize = 0` on all buffer bindings means the
+`GPUBindGroupLayout` does NOT need to be recreated when the per-face stride grows from
+16 to 24 bytes. Only the GPU buffer and bind group need to be recreated.
+
+## Likely Files / Areas to Touch
+
+- `isometric-webgpu/src/main/kotlin/.../webgpu/pipeline/SceneDataPacker.kt`
+  — add `UV_REGION_STRIDE = 24` to `SceneDataLayout`
+- `isometric-webgpu/src/main/kotlin/.../webgpu/shader/TriangulateEmitShader.kt`
+  — WGSL: change binding 5 from `array<vec4<f32>>` to `array<mat3x2<f32>>`;
+    replace 2-line atlas math with one matrix-vector multiply
+- `isometric-webgpu/src/main/kotlin/.../webgpu/texture/GpuTextureManager.kt`
+  — expand `uploadUvRegionBuffer()`: 16→24 bytes/face; add `resolveTextureTransform()`;
+    add `packUvRegionMatrix()` with IDENTITY fast path + full composition path
+- `isometric-webgpu/src/test/kotlin/.../webgpu/texture/GpuTextureManagerUvTransformTest.kt`
+  — new: 5 unit tests covering IDENTITY, tiling, rotation, offset, PerFace
+- `isometric-webgpu/src/test/kotlin/.../webgpu/shader/TriangulateEmitShaderUvTest.kt`
+  — new: WGSL string content tests (mat3x2 type, matrix-multiply pattern, no old var names)
+- `.maestro/textured-webgpu-uv.yaml`
+  — new: Maestro flow for visual AC verification in Full WebGPU mode
+
+No changes to: fragment shader, vertex shader, `GpuTextureBinder`, `GpuRenderPipeline`,
+`SceneDataPacker.packInto()`, or any public API surface.
+
+## Proposed Change Strategy
+
+**Compose user transform + atlas region into a single `mat3x2<f32>` on the CPU.**
+
+Instead of carrying atlas (scale+offset) and user transform (scale+offset+rotation) as
+separate data, pre-compose them in `GpuTextureManager.uploadUvRegionBuffer()` into one
+6-float affine matrix. The M5 shader reads one `mat3x2<f32>` and does one matrix-vector
+multiply per vertex. No trig in the shader.
+
+**Matrix composition math (for implementor reference):**
+
+```
+User transform (center-based, around UV center (0.5, 0.5)):
+  col0 = (scaleU * cosθ,   scaleU * sinθ)     ← x-axis basis
+  col1 = (-scaleV * sinθ,  scaleV * cosθ)     ← y-axis basis
+  col2 = (0.5*(1 - uc0x - uc1x) + offsetU,   ← tx
+          0.5*(1 - uc0y - uc1y) + offsetV)    ← ty
+
+where uc0x = scaleU*cosθ, uc1x = -scaleV*sinθ, uc0y = scaleU*sinθ, uc1y = scaleV*cosθ
+
+Compose with atlas (diagonal scale + offset):
+  composed_col0 = (atlasScaleU * uc0x,          atlasScaleV * uc0y)
+  composed_col1 = (atlasScaleU * uc1x,          atlasScaleV * uc1y)
+  composed_col2 = (atlasScaleU * tx + atlasOffU, atlasScaleV * ty + atlasOffV)
+
+IDENTITY fast path (scaleU=1, scaleV=1, offsetU=0, offsetV=0, rotationDegrees=0):
+  col0 = (atlasScaleU, 0f)
+  col1 = (0f, atlasScaleV)
+  col2 = (atlasOffU, atlasOffV)
+
+WGSL application:
+  let uv_k = sceneUvRegions[faceIdx] * vec3<f32>(base_uv_k, 1.0)
+```
+
+## Step-by-Step Plan
+
+### Step 1 — Add `UV_REGION_STRIDE` constant to `SceneDataLayout`
+
+**File:** `SceneDataPacker.kt`
+
+Add `const val UV_REGION_STRIDE = 24` to the `SceneDataLayout` object, alongside the
+existing `FACE_DATA_BYTES = 144` and `TRANSFORMED_FACE_BYTES = 96` constants. This is
+a named anchor for all downstream code that allocates or indexes into the UV region buffer.
+
+```kotlin
+object SceneDataLayout {
+    const val FACE_DATA_BYTES = 144
+    const val TRANSFORMED_FACE_BYTES = 96
+    const val UV_REGION_STRIDE = 24   // NEW: mat3x2<f32> = 3 × vec2<f32> = 6 × f32 = 24 bytes
+    const val NO_TEXTURE = -1
+}
+```
+
+---
+
+### Step 2 — Update `TriangulateEmitShader.kt` WGSL (WGSL-first)
+
+**File:** `TriangulateEmitShader.kt`
+
+**2a. Change binding 5 type declaration:**
+
+```wgsl
+// BEFORE:
+@group(0) @binding(5) var<storage, read> sceneUvRegions: array<vec4<f32>>;
+
+// AFTER:
+@group(0) @binding(5) var<storage, read> sceneUvRegions: array<mat3x2<f32>>;
+```
+
+**2b. Replace the UV computation pattern.**
+
+Find the block where `uvRegion` is loaded and used (approx lines 237–263 of the WGSL string,
+reported as the atlas UV transform section). Replace the 2-line pattern for EVERY vertex:
+
+```wgsl
+// BEFORE (repeated 6×, once per vertex):
+let uvOff = uvRegion.xy;
+let uvSc  = uvRegion.zw;
+let uv_k  = base_uv_k * uvSc + uvOff;
+
+// AFTER: load matrix once, apply per vertex
+let uvMatrix = sceneUvRegions[key.originalIndex];  // mat3x2<f32>
+let uv0 = uvMatrix * vec3<f32>(base_uv_0, 1.0);   // → vec2<f32>
+let uv1 = uvMatrix * vec3<f32>(base_uv_1, 1.0);
+let uv2 = uvMatrix * vec3<f32>(base_uv_2, 1.0);
+let uv3 = uvMatrix * vec3<f32>(base_uv_3, 1.0);
+let uv4 = uvMatrix * vec3<f32>(base_uv_4, 1.0);
+let uv5 = uvMatrix * vec3<f32>(base_uv_5, 1.0);
+```
+
+> **Note:** The exact WGSL variable names (`key.originalIndex`, `base_uv_k`) must match
+> the actual shader code. Read `TriangulateEmitShader.kt` before editing.
+
+**2c. Remove the now-unused `uvRegion` variable** (the old `let uvRegion = sceneUvRegions[...]`
+line is replaced by `let uvMatrix = sceneUvRegions[...]`).
+
+---
+
+### Step 3 — Update `GpuTextureManager.kt` Kotlin packing
+
+**File:** `GpuTextureManager.kt`
+
+**3a. Add `resolveTextureTransform(cmd: RenderCommand): TextureTransform`:**
+
+```kotlin
+private fun resolveTextureTransform(cmd: RenderCommand): TextureTransform {
+    val effective = when (val m = cmd.material) {
+        is IsometricMaterial.PerFace -> m.faceMap[cmd.faceType] ?: m.default
+        else -> m
+    }
+    return when (effective) {
+        is IsometricMaterial.Textured -> effective.transform
+        else -> TextureTransform.IDENTITY
+    }
+}
+```
+
+Pattern mirrors the existing `resolveAtlasRegion()` method.
+
+**3b. Add `packUvRegionMatrix(buf: ByteBuffer, region: AtlasRegion, transform: TextureTransform)`:**
+
+```kotlin
+private fun packUvRegionMatrix(
+    buf: ByteBuffer,
+    region: AtlasRegion,
+    transform: TextureTransform,
+) {
+    val aScU = region.uvScale[0]
+    val aScV = region.uvScale[1]
+    val aOffU = region.uvOffset[0]
+    val aOffV = region.uvOffset[1]
+
+    if (transform == TextureTransform.IDENTITY) {
+        // Fast path: diagonal scale + atlas offset (no trig)
+        buf.putFloat(aScU);  buf.putFloat(0f)     // col0
+        buf.putFloat(0f);    buf.putFloat(aScV)    // col1
+        buf.putFloat(aOffU); buf.putFloat(aOffV)   // col2
+        return
+    }
+
+    // Full path: compose user transform (rotation around (0.5,0.5)) with atlas
+    val thetaRad = transform.rotationDegrees * PI.toFloat() / 180f
+    val cosA = cos(thetaRad)
+    val sinA = sin(thetaRad)
+    val su = transform.scaleU
+    val sv = transform.scaleV
+    val du = transform.offsetU
+    val dv = transform.offsetV
+
+    // User transform columns (scale-rotation, centered at (0.5, 0.5)):
+    val uc0x = su * cosA;   val uc0y = su * sinA    // col0
+    val uc1x = -sv * sinA;  val uc1y = sv * cosA    // col1
+    val tx = 0.5f * (1f - uc0x - uc1x) + du         // col2.x
+    val ty = 0.5f * (1f - uc0y - uc1y) + dv         // col2.y
+
+    // Compose: atlas * userTransform → combined mat3x2
+    buf.putFloat(aScU * uc0x); buf.putFloat(aScV * uc0y)         // col0
+    buf.putFloat(aScU * uc1x); buf.putFloat(aScV * uc1y)         // col1
+    buf.putFloat(aScU * tx + aOffU); buf.putFloat(aScV * ty + aOffV) // col2
+}
+```
+
+**3c. Update `uploadUvRegionBuffer()`:**
+
+Change buffer allocation and per-face packing:
+
+```kotlin
+// OLD allocation (4 floats/face, 16 bytes):
+val buf = ByteBuffer.allocateDirect(4 * Float.SIZE_BYTES * faceCount)
+
+// NEW allocation (UV_REGION_STRIDE = 24 bytes/face):
+val buf = ByteBuffer.allocateDirect(SceneDataLayout.UV_REGION_STRIDE * faceCount)
+    .order(ByteOrder.nativeOrder())
+
+// OLD per-face packing (4 putFloat calls):
+buf.putFloat(region.uvOffset[0]); buf.putFloat(region.uvOffset[1])
+buf.putFloat(region.uvScale[0]);  buf.putFloat(region.uvScale[1])
+
+// NEW per-face packing:
+val transform = resolveTextureTransform(cmd)
+packUvRegionMatrix(buf, region, transform)
+```
+
+The GPU buffer upload call and bind group entry remain the same (`uvRegionBuf` GPUBuffer).
+The GPU driver re-allocates because the `ByteBuffer` size changed.
+
+---
+
+### Step 4 — Unit tests for UV packing
+
+**New file:** `isometric-webgpu/src/test/kotlin/.../webgpu/texture/GpuTextureManagerUvTransformTest.kt`
+
+> If `GpuTextureManager` has too many Android dependencies to unit-test directly, extract
+> `packUvRegionMatrix()` into a `UvRegionPacker` companion object and test it instead.
+
+**5 required tests:**
+
+| Test | Input | Expected output (6 floats in buffer) |
+|------|-------|---------------------------------------|
+| `identity_writesAtlasOnlyMatrix` | `IDENTITY`, atlas scale=(0.5f,0.5f), offset=(0.1f,0.2f)` | `[0.5, 0, 0, 0.5, 0.1, 0.2]` |
+| `tiling2x3_scalesMatrix` | `tiling(2f,3f)`, atlas scale=(1f,1f), offset=(0,0) | `[2.0, 0, 0, 3.0, -0.5, -1.0]` (tx=0.5*(1-2)=-0.5, ty=0.5*(1-3)=-1.0) |
+| `rotated90_producesCorrectMatrix` | `rotated(90f)`, atlas scale=(1f,1f), offset=(0,0) | col0=(0,1), col1=(-1,0), col2=(1,0) [cos90=0, sin90=1; tx=0.5*(1-0-(-1))=1.0, ty=0.5*(1-1-0)=0] |
+| `offset_shiftsTranslationColumn` | `offset(0.5f, 0f)`, atlas scale=(1f,1f), offset=(0,0) | col0=(1,0), col1=(0,1), col2=(0.5,0) [IDENTITY + offsetU=0.5 adds 0.5 to tx] |
+| `perFace_topFaceGetsOwnTransform` | `PerFace` with top face = `tiling(2f,2f)`, side = `IDENTITY`; pack for top face vs side face | top: `tiling(2f,2f)` matrix; side: atlas-only matrix |
+
+---
+
+### Step 5 — WGSL content tests for `TriangulateEmitShader`
+
+**New file:** `isometric-webgpu/src/test/kotlin/.../webgpu/shader/TriangulateEmitShaderUvTest.kt`
+
+Pattern follows existing `TriangulateEmitShaderTest`:
+
+```kotlin
+class TriangulateEmitShaderUvTest {
+    @Test fun binding5_usesmat3x2Type() {
+        assertTrue(
+            TriangulateEmitShader.WGSL.contains("array<mat3x2<f32>>"),
+            "binding 5 must use mat3x2<f32>"
+        )
+    }
+
+    @Test fun uvApplication_usesMatrixMultiply() {
+        assertTrue(
+            TriangulateEmitShader.WGSL.contains("* vec3<f32>"),
+            "UV application must use matrix-vector multiply"
+        )
+    }
+
+    @Test fun oldAtlasVarNames_areAbsent() {
+        assertFalse(TriangulateEmitShader.WGSL.contains("uvSc"),  "uvSc var removed")
+        assertFalse(TriangulateEmitShader.WGSL.contains("uvOff"), "uvOff var removed")
+    }
+}
+```
+
+---
+
+### Step 6 — Maestro flow for visual AC verification
+
+**New file:** `.maestro/textured-webgpu-uv.yaml`
+
+```yaml
+# Maestro flow: verify WebGPU UV transforms in TexturedDemoActivity
+# Manually compare screenshots against Canvas mode for AC1–AC4 parity.
+appId: io.github.jayteealao.isometric.sample
+---
+- launchApp:
+    appId: io.github.jayteealao.isometric.sample
+    clearState: false
+
+# Navigate to TexturedDemoActivity
+# (TexturedDemoActivity is not in the main nav — launch directly via adb before running Maestro,
+#  or add a navigation entry in the sample app if not exposed in MainActivity)
+- assertVisible: "Texture Demo"
+
+# Tap to cycle render modes to Full WebGPU
+- tapOn: "WebGPU"
+- waitForAnimationToEnd
+- takeScreenshot: verify-evidence/webgpu-uv-webgpu-mode
+
+# Cycle back to Canvas for side-by-side reference
+- tapOn: "Canvas"
+- waitForAnimationToEnd
+- takeScreenshot: verify-evidence/webgpu-uv-canvas-mode
+```
+
+> **Note:** `TexturedDemoActivity` uses `android:exported="false"`. To use with Maestro, either
+> (a) launch it via `adb shell am start` first then run the Maestro flow, or (b) expose it as an
+> option in `MainActivity`'s nav for the duration of this slice's verification.
+> 
+> If `TexturedDemoActivity` doesn't show `TextureTransform` parameters by default, also modify
+> `TexturedDemoActivity.kt` temporarily to pass `TextureTransform.tiling(2f, 2f)` on one face
+> to make tiling visually detectable in the screenshot (optional; delete after verification).
+
+---
+
+### Step 7 — Build + API check
+
+```bash
+./gradlew :isometric-webgpu:compileDebugKotlin \
+          :isometric-webgpu:test \
+          :isometric-webgpu:apiCheck
+```
+
+No public API surface changes expected — all modified classes are `internal`.
+`apiCheck` should pass without `apiDump`.
+
+## Test / Verification Plan
+
+### Automated checks
+
+- **Build:** `./gradlew :isometric-webgpu:compileDebugKotlin` — must pass (catches WGSL string
+  syntax errors indirectly via Kotlin compile + any type errors in packUvRegionMatrix)
+- **Unit tests:** `./gradlew :isometric-webgpu:test` — 5 packing tests + 3 WGSL content tests
+  + all existing tests must continue to pass (SceneDataPackerTest: 3 tests,
+  TriangulateEmitShaderTest: 2 tests, total existing: 14 JVM unit tests)
+- **API check:** `./gradlew :isometric-webgpu:apiCheck` — no new public API expected
+
+### Interactive verification (human-in-the-loop)
+
+**AC1: Scale/tiling parity**
+- **Platform:** Android emulator (`emulator-5554` — confirmed running)
+- **Setup:** Modify `TexturedDemoActivity` to use `TextureTransform.tiling(2f, 2f)` on the top face
+- **Steps:**
+  1. `adb shell am start -n io.github.jayteealao.isometric.sample/.TexturedDemoActivity`
+  2. Tap to Canvas mode → `adb shell screencap -p /sdcard/canvas-tiling.png && adb pull /sdcard/canvas-tiling.png verify-evidence/`
+  3. Tap to Full WebGPU mode → same screencap → `verify-evidence/webgpu-tiling.png`
+- **Evidence:** `verify-evidence/canvas-tiling.png` vs `verify-evidence/webgpu-tiling.png`
+- **Pass criteria:** Both screenshots show 2× horizontal and vertical tiling; visual output matches.
+
+**AC2: Offset parity**
+- Same flow with `TextureTransform(offsetU = 0.5f, offsetV = 0f)`
+- Pass: texture shifted 50% horizontally in both Canvas and WebGPU modes.
+
+**AC3: Rotation parity**
+- Same flow with `TextureTransform(rotationDegrees = 45f)`
+- Pass: texture rotated 45° in both modes.
+
+**AC4: Per-face independent transforms**
+- Setup: `perFace { top = texturedResource(src, transform = tiling(2f,2f)); leftSide = texturedResource(src, transform = tiling(1f,3f)) }`
+- Pass: top face tiles 2×2, leftSide tiles 1×3 in WebGPU mode.
+
+**AC5: IDENTITY no regression**
+- Use current `TexturedDemoActivity` unmodified (no `TextureTransform` set)
+- Pass: WebGPU rendering pixel-equivalent to pre-slice output.
+
+## Risks / Watchouts
+
+1. **WGSL variable name mismatch** — The plan uses pseudonames (`key.originalIndex`, `base_uv_k`).
+   Read `TriangulateEmitShader.kt` verbatim before editing; match exact WGSL identifiers.
+
+2. **`mat3x2<f32>` column-major storage** — WGSL stores `mat3x2` in column-major order.
+   The Kotlin `ByteBuffer.putFloat()` calls must write columns in order: col0.x, col0.y,
+   col1.x, col1.y, col2.x, col2.y. A transposed write produces incorrect UV output with no crash.
+
+3. **`GpuTextureManager` constructability** — If `packUvRegionMatrix()` can't be unit-tested
+   directly (Android context dependency), extract it to a package-private `UvRegionPacker` object.
+   Prefer testable code over convenience.
+
+4. **`AtlasRegion.NONE` handling** — When a face has no texture (`textureIndex == NO_TEXTURE`),
+   `resolveAtlasRegion()` returns `AtlasRegion.NONE` with `uvScale=[1,1], uvOffset=[0,0]`.
+   `packUvRegionMatrix()` will still pack a matrix for these faces, but the fragment shader's
+   `select(textured, in.color, in.textureIndex == 0xFFFFFFFFu)` ignores the UV sample. This is
+   correct — wasteful but not incorrect.
+
+5. **`ByteOrder.nativeOrder()` assumption** — Confirm the buffer allocation includes
+   `.order(ByteOrder.nativeOrder())`. The existing code may already do this; if not, add it.
+   Mixed endianness causes corrupted float values on big-endian systems.
+
+6. **REPEAT tiling mode** — The M5 emit shader writes UV values that may exceed [0,1] when
+   `scaleU > 1`. The sampler must use `AddressMode.Repeat` for tiling to work correctly.
+   Check `GpuTextureBinder.kt`'s sampler descriptor — currently uses `AddressMode.ClampToEdge`.
+   **If ClampToEdge is used, tiling will not work.** The plan for Canvas uses `TileMode.REPEAT`
+   when `transform != TextureTransform.IDENTITY`. The WebGPU path needs the same: use a
+   `Repeat` sampler when `TextureTransform != IDENTITY` on any face. This may require
+   two samplers (clamp + repeat) and per-draw sampler selection, or a single `Repeat` sampler
+   for all textured faces. Investigate before coding Step 3.
+
+## Dependencies on Other Slices
+
+- **`api-design-fixes`** (complete): provides final `TextureTransform` API — all field names,
+  `IDENTITY` constant, factory methods, and `init` validation are stable.
+- **`webgpu-textures`** (complete): provides `SceneDataPacker`, `GpuTextureManager`,
+  `GpuTextureBinder`, and `TriangulateEmitShader`. All complete; no in-flight changes.
+
+## Assumptions
+
+- `TextureTransform` field names (`scaleU`, `scaleV`, `offsetU`, `offsetV`, `rotationDegrees`)
+  are final and stable (verified in `api-design-fixes`).
+- `AtlasRegion` has `uvOffset: FloatArray` and `uvScale: FloatArray` (both size 2), as reported
+  by the exploration sub-agent.
+- The M5 emit shader uses `key.originalIndex` (or equivalent) to index into `sceneUvRegions`.
+  Confirm the exact index variable name before Step 2.
+- `GpuTextureManager.uploadUvRegionBuffer()` allocates the GPU buffer based on face count
+  (not a fixed size). The buffer grows automatically when face count increases.
+
+## Blockers
+
+None. `api-design-fixes` dependency is complete (verified). `isometric-webgpu` module builds
+clean. All prerequisite classes exist.
+
+## Freshness Research
+
+**WGSL `mat3x2<f32>` alignment (WebGPU spec, April 2025):**
+- AlignOf = 8, SizeOf = 24. Storage buffer stride for `array<mat3x2<f32>>` = 24 bytes. ✓
+- `mat3x2 * vec3 → vec2` is valid WGSL (3-col × 2-row matrix times 3-element vector).
+
+**WebGPU `minBindingSize=0` (MDN / WebGPU spec):**
+- Buffer binding layout stride is NOT encoded in the `GPUBindGroupLayout`. With
+  `minBindingSize=0`, no layout recreation needed when buffer size grows. ✓
+
+**Rotation around center (0.5, 0.5) — derived from standard 2D affine math:**
+- Canvas path uses `T^-1` pre-concat (inverse affine). WGSL path uses the forward
+  affine matrix composed with the atlas transform. Both produce identical UV output
+  when the math is correct — AC1–AC4 verify parity.
+
+**Source:** WebGPU specification §10.3 (Memory Layout), MDN WebGPU API reference,
+sub-agent 3 findings (2026-04-15).
+
+## Revision History
+
+*(appended by review-and-fix mode)*
+
+## Recommended Next Stage
+
+- **Option A (default):** `/wf-implement texture-material-shaders webgpu-uv-transforms`
+  — Plan is complete. Risk 6 (sampler AddressMode) should be investigated first as Step 0
+  of implementation; it may add a sampler change to Step 3.
+- **Option B:** `/wf-plan texture-material-shaders webgpu-texture-error-callback`
+  — Plan the next extension slice in parallel (no dependency on this slice).

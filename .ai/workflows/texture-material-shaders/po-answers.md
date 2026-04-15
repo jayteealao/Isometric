@@ -88,6 +88,29 @@ output in both render modes, verified by side-by-side screenshot.
 **Explicitly out of scope:** `onTextureLoadError` plumbing into `GpuTextureManager`;
 UV gen for non-Prism shapes; animated per-frame transforms.
 
+## 2026-04-15 — Plan (webgpu-uv-transforms)
+
+**Buffer strategy:** Compose `TextureTransform` + atlas region into a single `mat3x2<f32>`
+on the CPU. Expand `sceneUvRegions` binding 5 from `vec4<f32>` (16 bytes) to `mat3x2<f32>`
+(24 bytes) per face. Single matrix-vector multiply in WGSL M5 shader.
+
+**WGSL type:** `mat3x2<f32>` native WGSL type — `uvMatrix * vec3(baseUV, 1.0)` yields `vec2`
+directly.
+
+**IDENTITY fast path:** When `transform == TextureTransform.IDENTITY`, skip trig and write
+the atlas-only diagonal matrix directly.
+
+**Test strategy:** Unit packing tests (5 cases: IDENTITY, tiling, rotation, offset, PerFace)
++ WGSL string content tests + Maestro flow with screenshots for manual AC visual comparison.
+
+**Maestro scope:** Flow takes screenshots before/after mode switch (Canvas + Full WebGPU).
+Manual diff is the AC pass criterion for AC1–AC4.
+
+**Layout constant:** Add `UV_REGION_STRIDE = 24` to `SceneDataLayout`.
+
+**Implementation order:** WGSL-first — define the mat3x2 contract in the shader, then write
+the Kotlin packing code to match.
+
 ## 2026-04-14 — Extend round 2 (error callback + UV gen shape slices)
 
 **onTextureLoadError WebGPU plumbing:** Unified — forward the existing callback from

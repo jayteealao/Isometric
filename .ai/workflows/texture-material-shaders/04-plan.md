@@ -5,11 +5,11 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-13T23:17:09Z"
+updated-at: "2026-04-15T06:39:08Z"
 planning-mode: all
-slices-planned: 7
-slices-total: 7
-implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes]
+slices-planned: 8
+slices-total: 14
+implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes, webgpu-uv-transforms]
 conflicts-found: 0
 tags: [texture, material, shader, canvas, webgpu]
 refs:
@@ -99,6 +99,20 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   as a valid face material. TM-API-24 must land before TM-API-2 (REPEAT tile mode needed for
   TextureTransform tiling to render correctly).
 
+### `webgpu-uv-transforms` (new — 2026-04-15)
+- **Files:** 6 (3 modified, 3 new)
+- **Steps:** 7
+- **Strategy:** Compose `TextureTransform` + atlas region into a single `mat3x2<f32>` on the CPU
+  in `GpuTextureManager.uploadUvRegionBuffer()`. Expand `sceneUvRegions` buffer (binding 5)
+  from `array<vec4<f32>>` (16 bytes/face) to `array<mat3x2<f32>>` (24 bytes/face).
+  WGSL: single matrix-vector multiply replaces two-variable atlas math. IDENTITY fast path
+  skips trig. `resolveTextureTransform()` mirrors `resolveAtlasRegion()` for PerFace dispatch.
+  No fragment shader, vertex shader, or bind group layout changes needed (`minBindingSize=0`).
+- **Key risk:** Sampler `AddressMode.ClampToEdge` must change to `Repeat` when any face has
+  `transform != TextureTransform.IDENTITY`; otherwise tiling produces clamped (non-repeating)
+  output. Investigate before coding.
+- **Plan:** 04-plan-webgpu-uv-transforms.md
+
 ## Cross-Cutting Concerns
 
 - **Dependency graph (rev 3):** `core → compose → shader → webgpu`. Compose does NOT
@@ -131,6 +145,8 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 4. `webgpu-textures` — can run in parallel with canvas-textures if desired
 5. `per-face-materials` — hero feature, requires both renderers working
 6. `sample-demo` — end-to-end proof
+7. `api-design-fixes` — API cleanup (all above complete)
+8. `webgpu-uv-transforms` — requires api-design-fixes (final TextureTransform API)
 
 ## Conflicts Found
 
