@@ -35,6 +35,7 @@ import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.shader.perFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
+import io.github.jayteealao.isometric.shader.TextureTransform
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shader.Shape
 
@@ -67,6 +68,15 @@ private fun TexturedDemoScreen() {
         }
     }
 
+    // Tiling 2×2 on top, tiling 1×2 on sides — exercises TextureTransform path (AC1 / AC4)
+    val tilingMaterial = remember {
+        perFace {
+            top = texturedBitmap(TextureAssets.grassTop, transform = TextureTransform.tiling(2f, 2f))
+            sides = texturedBitmap(TextureAssets.dirtSide, transform = TextureTransform.tiling(1f, 2f))
+            default = texturedBitmap(TextureAssets.dirtSide, transform = TextureTransform.tiling(1f, 2f))
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Info card + render mode toggle
         Card(
@@ -79,7 +89,7 @@ private fun TexturedDemoScreen() {
                 Text(text = "Textured Materials", style = MaterialTheme.typography.subtitle1)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "4\u00d74 prism grid \u2014 grass top, dirt sides (perFace material)",
+                    text = "Left 2 cols: IDENTITY \u2014 Right 2 cols: tiling(2\u00d72 top, 1\u00d72 sides)",
                     style = MaterialTheme.typography.body2,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -108,7 +118,11 @@ private fun TexturedDemoScreen() {
 
         // Scene
         Box(modifier = Modifier.weight(1f)) {
-            TexturedPrismGridScene(renderMode = renderMode, tileMaterial = tileMaterial)
+            TexturedPrismGridScene(
+                renderMode = renderMode,
+                tileMaterial = tileMaterial,
+                tilingMaterial = tilingMaterial,
+            )
         }
     }
 }
@@ -117,6 +131,7 @@ private fun TexturedDemoScreen() {
 private fun TexturedPrismGridScene(
     renderMode: RenderMode,
     tileMaterial: IsometricMaterial,
+    tilingMaterial: IsometricMaterial,
 ) {
     ProvideTextureRendering {
         IsometricScene(
@@ -130,6 +145,9 @@ private fun TexturedPrismGridScene(
         ) {
             ForEach((0 until 4).toList()) { col ->
                 ForEach((0 until 4).toList()) { row ->
+                    // Columns 0–1: IDENTITY transform (AC5 baseline)
+                    // Columns 2–3: tiling(2×2 top, 1×2 sides) (AC1 / AC4 exercise)
+                    val material = if (col < 2) tileMaterial else tilingMaterial
                     Shape(
                         geometry = Prism(
                             position = Point(
@@ -141,7 +159,7 @@ private fun TexturedPrismGridScene(
                             depth = 1.0,
                             height = 1.0,
                         ),
-                        material = tileMaterial,
+                        material = material,
                     )
                 }
             }

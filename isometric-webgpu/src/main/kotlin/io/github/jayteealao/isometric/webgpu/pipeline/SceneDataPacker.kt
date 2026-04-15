@@ -43,8 +43,20 @@ internal object SceneDataLayout {
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
     const val TRANSFORMED_FACE_BYTES = 96
 
-    /** Bytes per entry in the per-face UV region buffer (one mat3x2&lt;f32&gt; = 6 × f32 = 24 bytes). */
-    const val UV_REGION_STRIDE = 24
+    /**
+     * Bytes per entry in the per-face UV region buffer.
+     *
+     * Each entry is one `UvRegion` WGSL struct:
+     * - `userMatrix : mat3x2<f32>` — user [TextureTransform] without atlas composition (24 bytes)
+     * - `atlasScale : vec2<f32>`   — atlas sub-region UV scale (8 bytes)
+     * - `atlasOffset : vec2<f32>`  — atlas sub-region UV offset (8 bytes)
+     *
+     * Total = 40 bytes, alignOf = 8.
+     *
+     * The GPU shader applies `fract(userMatrix × vec3(baseUV,1))` before the atlas mapping,
+     * so tiling works correctly within atlas sub-regions.
+     */
+    const val UV_REGION_STRIDE = 40
 
     /**
      * Sentinel value for [FaceData.textureIndex] when no texture is bound.

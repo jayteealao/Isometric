@@ -27,9 +27,11 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * ## UV coordinates
  *
  * Per-vertex UVs are read from `sceneUvCoords` (binding 6), packed as 3 × vec4 per face.
- * A composed affine transform (`uv = uvMatrix * vec3(baseUV, 1.0)`) is applied using the
- * `mat3x2<f32>` from `sceneUvRegions` (binding 5). The matrix folds in both the user's
- * `TextureTransform` and the atlas sub-region. Faces without UV data receive default quad UVs
+ * A two-step atlas-safe transform is applied using the `UvRegion` from `sceneUvRegions`
+ * (binding 5): first `localUV = userMatrix * vec3(baseUV, 1.0)`, then
+ * `atlasUV = fract(localUV) * atlasScale + atlasOffset`. The `fract()` wraps tiling UVs
+ * back into [0,1) before atlas mapping so tiles wrap within the sub-region rather than
+ * bleeding into adjacent atlas tiles. Faces without UV data receive default quad UVs
  * `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex slots by the CPU-side packer.
  *
  * ## Why fixed stride (no atomicAdd)?
@@ -73,7 +75,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * @group(0) @binding(2) var<storage, read_write>  vertices:         array<u32>
  * @group(0) @binding(3) var<uniform>              params:           EmitUniforms
  * @group(0) @binding(4) var<storage, read>        sceneTexIndices:  array<u32>
- * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<mat3x2<f32>>
+ * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<UvRegion>
  * @group(0) @binding(6) var<storage, read>        sceneUvCoords:    array<vec4<f32>>
  * ```
  *
@@ -154,6 +156,16 @@ internal object TriangulateEmitShader {
             _pad:           u32,
         }
 
+        // ── UvRegion ──────────────────────────────────────────────────────────────
+        // 40 bytes per entry: user transform (mat3x2 = 24 bytes) + atlas region (2×vec2 = 16 bytes).
+        // CPU layout: [col0.x, col0.y, col1.x, col1.y, col2.x, col2.y, scaleU, scaleV, offsetU, offsetV]
+        // Apply as: atlasUV = fract(userMatrix * vec3(baseUV, 1.0)) * atlasScale + atlasOffset
+        struct UvRegion {
+            userMatrix  : mat3x2<f32>,
+            atlasScale  : vec2<f32>,
+            atlasOffset : vec2<f32>,
+        }
+
         // Read transformed data as a flat vec4<f32> array. TransformedFace is 96 bytes = 6 ×
         // vec4<f32>, so the layout is:
         // TransformedFace is 96 bytes = 6 × vec4<f32>, so:
@@ -172,9 +184,9 @@ internal object TriangulateEmitShader {
         // Compact per-face texture index buffer, indexed by originalIndex.
         @group(0) @binding(4) var<storage, read>        sceneTexIndices: array<u32>;
         // Compact per-face UV region buffer, indexed by originalIndex.
-        // Each mat3x2<f32> is a composed affine transform (TextureTransform × atlas region).
-        // Apply as: uv = uvMatrix * vec3(baseUV, 1.0)
-        @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<mat3x2<f32>>;
+        // Each UvRegion stores the user TextureTransform and atlas sub-region separately.
+        // Apply as: fract(userMatrix * vec3(baseUV, 1.0)) * atlasScale + atlasOffset
+        @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<UvRegion>;
         // Per-vertex UV coordinates: 3 × vec4 per face = (u0,v0,u1,v1)(u2,v2,u3,v3)(u4,v4,u5,v5)
         @group(0) @binding(6) var<storage, read>        sceneUvCoords: array<vec4<f32>>;
 
@@ -233,9 +245,9 @@ internal object TriangulateEmitShader {
                 return;
             }
 
-            // Read per-face texture index and UV matrix from compact buffers
-            let texIdx    = sceneTexIndices[key.originalIndex];
-            let uvMatrix  = sceneUvRegions[key.originalIndex];  // mat3x2<f32>
+            // Read per-face texture index and UV region from compact buffers
+            let texIdx   = sceneTexIndices[key.originalIndex];
+            let uvRegion = sceneUvRegions[key.originalIndex];
 
             let nx0 = (v01.x / wF) * 2.0 - 1.0;
             let ny0 = 1.0 - (v01.y / hF) * 2.0;
@@ -260,17 +272,18 @@ internal object TriangulateEmitShader {
             // reducing storage writes by ~33% for the common quad case.
 
             // Per-vertex UVs from UvGenerator, packed as 3 × vec4 per face.
-            // Composed affine transform: uv = uvMatrix * vec3(baseUV, 1.0)
+            // Two-step transform: apply user matrix, fract() to wrap tiling, then atlas region.
+            // fract() ensures tiling wraps within the atlas sub-region, not to the atlas origin.
             let uvBase   = key.originalIndex * 3u;
             let uvPack0  = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
             let uvPack1  = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
             let uvPack2  = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
-            let uv0 = uvMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0);
-            let uv1 = uvMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0);
-            let uv2 = uvMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0);
-            let uv3 = uvMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0);
-            let uv4 = uvMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0);
-            let uv5 = uvMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0);
+            let uv0 = fract(uvRegion.userMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv1 = fract(uvRegion.userMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv2 = fract(uvRegion.userMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv3 = fract(uvRegion.userMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv4 = fract(uvRegion.userMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
+            let uv5 = fract(uvRegion.userMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset;
 
             // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
             writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);

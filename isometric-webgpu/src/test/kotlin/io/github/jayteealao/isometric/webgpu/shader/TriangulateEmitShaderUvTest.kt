@@ -7,40 +7,49 @@ import kotlin.test.assertTrue
 /**
  * Verifies the UV-transform section of [TriangulateEmitShader.WGSL]:
  *
- * - `sceneUvRegions` binding uses `mat3x2<f32>` (the composed affine matrix)
- * - UV coordinates are computed by multiplying the matrix against `vec3(baseUV, 1.0)`
+ * - `sceneUvRegions` binding uses `array<UvRegion>` (user transform + atlas region)
+ * - UV coordinates use the two-step `fract(userMatrix × vec3) × atlasScale + atlasOffset`
  * - Old per-component atlas variables (`uvSc`, `uvOff`) have been removed
  */
 class TriangulateEmitShaderUvTest {
 
     /**
-     * Binding 5 (`sceneUvRegions`) must be declared as `array<mat3x2<f32>>`.
-     * The previous declaration used `array<vec4<f32>>` which cannot represent
-     * a full affine transform.
+     * Binding 5 (`sceneUvRegions`) must be declared as `array<UvRegion>`.
+     * The previous declaration used `array<mat3x2<f32>>` which composed atlas into the user
+     * transform, breaking tiling by causing UV values to wrap to the atlas origin.
      */
     @Test
-    fun `binding 5 uses mat3x2 type`() {
+    fun `binding 5 uses UvRegion struct`() {
+        val wgsl = TriangulateEmitShader.WGSL
         assertTrue(
-            TriangulateEmitShader.WGSL.contains("array<mat3x2<f32>>"),
-            "sceneUvRegions binding must be declared as array<mat3x2<f32>>"
+            wgsl.contains("struct UvRegion"),
+            "WGSL must define a UvRegion struct"
+        )
+        assertTrue(
+            wgsl.contains("array<UvRegion>"),
+            "sceneUvRegions binding must be declared as array<UvRegion>"
         )
     }
 
     /**
-     * UV application must use matrix multiplication: `uvMatrix * vec3<f32>(…, 1.0)`.
-     * The `1.0` homogeneous coordinate is what makes the translation column work.
+     * UV application must use the two-step transform:
+     * `fract(uvRegion.userMatrix * vec3<f32>(…, 1.0)) * uvRegion.atlasScale + uvRegion.atlasOffset`
+     * The `fract()` wraps tiling UV values back to [0,1) before the atlas sub-region mapping.
      */
     @Test
-    fun `uv application uses matrix multiply`() {
+    fun `uv application uses fract and matrix multiply`() {
         val wgsl = TriangulateEmitShader.WGSL
         assertTrue(
-            wgsl.contains("uvMatrix") && wgsl.contains("vec3<f32>") && wgsl.contains("1.0"),
-            "WGSL must multiply uvMatrix against a homogeneous vec3(baseUV, 1.0)"
+            wgsl.contains("uvRegion.userMatrix") && wgsl.contains("vec3<f32>") && wgsl.contains("1.0"),
+            "WGSL must multiply uvRegion.userMatrix against a homogeneous vec3(baseUV, 1.0)"
         )
-        // The multiply operator must appear between the matrix and the vec3
         assertTrue(
-            wgsl.contains("uvMatrix *"),
-            "uvMatrix must be used as the left operand of a multiply"
+            wgsl.contains("fract(uvRegion.userMatrix *"),
+            "userMatrix multiply must be wrapped in fract() to support tiling"
+        )
+        assertTrue(
+            wgsl.contains("uvRegion.atlasScale") && wgsl.contains("uvRegion.atlasOffset"),
+            "WGSL must apply atlasScale and atlasOffset after fract()"
         )
     }
 
