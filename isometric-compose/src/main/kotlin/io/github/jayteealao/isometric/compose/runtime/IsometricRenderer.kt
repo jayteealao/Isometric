@@ -276,6 +276,10 @@ class IsometricRenderer(
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return
         if (forceRebuild) clearCache()
+        // If the cached scene is a GPU-only (unprojected) scene from Full WebGPU mode,
+        // it cannot be used for Canvas rendering. Force a rebuild so the CPU projection
+        // pass runs and Canvas draws correctly on the first frame after mode switch.
+        if (cache.currentPreparedScene?.isProjected == false) clearCache()
 
         if (cache.needsUpdate(rootNode, context, width, height)) {
             benchmarkHooks?.onCacheMiss()
@@ -416,6 +420,8 @@ class IsometricRenderer(
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return null
         if (forceRebuild) clearCache()
+        // GPU-only scenes cannot be drawn on a Canvas — force rebuild if one is cached.
+        if (cache.currentPreparedScene?.isProjected == false) clearCache()
         if (cache.needsUpdate(rootNode, context, width, height)) {
             benchmarkHooks?.onCacheMiss()
             benchmarkHooks?.onPrepareStart()

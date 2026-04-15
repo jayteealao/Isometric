@@ -184,6 +184,13 @@ internal class WebGpuSceneRenderer : AutoCloseable {
                     }
 
                     val scene = preparedScene.get()
+                    // Wait for the first scene before rendering. Without this guard the
+                    // render loop would present a white clear-color frame on every tick
+                    // while the LaunchedEffect's prepareSceneForGpu() is still running
+                    // on Dispatchers.Default — producing a visible white flash during the
+                    // Canvas → Full WebGPU mode transition.
+                    if (scene == null && lastScene == null) continue
+
                     // Re-upload when scene changes OR when viewport was reconfigured since
                     // the last upload (uniforms and emit bind group include viewport dims).
                     val viewportChanged = currentWidth != lastUploadWidth ||

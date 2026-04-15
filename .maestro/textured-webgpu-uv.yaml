@@ -23,9 +23,11 @@ name: "Textured WebGPU — UV transform + atlas tiling fix verification"
 
 # Switch to Full WebGPU render mode to exercise the UvRegion / fract() path
 - tapOn: "Full WebGPU"
+# Capture immediately (before animation ends) to detect blank-on-transition
+- takeScreenshot: screenshots/transition_canvas_to_webgpu
 - waitForAnimationToEnd
 
-# Screenshot 2: WebGPU mode with tiling fix
+# Screenshot 2: WebGPU mode with tiling fix (settled)
 # Expected: right 2 cols should match Canvas — green tops (NOT black).
 # Before the fix: right 2 cols had black/wrong-color tops (UV wrapped to atlas origin).
 # After the fix: fract() wraps within the atlas sub-region correctly.
@@ -33,9 +35,11 @@ name: "Textured WebGPU — UV transform + atlas tiling fix verification"
 
 # Switch to Canvas + GPU Sort to verify the hybrid path
 - tapOn: "Canvas + GPU Sort"
+# Capture immediately to detect blank-on-transition
+- takeScreenshot: screenshots/transition_webgpu_to_canvas_gpu_sort
 - waitForAnimationToEnd
 
-# Screenshot 3: Hybrid canvas+GPU sort mode
+# Screenshot 3: Hybrid canvas+GPU sort mode (settled)
 - takeScreenshot: screenshots/tiling_fix_canvas_gpu_sort
 
 # Cycle back to Canvas to confirm no state corruption after toggling

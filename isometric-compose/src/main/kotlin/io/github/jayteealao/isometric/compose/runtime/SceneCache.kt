@@ -263,6 +263,7 @@ internal class SceneCache(
                 height = height,
                 projectionParams = concreteEngine.projectionParams,
                 lightDirection = context.lightDirection,
+                isProjected = false,
             )
 
             currentPreparedScene = scene
