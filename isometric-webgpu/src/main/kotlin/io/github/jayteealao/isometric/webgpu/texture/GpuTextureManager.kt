@@ -8,9 +8,11 @@ import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.shader.IsometricMaterial
 import io.github.jayteealao.isometric.shader.TextureSource
+import io.github.jayteealao.isometric.shader.TextureTransform
 import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GrowableGpuStagingBuffer
+import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
 import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataPacker
 
 /**
@@ -227,12 +229,13 @@ internal class GpuTextureManager(
 
     /**
      * Pack and upload the compact per-face UV region buffer for the emit shader.
-     * Each face gets 4 floats: [uvOffsetU, uvOffsetV, uvScaleU, uvScaleV] = 16 bytes.
+     * Each face gets one `mat3x2<f32>` = 6 floats = [SceneDataLayout.UV_REGION_STRIDE] = 24 bytes.
+     * The matrix composes the user [TextureTransform] with the atlas sub-region.
      */
     private fun uploadUvRegionBuffer(scene: PreparedScene, faceCount: Int) {
         if (faceCount == 0) return
 
-        val entryBytes = 16 // 4 floats × 4 bytes
+        val entryBytes = SceneDataLayout.UV_REGION_STRIDE
         uvRegionBuf.ensureCapacity(faceCount, entryBytes)
 
         val requiredBytes = faceCount * entryBytes
@@ -242,22 +245,37 @@ internal class GpuTextureManager(
         for (i in 0 until faceCount) {
             val cmd = scene.commands[i]
             val region = resolveAtlasRegion(cmd)
-            if (region != null) {
-                buf.putFloat(region.uvOffset[0])
-                buf.putFloat(region.uvOffset[1])
-                buf.putFloat(region.uvScale[0])
-                buf.putFloat(region.uvScale[1])
-            } else {
-                // Identity transform: offset (0,0), scale (1,1)
-                buf.putFloat(0f)
-                buf.putFloat(0f)
-                buf.putFloat(1f)
-                buf.putFloat(1f)
-            }
+            val transform = resolveTextureTransform(cmd)
+            UvRegionPacker.pack(
+                buf          = buf,
+                atlasScaleU  = region?.uvScale?.get(0)  ?: 1f,
+                atlasScaleV  = region?.uvScale?.get(1)  ?: 1f,
+                atlasOffsetU = region?.uvOffset?.get(0) ?: 0f,
+                atlasOffsetV = region?.uvOffset?.get(1) ?: 0f,
+                transform    = transform,
+            )
         }
         buf.rewind()
-
         ctx.queue.writeBuffer(uvRegionBuf.gpuBuffer!!, 0L, buf)
+    }
+
+    /**
+     * Resolve the user [TextureTransform] for a command's effective material.
+     * Returns [TextureTransform.IDENTITY] for non-textured faces.
+     * Expands [IsometricMaterial.PerFace] using [RenderCommand.faceType].
+     */
+    private fun resolveTextureTransform(cmd: RenderCommand): TextureTransform {
+        val effective = when (val m = cmd.material) {
+            is IsometricMaterial.PerFace -> {
+                val face = cmd.faceType
+                if (face != null) m.faceMap[face] ?: m.default else m.default
+            }
+            else -> m
+        }
+        return when (effective) {
+            is IsometricMaterial.Textured -> effective.transform
+            else -> TextureTransform.IDENTITY
+        }
     }
 
     /**

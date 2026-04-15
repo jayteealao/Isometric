@@ -100,17 +100,17 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   TextureTransform tiling to render correctly).
 
 ### `webgpu-uv-transforms` (new — 2026-04-15)
-- **Files:** 6 (3 modified, 3 new)
-- **Steps:** 7
+- **Files:** 7 (4 modified, 3 new)
+- **Steps:** 8
 - **Strategy:** Compose `TextureTransform` + atlas region into a single `mat3x2<f32>` on the CPU
   in `GpuTextureManager.uploadUvRegionBuffer()`. Expand `sceneUvRegions` buffer (binding 5)
   from `array<vec4<f32>>` (16 bytes/face) to `array<mat3x2<f32>>` (24 bytes/face).
   WGSL: single matrix-vector multiply replaces two-variable atlas math. IDENTITY fast path
   skips trig. `resolveTextureTransform()` mirrors `resolveAtlasRegion()` for PerFace dispatch.
   No fragment shader, vertex shader, or bind group layout changes needed (`minBindingSize=0`).
-- **Key risk:** Sampler `AddressMode.ClampToEdge` must change to `Repeat` when any face has
-  `transform != TextureTransform.IDENTITY`; otherwise tiling produces clamped (non-repeating)
-  output. Investigate before coding.
+- **Key risk (RESOLVED):** `GpuTextureBinder.kt` sampler changed to `AddressMode.Repeat`
+  (Step 2 of plan). Single-sampler approach; no pipeline recompile; ClampToEdge==Repeat
+  for IDENTITY faces. Concrete change: 1 line in `GpuTextureBinder.kt`.
 - **Plan:** 04-plan-webgpu-uv-transforms.md
 
 ## Cross-Cutting Concerns

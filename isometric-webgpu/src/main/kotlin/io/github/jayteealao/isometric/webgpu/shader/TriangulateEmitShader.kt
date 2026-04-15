@@ -27,8 +27,9 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * ## UV coordinates
  *
  * Per-vertex UVs are read from `sceneUvCoords` (binding 6), packed as 3 × vec4 per face.
- * An atlas transform (`atlasUV = baseUV * uvScale + uvOffset`) is applied using the region
- * from `sceneUvRegions` (binding 5). Faces without UV data receive default quad UVs
+ * A composed affine transform (`uv = uvMatrix * vec3(baseUV, 1.0)`) is applied using the
+ * `mat3x2<f32>` from `sceneUvRegions` (binding 5). The matrix folds in both the user's
+ * `TextureTransform` and the atlas sub-region. Faces without UV data receive default quad UVs
  * `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex slots by the CPU-side packer.
  *
  * ## Why fixed stride (no atomicAdd)?
@@ -72,7 +73,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * @group(0) @binding(2) var<storage, read_write>  vertices:         array<u32>
  * @group(0) @binding(3) var<uniform>              params:           EmitUniforms
  * @group(0) @binding(4) var<storage, read>        sceneTexIndices:  array<u32>
- * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<vec4<f32>>
+ * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<mat3x2<f32>>
  * @group(0) @binding(6) var<storage, read>        sceneUvCoords:    array<vec4<f32>>
  * ```
  *
@@ -171,8 +172,9 @@ internal object TriangulateEmitShader {
         // Compact per-face texture index buffer, indexed by originalIndex.
         @group(0) @binding(4) var<storage, read>        sceneTexIndices: array<u32>;
         // Compact per-face UV region buffer, indexed by originalIndex.
-        // Each vec4 = (uvOffsetU, uvOffsetV, uvScaleU, uvScaleV).
-        @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<vec4<f32>>;
+        // Each mat3x2<f32> is a composed affine transform (TextureTransform × atlas region).
+        // Apply as: uv = uvMatrix * vec3(baseUV, 1.0)
+        @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<mat3x2<f32>>;
         // Per-vertex UV coordinates: 3 × vec4 per face = (u0,v0,u1,v1)(u2,v2,u3,v3)(u4,v4,u5,v5)
         @group(0) @binding(6) var<storage, read>        sceneUvCoords: array<vec4<f32>>;
 
@@ -231,11 +233,9 @@ internal object TriangulateEmitShader {
                 return;
             }
 
-            // Read per-face texture index and UV region from compact buffers
-            let texIdx = sceneTexIndices[key.originalIndex];
-            let uvRegion = sceneUvRegions[key.originalIndex];
-            let uvOff = uvRegion.xy;   // (uvOffsetU, uvOffsetV)
-            let uvSc  = uvRegion.zw;   // (uvScaleU, uvScaleV)
+            // Read per-face texture index and UV matrix from compact buffers
+            let texIdx    = sceneTexIndices[key.originalIndex];
+            let uvMatrix  = sceneUvRegions[key.originalIndex];  // mat3x2<f32>
 
             let nx0 = (v01.x / wF) * 2.0 - 1.0;
             let ny0 = 1.0 - (v01.y / hF) * 2.0;
@@ -260,17 +260,17 @@ internal object TriangulateEmitShader {
             // reducing storage writes by ~33% for the common quad case.
 
             // Per-vertex UVs from UvGenerator, packed as 3 × vec4 per face.
-            // Atlas transform: atlasUV = baseUV * uvScale + uvOffset
-            let uvBase = key.originalIndex * 3u;
-            let uvPack0 = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
-            let uvPack1 = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
-            let uvPack2 = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
-            let uv0 = vec2<f32>(uvPack0.x, uvPack0.y) * uvSc + uvOff;
-            let uv1 = vec2<f32>(uvPack0.z, uvPack0.w) * uvSc + uvOff;
-            let uv2 = vec2<f32>(uvPack1.x, uvPack1.y) * uvSc + uvOff;
-            let uv3 = vec2<f32>(uvPack1.z, uvPack1.w) * uvSc + uvOff;
-            let uv4 = vec2<f32>(uvPack2.x, uvPack2.y) * uvSc + uvOff;
-            let uv5 = vec2<f32>(uvPack2.z, uvPack2.w) * uvSc + uvOff;
+            // Composed affine transform: uv = uvMatrix * vec3(baseUV, 1.0)
+            let uvBase   = key.originalIndex * 3u;
+            let uvPack0  = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
+            let uvPack1  = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
+            let uvPack2  = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
+            let uv0 = uvMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0);
+            let uv1 = uvMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0);
+            let uv2 = uvMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0);
+            let uv3 = uvMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0);
+            let uv4 = uvMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0);
+            let uv5 = uvMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0);
 
             // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
             writeVertex((base + 0u) * 9u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, texIdx);

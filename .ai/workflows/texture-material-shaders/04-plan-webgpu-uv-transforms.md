@@ -6,11 +6,11 @@ slice-slug: webgpu-uv-transforms
 status: complete
 stage-number: 4
 created-at: "2026-04-15T06:39:08Z"
-updated-at: "2026-04-15T06:39:08Z"
-metric-files-to-touch: 6
-metric-step-count: 7
+updated-at: "2026-04-15T06:54:54Z"
+metric-files-to-touch: 7
+metric-step-count: 8
 has-blockers: false
-revision-count: 0
+revision-count: 1
 tags: [webgpu, texture, uv, transform, wgsl, mat3x2]
 refs:
   index: 00-index.md
@@ -62,10 +62,13 @@ the fragment shader:
   — new: 5 unit tests covering IDENTITY, tiling, rotation, offset, PerFace
 - `isometric-webgpu/src/test/kotlin/.../webgpu/shader/TriangulateEmitShaderUvTest.kt`
   — new: WGSL string content tests (mat3x2 type, matrix-multiply pattern, no old var names)
+- `isometric-webgpu/src/main/kotlin/.../webgpu/texture/GpuTextureBinder.kt`
+  — change sampler `addressModeU` and `addressModeV` from `AddressMode.ClampToEdge` to
+    `AddressMode.Repeat` (one line; no pipeline layout change needed)
 - `.maestro/textured-webgpu-uv.yaml`
   — new: Maestro flow for visual AC verification in Full WebGPU mode
 
-No changes to: fragment shader, vertex shader, `GpuTextureBinder`, `GpuRenderPipeline`,
+No changes to: fragment shader, vertex shader, `GpuRenderPipeline`,
 `SceneDataPacker.packInto()`, or any public API surface.
 
 ## Proposed Change Strategy
@@ -123,11 +126,47 @@ object SceneDataLayout {
 
 ---
 
-### Step 2 — Update `TriangulateEmitShader.kt` WGSL (WGSL-first)
+### Step 2 — Fix sampler `AddressMode` in `GpuTextureBinder.kt`
+
+**File:** `GpuTextureBinder.kt`
+
+**Why first:** UV values produced by `packUvRegionMatrix()` may exceed [0,1] when `scaleU > 1`
+(tiling). If the sampler uses `AddressMode.ClampToEdge`, those values are clamped to the texture
+edge — tiling renders as a solid border color. This must be fixed before the WGSL and packing
+changes are made, so that correctness is verifiable immediately.
+
+**Change:** In the sampler descriptor construction (a `val` created once at `GpuTextureBinder`
+construction, never recreated per-frame), change both address modes:
+
+```kotlin
+// BEFORE:
+addressModeU = AddressMode.ClampToEdge,
+addressModeV = AddressMode.ClampToEdge,
+
+// AFTER:
+addressModeU = AddressMode.Repeat,
+addressModeV = AddressMode.Repeat,
+```
+
+**Why `Repeat` for all faces (including IDENTITY):**
+- For IDENTITY faces, UV values stay in [0,1] — `ClampToEdge` and `Repeat` produce identical output.
+- A single `Repeat` sampler requires no pipeline recompile, no bind group layout change, and no
+  per-draw sampler selection logic (`minBindingSize=0` means the `GPUBindGroupLayout` is
+  indifferent to sampler changes).
+- A two-sampler approach would require pipeline recompile or dynamic bind group rebuilding —
+  unnecessary complexity for zero visual gain on IDENTITY faces.
+
+**Auto-derived layout:** `GpuTextureBinder` obtains its bind group layout via
+`GPURenderPipeline.getBindGroupLayout(0)`, not hardcoded. Sampler descriptor changes do not
+affect this layout derivation.
+
+---
+
+### Step 3 — Update `TriangulateEmitShader.kt` WGSL (WGSL-first)
 
 **File:** `TriangulateEmitShader.kt`
 
-**2a. Change binding 5 type declaration:**
+**3a. Change binding 5 type declaration:**
 
 ```wgsl
 // BEFORE:
@@ -137,7 +176,7 @@ object SceneDataLayout {
 @group(0) @binding(5) var<storage, read> sceneUvRegions: array<mat3x2<f32>>;
 ```
 
-**2b. Replace the UV computation pattern.**
+**3b. Replace the UV computation pattern.**
 
 Find the block where `uvRegion` is loaded and used (approx lines 237–263 of the WGSL string,
 reported as the atlas UV transform section). Replace the 2-line pattern for EVERY vertex:
@@ -161,16 +200,16 @@ let uv5 = uvMatrix * vec3<f32>(base_uv_5, 1.0);
 > **Note:** The exact WGSL variable names (`key.originalIndex`, `base_uv_k`) must match
 > the actual shader code. Read `TriangulateEmitShader.kt` before editing.
 
-**2c. Remove the now-unused `uvRegion` variable** (the old `let uvRegion = sceneUvRegions[...]`
+**3c. Remove the now-unused `uvRegion` variable** (the old `let uvRegion = sceneUvRegions[...]`
 line is replaced by `let uvMatrix = sceneUvRegions[...]`).
 
 ---
 
-### Step 3 — Update `GpuTextureManager.kt` Kotlin packing
+### Step 4 — Update `GpuTextureManager.kt` Kotlin packing
 
 **File:** `GpuTextureManager.kt`
 
-**3a. Add `resolveTextureTransform(cmd: RenderCommand): TextureTransform`:**
+**4a. Add `resolveTextureTransform(cmd: RenderCommand): TextureTransform`:**
 
 ```kotlin
 private fun resolveTextureTransform(cmd: RenderCommand): TextureTransform {
@@ -187,7 +226,7 @@ private fun resolveTextureTransform(cmd: RenderCommand): TextureTransform {
 
 Pattern mirrors the existing `resolveAtlasRegion()` method.
 
-**3b. Add `packUvRegionMatrix(buf: ByteBuffer, region: AtlasRegion, transform: TextureTransform)`:**
+**4b. Add `packUvRegionMatrix(buf: ByteBuffer, region: AtlasRegion, transform: TextureTransform)`:**
 
 ```kotlin
 private fun packUvRegionMatrix(
@@ -230,7 +269,7 @@ private fun packUvRegionMatrix(
 }
 ```
 
-**3c. Update `uploadUvRegionBuffer()`:**
+**4c. Update `uploadUvRegionBuffer()`:**
 
 Change buffer allocation and per-face packing:
 
@@ -256,7 +295,7 @@ The GPU driver re-allocates because the `ByteBuffer` size changed.
 
 ---
 
-### Step 4 — Unit tests for UV packing
+### Step 5 — Unit tests for UV packing
 
 **New file:** `isometric-webgpu/src/test/kotlin/.../webgpu/texture/GpuTextureManagerUvTransformTest.kt`
 
@@ -275,7 +314,7 @@ The GPU driver re-allocates because the `ByteBuffer` size changed.
 
 ---
 
-### Step 5 — WGSL content tests for `TriangulateEmitShader`
+### Step 6 — WGSL content tests for `TriangulateEmitShader`
 
 **New file:** `isometric-webgpu/src/test/kotlin/.../webgpu/shader/TriangulateEmitShaderUvTest.kt`
 
@@ -306,7 +345,7 @@ class TriangulateEmitShaderUvTest {
 
 ---
 
-### Step 6 — Maestro flow for visual AC verification
+### Step 7 — Maestro flow for visual AC verification
 
 **New file:** `.maestro/textured-webgpu-uv.yaml`
 
@@ -345,7 +384,7 @@ appId: io.github.jayteealao.isometric.sample
 
 ---
 
-### Step 7 — Build + API check
+### Step 8 — Build + API check
 
 ```bash
 ./gradlew :isometric-webgpu:compileDebugKotlin \
@@ -418,14 +457,13 @@ No public API surface changes expected — all modified classes are `internal`.
    `.order(ByteOrder.nativeOrder())`. The existing code may already do this; if not, add it.
    Mixed endianness causes corrupted float values on big-endian systems.
 
-6. **REPEAT tiling mode** — The M5 emit shader writes UV values that may exceed [0,1] when
-   `scaleU > 1`. The sampler must use `AddressMode.Repeat` for tiling to work correctly.
-   Check `GpuTextureBinder.kt`'s sampler descriptor — currently uses `AddressMode.ClampToEdge`.
-   **If ClampToEdge is used, tiling will not work.** The plan for Canvas uses `TileMode.REPEAT`
-   when `transform != TextureTransform.IDENTITY`. The WebGPU path needs the same: use a
-   `Repeat` sampler when `TextureTransform != IDENTITY` on any face. This may require
-   two samplers (clamp + repeat) and per-draw sampler selection, or a single `Repeat` sampler
-   for all textured faces. Investigate before coding Step 3.
+6. **REPEAT tiling mode** (**RESOLVED — addressed in Step 2**) — `GpuTextureBinder.kt`
+   currently uses `AddressMode.ClampToEdge` on both U and V. UV values from `packUvRegionMatrix()`
+   exceed [0,1] when `scaleU > 1`, which would clamp instead of wrap, making tiling invisible.
+   **Fix (Step 2):** Change both address modes to `AddressMode.Repeat`. Single-sampler approach
+   chosen: for IDENTITY faces UVs stay in [0,1], so `ClampToEdge == Repeat` — zero visual
+   difference. No pipeline recompile needed (`minBindingSize=0`; layout auto-derived via
+   `getBindGroupLayout(0)`). Eliminates per-draw sampler selection complexity.
 
 ## Dependencies on Other Slices
 
@@ -470,12 +508,27 @@ sub-agent 3 findings (2026-04-15).
 
 ## Revision History
 
-*(appended by review-and-fix mode)*
+### Rev 1 — 2026-04-15T06:54:54Z — Directed Fix
+**Mode:** Directed Fix
+**Feedback:** `investigate sampler AddressMode` (Risk 6 flagged in original plan as "investigate before coding Step 3")
+**Sub-agent investigation findings:**
+- `GpuTextureBinder.kt` uses a single `val` sampler with `addressModeU = AddressMode.ClampToEdge, addressModeV = AddressMode.ClampToEdge`
+- `AddressMode.Repeat = 0x00000002` confirmed available in vendor source
+- Bind group layout is auto-derived via `GPURenderPipeline.getBindGroupLayout(0)` — no hardcoded layout
+- `minBindingSize=0` on all buffer bindings — GPUBindGroupLayout does not change on sampler switch
+- For IDENTITY faces (UVs in [0,1]), `ClampToEdge == Repeat` — no visual regression
+
+**Changes applied:**
+1. Added **Step 2** — change `GpuTextureBinder.kt` sampler to `AddressMode.Repeat` (new; inserts before old Step 2)
+2. Added `GpuTextureBinder.kt` to **Likely Files / Areas to Touch**; removed it from "No changes to" line
+3. Renumbered old Steps 2–7 → Steps 3–8
+4. Resolved **Risk 6** with concrete resolution (was: "investigate before coding"; now: resolved in Step 2)
+5. Updated frontmatter: `metric-files-to-touch: 7`, `metric-step-count: 8`, `revision-count: 1`
+6. Removed "investigate Risk 6 first" caveat from Recommended Next Stage
 
 ## Recommended Next Stage
 
 - **Option A (default):** `/wf-implement texture-material-shaders webgpu-uv-transforms`
-  — Plan is complete. Risk 6 (sampler AddressMode) should be investigated first as Step 0
-  of implementation; it may add a sampler change to Step 3.
+  — Plan is complete. All 8 steps are ready; Risk 6 (sampler AddressMode) is resolved in Step 2.
 - **Option B:** `/wf-plan texture-material-shaders webgpu-texture-error-callback`
   — Plan the next extension slice in parallel (no dependency on this slice).

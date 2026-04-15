@@ -43,6 +43,9 @@ internal object SceneDataLayout {
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
     const val TRANSFORMED_FACE_BYTES = 96
 
+    /** Bytes per entry in the per-face UV region buffer (one mat3x2&lt;f32&gt; = 6 × f32 = 24 bytes). */
+    const val UV_REGION_STRIDE = 24
+
     /**
      * Sentinel value for [FaceData.textureIndex] when no texture is bound.
      * Equals `0xFFFFFFFF` as an unsigned 32-bit integer, stored as a signed Kotlin [Int].

@@ -1,0 +1,31 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Textured WebGPU — UV transform visual verification"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate to Textured Materials demo from the chooser
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+
+# Verify the info card is visible (confirms navigation succeeded)
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Screenshot 1: Canvas (CPU) baseline — default render mode on launch
+- takeScreenshot: screenshots/textured_canvas_baseline
+
+# Switch to Full WebGPU render mode to exercise the mat3x2 UV path
+- tapOn: "Full WebGPU"
+- waitForAnimationToEnd
+
+# Screenshot 2: WebGPU mode — UV regions packed as mat3x2, sampler in Repeat mode
+- takeScreenshot: screenshots/textured_webgpu_uv
+
+# Switch to Canvas + GPU Sort to verify the hybrid path
+- tapOn: "Canvas + GPU Sort"
+- waitForAnimationToEnd
+
+# Screenshot 3: Hybrid canvas+GPU sort mode
+- takeScreenshot: screenshots/textured_canvas_gpu_sort
