@@ -357,7 +357,7 @@ class IsometricEngine @JvmOverloads constructor(
             )
         }
 
-        return PreparedScene(commands, width, height, projectionParams, lightDirection)
+        return PreparedScene(commands, width, height, projectionParams, lightDirection, isGpuSorted = true)
     }
 
     private fun projectAndCull(

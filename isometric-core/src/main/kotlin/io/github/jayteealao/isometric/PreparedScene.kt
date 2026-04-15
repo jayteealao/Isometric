@@ -16,6 +16,10 @@ package io.github.jayteealao.isometric
  *   safe to render on a Canvas. `false` for scenes built by the Full WebGPU lightweight path
  *   ([SceneCache.rebuildForGpu]) whose commands carry only 3D vertices — Canvas rendering with
  *   such a scene produces a blank or garbled frame.
+ * @property isGpuSorted `true` when depth sorting was performed by the GPU compute backend
+ *   ([SceneCache.rebuildAsync]). `false` for CPU-sorted ([SceneCache.rebuild]) or unprojected
+ *   ([SceneCache.rebuildForGpu]) scenes. Used by [IsometricRenderer.prepareAsync] to detect
+ *   when a CPU-sync fallback scene is in cache and force a GPU-sort rebuild.
  */
 class PreparedScene(
     val commands: List<RenderCommand>,
@@ -24,6 +28,7 @@ class PreparedScene(
     val projectionParams: ProjectionParams,
     val lightDirection: Vector,
     val isProjected: Boolean = true,
+    val isGpuSorted: Boolean = false,
 ) {
     override fun equals(other: Any?): Boolean =
         other is PreparedScene &&
