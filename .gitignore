@@ -46,3 +46,5 @@ compare_benchmarks.py
 compare_gc.py
 webgpu_screen.png
 build-logic/.kotlin/**/*
+.kotlin/sessions/**/*
+.ai/**/*

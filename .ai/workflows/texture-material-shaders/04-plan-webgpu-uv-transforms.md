@@ -6,11 +6,11 @@ slice-slug: webgpu-uv-transforms
 status: complete
 stage-number: 4
 created-at: "2026-04-15T06:39:08Z"
-updated-at: "2026-04-15T06:54:54Z"
+updated-at: "2026-04-15T11:31:09Z"
 metric-files-to-touch: 7
 metric-step-count: 8
 has-blockers: false
-revision-count: 1
+revision-count: 2
 tags: [webgpu, texture, uv, transform, wgsl, mat3x2]
 refs:
   index: 00-index.md
@@ -21,8 +21,8 @@ refs:
     - 04-plan-webgpu-textures.md
     - 04-plan-per-face-materials.md
   implement: 05-implement-webgpu-uv-transforms.md
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders webgpu-uv-transforms"
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders webgpu-uv-transforms"
 ---
 
 # Plan: webgpu-uv-transforms
@@ -178,30 +178,39 @@ affect this layout derivation.
 
 **3b. Replace the UV computation pattern.**
 
-Find the block where `uvRegion` is loaded and used (approx lines 237–263 of the WGSL string,
-reported as the atlas UV transform section). Replace the 2-line pattern for EVERY vertex:
+The current WGSL has 9 lines to replace (3 variable declarations + 6 per-vertex UV computations).
+These are confirmed verbatim from `TriangulateEmitShader.kt` (auto-review 2026-04-15):
 
 ```wgsl
-// BEFORE (repeated 6×, once per vertex):
-let uvOff = uvRegion.xy;
-let uvSc  = uvRegion.zw;
-let uv_k  = base_uv_k * uvSc + uvOff;
+// BEFORE — remove all 9 of these lines:
+let uvRegion = sceneUvRegions[key.originalIndex];
+let uvOff = uvRegion.xy;   // (uvOffsetU, uvOffsetV)
+let uvSc  = uvRegion.zw;   // (uvScaleU, uvScaleV)
+// ... NDC coordinate computations and uvPack0/1/2 loads remain untouched ...
+let uv0 = vec2<f32>(uvPack0.x, uvPack0.y) * uvSc + uvOff;
+let uv1 = vec2<f32>(uvPack0.z, uvPack0.w) * uvSc + uvOff;
+let uv2 = vec2<f32>(uvPack1.x, uvPack1.y) * uvSc + uvOff;
+let uv3 = vec2<f32>(uvPack1.z, uvPack1.w) * uvSc + uvOff;
+let uv4 = vec2<f32>(uvPack2.x, uvPack2.y) * uvSc + uvOff;
+let uv5 = vec2<f32>(uvPack2.z, uvPack2.w) * uvSc + uvOff;
 
-// AFTER: load matrix once, apply per vertex
+// AFTER — replace with these 7 lines (net: -2 lines):
 let uvMatrix = sceneUvRegions[key.originalIndex];  // mat3x2<f32>
-let uv0 = uvMatrix * vec3<f32>(base_uv_0, 1.0);   // → vec2<f32>
-let uv1 = uvMatrix * vec3<f32>(base_uv_1, 1.0);
-let uv2 = uvMatrix * vec3<f32>(base_uv_2, 1.0);
-let uv3 = uvMatrix * vec3<f32>(base_uv_3, 1.0);
-let uv4 = uvMatrix * vec3<f32>(base_uv_4, 1.0);
-let uv5 = uvMatrix * vec3<f32>(base_uv_5, 1.0);
+let uv0 = uvMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0);
+let uv1 = uvMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0);
+let uv2 = uvMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0);
+let uv3 = uvMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0);
+let uv4 = uvMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0);
+let uv5 = uvMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0);
 ```
 
-> **Note:** The exact WGSL variable names (`key.originalIndex`, `base_uv_k`) must match
-> the actual shader code. Read `TriangulateEmitShader.kt` before editing.
+> **`uvPack0/1/2` remain** — these are `sceneUvCoords` reads that pack base UV coordinates.
+> They are NOT removed; only `uvRegion`, `uvOff`, `uvSc`, and the 6 per-vertex lines change.
+> `key.originalIndex` confirmed correct index variable (auto-review verified).
 
-**3c. Remove the now-unused `uvRegion` variable** (the old `let uvRegion = sceneUvRegions[...]`
-line is replaced by `let uvMatrix = sceneUvRegions[...]`).
+**3c.** The 9-line BEFORE block is entirely replaced by the 7-line AFTER block from 3b —
+there are no orphaned variables. `uvRegion`, `uvOff`, and `uvSc` are fully removed as part of
+that replacement. The `uvPack0/1/2` reads stay. No other lines change.
 
 ---
 
@@ -271,27 +280,38 @@ private fun packUvRegionMatrix(
 
 **4c. Update `uploadUvRegionBuffer()`:**
 
-Change buffer allocation and per-face packing:
+Update the capacity sizing and per-face packing. **Important:** `uploadUvRegionBuffer` uses a
+`GrowableGpuStagingBuffer` (auto-review confirmed), NOT `ByteBuffer.allocateDirect`. Follow the
+existing buffer resize pattern in the method — find the capacity call that currently sizes for
+`4 * Float.SIZE_BYTES * faceCount` (16 bytes/face) and update it to use `UV_REGION_STRIDE`:
 
 ```kotlin
-// OLD allocation (4 floats/face, 16 bytes):
-val buf = ByteBuffer.allocateDirect(4 * Float.SIZE_BYTES * faceCount)
+// OLD capacity (4 floats/face, 16 bytes):
+// <follow existing GrowableGpuStagingBuffer capacity call pattern>
+//   currently: 4 * Float.SIZE_BYTES * faceCount  →  16 * faceCount
 
-// NEW allocation (UV_REGION_STRIDE = 24 bytes/face):
-val buf = ByteBuffer.allocateDirect(SceneDataLayout.UV_REGION_STRIDE * faceCount)
-    .order(ByteOrder.nativeOrder())
+// NEW capacity (6 floats/face, 24 bytes):
+// <same call, updated size>:
+//   SceneDataLayout.UV_REGION_STRIDE * faceCount  →  24 * faceCount
+
+// Do NOT add .order(ByteOrder.nativeOrder()) — GrowableGpuStagingBuffer handles this internally
+// (confirmed: ByteOrder.nativeOrder() is set in GrowableGpuStagingBuffer.kt line 53)
 
 // OLD per-face packing (4 putFloat calls):
 buf.putFloat(region.uvOffset[0]); buf.putFloat(region.uvOffset[1])
 buf.putFloat(region.uvScale[0]);  buf.putFloat(region.uvScale[1])
 
-// NEW per-face packing:
+// NEW per-face packing (via helper):
 val transform = resolveTextureTransform(cmd)
 packUvRegionMatrix(buf, region, transform)
 ```
 
+For `packUvRegionMatrix(buf: ByteBuffer, ...)`: check whether `GrowableGpuStagingBuffer` exposes
+a `ByteBuffer`-typed `data` property to pass here, or adapt the signature to accept the staging
+buffer directly. The `putFloat` calls in Step 4b use `ByteBuffer` semantics.
+
 The GPU buffer upload call and bind group entry remain the same (`uvRegionBuf` GPUBuffer).
-The GPU driver re-allocates because the `ByteBuffer` size changed.
+The GPU driver re-allocates because the buffer capacity changed.
 
 ---
 
@@ -436,8 +456,13 @@ No public API surface changes expected — all modified classes are `internal`.
 
 ## Risks / Watchouts
 
-1. **WGSL variable name mismatch** — The plan uses pseudonames (`key.originalIndex`, `base_uv_k`).
-   Read `TriangulateEmitShader.kt` verbatim before editing; match exact WGSL identifiers.
+1. **WGSL variable names (CONFIRMED — auto-review 2026-04-15):**
+   - `key.originalIndex` ✓ confirmed correct index into `sceneUvRegions`
+   - Base UV names are NOT generic `base_uv_k` — actual code uses `vec2<f32>(uvPack0.x, uvPack0.y)` etc.
+     (Step 3b now shows exact BEFORE/AFTER verbatim from the file)
+   - `uvSc` WGSL content test: `assertFalse(WGSL.contains("uvSc"))` is safe only if comments
+     containing "uvScaleU/V" (which have "uvSc" as a substring) are removed with the block.
+     The BEFORE block (Step 3b) includes those comments — ensure the full 9-line block is replaced.
 
 2. **`mat3x2<f32>` column-major storage** — WGSL stores `mat3x2` in column-major order.
    The Kotlin `ByteBuffer.putFloat()` calls must write columns in order: col0.x, col0.y,
@@ -507,6 +532,25 @@ clean. All prerequisite classes exist.
 sub-agent 3 findings (2026-04-15).
 
 ## Revision History
+
+### Rev 2 — 2026-04-15T11:31:09Z — Auto-Review
+**Mode:** Auto-Review (re-inspected codebase against plan assumptions)
+**Issues found:** 4 (2 HIGH, 1 MED, 1 LOW)
+
+| ID | Sev | What was wrong | What was fixed |
+|----|-----|----------------|----------------|
+| AR-1 | HIGH | Step 3b pseudocode used `base_uv_0..5` — these don't exist in the shader; actual names are inline `vec2<f32>(uvPack0.x, uvPack0.y)` etc. | Replaced entire BEFORE/AFTER block with verbatim WGSL from file |
+| AR-2 | HIGH | Step 4c showed `ByteBuffer.allocateDirect` — actual code uses `GrowableGpuStagingBuffer` | Updated Step 4c to describe the actual capacity resize pattern; noted ByteOrder is set internally |
+| AR-3 | MED | Step 3c only mentioned removing `uvRegion`; `uvOff`, `uvSc`, and 6 per-vertex UV lines also removed | Rewrote Step 3c to clarify all 9 lines are replaced |
+| AR-4 | LOW | Risk 1 still said "pseudonames — read file before editing" after directed fix; `key.originalIndex` had been confirmed and `base_uv_k` confirmed wrong | Updated Risk 1 with confirmed findings; added `uvSc` substring test caveat |
+
+**Confirmed correct (no change needed):**
+- `key.originalIndex` ✓, `TriangulateEmitShader.WGSL` constant name ✓
+- `TextureTransform` field names ✓, `AtlasRegion.uvOffset/uvScale: FloatArray` ✓
+- `UV_REGION_STRIDE` does not exist yet ✓, `cmd.faceType` available ✓
+- JUnit 4 + Kotlin Test (test files use `kotlin.test.Test`, `kotlin.test.assertEquals`) ✓
+
+---
 
 ### Rev 1 — 2026-04-15T06:54:54Z — Directed Fix
 **Mode:** Directed Fix

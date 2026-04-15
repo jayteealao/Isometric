@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-14T06:46:32Z"
-slices-implemented: 7
-slices-total: 7
-metric-total-files-changed: 72
-metric-total-lines-added: 2599
-metric-total-lines-removed: 860
+updated-at: "2026-04-15T12:38:57Z"
+slices-implemented: 8
+slices-total: 8
+metric-total-files-changed: 80
+metric-total-lines-added: 2959
+metric-total-lines-removed: 895
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders sample-demo"
+next-invocation: "/wf-verify texture-material-shaders webgpu-uv-transforms"
 ---
 
 # Implement Index
@@ -58,6 +58,11 @@ next-invocation: "/wf-verify texture-material-shaders sample-demo"
 - Summary: 25 API design findings resolved: FlatColor removed, IsoColor:MaterialData, UvTransform→TextureTransform, BitmapSource→Bitmap, textured→texturedResource, TextureLoader fun interface, TextureCacheConfig, @DslMarker, PerFace.of() factory, Shape(material:MaterialData), TileMode per-draw shader cache
 - Record: [05-implement-api-design-fixes.md](05-implement-api-design-fixes.md)
 
+### `webgpu-uv-transforms` — complete
+- Files: 8 (5 new, 3 modified)
+- Summary: Migrated `sceneUvRegions` from `vec4<f32>` (16 bytes) to `mat3x2<f32>` (24 bytes); CPU-composed affine matrix folds `TextureTransform` + atlas region; IDENTITY fast path; `AddressMode.Repeat` sampler; `UvRegionPacker` extracted for JVM testability; 5 unit tests + 3 WGSL regression tests + Maestro visual flow
+- Record: [05-implement-webgpu-uv-transforms.md](05-implement-webgpu-uv-transforms.md)
+
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`
 - `isometric-compose` has zero shader imports — fully usable standalone
@@ -66,5 +71,5 @@ next-invocation: "/wf-verify texture-material-shaders sample-demo"
 - `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders sample-demo`
-- **Option B:** `/compact` then Option A — clear implementation context
+- **Option A (default):** `/wf-verify texture-material-shaders webgpu-uv-transforms`
+- **Option B:** `/wf-handoff texture-material-shaders api-design-fixes` — merge PR #8 first, then verify webgpu-uv-transforms on clean base
