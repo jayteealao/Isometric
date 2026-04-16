@@ -8,6 +8,7 @@ import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
+import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.webgpu.texture.GpuTextureManager
 import java.nio.ByteOrder
 
@@ -56,6 +57,7 @@ import java.nio.ByteOrder
  */
 internal class GpuFullPipeline(
     private val ctx: GpuContext,
+    private val onTextureLoadError: ((TextureSource) -> Unit)? = null,
 ) : AutoCloseable {
 
     companion object {
@@ -88,7 +90,7 @@ internal class GpuFullPipeline(
 
     // ── Texture manager ───────────────────────────────────────────────────────
 
-    private val textureManager = GpuTextureManager(ctx)
+    private val textureManager = GpuTextureManager(ctx, onTextureLoadError)
 
     // ── Per-vertex UV coords (geometry concern, separate from atlas) ──────────
 

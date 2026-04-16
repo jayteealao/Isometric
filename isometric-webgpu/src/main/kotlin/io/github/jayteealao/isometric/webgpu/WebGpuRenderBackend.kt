@@ -7,10 +7,12 @@ import android.view.WindowManager
 import androidx.compose.foundation.AndroidExternalSurface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
+import io.github.jayteealao.isometric.shader.render.LocalTextureErrorCallback
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.PreparedScene
@@ -32,6 +34,10 @@ internal class WebGpuRenderBackend : RenderBackend {
         strokeStyle: StrokeStyle,
     ) {
         val renderer = remember { WebGpuSceneRenderer() }
+        val onError = LocalTextureErrorCallback.current
+        SideEffect {
+            renderer.onTextureLoadError = onError
+        }
         val frameCallback = LocalWebGpuFrameCallback.current
         val vsync = LocalWebGpuVsync.current
 

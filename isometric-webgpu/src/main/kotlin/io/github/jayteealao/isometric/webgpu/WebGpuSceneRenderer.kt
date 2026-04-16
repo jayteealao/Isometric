@@ -19,6 +19,7 @@ import androidx.webgpu.TextureFormat
 import androidx.webgpu.TextureUsage
 import androidx.webgpu.helper.Util.windowFromSurface
 import io.github.jayteealao.isometric.PreparedScene
+import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuFullPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuRenderPipeline
 import io.github.jayteealao.isometric.webgpu.pipeline.GpuTimestampProfiler
@@ -90,6 +91,31 @@ internal class WebGpuSceneRenderer : AutoCloseable {
     // surface is reconfigured while the scene remains unchanged.
     private var lastUploadWidth: Int = 0
     private var lastUploadHeight: Int = 0
+    /**
+     * The texture-error callback currently wired from the Compose tree via
+     * [WebGpuRenderBackend.Surface]. Null until the first [SideEffect] commits.
+     *
+     * **Why `@Volatile`:** Written by the Compose main thread (via [SideEffect]),
+     * read from the GPU thread inside [GpuFullPipeline]. `@Volatile` provides the
+     * JMM happens-before guarantee so the GPU thread always sees the latest write.
+     *
+     * **Why `var` (not a constructor param):** `WebGpuSceneRenderer` is created via
+     * `remember { WebGpuSceneRenderer() }` *before* CompositionLocals are available.
+     * The callback value is only known after the first composition, so it cannot be
+     * captured at construction time.
+     *
+     * **Why the forwarding lambda in [ensureInitialized]:** `GpuFullPipeline` is
+     * constructed once and captures its constructor arguments at that instant. Passing
+     * `onTextureLoadError` directly would capture `null` (before the first [SideEffect]
+     * fires). The forwarding lambda `{ src -> onTextureLoadError?.invoke(src) }` reads
+     * this field at invocation time, picking up any subsequent [SideEffect] writes.
+     *
+     * **One-frame null window:** A texture failure on the very first render frame
+     * (before the first [SideEffect] commits) is silently dropped. This is acceptable —
+     * a single missed error event at startup is preferable to a more complex scheme.
+     */
+    @Volatile var onTextureLoadError: ((TextureSource) -> Unit)? = null
+        internal set
 
     suspend fun renderLoop(
         androidSurface: Surface,
@@ -283,7 +309,14 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             configureSurface(width, height)
             val rp = GpuRenderPipeline(context, surfaceFormat)
             renderPipeline = rp
-            val gp = GpuFullPipeline(context)
+            val gp = GpuFullPipeline(
+                ctx = context,
+                // Forwarding lambda — do NOT simplify to direct assignment.
+                // GpuFullPipeline is constructed before the first SideEffect fires,
+                // so onTextureLoadError is still null here. The lambda reads the
+                // @Volatile field at invocation time and always sees the latest value.
+                onTextureLoadError = { src -> onTextureLoadError?.invoke(src) },
+            )
             gp.ensurePipelines(rp)
             fullPipeline = gp
         }
@@ -607,6 +640,10 @@ internal class WebGpuSceneRenderer : AutoCloseable {
         lastScene         = null
         lastUploadWidth   = 0
         lastUploadHeight  = 0
+        // LIFE-1: null the callback so any queued Handler.post lambdas that fire after
+        // teardown see null and short-circuit, preventing post-cleanup UI mutations and
+        // delaying GC of this renderer via the forwarding lambda closure.
+        onTextureLoadError = null
     }
 
     override fun close() {

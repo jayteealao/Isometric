@@ -41,7 +41,6 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterial$Textu
 }
 
 public final class io/github/jayteealao/isometric/shader/IsometricMaterialComposablesKt {
-	public static final fun Path (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/shader/IsometricMaterial;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
 	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/shader/IsometricMaterial;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
 }
 
@@ -150,6 +149,7 @@ public final class io/github/jayteealao/isometric/shader/TextureTransform$Compan
 
 public final class io/github/jayteealao/isometric/shader/render/ProvideTextureRenderingKt {
 	public static final fun ProvideTextureRendering (Lio/github/jayteealao/isometric/shader/render/TextureCacheConfig;Lio/github/jayteealao/isometric/shader/render/TextureLoader;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
+	public static final fun getLocalTextureErrorCallback ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class io/github/jayteealao/isometric/shader/render/TextureCacheConfig {

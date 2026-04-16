@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric.webgpu.texture
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.webgpu.GPUBindGroup
 import androidx.webgpu.GPUBuffer
@@ -28,14 +30,23 @@ import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataPacker
  * 2. Call [ensurePipelines] after the render pipeline is compiled (one-time, GPU thread).
  * 3. Call [uploadTextures] each frame/scene upload (GPU thread).
  * 4. Call [close] on teardown.
+ *
+ * @param onTextureLoadError Optional callback invoked when a texture source cannot be
+ *   loaded or packed into the atlas. Always dispatched to the **main thread** via
+ *   `Handler(Looper.getMainLooper()).post {}` — safe to update UI directly.
+ *   **Bulk-fire semantics:** on atlas overflow, the callback fires once for *each* source
+ *   in the failing batch, not just the source that caused the capacity constraint.
  */
 internal class GpuTextureManager(
     private val ctx: GpuContext,
+    private val onTextureLoadError: ((TextureSource) -> Unit)? = null,
 ) : AutoCloseable {
 
     companion object {
         private const val TAG = "GpuTextureManager"
     }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // ── Core texture components ───────────────────────────────────────────────
 
@@ -186,6 +197,10 @@ internal class GpuTextureManager(
                 }
                 else -> {
                     Log.w(TAG, "TextureSource ${source::class.simpleName} not yet supported in WebGPU — skipping")
+                    mainHandler.post {
+                        try { onTextureLoadError?.invoke(source) }
+                        catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                    }
                     null
                 }
             }
@@ -194,16 +209,33 @@ internal class GpuTextureManager(
 
         if (entries.isEmpty()) {
             rebuildBindGroup(textureStore.fallbackTextureView)
-            lastAtlasSignature = null
+            // Record the failing source set as "known bad" so subsequent frames with the
+            // same sources skip the dispatch path. Without this, textureSources != null
+            // every frame and the callback fires at render frame rate (SPAM-1 fix).
+            lastAtlasSignature = textureSources
             return
         }
 
-        val built = atlasManager.rebuild(entries)
-        if (built) {
-            rebuildBindGroup(atlasManager.textureView!!)
-        } else {
+        if (!atlasManager.rebuild(entries)) {
+            Log.w(TAG, "GpuTextureManager: atlas rebuild failed — using fallback bind group")
+            // Bulk-fire: the atlas failure is a GPU capacity constraint affecting all entries,
+            // not an individual load failure. We report every source in the batch so callers
+            // can distinguish partial atlas failures from individual source decode errors.
+            // Each source gets its own Handler.post to match the per-source contract, but
+            // all N messages are enqueued in a single frame — callers should be idempotent.
+            entries.keys.forEach { source ->
+                mainHandler.post {
+                    try { onTextureLoadError?.invoke(source) }
+                    catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                }
+            }
             rebuildBindGroup(textureStore.fallbackTextureView)
+            // Record the failing source set so subsequent frames with the same sources skip
+            // re-triggering the rebuild and re-firing the callback (SPAM-1 fix).
+            lastAtlasSignature = textureSources
+            return
         }
+        rebuildBindGroup(atlasManager.textureView!!)
         lastAtlasSignature = textureSources
     }
 

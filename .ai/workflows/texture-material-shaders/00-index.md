@@ -7,11 +7,11 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-15T23:23:04Z"
-selected-slice: "webgpu-uv-transforms"
-current-stage-status: implement-reviews-complete
+updated-at: "2026-04-16T22:22:49Z"
+selected-slice: "webgpu-texture-error-callback"
+current-stage-status: review-fixes-applied
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders webgpu-uv-transforms"
+next-invocation: "/wf-verify texture-material-shaders webgpu-texture-error-callback"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -101,6 +101,7 @@ workflow-files:
   - 07-review-api-design-fixes-performance.md
   - 03-slice-webgpu-uv-transforms.md
   - 04-plan-webgpu-uv-transforms.md
+  - 04-plan-webgpu-texture-error-callback.md
   - 05-implement-webgpu-uv-transforms.md
   - 06-verify-webgpu-uv-transforms.md
   - 07-review-webgpu-uv-transforms.md
@@ -113,6 +114,9 @@ workflow-files:
   - 07-review-webgpu-uv-transforms-performance.md
   - 07-review-webgpu-uv-transforms-backend-concurrency.md
   - 03-slice-webgpu-texture-error-callback.md
+  - 05-implement-webgpu-texture-error-callback.md
+  - 06-verify-webgpu-texture-error-callback.md
+  - 07-review-webgpu-texture-error-callback.md
   - 03-slice-uv-generation-cylinder.md
   - 03-slice-uv-generation-pyramid.md
   - 03-slice-uv-generation-stairs.md
@@ -134,8 +138,8 @@ progress:
   ship: skipped
   retro: complete
   api-design-fixes: verify-complete
-  webgpu-uv-transforms: implement-reviews-complete
-  webgpu-texture-error-callback: not-started
+  webgpu-uv-transforms: verify-complete
+  webgpu-texture-error-callback: review-fixes-applied
   uv-generation-cylinder: not-started
   uv-generation-pyramid: not-started
   uv-generation-stairs: not-started

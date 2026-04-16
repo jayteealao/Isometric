@@ -2,7 +2,9 @@ package io.github.jayteealao.isometric.shader.render
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import io.github.jayteealao.isometric.compose.runtime.LocalMaterialDrawHook
 import io.github.jayteealao.isometric.shader.TextureSource
@@ -24,6 +26,27 @@ data class TextureCacheConfig(val maxSize: Int = 20) {
         require(maxSize > 0) { "maxSize must be positive, got $maxSize" }
     }
 }
+
+/**
+ * [CompositionLocal] that carries the active `onTextureLoadError` callback from
+ * [ProvideTextureRendering] down to the WebGPU render backend.
+ *
+ * **Canonical provider:** [ProvideTextureRendering] sets this local automatically — do not
+ * provide it directly unless you are implementing a custom render backend.
+ *
+ * **Default:** `null` (no error reporting; texture failures are silently logged via `Log.w`).
+ *
+ * **Threading:** The callback is always dispatched to the main thread by the backends that
+ * read this local, regardless of which thread the failure is detected on.
+ *
+ * **Recomposition warning:** This local uses [staticCompositionLocalOf], which triggers
+ * full-subtree recomposition whenever the provided value changes reference identity.
+ * Always pass a stable callback reference — hoist the lambda outside the composition or
+ * wrap it in `remember` — to avoid silently invalidating the entire scene subtree on each
+ * recomposition.
+ */
+val LocalTextureErrorCallback: ProvidableCompositionLocal<((TextureSource) -> Unit)?> =
+    staticCompositionLocalOf { null }
 
 /**
  * Enables textured Canvas rendering for any `IsometricScene` in [content].
@@ -68,6 +91,13 @@ data class TextureCacheConfig(val maxSize: Int = 20) {
  *   time. When `null`, the default Android resource/asset loader is used.
  * @param onTextureLoadError Called when a texture fails to load. Receives the [TextureSource]
  *   that failed. Use for analytics, user-visible error feedback, or retry logic.
+ *   Always dispatched to the **main thread**, even when the failure is detected on a GPU
+ *   thread. On WebGPU atlas overflow, the callback fires once per source in the failing
+ *   batch — not just for the single source that caused the capacity constraint.
+ *
+ *   **Privacy caveat:** Do not log or transmit the [TextureSource] verbatim.
+ *   [TextureSource.Asset.path] exposes the full internal asset path. Extract only the
+ *   source kind for analytics: `source::class.simpleName`.
  * @param content The composable tree containing `IsometricScene`(s).
  */
 @Composable
@@ -83,7 +113,10 @@ fun ProvideTextureRendering(
         val effectiveLoader = loader ?: defaultTextureLoader(context.applicationContext)
         TexturedCanvasDrawHook(cache, effectiveLoader, onTextureLoadError)
     }
-    CompositionLocalProvider(LocalMaterialDrawHook provides hook) {
+    CompositionLocalProvider(
+        LocalMaterialDrawHook provides hook,
+        LocalTextureErrorCallback provides onTextureLoadError,
+    ) {
         content()
     }
 }
