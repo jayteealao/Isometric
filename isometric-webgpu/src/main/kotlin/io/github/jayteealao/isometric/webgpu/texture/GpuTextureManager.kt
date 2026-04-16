@@ -18,6 +18,22 @@ import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
 import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataPacker
 
 /**
+ * Resolves [source] to its backing [android.graphics.Bitmap] if supported by the
+ * WebGPU upload path, or `null` for any type not yet supported.
+ *
+ * A `null` return means the source is skipped and the `onTextureLoadError` callback
+ * is fired by the caller. Extracted as a package-level function so the source-classification
+ * decision can be unit-tested on the JVM without a [GpuContext] or Android Looper.
+ */
+internal fun resolveSourceToBitmap(source: TextureSource): android.graphics.Bitmap? = when (source) {
+    is TextureSource.Bitmap -> {
+        source.ensureNotRecycled()
+        source.bitmap
+    }
+    else -> null
+}
+
+/**
  * Encapsulates all texture-related concerns for the GPU pipeline:
  * - Atlas management ([TextureAtlasManager])
  * - Texture bind group lifecycle ([GpuTextureBinder])
@@ -190,21 +206,16 @@ internal class GpuTextureManager(
         // Resolve all TextureSources to Bitmaps
         val entries = mutableMapOf<TextureSource, android.graphics.Bitmap>()
         for (source in textureSources) {
-            val bitmap = when (source) {
-                is TextureSource.Bitmap -> {
-                    source.ensureNotRecycled()
-                    source.bitmap
+            val bitmap = resolveSourceToBitmap(source)
+            if (bitmap == null) {
+                Log.w(TAG, "TextureSource ${source::class.simpleName} not yet supported in WebGPU — skipping")
+                mainHandler.post {
+                    try { onTextureLoadError?.invoke(source) }
+                    catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
                 }
-                else -> {
-                    Log.w(TAG, "TextureSource ${source::class.simpleName} not yet supported in WebGPU — skipping")
-                    mainHandler.post {
-                        try { onTextureLoadError?.invoke(source) }
-                        catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
-                    }
-                    null
-                }
+            } else {
+                entries[source] = bitmap
             }
-            if (bitmap != null) entries[source] = bitmap
         }
 
         if (entries.isEmpty()) {
