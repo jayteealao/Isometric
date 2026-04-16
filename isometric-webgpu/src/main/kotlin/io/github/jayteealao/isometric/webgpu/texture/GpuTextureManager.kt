@@ -56,6 +56,8 @@ internal fun resolveSourceToBitmap(source: TextureSource): android.graphics.Bitm
 internal class GpuTextureManager(
     private val ctx: GpuContext,
     private val onTextureLoadError: ((TextureSource) -> Unit)? = null,
+    /** Maximum atlas dimension in pixels. Defaults to 2048. Exposed for testing. */
+    internal val maxAtlasSizePx: Int = 2048,
 ) : AutoCloseable {
 
     companion object {
@@ -123,7 +125,7 @@ internal class GpuTextureManager(
             textureBinder = GpuTextureBinder(ctx, layout)
         }
         if (!::atlasManager.isInitialized) {
-            atlasManager = TextureAtlasManager(ctx, textureStore)
+            atlasManager = TextureAtlasManager(ctx, textureStore, maxAtlasSizePx)
         }
     }
 
