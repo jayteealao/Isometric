@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Card
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.ScrollableTabRow
 import androidx.compose.material.Surface
+import androidx.compose.material.Tab
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -110,7 +112,22 @@ private fun TexturedDemoScreen() {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Info card + shape tab + render mode toggle
+        // Shape tabs — matches the ScrollableTabRow pattern used by ComposeActivity
+        // and RuntimeApiActivity.
+        ScrollableTabRow(
+            selectedTabIndex = shapeTab.ordinal,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            for (tab in ShapeTab.entries) {
+                Tab(
+                    selected = shapeTab == tab,
+                    onClick = { shapeTab = tab },
+                    text = { Text(tab.label) },
+                )
+            }
+        }
+
+        // Info card + render-mode pills
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -121,17 +138,6 @@ private fun TexturedDemoScreen() {
                 Text(text = "Textured Materials", style = MaterialTheme.typography.subtitle1)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = shapeTab.description, style = MaterialTheme.typography.body2)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Shape", style = MaterialTheme.typography.caption)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (tab in ShapeTab.entries) {
-                        TogglePill(
-                            label = tab.label,
-                            selected = shapeTab == tab,
-                            onClick = { shapeTab = tab },
-                        )
-                    }
-                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Render mode", style = MaterialTheme.typography.caption)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
