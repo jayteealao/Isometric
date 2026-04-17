@@ -257,18 +257,18 @@ internal class GpuTextureManager(
      * Recursively collect [TextureSource] references from a material, expanding
      * [IsometricMaterial.PerFace] into its constituent sub-materials.
      *
-     * **Per-slot textures on non-Prism [IsometricMaterial.PerFace] variants are not yet
-     * collected into the atlas.** Each non-Prism variant (`Cylinder`, `Pyramid`,
-     * `Stairs`, `Octahedron`) currently ships as an empty dispatch stub: constructing
-     * one with per-slot [IsometricMaterial.Textured] entries is legal, but those
-     * textures never make it into the atlas and the faces render with the material's
-     * [IsometricMaterial.PerFace.default] at runtime. The corresponding
-     * `uv-generation-<shape>` slice will enable per-slot collection for each shape.
+     * **Per-slot textures on `Cylinder` and `Stairs` `PerFace` variants are not yet
+     * collected into the atlas.** Each still-stubbed variant ships as an empty dispatch
+     * stub: constructing one with per-slot [IsometricMaterial.Textured] entries is legal,
+     * but those textures never make it into the atlas and the faces render with the
+     * material's [IsometricMaterial.PerFace.default] at runtime. The corresponding
+     * `uv-generation-<shape>` slice enables per-slot collection for each shape; `Prism`,
+     * `Octahedron`, and `Pyramid` are already wired.
      *
      * To avoid silently dropping textures, this function emits a single Log.w warning
-     * the first time a non-Prism variant carrying at least one `Textured` slot is seen,
-     * naming the shape and listing the slot sources. Callers that need textured non-Prism
-     * rendering should wait for the corresponding shape slice.
+     * the first time a still-stubbed variant carrying at least one `Textured` slot is
+     * seen, naming the shape and listing the slot sources. Callers that need textured
+     * non-Prism rendering should wait for the corresponding shape slice.
      */
     private fun collectTextureSources(
         material: MaterialData?,
@@ -288,8 +288,13 @@ internal class GpuTextureManager(
                             if (sub is IsometricMaterial.Textured) out.add(sub.source)
                         }
                     }
+                    is IsometricMaterial.PerFace.Pyramid -> {
+                        (m.base as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                        for (sub in m.laterals.values) {
+                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                        }
+                    }
                     is IsometricMaterial.PerFace.Cylinder,
-                    is IsometricMaterial.PerFace.Pyramid,
                     is IsometricMaterial.PerFace.Stairs -> {
                         warnIfNonPrismPerFaceHasTexturedSlots(m)
                     }

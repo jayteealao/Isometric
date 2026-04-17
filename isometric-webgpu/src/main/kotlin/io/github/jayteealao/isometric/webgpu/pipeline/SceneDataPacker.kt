@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
+import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.shader.IsometricMaterial
@@ -136,11 +137,15 @@ internal object SceneDataPacker {
             }
 
             // baseColor: vec4<f32> RGBA in [0, 1] — use raw material color (pre-lighting)
-            // so the GPU M3 shader applies lighting exactly once.
-            buffer.putFloat(cmd.baseColor.r.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.g.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.b.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.a.toFloat() / 255f)
+            // so the GPU M3 shader applies lighting exactly once. For PerFace materials
+            // that resolve to a per-face IsoColor, use that color instead of the command's
+            // default-carrying baseColor — otherwise every face renders as the PerFace
+            // default (typically mid-gray), erasing distinct per-face colors.
+            val effectiveColor = resolveEffectiveColor(cmd)
+            buffer.putFloat(effectiveColor.r.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.g.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.b.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.a.toFloat() / 255f)
 
             // normal: vec3<f32> — cross product of first two edge vectors, inlined to
             // avoid Triple<Float,Float,Float> allocation per face.
@@ -223,6 +228,27 @@ internal object SceneDataPacker {
         return when (effective) {
             is IsometricMaterial.Textured -> 0
             else -> SceneDataLayout.NO_TEXTURE
+        }
+    }
+
+    /**
+     * Resolve the per-face effective color for vertex packing.
+     *
+     * For `PerFace` materials whose [faceType][RenderCommand.faceType] resolves to a
+     * per-face [IsoColor], returns that color so distinct face colors survive the
+     * GPU vertex buffer. For `PerFace` that resolves to a [IsometricMaterial.Textured],
+     * returns the `tint` (so the fragment shader's `sample * tint` multiplication
+     * behaves as the user intends per-face).
+     *
+     * For all other cases (flat materials, unresolved per-face), returns
+     * [RenderCommand.baseColor] so the pre-existing flat-material path is unchanged.
+     */
+    private fun resolveEffectiveColor(cmd: RenderCommand): IsoColor {
+        val perFace = cmd.material as? IsometricMaterial.PerFace ?: return cmd.baseColor
+        return when (val sub = perFace.resolveForFace(cmd.faceType)) {
+            is IsoColor -> sub
+            is IsometricMaterial.Textured -> sub.tint
+            else -> cmd.baseColor
         }
     }
 

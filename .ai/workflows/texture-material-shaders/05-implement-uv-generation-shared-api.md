@@ -6,14 +6,16 @@ slice-slug: uv-generation-shared-api
 status: complete
 stage-number: 5
 created-at: "2026-04-17T11:16:37Z"
-updated-at: "2026-04-17T16:50:41Z"
+updated-at: "2026-04-17T17:12:24Z"
 metric-files-changed: 19
 metric-lines-added: 1430
 metric-lines-removed: 140
 metric-deviations-from-plan: 2
 metric-review-fixes-applied: 20
+metric-verify-fixes-applied: 1
 commit-sha: "99369ef82191a3407f99a7625d225bc9cba54e6a"
-review-fixes-commit-sha: "4d3d22cdb94db7736a15b22c73673580886b798f"
+review-fixes-commit-sha: "750733156dac70f31e623b92fc8aa50fe37edc99"
+verify-fixes-commit-sha: "192f586"
 tags: [uv, api, refactor, shared-infrastructure, sealed-class, face-enum]
 refs:
   index: 00-index.md
@@ -342,3 +344,54 @@ tracked in the review rollup.
 
 No changes to `isometric-compose.api` / `isometric-webgpu.api` / `isometric-android-view.api`
 (they use the retyped APIs but their own public surface is unchanged).
+
+## Verify-Fix Applied (2026-04-17 re-verify pass)
+
+### I-01 — `PerFaceSharedApiTest` round-trip relied on `Path` value equality
+
+**Context:** The 2026-04-17 `/wf-verify` pass (after review-fixes commit `7507331`)
+flagged one newly-introduced failing case: `PerFaceSharedApiTest.RenderCommand
+equality hashCode and toString distinguish by faceVertexCount` at line 335. The
+L-05 review fix added an `assertEquals(quad, quadCopy)` round-trip to pin
+`faceVertexCount` through `equals/hashCode/toString`, but `stubRenderCommand`
+constructed a fresh `Path` on every invocation. `Path` is `open class` with no
+`equals()` override (identity equality), so two otherwise-identical
+`RenderCommand`s could never compare equal through the helper.
+
+### Fix
+
+`isometric-shader/src/test/kotlin/.../shader/PerFaceSharedApiTest.kt:370-389`:
+
+- Promoted `stubRenderCommand`'s previously-local `Path` to a module-level
+  `sharedStubPath` inside a `private companion object`. One `Path` instance is
+  now reused across every `stubRenderCommand()` call.
+- Added an optional `path: Path = sharedStubPath` parameter to
+  `stubRenderCommand` so any future test that legitimately needs a distinct
+  `Path` identity can still inject one.
+- Converted `stubRenderCommand` from a block-bodied function with a local `val`
+  + `return RenderCommand(...)` into a single-expression `= RenderCommand(...)`
+  now that no local preamble remained.
+
+Rejected alternatives:
+
+- **Overriding `equals()` on `Path`:** out of scope for this slice; changes
+  library-wide semantics that other code may silently rely on.
+- **Dropping `assertEquals(quad, quadCopy)` from the test:** discards the round-trip
+  intent of L-05 (catch accidental drop of `faceVertexCount` from
+  `equals/hashCode`). Sharing one `Path` preserves that intent without touching
+  production code.
+
+### Verification
+
+`:isometric-shader:testDebugUnitTest` full suite re-run after the fix:
+
+| Suite | tests | failures | note |
+|---|---|---|---|
+| `PerFaceSharedApiTest` | 22 | 0 | previously 1/22 failed |
+| `IsometricMaterialTest` | 49 | 0 | unchanged |
+| `PerFaceMaterialTest` | 10 | 0 | unchanged |
+| `UvGeneratorTest` | 10 | 0 | unchanged |
+| `TextureRenderUtilsTest` | 6 | 0 | unchanged |
+| `TexturedCanvasDrawHookTest` | 7 | 0 | 7 skipped (instrumented-only, unchanged) |
+
+All 104 shader unit tests green. No other modules touched; no `.api` diff.

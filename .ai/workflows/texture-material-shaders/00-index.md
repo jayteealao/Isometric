@@ -7,13 +7,13 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-17T19:01:24Z"
-selected-slice: "uv-generation-octahedron"
+updated-at: "2026-04-17T23:24:00Z"
+selected-slice: "uv-generation-pyramid"
 current-stage: implement
 stage-number: 5
-current-stage-status: verify-fix-applied
+current-stage-status: complete
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-octahedron"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -132,6 +132,12 @@ workflow-files:
   - 04-plan-uv-generation-knot.md
   - 04-plan-uv-generation-octahedron.md
   - 05-implement-uv-generation-shared-api.md
+  - 05-implement-uv-generation-pyramid.md
+  - 06-verify-uv-generation-pyramid.md
+  - .maestro/verify-pyramid.yaml
+  - isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/ShapeNodeFaceTypeTest.kt
+  - isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHook.kt
+  - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/SceneDataPacker.kt
   - isometric-core/src/main/kotlin/io/github/jayteealao/isometric/shapes/FaceIdentifier.kt
   - isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/UvCoordProviderForShape.kt
   - 06-verify-uv-generation-shared-api.md
@@ -166,8 +172,8 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: plan-complete
-  uv-generation-pyramid: plan-complete
+  uv-generation-pyramid: implement-verify-fix-complete
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete
-  uv-generation-octahedron: verify-fix-applied
+  uv-generation-octahedron: review-ship-with-caveats
 ---

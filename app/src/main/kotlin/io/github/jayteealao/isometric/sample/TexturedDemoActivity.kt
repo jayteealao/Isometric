@@ -36,12 +36,14 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.RenderMode
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.shader.perFace
+import io.github.jayteealao.isometric.shader.pyramidPerFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shader.TextureTransform
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shader.Shape
 
 class TexturedDemoActivity : ComponentActivity() {
@@ -69,6 +71,10 @@ private enum class ShapeTab(val label: String, val description: String) {
     Octahedron(
         label = "Octahedron",
         description = "Left: single grass texture across all 8 faces \u2014 Right: PerFace with 8 distinct face colors",
+    ),
+    Pyramid(
+        label = "Pyramid",
+        description = "Left: grass texture on 4 laterals + dirt base \u2014 Right: PerFace with 4 distinct lateral colors + gray base",
     ),
 }
 
@@ -109,6 +115,23 @@ private fun TexturedDemoScreen() {
             ),
             default = IsoColor(150, 150, 150),
         )
+    }
+
+    val pyramidTextured = remember {
+        pyramidPerFace {
+            allLaterals(texturedBitmap(TextureAssets.grassTop))
+            base = texturedBitmap(TextureAssets.dirtSide)
+        }
+    }
+    val pyramidPerFaceMat = remember {
+        pyramidPerFace {
+            lateral(0, IsoColor(220, 50, 50))
+            lateral(1, IsoColor(50, 180, 50))
+            lateral(2, IsoColor(50, 80, 220))
+            lateral(3, IsoColor(220, 200, 50))
+            base = IsoColor(150, 150, 150)
+            default = IsoColor(100, 100, 100)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -174,6 +197,11 @@ private fun TexturedDemoScreen() {
                     renderMode = renderMode,
                     texturedMaterial = octahedronTextured,
                     perFaceMaterial = octahedronPerFace,
+                )
+                ShapeTab.Pyramid -> TexturedPyramidScene(
+                    renderMode = renderMode,
+                    texturedMaterial = pyramidTextured,
+                    perFaceMaterial = pyramidPerFaceMat,
                 )
             }
         }
@@ -246,6 +274,36 @@ private fun TexturedOctahedronScene(
             )
             Shape(
                 geometry = Octahedron(Point(2.0, 0.0, 0.0)),
+                material = perFaceMaterial,
+                scale = 3.0,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TexturedPyramidScene(
+    renderMode: RenderMode,
+    texturedMaterial: IsometricMaterial,
+    perFaceMaterial: IsometricMaterial,
+) {
+    ProvideTextureRendering {
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(
+                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+                renderMode = renderMode,
+                useNativeCanvas = false,
+                gestures = GestureConfig.Disabled,
+            ),
+        ) {
+            Shape(
+                geometry = Pyramid(Point(-1.5, 0.0, 0.0)),
+                material = texturedMaterial,
+                scale = 3.0,
+            )
+            Shape(
+                geometry = Pyramid(Point(1.5, 0.0, 0.0)),
                 material = perFaceMaterial,
                 scale = 3.0,
             )

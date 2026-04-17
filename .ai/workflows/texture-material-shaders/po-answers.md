@@ -127,3 +127,68 @@ UV don't block simpler ones).
 `api-design-fixes` completing first. UV gen slices also depend on `uv-generation` (the
 original Prism UV system they extend).
 
+## 2026-04-16 — Plan (webgpu-texture-error-callback)
+
+**Bridge strategy:** New `LocalTextureErrorCallback = staticCompositionLocalOf { null }`
+CompositionLocal in `isometric-shader` (`ProvideTextureRendering.kt`). `ProvideTextureRendering`
+sets it alongside `LocalMaterialDrawHook`. `WebGpuRenderBackend.Surface()` reads it and updates
+`@Volatile var onTextureLoadError` on `WebGpuSceneRenderer` via `SideEffect`. Forwarding lambda
+passed to `GpuFullPipeline` → `GpuTextureManager`. No new public API beyond the CompositionLocal.
+
+**Thread dispatch:** Dispatch callback to main thread via `Handler(Looper.getMainLooper()).post { ... }`
+from inside `GpuTextureManager`. `Log.w` is kept — callback is additive.
+
+**Error scope:** All load failure paths:
+- Site 1: `Log.w` else-branch (unsupported `TextureSource` type) — fires per individual source
+- Site 2: `atlasManager.rebuild(entries)` failure — fires for all keys in `entries`
+- (The "empty entries" case is already covered by Site 1 firing per skipped source)
+
+## 2026-04-16 — Plan (uv-generation-* batch discovery)
+
+**Batch strategy:** All 5 shape UV slices (cylinder, pyramid, stairs, knot, octahedron) planned in parallel
+using sub-agents. Full research playbook per slice (affected code + test infra + web research).
+
+**webgpu-texture-error-callback handoff:** Skip entirely. Follow the pattern of original slices where
+per-slice handoff was handled via the master `08-handoff.md`. Mark `progress.webgpu-texture-error-callback`
+as `complete` (handoff skipped).
+
+**PerFace scope for non-Prism shapes:** Per-shape PerFace variants. Abstract `IsometricMaterial.PerFace`
+base class with shape-specific subclasses: existing `PerFace` becomes `PerFace.Prism`, new `PerFace.Cylinder(top, bottom, side)`,
+`PerFace.Pyramid(base, laterals: Map<Int, MaterialData>, default)`, `PerFace.Stairs(tread, riser, side, default)`,
+`PerFace.Octahedron(byIndex: Map<Int, MaterialData>, default)`. Knot gets no `PerFace.Knot` variant
+(documented as unsupported).
+
+**Variable vertex count:** Add `faceVertexCount: Int` field to `RenderCommand`. `uvCoords` length is
+`2 × faceVertexCount`. Canvas + WebGPU consumers must stop assuming 4 vertices per face.
+
+**UV dispatch:** `UvCoordProvider.forShape(geometry: Shape): UvCoordProvider?` factory in `isometric-shader`.
+Single `when (geometry)` dispatch grows with each slice. Replaces the current `geometry as? Prism` gate
+in `IsometricMaterialComposables.Shape()`.
+
+**Knot handling:** Bag-of-prisms reuse. `UvGenerator.forKnotFace()` delegates to `forPrismFace()` for
+the 18 sub-prism paths (indices 0–5, 6–11, 12–17) and applies planar UV to the 2 custom quads (18–19).
+No `KnotFace` enum; no `PerFace.Knot` variant. Documented as `perFace` unsupported on Knot.
+
+**Cylinder seam:** Duplicate seam vertices in the `Cylinder` shape (core change) so adjacent side quads
+have distinct UV u-values (1.0 and 0.0). Requires a `Cylinder.paths` structural change; core plan must
+identify all callers that index by `paths.size` or vertex count.
+
+**Pyramid base:** Add a 5th path (rectangular base quad) to `Pyramid.createPaths()`. Breaking change for
+anyone iterating `pyramid.paths`; plan must identify affected callers (tests, snapshot tests, existing
+renders) and update them.
+
+**Stairs DSL:** `PerFace.Stairs(tread, riser, side, default)` — logical groups only, `stepCount`-independent.
+All treads share one material, all risers share one, both sides share one.
+
+**Prerequisite slice:** New `uv-generation-shared-api` slice lands shared infrastructure FIRST (full-surface
+prereq): `RenderCommand.faceVertexCount`, abstract `PerFace` base, all 4 shape face enums
+(`CylinderFace`, `PyramidFace`, `StairsFace`, `OctahedronFace`) in `isometric-core`, empty `PerFace.<Shape>`
+variant stubs in `isometric-shader`, `UvCoordProvider.forShape()` factory skeleton. Each shape slice then
+becomes purely additive.
+
+**Delivery strategy:** No PR strategy per slice — PR strategy decided at slug level at ship time.
+Per-slice plans focus on code changes only.
+
+**Slice total:** 6 slices to plan (1 prereq + 5 shape slices). Implementation order: prereq → octahedron →
+pyramid → cylinder → stairs → knot (simple to complex).
+

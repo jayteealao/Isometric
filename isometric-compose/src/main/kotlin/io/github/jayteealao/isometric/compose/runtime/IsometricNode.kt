@@ -11,6 +11,8 @@ import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.Pyramid
+import io.github.jayteealao.isometric.shapes.PyramidFace
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
 
@@ -288,9 +290,16 @@ class ShapeNode(
                     ownerNodeId = nodeId,
                     material = material,
                     uvCoords = uvProvider?.provide(shape, index),
-                    faceType = when (transformedShape) {
+                    // Dispatch on the pre-transform `shape` field, not `transformedShape`.
+                    // `Shape.rotateZ` / `Shape.scale` return the base `Shape` type and
+                    // cannot be overridden, so a transformed Pyramid/Octahedron would
+                    // fail the `is <Shape>` check and null out faceType, which in turn
+                    // makes `PerFace.resolveForFace(null)` fall back to `default`.
+                    // Face identity is structural (path-index order), not transform-dependent.
+                    faceType = when (shape) {
                         is Prism -> PrismFace.fromPathIndex(index)
                         is Octahedron -> OctahedronFace.fromPathIndex(index)
+                        is Pyramid -> PyramidFace.fromPathIndex(index)
                         else -> null
                     },
                     faceVertexCount = path.points.size,

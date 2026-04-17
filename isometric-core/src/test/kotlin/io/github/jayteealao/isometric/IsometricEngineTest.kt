@@ -296,7 +296,7 @@ class IsometricEngineTest {
     @Test
     fun `shapes support zero arg defaults where intended`() {
         assertEquals(6, Prism().paths.size)
-        assertEquals(4, io.github.jayteealao.isometric.shapes.Pyramid().paths.size)
+        assertEquals(5, io.github.jayteealao.isometric.shapes.Pyramid().paths.size)
         assertTrue(io.github.jayteealao.isometric.shapes.Cylinder().paths.isNotEmpty())
         assertEquals(8, Octahedron().paths.size)
         assertTrue(Knot().paths.isNotEmpty())

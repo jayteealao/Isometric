@@ -56,6 +56,15 @@ class Pyramid @JvmOverloads constructor(
             paths.add(face2)
             paths.add(face2.rotateZ(center, PI))
 
+            /* Rectangular base quad (CCW viewed from below). */
+            val base = Path(
+                position,
+                Point(position.x + width, position.y, position.z),
+                Point(position.x + width, position.y + depth, position.z),
+                Point(position.x, position.y + depth, position.z),
+            )
+            paths.add(base)
+
             return paths
         }
     }

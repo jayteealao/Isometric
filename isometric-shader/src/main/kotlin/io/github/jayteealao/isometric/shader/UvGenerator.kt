@@ -4,6 +4,7 @@ import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.Pyramid
 
 /**
  * Generates per-vertex UV coordinates for [Prism] faces. Internal implementation detail.
@@ -77,6 +78,58 @@ internal object UvGenerator {
      */
     fun forAllOctahedronFaces(octahedron: Octahedron): List<FloatArray> =
         octahedron.paths.indices.map { forOctahedronFace(octahedron, it) }
+
+    /**
+     * Generates UV coordinates for a single [Pyramid] face.
+     *
+     * Lateral faces (indices 0..3) share the canonical triangle layout
+     * `(0,1)–(1,1)–(0.5,0)` — apex at UV-top, so the texture's top edge maps to
+     * the pyramid's peak. The BASE face (index 4) uses a planar top-down
+     * projection yielding `(0,0)–(1,0)–(1,1)–(0,1)` for any unit pyramid.
+     *
+     * @param pyramid The source Pyramid (provides dimensional extents for base normalization)
+     * @param faceIndex 0..3 for laterals, 4 for the rectangular base
+     * @return [FloatArray] of 6 floats for laterals, 8 floats for the base
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until pyramid.paths.size`
+     */
+    fun forPyramidFace(pyramid: Pyramid, faceIndex: Int): FloatArray {
+        require(faceIndex in pyramid.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Pyramid with ${pyramid.paths.size} faces (valid range: 0 until ${pyramid.paths.size})"
+        }
+        return if (faceIndex == 4) {
+            computePyramidBaseUvs(pyramid)
+        } else {
+            LATERAL_CANONICAL_UVS.copyOf()
+        }
+    }
+
+    /**
+     * Generates UV coordinates for all five Pyramid faces in `Pyramid.paths` order
+     * (0..3 laterals, 4 base).
+     */
+    fun forAllPyramidFaces(pyramid: Pyramid): List<FloatArray> =
+        pyramid.paths.indices.map { forPyramidFace(pyramid, it) }
+
+    private val LATERAL_CANONICAL_UVS: FloatArray = floatArrayOf(
+        0.0f, 1.0f,   // v[0] base-left
+        1.0f, 1.0f,   // v[1] base-right
+        0.5f, 0.0f,   // v[2] apex
+    )
+
+    private fun computePyramidBaseUvs(pyramid: Pyramid): FloatArray {
+        val ox = pyramid.position.x
+        val oy = pyramid.position.y
+        val w = pyramid.width
+        val d = pyramid.depth
+        val path = pyramid.paths[4]
+        val result = FloatArray(8)
+        for (i in 0..3) {
+            val pt = path.points[i]
+            result[i * 2] = ((pt.x - ox) / w).toFloat()
+            result[i * 2 + 1] = ((pt.y - oy) / d).toFloat()
+        }
+        return result
+    }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
         val ox = prism.position.x

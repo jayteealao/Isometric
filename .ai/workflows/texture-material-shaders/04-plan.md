@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-15T06:39:08Z"
+updated-at: "2026-04-17T21:27:19Z"
 planning-mode: all
-slices-planned: 8
-slices-total: 14
-implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes, webgpu-uv-transforms]
-conflicts-found: 0
+slices-planned: 15
+slices-total: 15
+implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes, webgpu-uv-transforms, webgpu-texture-error-callback, uv-generation-shared-api, uv-generation-octahedron, uv-generation-pyramid, uv-generation-cylinder, uv-generation-stairs, uv-generation-knot]
+conflicts-found: 3
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   slice-index: 03-slice.md
 next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders material-types"
+next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
 ---
 
 # Plan Index
@@ -99,6 +99,132 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   as a valid face material. TM-API-24 must land before TM-API-2 (REPEAT tile mode needed for
   TextureTransform tiling to render correctly).
 
+### `webgpu-texture-error-callback` (new — 2026-04-16)
+- **Files:** 5 (all modified)
+- **Steps:** 9
+- **Strategy:** Add `LocalTextureErrorCallback = staticCompositionLocalOf { null }` in
+  `isometric-shader` (`ProvideTextureRendering.kt`). `ProvideTextureRendering` sets it
+  alongside `LocalMaterialDrawHook`. `WebGpuRenderBackend.Surface()` reads it via
+  `LocalTextureErrorCallback.current` and assigns to `@Volatile var` on `WebGpuSceneRenderer`
+  via `SideEffect`. Forwarding lambda `{ src -> onTextureLoadError?.invoke(src) }` is passed
+  to `GpuFullPipeline(ctx, onError)` → `GpuTextureManager(ctx, onError)`. Callback dispatched
+  to main thread via `Handler(Looper.getMainLooper()).post { ... }`.
+  Fires at 2 sites: (1) `Log.w` else-branch for unsupported source types; (2) atlas rebuild
+  failure for all involved sources.
+- **Key risk:** `LocalTextureErrorCallback` must be `public` (cross-module CompositionLocal) —
+  regenerate `isometric-shader.api` with `apiDump` before `apiCheck`.
+- **Plan:** `04-plan-webgpu-texture-error-callback.md`
+
+### `uv-generation-shared-api` (new — 2026-04-17, prerequisite for all UV geometry slices)
+- **Files:** 16 (4 create face-type files in core, 4 create test files, 8 modify/update)
+- **Steps:** 9
+- **Strategy:** Refactor `IsometricMaterial.PerFace` to abstract sealed class with 5
+  subclasses (`Prism`, `Cylinder`, `Pyramid`, `Stairs`, `Octahedron`). Add
+  `RenderCommand.faceVertexCount: Int = 4` at end of params (preserves positional calls).
+  Add 4 shape face types to `isometric-core`: `CylinderFace`/`StairsFace`/`OctahedronFace`
+  as enums, `PyramidFace` as **sealed class** (`BASE` object + `Lateral(index)` data class).
+  Add `uvCoordProviderForShape(shape: Shape): UvCoordProvider?` factory returning
+  Prism provider + null for all others. `when (m)` sub-dispatch in Canvas/WebGPU material
+  consumers handles `PerFace.Prism` vs non-Prism variants. `GpuUvCoordsBuffer` guard
+  uses `faceVertexCount` instead of `>= 8`.
+- **Key decision:** `RenderCommand.faceType` stays `PrismFace?` (NOT generalized to a
+  `ShapeFaceTag?` marker). Non-Prism shapes derive face via `command.originalShape as? <Shape>`
+  + `paths.indexOf(command.originalPath)` + `<ShapeFace>.fromPathIndex(index)` in consumers.
+  Trade-off: O(N) path lookup per command (N ≤ 22 for Stairs) vs zero new fields on RenderCommand.
+- **Key risk:** `PerFace` rename is binary-breaking (JVM name changes). Pre-1.0 library;
+  commit `.api` diff via `apiDump`.
+- **Plan:** `04-plan-uv-generation-shared-api.md`
+
+### `uv-generation-octahedron` (revised 2026-04-17T17:37Z — auto-review)
+- **Files:** 7 (1 create test, 6 modify, 1 apiDump)
+- **Steps:** 9
+- **Strategy:** Purely additive after prereq. `UvGenerator.forOctahedronFace` returns
+  canonical triangle UV `(0,0),(1,0),(0.5,1)` for all 8 faces — congruent equilateral
+  triangles need no per-face orientation tracking. Touches five integration points:
+  (1) adds `is Octahedron` branch to `uvCoordProviderForShape` in `UvCoordProviderForShape.kt`
+  (not `IsometricMaterialComposables.kt`, which the prereq no longer owns);
+  (2) replaces the `is PerFace.Octahedron -> default` arm in the shared
+  `resolveForFace` extension (H-04 leverage pattern) with real
+  `byIndex[faceType as? OctahedronFace] ?: default` dispatch;
+  (3) expands `IsometricNode.kt:290` to emit `OctahedronFace.fromPathIndex(index)` so
+  per-face dispatch actually fires for AC2;
+  (4) adds `is PerFace.Octahedron` collection branch to
+  `GpuTextureManager.collectTextureSources` so atlas picks up `byIndex.values` textures;
+  (5) clears four `TODO(uv-generation-octahedron)` markers left by the shared-api prereq.
+  `Octahedron.kt` is NOT modified.
+- **Key risk:** `IsometricNode.kt:290` currently emits `faceType = null` for every
+  non-Prism shape, so without the Step 4 expansion, AC2 per-face addressing would silently
+  fail — every face resolves to `default`. Auto-review revision caught this.
+- **Plan:** `04-plan-uv-generation-octahedron.md` (revision 1)
+
+### `uv-generation-pyramid` (revised 2026-04-17T21:27Z — auto-review; BREAKING CHANGE)
+- **Files:** 10 (1 core modify Pyramid, 1 core test update, 4 shader modify, 1 compose modify, 1 webgpu modify, 1 create shader test, 1 sample-app modify)
+- **Steps:** 12
+- **Strategy:** Add 5th path (rectangular base quad) to `Pyramid.createPaths()` — **breaking
+  change** to Pyramid path count (4 → 5). Lateral UV uses constant `(0,1),(1,1),(0.5,0)` for
+  all 4 laterals (apex at UV top). Base UV uses planar top-down projection. Wire `is Pyramid`
+  into `uvCoordProviderForShape` + `IsometricNode.faceType` emission + `GpuTextureManager.collectTextureSources`
+  + replace Pyramid arm in `resolveForFace` (4 shared surfaces). `PerFace.Pyramid.resolve()`
+  is **already implemented** by shared-api — plan Step 4 is now a no-op. Add `pyramidPerFace {}`
+  DSL alongside Prism's. Pyramid tab added to TexturedDemoActivity mirroring octahedron pattern.
+  **Mixed-vertex-count is the first real I-02 stress test** (3-vert laterals + 4-vert base)
+  — any remaining propagation gap surfaces visibly as split rendering between lateral/base.
+- **Key risks:** (1) mixed-vertex-count I-02 stress test — first shape with within-shape
+  vertex-count variation; any propagation gap surfaces visibly.
+  (2) `IsometricEngineTest.kt:299` hard assertion on `Pyramid().paths.size == 4` must change to 5.
+  (3) Paparazzi `pyramid()` + `sampleThree()` snapshots differ; regenerate.
+  (4) `DocScreenshotGenerator.shapePyramid()` PNG differs; regenerate.
+  (5) Lateral numbering is straight (`0→Lateral(0), 1→Lateral(1), ...`) per prereq —
+  `Lateral(1)` is the opposite face of `Lateral(0)`, not adjacent. Already documented in PyramidFace KDoc.
+- **Inherits 7 deferred HIGH findings** from `/wf-review uv-generation-octahedron`
+  (CR-2/A-02/M-01, CR-3/R-05, CR-5/AC-04/AC-05, TEST-03/RS-05, TEST-04, M-02, M-04/A-01).
+  Not fixed by this slice per user triage.
+- **Plan:** `04-plan-uv-generation-pyramid.md` (revision 1)
+
+### `uv-generation-cylinder` (new — 2026-04-17, BREAKING CHANGE)
+- **Files:** 9 (1 modify core Cylinder, 4 modify shader, 1 modify webgpu doc, 1 modify test, 2 apiDump)
+- **Steps:** 9
+- **Strategy:** Seam vertex duplication in `Cylinder.kt` via new `buildCylinderPaths()`
+  private function — generates N+1 base/top `Point` objects where index N is a geometric
+  copy of index 0 but distinct identity. Side quad k=N-1 references `basePoints[N-1..N]`,
+  giving UV u=(N-1)/N and u=1.0 at the seam (no smear). Path count unchanged (N+2). Side
+  UV: `u = k/N` left / `(k+1)/N` right; v=0 at top, v=1 at base (**convention differs from
+  Prism** — documented). Cap UV: planar disk projection `(0.5+0.5·cos(θ), 0.5+0.5·sin(θ))`.
+- **Key risk:** `GpuUvCoordsBuffer` fixed 12-float (6 UV pair) stride truncates cap UV for
+  N>6 in WebGPU mode. Canvas unaffected (3-point affine). Documented as known limitation;
+  defer variable-stride fix to a dedicated WebGPU slice.
+- **Cross-cutting:** v=0-at-top for Cylinder sides vs v=0-at-bottom for Prism is a real
+  inconsistency for users mixing shapes with the same texture — documented for user
+  feedback. Flagged under "Cross-Cutting Concerns" below.
+- **Plan:** `04-plan-uv-generation-cylinder.md`
+
+### `uv-generation-stairs` (new — 2026-04-17)
+- **Files:** 8
+- **Steps:** 7
+- **Strategy:** Riser (even path indices, 4 verts): u=x, v=z normalized over riser height.
+  Tread (odd indices, 4 verts): u=x, v=y normalized over tread depth. Side (indices 2N, 2N+1,
+  variable 2N+2 verts): planar bounding-box projection on (y,z) plane; right side u-mirrored.
+  Fill in `PerFace.Stairs.resolve(face: StairsFace)` — logical groups tread/riser/side.
+  Wire `is Stairs ->` in `uvCoordProviderForShape()`. Variable `faceVertexCount` per path
+  handled by prereq's field.
+- **Key risk:** `SceneDataPacker.packInto()` has `coerceAtMost(6)` — side faces with
+  stepCount ≥ 3 (8+ verts) are truncated in WebGPU, producing a visible "notch" artifact.
+  Canvas mode correct for all stepCounts. Same root cause as Cylinder cap limitation.
+- **Plan:** `04-plan-uv-generation-stairs.md`
+
+### `uv-generation-knot` (new — 2026-04-17, EXPERIMENTAL)
+- **Files:** 7
+- **Steps:** 7
+- **Strategy:** Add `sourcePrisms: List<Prism>` public val to `Knot.kt` with
+  `@ExperimentalIsometricApi` (required for UV to access pre-transform dimensions).
+  `UvGenerator.forKnotFace` delegates indices 0..17 to `forPrismFace(sourcePrisms[i/6], i%6)`,
+  uses `quadBboxUvs` planar projection for custom quads 18, 19. **No `KnotFace` enum, no
+  `PerFace.Knot` variant** — `perFace {}` on Knot falls through to `PerFace.Prism.default`
+  because `faceType` is null for non-Prism shapes (documented zero-code-change behavior).
+- **Key risk:** `sourcePrisms` duplicates constants from `createPaths()` — dimension unit
+  test is the regression guard against drift.
+- **Plan:** `04-plan-uv-generation-knot.md`
+
 ### `webgpu-uv-transforms` (new — 2026-04-15)
 - **Files:** 7 (4 modified, 3 new)
 - **Steps:** 8
@@ -127,6 +253,62 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
   `docs/internal/api-design-guideline.md` (§2 progressive disclosure, §3 defaults,
   §6 invalid states, §10 host language, §11 evolution).
 
+### Cross-Cutting Concerns (2026-04-17, added for UV geometry batch)
+
+- **WebGPU n-gon face infrastructure debt (BLOCKS clean completion):** `SceneDataPacker.packInto()`
+  uses `pts3d.size.coerceAtMost(6)` and `TriangulateEmitShader` caps at 6 vertices /
+  4 triangles. `GpuUvCoordsBuffer` allocates 48 bytes (12 floats / 6 UV pairs) per face.
+  Two shapes in this batch hit this limit in WebGPU mode:
+  - **Cylinder caps** with `vertices > 6` (default is 20) — truncated to 6 verts;
+    outer cap ring renders incorrectly
+  - **Stairs side faces** with `stepCount > 2` — zigzag polygons have `2·stepCount + 2`
+    vertices; truncated to 6; visible "notch" artifact
+  Canvas mode is correct in both cases (uses 3-point affine `setPolyToPoly`).
+  **Not fixed in this batch.** Each affected slice documents the limitation and suggests
+  `stepCount ≤ 2` / `vertices ≤ 6` workaround. A follow-up `webgpu-ngon-faces` slice
+  should introduce variable-stride UV packing + WGSL changes. This is a genuine
+  cross-cutting concern that will affect any future non-Prism shape with variable-vertex
+  faces on WebGPU.
+
+- **`RenderCommand.faceType` typing decision:** Prereq (`uv-generation-shared-api`) keeps
+  `faceType: PrismFace?` rather than generalizing to a `ShapeFaceTag?` sealed marker.
+  **Consequence:** Non-Prism shape face dispatch in `TexturedCanvasDrawHook`,
+  `SceneDataPacker.resolveTextureIndex`, and `GpuTextureManager.resolveEffectiveMaterial`
+  must derive the shape-specific face via `command.originalShape as? <Shape>` +
+  `paths.indexOf(command.originalPath)` + `<ShapeFace>.fromPathIndex(index)`.
+  O(N) path lookup per command, N ≤ 22 for Stairs. Acceptable for now; a follow-up slice
+  can add `shapeFaceIndex: Int?` to `RenderCommand` if benchmarks show it hot.
+
+- **UV v-axis convention drift:** `uv-generation-cylinder` plan sets v=0 at top of side
+  faces (matches wall/brick texture orientation). Prism + Stairs use v=0 at bottom.
+  Real papercut when users apply the same texture to a Prism and a Cylinder in the same
+  scene. Documented as known limitation; flipping Prism would be a breaking change.
+
+- **Pyramid lateral numbering:** Prereq's `PyramidFace.fromPathIndex` uses **straight**
+  numbering (`0→Lateral(0), 1→Lateral(1), 2→Lateral(2), 3→Lateral(3)`). Construction-order
+  in `Pyramid.createPaths()` is `face1, face1.rotateZ(PI), face2, face2.rotateZ(PI)` —
+  so `Lateral(1)` refers to the face OPPOSITE `Lateral(0)` (not adjacent). Documented
+  in `PyramidFace.Lateral` KDoc.
+
+- **Knot experimental scope:** `Knot` gets no `KnotFace` enum and no `PerFace.Knot`
+  variant. Adding `sourcePrisms` to `Knot` (experimental property) is the only core
+  change for knot UV support. `perFace {}` on Knot silently falls through to
+  `PerFace.Prism.default` because `faceType` is null for non-Prism shapes.
+
+- **Snapshot regeneration burden:** `uv-generation-pyramid` changes Pyramid path count
+  from 4 → 5, breaking `pyramid()`, `sampleThree()` Paparazzi snapshots and
+  `DocScreenshotGenerator.shapePyramid()` PNG. All three must be regenerated and
+  committed by the pyramid slice implementer.
+
+- **Slice planning conflicts detected during cohesion check:**
+  1. Original pyramid plan proposed interleaved lateral numbering (reflecting construction
+     order: `0→L0, 1→L2, 2→L1, 3→L3`). Corrected to straight numbering to align with prereq.
+  2. Original stairs plan used `resolve(faceType: Any?)` signature. Prereq's typed
+     `resolve(face: StairsFace)` is cleaner — aligned.
+  3. Original pyramid plan proposed generalizing `faceType` to a `ShapeFaceTag?` marker.
+     Prereq decided to keep `PrismFace?` with `when (m)` sub-dispatch in consumers —
+     pyramid and stairs plans aligned to this decision.
+
 ## Integration Points Between Slices
 
 | Producer Slice | Consumer Slice | Shared Interface |
@@ -139,14 +321,26 @@ next-invocation: "/wf-implement texture-material-shaders material-types"
 
 ## Recommended Implementation Order
 
-1. `material-types` — dependency root, all slices need these types
-2. `uv-generation` — pure math, enables both renderers
-3. `canvas-textures` — default render mode, immediate visual validation
-4. `webgpu-textures` — can run in parallel with canvas-textures if desired
-5. `per-face-materials` — hero feature, requires both renderers working
-6. `sample-demo` — end-to-end proof
-7. `api-design-fixes` — API cleanup (all above complete)
-8. `webgpu-uv-transforms` — requires api-design-fixes (final TextureTransform API)
+1. `material-types` — dependency root, all slices need these types ✓ complete
+2. `uv-generation` — pure math, enables both renderers ✓ complete
+3. `canvas-textures` — default render mode ✓ complete
+4. `webgpu-textures` — GPU path ✓ complete
+5. `per-face-materials` — hero feature ✓ complete
+6. `sample-demo` — end-to-end proof ✓ complete
+7. `api-design-fixes` — API cleanup ✓ complete
+8. `webgpu-uv-transforms` — TextureTransform on WebGPU ✓ complete
+9. `webgpu-texture-error-callback` — error callback WebGPU parity ✓ complete
+10. **`uv-generation-shared-api`** — prerequisite for all UV geometry slices ← NEXT
+11. `uv-generation-octahedron` — simplest UV geometry (canonical triangle UV)
+12. `uv-generation-pyramid` — adds 5th path (BREAKING), snapshot regeneration
+13. `uv-generation-cylinder` — seam duplication in Cylinder shape (BREAKING to vertex count)
+14. `uv-generation-stairs` — variable-vertex side faces (WebGPU truncation for stepCount > 2)
+15. `uv-generation-knot` — EXPERIMENTAL, bag-of-prisms reuse, `textured()`-only
+
+Slices 11–15 can be implemented in parallel after slice 10 merges, since they only share
+the additive extension points established by `uv-generation-shared-api` (each slice fills
+in its own `PerFace.<Shape>.resolve()` body, adds its `UvGenerator.forXxxFace()` method,
+and wires its `is <Shape> ->` branch in `uvCoordProviderForShape()`).
 
 ## Conflicts Found
 
@@ -169,7 +363,12 @@ Key coordination points after fix:
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf-implement texture-material-shaders material-types` — rework
-  the already-implemented material-types slice per rev 3 (reverse the dependency).
-  **Consider `/compact` first** — planning/review context is noise for implementation.
-- **Option B:** Sequential through all 6 slices after material-types rework.
+- **Option A (default):** `/wf-implement texture-material-shaders uv-generation-shared-api`
+  — land the shared-infrastructure prereq first. All 5 UV geometry slices depend on it.
+  **Consider `/compact` first** — planning/cohesion-check context is noise for implementation.
+- **Option B:** After the prereq merges, run each UV geometry slice's `/wf-implement` in
+  parallel branches. Recommended order: octahedron (simplest) → pyramid → cylinder →
+  stairs → knot.
+- **Option C:** `/wf-slice texture-material-shaders` — if cohesion conflicts identified
+  above (pyramid lateral numbering, `faceType` typing, v-axis convention) need further
+  refinement before implementation.

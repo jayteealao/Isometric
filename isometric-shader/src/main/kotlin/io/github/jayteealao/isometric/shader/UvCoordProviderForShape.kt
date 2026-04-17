@@ -4,6 +4,7 @@ import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
 
 /**
  * Returns a [UvCoordProvider] that generates per-face UVs for [shape], or `null` if
@@ -22,7 +23,6 @@ import io.github.jayteealao.isometric.shapes.Prism
  *
  * Each shape slice adds a `when` branch here:
  * - `uv-generation-cylinder` → `is Cylinder`
- * - `uv-generation-pyramid`  → `is Pyramid`
  * - `uv-generation-stairs`   → `is Stairs`
  * - `uv-generation-knot`     → `is Knot`
  *
@@ -32,5 +32,6 @@ import io.github.jayteealao.isometric.shapes.Prism
 internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (shape) {
     is Prism -> UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(shape, faceIndex) }
     is Octahedron -> UvCoordProvider { _, faceIndex -> UvGenerator.forOctahedronFace(shape, faceIndex) }
+    is Pyramid -> UvCoordProvider { _, faceIndex -> UvGenerator.forPyramidFace(shape, faceIndex) }
     else -> null
 }

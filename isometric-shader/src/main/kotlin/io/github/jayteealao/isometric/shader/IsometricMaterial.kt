@@ -237,17 +237,17 @@ sealed interface IsometricMaterial : MaterialData {
          * [io.github.jayteealao.isometric.shapes.Pyramid].
          *
          * [laterals] maps a [PyramidFace.Lateral] slot to its material. Missing slots
-         * fall back to [default]. [base] applies to the rectangular base quad (added by
-         * the `uv-generation-pyramid` slice).
+         * fall back to [default]. [base] applies to the rectangular base quad (path
+         * index 4, added by the `uv-generation-pyramid` slice).
          *
-         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
-         * collaborators that this slice deliberately leaves empty:
+         * Per-face rendering is fully wired: [uvCoordProviderForShape] registers the
+         * Pyramid UV provider (laterals use a canonical apex-at-top triangle layout,
+         * base uses a top-down planar projection); [resolveForFace] dispatches via
+         * `faceType as? PyramidFace`; and `GpuTextureManager.collectTextureSources`
+         * aggregates textures from [base] and [laterals].
          *
-         * - TODO(uv-generation-pyramid): register a non-null provider in
-         *   [uvCoordProviderForShape].
-         * - TODO(uv-generation-pyramid): add a `is Pyramid` branch to [resolveForFace].
-         * - TODO(uv-generation-pyramid): collect per-slot textures in
-         *   `GpuTextureManager.collectTextureSources` (warning fires today).
+         * Prefer the [pyramidPerFace] DSL for construction — it avoids boilerplate
+         * `PyramidFace.Lateral(n)` keys and offers an `allLaterals(material)` convenience.
          *
          * @property base Material for the rectangular base quad (path index 4)
          * @property laterals Map from [PyramidFace.Lateral] to material for that lateral.
@@ -383,10 +383,11 @@ sealed interface IsometricMaterial : MaterialData {
  * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for
  * the face currently being rendered.
  *
- * [IsometricMaterial.PerFace.Prism] and [IsometricMaterial.PerFace.Octahedron] dispatch
- * via [faceType] today; the remaining variants (`Cylinder`, `Pyramid`, `Stairs`) ship
- * empty stubs and return [IsometricMaterial.PerFace.default] until their
- * `uv-generation-<shape>` slices wire up per-face resolution.
+ * [IsometricMaterial.PerFace.Prism], [IsometricMaterial.PerFace.Octahedron], and
+ * [IsometricMaterial.PerFace.Pyramid] dispatch via [faceType] today; the remaining
+ * variants (`Cylinder`, `Stairs`) ship empty stubs and return
+ * [IsometricMaterial.PerFace.default] until their `uv-generation-<shape>` slices
+ * wire up per-face resolution.
  *
  * Centralising this dispatch means each downstream shape slice adds exactly one
  * `when` branch here — rather than updating the 3 consumer sites
@@ -408,11 +409,13 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         val octahedronFace = faceType as? OctahedronFace
         if (octahedronFace != null) byIndex[octahedronFace] ?: default else default
     }
+    is IsometricMaterial.PerFace.Pyramid -> {
+        val pyramidFace = faceType as? PyramidFace
+        if (pyramidFace != null) resolve(pyramidFace) else default
+    }
     // TODO(uv-generation-cylinder): dispatch via faceType as? CylinderFace
-    // TODO(uv-generation-pyramid):  dispatch via faceType as? PyramidFace
     // TODO(uv-generation-stairs):   dispatch via faceType as? StairsFace
     is IsometricMaterial.PerFace.Cylinder,
-    is IsometricMaterial.PerFace.Pyramid,
     is IsometricMaterial.PerFace.Stairs -> default
 }
 
@@ -492,6 +495,34 @@ fun perFace(
 ): IsometricMaterial.PerFace.Prism =
     PerFaceMaterialScope().apply(block).build()
 
+/**
+ * Creates an [IsometricMaterial.PerFace.Pyramid] via a builder with named face slots.
+ *
+ * Pyramid has two face categories — the rectangular [PyramidPerFaceMaterialScope.base]
+ * and four triangular laterals addressed by index 0..3. Use [PyramidPerFaceMaterialScope.allLaterals]
+ * to paint every lateral with the same material, then override individual laterals via
+ * [PyramidPerFaceMaterialScope.lateral] when needed.
+ *
+ * ```kotlin
+ * Shape(Pyramid(origin), material = pyramidPerFace {
+ *     base = texturedResource(R.drawable.dirt)
+ *     allLaterals(texturedResource(R.drawable.brick))
+ * })
+ *
+ * Shape(Pyramid(origin), material = pyramidPerFace {
+ *     lateral(0, IsoColor.RED)
+ *     lateral(1, IsoColor.GREEN)
+ *     lateral(2, IsoColor.BLUE)
+ *     lateral(3, IsoColor.YELLOW)
+ *     base = IsoColor.GRAY
+ * })
+ * ```
+ */
+fun pyramidPerFace(
+    block: PyramidPerFaceMaterialScope.() -> Unit,
+): IsometricMaterial.PerFace.Pyramid =
+    PyramidPerFaceMaterialScope().apply(block).build()
+
 // -- Builder classes ----------------------------------------------------------
 
 /** DSL marker that prevents nesting [PerFaceMaterialScope] calls inadvertently. */
@@ -528,4 +559,37 @@ class PerFaceMaterialScope internal constructor() {
         }
         return IsometricMaterial.PerFace.Prism.of(faceMap = map, default = default)
     }
+}
+
+@IsometricMaterialDsl
+class PyramidPerFaceMaterialScope internal constructor() {
+    /** Material for the rectangular base quad (path index 4). */
+    var base: MaterialData? = null
+
+    /** Fallback for the base or any lateral not explicitly assigned. */
+    var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
+
+    private val lateralMap = mutableMapOf<PyramidFace.Lateral, MaterialData>()
+
+    /**
+     * Assigns [material] to the lateral face at [index] (0..3).
+     *
+     * @throws IllegalArgumentException if [index] is outside 0..3
+     *   (enforced by [PyramidFace.Lateral]'s init block).
+     */
+    fun lateral(index: Int, material: MaterialData) {
+        lateralMap[PyramidFace.Lateral(index)] = material
+    }
+
+    /** Convenience: assigns [material] to all four lateral faces. */
+    fun allLaterals(material: MaterialData) {
+        for (i in 0..3) lateralMap[PyramidFace.Lateral(i)] = material
+    }
+
+    internal fun build(): IsometricMaterial.PerFace.Pyramid =
+        IsometricMaterial.PerFace.Pyramid(
+            base = base,
+            laterals = lateralMap.toMap(),
+            default = default,
+        )
 }

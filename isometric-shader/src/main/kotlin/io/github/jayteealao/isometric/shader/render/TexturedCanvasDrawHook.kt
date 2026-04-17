@@ -40,6 +40,7 @@ internal class TexturedCanvasDrawHook(
 ) : MaterialDrawHook {
 
     private val texturedPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val flatPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val affineMatrix = Matrix()
     private val transformMatrix = Matrix()
     private val transformMatrixInv = Matrix()
@@ -102,11 +103,39 @@ internal class TexturedCanvasDrawHook(
             is IsometricMaterial.PerFace -> {
                 when (val sub = material.resolveForFace(command.faceType)) {
                     is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
-                    // IsoColor or other MaterialData — delegate to the flat-color draw path
+                    is IsoColor -> drawFlatColor(nativeCanvas, nativePath, sub)
+                    // Any other non-Textured MaterialData — delegate to the default
+                    // flat-color path. The default path paints command.color (which equals
+                    // material.baseColor() — the PerFace.default's baseColor), so this only
+                    // renders the fallback for per-face materials that aren't Textured or IsoColor.
                     else -> false
                 }
             }
         }
+    }
+
+    /**
+     * Draws a per-face resolved [IsoColor] directly. Needed because the default
+     * flat-color path paints [RenderCommand.color] which, for a [IsometricMaterial.PerFace]
+     * material, is the [IsometricMaterial.PerFace.default]'s baseColor — not the per-face
+     * resolved value. Without this arm, `pyramidPerFace { lateral(0, RED); ... }` would
+     * render every lateral as the default gray.
+     */
+    private fun drawFlatColor(
+        nativeCanvas: android.graphics.Canvas,
+        nativePath: android.graphics.Path,
+        color: IsoColor,
+    ): Boolean {
+        // Mirror NativeSceneRenderer.toAndroidColor: Android's Color.argb expects
+        // alpha-red-green-blue channel order; IsoColor stores each as a [0..255] Double.
+        flatPaint.color = android.graphics.Color.argb(
+            color.a.toInt().coerceIn(0, 255),
+            color.r.toInt().coerceIn(0, 255),
+            color.g.toInt().coerceIn(0, 255),
+            color.b.toInt().coerceIn(0, 255),
+        )
+        nativeCanvas.drawPath(nativePath, flatPaint)
+        return true
     }
 
     private fun drawTextured(

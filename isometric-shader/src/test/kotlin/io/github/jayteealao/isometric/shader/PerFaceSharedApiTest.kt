@@ -297,9 +297,8 @@ class PerFaceSharedApiTest {
     @Test
     fun `uvCoordProviderForShape returns null for shapes without per-face UV support`() {
         // Shapes not yet wired by their uv-generation-<shape> slice still return null.
-        // Octahedron was removed from this list when uv-generation-octahedron landed.
+        // Octahedron + Pyramid dropped from this list as their shape slices landed.
         assertNull(uvCoordProviderForShape(Cylinder()))
-        assertNull(uvCoordProviderForShape(Pyramid()))
         assertNull(uvCoordProviderForShape(Stairs(stepCount = 3)))
         assertNull(uvCoordProviderForShape(Knot()))
     }
