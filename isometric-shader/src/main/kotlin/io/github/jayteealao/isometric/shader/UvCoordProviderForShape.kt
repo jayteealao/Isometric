@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
+import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 
 /**
@@ -23,13 +24,13 @@ import io.github.jayteealao.isometric.shapes.Prism
  * - `uv-generation-cylinder` → `is Cylinder`
  * - `uv-generation-pyramid`  → `is Pyramid`
  * - `uv-generation-stairs`   → `is Stairs`
- * - `uv-generation-octahedron` → `is Octahedron`
  * - `uv-generation-knot`     → `is Knot`
  *
- * Until those slices land, non-Prism shapes return `null` and texturing is a no-op
- * for them at the renderer level.
+ * Until those slices land, the remaining non-Prism shapes return `null` and texturing
+ * is a no-op for them at the renderer level.
  */
 internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (shape) {
     is Prism -> UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(shape, faceIndex) }
+    is Octahedron -> UvCoordProvider { _, faceIndex -> UvGenerator.forOctahedronFace(shape, faceIndex) }
     else -> null
 }

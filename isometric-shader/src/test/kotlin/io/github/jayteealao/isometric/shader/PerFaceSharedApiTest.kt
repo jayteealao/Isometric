@@ -295,11 +295,12 @@ class PerFaceSharedApiTest {
 
     @OptIn(ExperimentalIsometricApi::class)
     @Test
-    fun `uvCoordProviderForShape returns null for non-Prism shapes pre-slice`() {
+    fun `uvCoordProviderForShape returns null for shapes without per-face UV support`() {
+        // Shapes not yet wired by their uv-generation-<shape> slice still return null.
+        // Octahedron was removed from this list when uv-generation-octahedron landed.
         assertNull(uvCoordProviderForShape(Cylinder()))
         assertNull(uvCoordProviderForShape(Pyramid()))
         assertNull(uvCoordProviderForShape(Stairs(stepCount = 3)))
-        assertNull(uvCoordProviderForShape(Octahedron()))
         assertNull(uvCoordProviderForShape(Knot()))
     }
 

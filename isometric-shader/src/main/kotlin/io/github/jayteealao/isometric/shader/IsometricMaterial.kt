@@ -344,15 +344,11 @@ sealed interface IsometricMaterial : MaterialData {
          *
          * [byIndex] maps an [OctahedronFace] to its material; unassigned faces use [default].
          *
-         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
-         * collaborators that this slice deliberately leaves empty:
-         *
-         * - TODO(uv-generation-octahedron): register a non-null provider in
-         *   [uvCoordProviderForShape].
-         * - TODO(uv-generation-octahedron): add a `is Octahedron` branch to
-         *   [resolveForFace].
-         * - TODO(uv-generation-octahedron): collect per-slot textures in
-         *   `GpuTextureManager.collectTextureSources` (warning fires today).
+         * Per-face rendering is fully wired: [uvCoordProviderForShape] registers the
+         * Octahedron UV provider, [resolveForFace] dispatches via `faceType as? OctahedronFace`,
+         * and `GpuTextureManager.collectTextureSources` aggregates textures from [byIndex].
+         * All 8 faces map to the same canonical triangle UV `(0,0)–(1,0)–(0.5,1)` —
+         * per-face textures differ in material content, not UV layout.
          */
         public class Octahedron(
             public val byIndex: Map<OctahedronFace, MaterialData> = emptyMap(),
@@ -387,9 +383,9 @@ sealed interface IsometricMaterial : MaterialData {
  * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for
  * the face currently being rendered.
  *
- * Only [IsometricMaterial.PerFace.Prism] dispatches via [faceType] in this slice;
- * the other variants (`Cylinder`, `Pyramid`, `Stairs`, `Octahedron`) ship empty
- * stubs and return [IsometricMaterial.PerFace.default] until their
+ * [IsometricMaterial.PerFace.Prism] and [IsometricMaterial.PerFace.Octahedron] dispatch
+ * via [faceType] today; the remaining variants (`Cylinder`, `Pyramid`, `Stairs`) ship
+ * empty stubs and return [IsometricMaterial.PerFace.default] until their
  * `uv-generation-<shape>` slices wire up per-face resolution.
  *
  * Centralising this dispatch means each downstream shape slice adds exactly one
@@ -408,14 +404,16 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         val prismFace = faceType as? PrismFace
         if (prismFace != null) faceMap[prismFace] ?: default else default
     }
-    // TODO(uv-generation-cylinder):   dispatch via faceType as? CylinderFace
-    // TODO(uv-generation-pyramid):    dispatch via faceType as? PyramidFace
-    // TODO(uv-generation-stairs):     dispatch via faceType as? StairsFace
-    // TODO(uv-generation-octahedron): dispatch via faceType as? OctahedronFace
+    is IsometricMaterial.PerFace.Octahedron -> {
+        val octahedronFace = faceType as? OctahedronFace
+        if (octahedronFace != null) byIndex[octahedronFace] ?: default else default
+    }
+    // TODO(uv-generation-cylinder): dispatch via faceType as? CylinderFace
+    // TODO(uv-generation-pyramid):  dispatch via faceType as? PyramidFace
+    // TODO(uv-generation-stairs):   dispatch via faceType as? StairsFace
     is IsometricMaterial.PerFace.Cylinder,
     is IsometricMaterial.PerFace.Pyramid,
-    is IsometricMaterial.PerFace.Stairs,
-    is IsometricMaterial.PerFace.Octahedron -> default
+    is IsometricMaterial.PerFace.Stairs -> default
 }
 
 // -- DSL builders -------------------------------------------------------------

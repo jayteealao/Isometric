@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.Path
+import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 
@@ -47,6 +48,35 @@ internal object UvGenerator {
      */
     fun forAllPrismFaces(prism: Prism): List<FloatArray> =
         PrismFace.entries.indices.map { forPrismFace(prism, it) }
+
+    /**
+     * Generates UV coordinates for a single [Octahedron] face.
+     *
+     * Every face maps to the canonical equilateral-triangle UV layout:
+     * `vertex 0 → (0,0)`, `vertex 1 → (1,0)`, `vertex 2 → (0.5,1)`. All 8 faces are
+     * congruent in a regular octahedron, so no per-face orientation tracking is needed.
+     *
+     * @param octahedron The source Octahedron (used only for bounds validation)
+     * @param faceIndex 0-based index into `Octahedron.paths` (0..7, interleaved upper/lower)
+     * @return [FloatArray] of 6 floats `[u0,v0, u1,v1, u2,v2]`
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until octahedron.paths.size`
+     */
+    fun forOctahedronFace(octahedron: Octahedron, faceIndex: Int): FloatArray {
+        require(faceIndex in octahedron.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Octahedron with ${octahedron.paths.size} faces (valid range: 0 until ${octahedron.paths.size})"
+        }
+        return floatArrayOf(
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.5f, 1.0f,
+        )
+    }
+
+    /**
+     * Generates UV coordinates for all eight Octahedron faces in `Octahedron.paths` order.
+     */
+    fun forAllOctahedronFaces(octahedron: Octahedron): List<FloatArray> =
+        octahedron.paths.indices.map { forOctahedronFace(octahedron, it) }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
         val ox = prism.position.x

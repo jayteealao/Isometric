@@ -277,12 +277,22 @@ internal class GpuTextureManager(
         when (val m = material) {
             is IsometricMaterial.Textured -> out.add(m.source)
             is IsometricMaterial.PerFace -> {
-                if (m is IsometricMaterial.PerFace.Prism) {
-                    for (sub in m.faceMap.values) {
-                        if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                when (m) {
+                    is IsometricMaterial.PerFace.Prism -> {
+                        for (sub in m.faceMap.values) {
+                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                        }
                     }
-                } else {
-                    warnIfNonPrismPerFaceHasTexturedSlots(m)
+                    is IsometricMaterial.PerFace.Octahedron -> {
+                        for (sub in m.byIndex.values) {
+                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                        }
+                    }
+                    is IsometricMaterial.PerFace.Cylinder,
+                    is IsometricMaterial.PerFace.Pyramid,
+                    is IsometricMaterial.PerFace.Stairs -> {
+                        warnIfNonPrismPerFaceHasTexturedSlots(m)
+                    }
                 }
                 val default = m.default
                 if (default is IsometricMaterial.Textured) out.add(default.source)

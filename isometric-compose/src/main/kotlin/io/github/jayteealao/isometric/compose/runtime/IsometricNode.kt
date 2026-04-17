@@ -7,6 +7,8 @@ import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.Octahedron
+import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 import java.util.Collections
@@ -275,7 +277,6 @@ class ShapeNode(
         val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
         // Convert shape to render commands — adds directly to accumulator
-        val isPrism = transformedShape is Prism
         for ((index, path) in transformedShape.paths.withIndex()) {
             output.add(
                 RenderCommand(
@@ -287,7 +288,11 @@ class ShapeNode(
                     ownerNodeId = nodeId,
                     material = material,
                     uvCoords = uvProvider?.provide(shape, index),
-                    faceType = if (isPrism) PrismFace.fromPathIndex(index) else null,
+                    faceType = when (transformedShape) {
+                        is Prism -> PrismFace.fromPathIndex(index)
+                        is Octahedron -> OctahedronFace.fromPathIndex(index)
+                        else -> null
+                    },
                     faceVertexCount = path.points.size,
                 )
             )
