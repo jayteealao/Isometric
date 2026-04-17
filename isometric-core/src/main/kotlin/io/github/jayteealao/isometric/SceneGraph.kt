@@ -16,6 +16,7 @@ internal class SceneGraph {
         val material: MaterialData? = null,
         val uvCoords: FloatArray? = null,
         val faceType: FaceIdentifier? = null,
+        val faceVertexCount: Int = 4,
     )
 
     private val _items = mutableListOf<SceneItem>()
@@ -39,8 +40,9 @@ internal class SceneGraph {
         material: MaterialData? = null,
         uvCoords: FloatArray? = null,
         faceType: FaceIdentifier? = null,
+        faceVertexCount: Int = 4,
     ) {
-        _items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId, material, uvCoords, faceType))
+        _items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId, material, uvCoords, faceType, faceVertexCount))
     }
 
     fun clear() {

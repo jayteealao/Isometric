@@ -117,6 +117,7 @@ internal class SceneCache(
                     material = command.material,
                     uvCoords = command.uvCoords,
                     faceType = command.faceType,
+                    faceVertexCount = command.faceVertexCount,
                 )
             }
 
@@ -187,6 +188,7 @@ internal class SceneCache(
                     material = command.material,
                     uvCoords = command.uvCoords,
                     faceType = command.faceType,
+                    faceVertexCount = command.faceVertexCount,
                 )
             }
 

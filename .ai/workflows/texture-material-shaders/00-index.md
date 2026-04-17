@@ -7,11 +7,11 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-17T17:59:30Z"
+updated-at: "2026-04-17T19:01:24Z"
 selected-slice: "uv-generation-octahedron"
 current-stage: implement
 stage-number: 5
-current-stage-status: complete
+current-stage-status: verify-fix-applied
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-octahedron"
 branch-strategy: dedicated
@@ -169,5 +169,5 @@ progress:
   uv-generation-pyramid: plan-complete
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete
-  uv-generation-octahedron: implement-complete
+  uv-generation-octahedron: verify-fix-applied
 ---

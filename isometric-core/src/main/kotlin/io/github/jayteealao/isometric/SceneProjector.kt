@@ -40,6 +40,7 @@ interface SceneProjector {
         material: MaterialData? = null,
         uvCoords: FloatArray? = null,
         faceType: FaceIdentifier? = null,
+        faceVertexCount: Int = 4,
     )
 
     /**
