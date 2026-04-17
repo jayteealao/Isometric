@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.shader.IsometricMaterial
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderOptions
@@ -36,6 +37,8 @@ import io.github.jayteealao.isometric.shader.perFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shader.TextureTransform
+import io.github.jayteealao.isometric.shapes.Octahedron
+import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shader.Shape
 
@@ -56,9 +59,21 @@ class TexturedDemoActivity : ComponentActivity() {
     }
 }
 
+private enum class ShapeTab(val label: String, val description: String) {
+    Prism(
+        label = "Prism",
+        description = "Left 2 cols: IDENTITY \u2014 Right 2 cols: tiling(2\u00d72 top, 1\u00d72 sides)",
+    ),
+    Octahedron(
+        label = "Octahedron",
+        description = "Left: single grass texture across all 8 faces \u2014 Right: PerFace with 8 distinct face colors",
+    ),
+}
+
 @Composable
 private fun TexturedDemoScreen() {
     var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.Canvas()) }
+    var shapeTab by remember { mutableStateOf(ShapeTab.Prism) }
 
     val tileMaterial = remember {
         perFace {
@@ -77,8 +92,25 @@ private fun TexturedDemoScreen() {
         }
     }
 
+    val octahedronTextured = remember { texturedBitmap(TextureAssets.grassTop) }
+    val octahedronPerFace = remember {
+        IsometricMaterial.PerFace.Octahedron(
+            byIndex = mapOf(
+                OctahedronFace.UPPER_0 to IsoColor(220, 50, 50),
+                OctahedronFace.UPPER_1 to IsoColor(50, 180, 50),
+                OctahedronFace.UPPER_2 to IsoColor(50, 80, 220),
+                OctahedronFace.UPPER_3 to IsoColor(220, 200, 50),
+                OctahedronFace.LOWER_0 to IsoColor(220, 120, 220),
+                OctahedronFace.LOWER_1 to IsoColor(120, 220, 220),
+                OctahedronFace.LOWER_2 to IsoColor(220, 180, 120),
+                OctahedronFace.LOWER_3 to IsoColor(120, 180, 220),
+            ),
+            default = IsoColor(150, 150, 150),
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        // Info card + render mode toggle
+        // Info card + shape tab + render mode toggle
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -88,10 +120,18 @@ private fun TexturedDemoScreen() {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(text = "Textured Materials", style = MaterialTheme.typography.subtitle1)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Left 2 cols: IDENTITY \u2014 Right 2 cols: tiling(2\u00d72 top, 1\u00d72 sides)",
-                    style = MaterialTheme.typography.body2,
-                )
+                Text(text = shapeTab.description, style = MaterialTheme.typography.body2)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Shape", style = MaterialTheme.typography.caption)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (tab in ShapeTab.entries) {
+                        TogglePill(
+                            label = tab.label,
+                            selected = shapeTab == tab,
+                            onClick = { shapeTab = tab },
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(text = "Render mode", style = MaterialTheme.typography.caption)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -118,11 +158,18 @@ private fun TexturedDemoScreen() {
 
         // Scene
         Box(modifier = Modifier.weight(1f)) {
-            TexturedPrismGridScene(
-                renderMode = renderMode,
-                tileMaterial = tileMaterial,
-                tilingMaterial = tilingMaterial,
-            )
+            when (shapeTab) {
+                ShapeTab.Prism -> TexturedPrismGridScene(
+                    renderMode = renderMode,
+                    tileMaterial = tileMaterial,
+                    tilingMaterial = tilingMaterial,
+                )
+                ShapeTab.Octahedron -> TexturedOctahedronScene(
+                    renderMode = renderMode,
+                    texturedMaterial = octahedronTextured,
+                    perFaceMaterial = octahedronPerFace,
+                )
+            }
         }
     }
 }
@@ -167,3 +214,35 @@ private fun TexturedPrismGridScene(
     }
 }
 
+@Composable
+private fun TexturedOctahedronScene(
+    renderMode: RenderMode,
+    texturedMaterial: IsometricMaterial,
+    perFaceMaterial: IsometricMaterial,
+) {
+    ProvideTextureRendering {
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(
+                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+                renderMode = renderMode,
+                useNativeCanvas = false,
+                gestures = GestureConfig.Disabled,
+            ),
+        ) {
+            // Two Octahedrons side by side; scale = 3.0 so each fills a substantial
+            // portion of the viewport instead of shrinking down to match the whole-
+            // scene auto-framing of small unit shapes.
+            Shape(
+                geometry = Octahedron(Point(-2.0, 0.0, 0.0)),
+                material = texturedMaterial,
+                scale = 3.0,
+            )
+            Shape(
+                geometry = Octahedron(Point(2.0, 0.0, 0.0)),
+                material = perFaceMaterial,
+                scale = 3.0,
+            )
+        }
+    }
+}
