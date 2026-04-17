@@ -26,7 +26,12 @@ import io.github.jayteealao.isometric.shapes.PrismFace
  *   no texture mapping is active.
  * @property faceType Identifies which face of a Prism this command represents (null for
  *   non-Prism shapes). Used by per-face material resolution to look up the correct
- *   sub-material from [IsometricMaterial.PerFace.faceMap].
+ *   sub-material from `IsometricMaterial.PerFace.Prism.faceMap`.
+ * @property faceVertexCount Number of vertices per face for this command. For Prism
+ *   quads this is 4 (the default); other shape families may emit faces with 3 (triangles
+ *   on Octahedron and Pyramid laterals), N (Cylinder caps), or (2 * stepCount + 2)
+ *   (Stairs zigzag sides). Consumers that read [uvCoords] must use
+ *   `2 * faceVertexCount` rather than assuming 8 floats per face.
  */
 class RenderCommand(
     val commandId: String,
@@ -39,6 +44,7 @@ class RenderCommand(
     val material: MaterialData? = null,
     val uvCoords: FloatArray? = null,
     val faceType: PrismFace? = null,
+    val faceVertexCount: Int = 4,
 ) {
     /** Number of 2D vertices in [points]. */
     val pointCount: Int get() = points.size / 2
@@ -60,7 +66,8 @@ class RenderCommand(
             ownerNodeId == other.ownerNodeId &&
             material == other.material &&
             uvCoords.contentEqualsNullable(other.uvCoords) &&
-            faceType == other.faceType
+            faceType == other.faceType &&
+            faceVertexCount == other.faceVertexCount
 
     override fun hashCode(): Int {
         var result = commandId.hashCode()
@@ -73,11 +80,12 @@ class RenderCommand(
         result = 31 * result + (material?.hashCode() ?: 0)
         result = 31 * result + (uvCoords?.contentHashCode() ?: 0)
         result = 31 * result + (faceType?.hashCode() ?: 0)
+        result = 31 * result + faceVertexCount
         return result
     }
 
     override fun toString(): String =
-        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }}, faceType=$faceType)"
+        "RenderCommand(commandId=$commandId, pointCount=$pointCount, color=$color, baseColor=$baseColor, originalPath=$originalPath, originalShape=$originalShape, ownerNodeId=$ownerNodeId, material=$material, uvCoords=${uvCoords?.size?.let { "${it / 2} coords" }}, faceType=$faceType, faceVertexCount=$faceVertexCount)"
 }
 
 /** Null-safe contentEquals for nullable FloatArrays. Both null → true. */

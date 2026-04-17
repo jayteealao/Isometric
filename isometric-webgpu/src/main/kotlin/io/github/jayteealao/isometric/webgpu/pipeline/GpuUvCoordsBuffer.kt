@@ -42,8 +42,14 @@ internal class GpuUvCoordsBuffer(
         cpu.rewind()
         cpu.limit(requiredBytes)
         for (i in 0 until faceCount) {
-            val uv = scene.commands[i].uvCoords
-            if (uv != null && uv.size >= 8) {
+            val cmd = scene.commands[i]
+            val uv = cmd.uvCoords
+            val vertCount = cmd.faceVertexCount
+            // TODO(uv-variable-stride): 48-byte slot caps faces at 6 verts. Shapes that
+            // exceed this (Cylinder caps when vertices > 6, Stairs zigzag sides when
+            // stepCount > 2, Knot) silently truncate here. When those cases become
+            // real, switch to variable-stride packing or a scatter-gather layout.
+            if (uv != null && uv.size >= 2 * vertCount) {
                 for (j in 0 until 12) {
                     cpu.putFloat(if (j < uv.size) uv[j] else 0f)
                 }

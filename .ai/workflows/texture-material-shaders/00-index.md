@@ -4,14 +4,14 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: review
-stage-number: 7
+current-stage: implement
+stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-16T22:22:49Z"
-selected-slice: "webgpu-texture-error-callback"
-current-stage-status: review-fixes-applied
+updated-at: "2026-04-17T11:16:37Z"
+selected-slice: "uv-generation-shared-api"
+current-stage-status: complete
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders webgpu-texture-error-callback"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-shared-api"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -122,6 +122,14 @@ workflow-files:
   - 03-slice-uv-generation-stairs.md
   - 03-slice-uv-generation-knot.md
   - 03-slice-uv-generation-octahedron.md
+  - 03-slice-uv-generation-shared-api.md
+  - 04-plan-uv-generation-shared-api.md
+  - 04-plan-uv-generation-cylinder.md
+  - 04-plan-uv-generation-pyramid.md
+  - 04-plan-uv-generation-stairs.md
+  - 04-plan-uv-generation-knot.md
+  - 04-plan-uv-generation-octahedron.md
+  - 05-implement-uv-generation-shared-api.md
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -139,10 +147,11 @@ progress:
   retro: complete
   api-design-fixes: verify-complete
   webgpu-uv-transforms: verify-complete
-  webgpu-texture-error-callback: review-fixes-applied
-  uv-generation-cylinder: not-started
-  uv-generation-pyramid: not-started
-  uv-generation-stairs: not-started
-  uv-generation-knot: not-started
-  uv-generation-octahedron: not-started
+  webgpu-texture-error-callback: complete
+  uv-generation-shared-api: implement-complete
+  uv-generation-cylinder: plan-complete
+  uv-generation-pyramid: plan-complete
+  uv-generation-stairs: plan-complete
+  uv-generation-knot: plan-complete
+  uv-generation-octahedron: plan-complete
 ---

@@ -1,0 +1,35 @@
+package io.github.jayteealao.isometric.shader
+
+import io.github.jayteealao.isometric.Shape
+import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
+import io.github.jayteealao.isometric.shapes.Prism
+
+/**
+ * Returns a [UvCoordProvider] that generates per-face UVs for [shape], or `null` if
+ * per-face texturing is not yet supported for this shape type.
+ *
+ * ## Contract
+ *
+ * - Returning `null` means the renderer should skip UV computation and fall back to
+ *   flat-color rendering even if the material is [IsometricMaterial.Textured]
+ *   or [IsometricMaterial.PerFace].
+ * - Returning non-null commits to producing a [FloatArray] of `2 * faceVertexCount`
+ *   floats per face in `[u0,v0, u1,v1, ...]` order matching the shape's path
+ *   vertex order.
+ *
+ * ## Extension
+ *
+ * Each shape slice adds a `when` branch here:
+ * - `uv-generation-cylinder` → `is Cylinder`
+ * - `uv-generation-pyramid`  → `is Pyramid`
+ * - `uv-generation-stairs`   → `is Stairs`
+ * - `uv-generation-octahedron` → `is Octahedron`
+ * - `uv-generation-knot`     → `is Knot`
+ *
+ * Until those slices land, non-Prism shapes return `null` and texturing is a no-op
+ * for them at the renderer level.
+ */
+internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (shape) {
+    is Prism -> UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(shape, faceIndex) }
+    else -> null
+}

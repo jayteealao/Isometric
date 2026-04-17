@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-15T12:38:57Z"
-slices-implemented: 8
-slices-total: 8
-metric-total-files-changed: 80
-metric-total-lines-added: 2959
-metric-total-lines-removed: 895
+updated-at: "2026-04-17T11:16:37Z"
+slices-implemented: 10
+slices-total: 15
+metric-total-files-changed: 99
+metric-total-lines-added: 4389
+metric-total-lines-removed: 1035
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders webgpu-uv-transforms"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-shared-api"
 ---
 
 # Implement Index
@@ -63,13 +63,24 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-uv-transforms"
 - Summary: Migrated `sceneUvRegions` from `vec4<f32>` (16 bytes) to `mat3x2<f32>` (24 bytes); CPU-composed affine matrix folds `TextureTransform` + atlas region; IDENTITY fast path; `AddressMode.Repeat` sampler; `UvRegionPacker` extracted for JVM testability; 5 unit tests + 3 WGSL regression tests + Maestro visual flow
 - Record: [05-implement-webgpu-uv-transforms.md](05-implement-webgpu-uv-transforms.md)
 
+### `webgpu-texture-error-callback` — complete
+- Files: see slice record
+- Summary: Unified `onTextureLoadError` forwarding into `GpuTextureManager` via `LocalTextureErrorCallback` CompositionLocal; dispatches on main thread; T-01..T-05 tests.
+- Record: [05-implement-webgpu-texture-error-callback.md](05-implement-webgpu-texture-error-callback.md)
+
+### `uv-generation-shared-api` — complete
+- Files: 19 (7 new, 12 modified)
+- Summary: Abstract sealed `IsometricMaterial.PerFace` base with 5 subclasses; 4 shape face types (CylinderFace, PyramidFace sealed class, StairsFace, OctahedronFace); `RenderCommand.faceVertexCount` propagated through all 4 compose construction sites; `uvCoordProviderForShape()` factory; WebGPU + Canvas consumers migrated to `when (m)` sub-dispatch; `GpuUvCoordsBuffer` keyed on `2 * faceVertexCount`. apiDump committed.
+- Record: [05-implement-uv-generation-shared-api.md](05-implement-uv-generation-shared-api.md)
+
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`
 - `isometric-compose` has zero shader imports — fully usable standalone
 - `ShapeNode.material: MaterialData?` is the cross-module bridge
 - `MaterialDrawHook` is the render-time bridge: compose defines interface, shader implements
 - `NativeSceneRenderer.renderNative()` now accepts optional `MaterialDrawHook` parameter
+- **After `uv-generation-shared-api` (this slice):** five shape UV slices become purely additive — each adds a new `PerFace.<Shape>.resolve()` implementation, a new `when` branch in `uvCoordProviderForShape()`, and per-shape UV generator logic. No further changes to `IsometricMaterial.kt`, `RenderCommand.kt`, or the WebGPU/Canvas consumer dispatches.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders webgpu-uv-transforms`
-- **Option B:** `/wf-handoff texture-material-shaders api-design-fixes` — merge PR #8 first, then verify webgpu-uv-transforms on clean base
+- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-shared-api`
+- **Option B:** After this verify + review, begin the five shape UV slices in order octahedron → pyramid → cylinder → stairs → knot.

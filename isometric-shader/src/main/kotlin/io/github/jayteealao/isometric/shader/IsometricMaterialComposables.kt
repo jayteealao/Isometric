@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReusableComposeNode
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
-import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.compose.runtime.IsometricApplier
 import io.github.jayteealao.isometric.compose.runtime.IsometricComposable
 import io.github.jayteealao.isometric.compose.runtime.IsometricScope
@@ -55,17 +54,12 @@ fun IsometricScope.Shape(
     nodeId: String? = null,
 ) {
     val color = material.baseColor()
-    // UV provider: generates per-face UVs when material is Textured and geometry is a Prism.
-    // Closes over the original Prism reference (model-space dimensions) rather than
-    // re-casting the render-time shape, which avoids ClassCastException if shape is mutated.
-    val prism = geometry as? Prism
-    val needsUvs = prism != null && (
-        material is IsometricMaterial.Textured ||
+    // UV provider: dispatched by shape type through uvCoordProviderForShape(). Each
+    // shape slice adds its own branch there; shapes without per-face UV support
+    // (currently everything except Prism) return null and fall back to flat color.
+    val needsUvs = material is IsometricMaterial.Textured ||
         material is IsometricMaterial.PerFace
-    )
-    val uvProvider: UvCoordProvider? = if (needsUvs) {
-        UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(prism!!, faceIndex) }
-    } else null
+    val uvProvider: UvCoordProvider? = if (needsUvs) uvCoordProviderForShape(geometry) else null
 
     ReusableComposeNode<ShapeNode, IsometricApplier>(
         factory = {

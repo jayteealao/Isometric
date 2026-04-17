@@ -4,7 +4,11 @@ import android.graphics.Bitmap
 import androidx.annotation.DrawableRes
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.CylinderFace
+import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.PyramidFace
+import io.github.jayteealao.isometric.shapes.StairsFace
 
 /**
  * Describes how a face should be painted.
@@ -46,68 +50,270 @@ sealed interface IsometricMaterial : MaterialData {
     }
 
     /**
-     * Assigns different materials to different faces of a Prism shape.
+     * Assigns different materials to different faces of a shape.
      *
-     * Faces not covered by [faceMap] fall back to [default].
+     * `PerFace` is a sealed hierarchy with one subclass per supported shape family:
      *
-     * Use [perFace] DSL to construct instances. For advanced callers needing direct
-     * map construction, use [PerFace.of].
+     * - [Prism] — `TOP`, `BOTTOM`, `FRONT`, `BACK`, `LEFT`, `RIGHT` (six faces, via [PrismFace])
+     * - [Cylinder] — `TOP`, `BOTTOM`, `SIDE` (three logical faces, via [CylinderFace])
+     * - [Pyramid] — `BASE` + four `Lateral` triangles (via [PyramidFace])
+     * - [Stairs] — `RISER`, `TREAD`, `SIDE` logical groups (via [StairsFace])
+     * - [Octahedron] — eight individual triangular faces (via [OctahedronFace])
      *
-     * @property faceMap Map from [PrismFace] role to material for that face
-     * @property default Material used for faces not present in [faceMap].
-     *   Defaults to mid-gray ([PerFace.Companion.UNASSIGNED_FACE_DEFAULT]) so unassigned faces are visible.
+     * Faces not covered by a subclass's per-face slots fall back to [default]. The
+     * [default] invariant — a `PerFace` material cannot itself be a `PerFace` — is
+     * enforced in the base [init] block and applies to every subclass.
+     *
+     * Use the [perFace] DSL to construct a [Prism] instance. For non-Prism shapes,
+     * construct the matching subclass directly, e.g. `PerFace.Cylinder(top = ..., default = ...)`.
+     *
+     * @property default Material used for faces not explicitly assigned. Must not itself
+     *   be a [PerFace] instance. Defaults to mid-gray ([UNASSIGNED_FACE_DEFAULT]) so
+     *   unassigned faces are visible.
      */
-    class PerFace private constructor(
-        val faceMap: Map<PrismFace, MaterialData>,
-        val default: MaterialData = UNASSIGNED_FACE_DEFAULT,
-    ) : IsometricMaterial {
+    sealed class PerFace(public val default: MaterialData) : IsometricMaterial {
         init {
-            require(faceMap.values.none { it is PerFace }) {
-                "PerFace materials cannot be nested — each face must be IsoColor or Textured"
-            }
             require(default !is PerFace) {
-                "PerFace default cannot itself be PerFace"
+                "PerFace default cannot itself be PerFace — nesting is not supported"
             }
-        }
-
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other !is PerFace) return false
-            return faceMap == other.faceMap && default == other.default
-        }
-
-        override fun hashCode(): Int {
-            var result = faceMap.hashCode()
-            result = 31 * result + default.hashCode()
-            return result
         }
 
         override fun baseColor(): IsoColor = default.baseColor()
 
-        override fun toString(): String = "PerFace(faceMap=$faceMap, default=$default)"
-
-        companion object {
+        public companion object {
             /** Mid-gray fallback for unassigned [PerFace] faces (visible, not transparent). */
             internal val UNASSIGNED_FACE_DEFAULT: IsoColor = IsoColor(128, 128, 128, 255)
+        }
 
-            /**
-             * Creates a [PerFace] material that maps different materials to each face of a prism.
-             *
-             * This factory function exists because [PerFace] uses an `internal constructor` to satisfy
-             * Kotlin's `explicitApi()` requirement: the class itself must be `public` (so it can appear
-             * in public function signatures), but direct construction is locked down so callers cannot
-             * bypass the [default]-must-not-be-[PerFace] invariant enforced here.
-             *
-             * Prefer the [perFace] DSL for typical usage.
-             *
-             * @param faceMap Map from [PrismFace] to material for that face
-             * @param default The material to use for faces not explicitly assigned. Must not itself be
-             *   a [PerFace] instance.
-             */
-            fun of(
-                faceMap: Map<PrismFace, MaterialData>,
-                default: MaterialData = UNASSIGNED_FACE_DEFAULT,
-            ) = PerFace(faceMap, default)
+        /**
+         * Assigns different materials to the six faces of a [io.github.jayteealao.isometric.shapes.Prism].
+         *
+         * @property faceMap Map from [PrismFace] role to material for that face
+         * @property default Material used for faces not present in [faceMap].
+         */
+        public class Prism internal constructor(
+            public val faceMap: Map<PrismFace, MaterialData>,
+            default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+        ) : PerFace(default) {
+            init {
+                require(faceMap.values.none { it is PerFace }) {
+                    "PerFace.Prism: face materials cannot themselves be PerFace"
+                }
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is Prism) return false
+                return faceMap == other.faceMap && default == other.default
+            }
+
+            override fun hashCode(): Int {
+                var result = faceMap.hashCode()
+                result = 31 * result + default.hashCode()
+                return result
+            }
+
+            override fun toString(): String = "PerFace.Prism(faceMap=$faceMap, default=$default)"
+
+            public companion object {
+                /**
+                 * Creates a [Prism] per-face material.
+                 *
+                 * Prefer the [perFace] DSL for typical usage; use this factory when you
+                 * already have a `Map<PrismFace, MaterialData>` in hand (e.g. loading
+                 * from data).
+                 *
+                 * @param faceMap Map from [PrismFace] to material for that face
+                 * @param default Material for faces not in [faceMap]; must not be a [PerFace]
+                 */
+                public fun of(
+                    faceMap: Map<PrismFace, MaterialData>,
+                    default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+                ): Prism = Prism(faceMap, default)
+            }
+        }
+
+        /**
+         * Assigns different materials to the top cap, bottom cap, and side barrel of a
+         * [io.github.jayteealao.isometric.shapes.Cylinder].
+         *
+         * All side quads share the same [side] material (logical grouping). Any slot
+         * left `null` falls back to [default].
+         *
+         * **Stub:** [resolve] always returns [default] until the `uv-generation-cylinder`
+         * slice wires up per-face UV generation. Constructing a `Cylinder` variant today
+         * is legal but the caller will see only the default material at render time.
+         *
+         * @property top Material for the top cap (path index 0)
+         * @property bottom Material for the bottom cap (path index 1)
+         * @property side Material for every side quad (path indices 2..)
+         * @property default Fallback for any slot left null
+         */
+        public class Cylinder(
+            public val top: MaterialData? = null,
+            public val bottom: MaterialData? = null,
+            public val side: MaterialData? = null,
+            default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+        ) : PerFace(default) {
+
+            /** Returns the material for [face], falling back to [default] if unassigned. */
+            public fun resolve(face: CylinderFace): MaterialData = when (face) {
+                CylinderFace.TOP -> top ?: default
+                CylinderFace.BOTTOM -> bottom ?: default
+                CylinderFace.SIDE -> side ?: default
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is Cylinder) return false
+                return top == other.top &&
+                    bottom == other.bottom &&
+                    side == other.side &&
+                    default == other.default
+            }
+
+            override fun hashCode(): Int {
+                var result = top?.hashCode() ?: 0
+                result = 31 * result + (bottom?.hashCode() ?: 0)
+                result = 31 * result + (side?.hashCode() ?: 0)
+                result = 31 * result + default.hashCode()
+                return result
+            }
+
+            override fun toString(): String =
+                "PerFace.Cylinder(top=$top, bottom=$bottom, side=$side, default=$default)"
+        }
+
+        /**
+         * Assigns different materials to the base and lateral triangles of a
+         * [io.github.jayteealao.isometric.shapes.Pyramid].
+         *
+         * [laterals] maps a lateral index (0..3) to its material. Missing indices fall
+         * back to [default]. [base] applies to the rectangular base quad (added by the
+         * `uv-generation-pyramid` slice).
+         *
+         * **Stub:** [resolve] always returns [default] until the `uv-generation-pyramid`
+         * slice wires up per-face UV generation.
+         *
+         * @property base Material for the rectangular base quad (path index 4)
+         * @property laterals Map from lateral index (0..3) to material for that lateral
+         * @property default Fallback for any slot left null or any lateral not in [laterals]
+         */
+        public class Pyramid(
+            public val base: MaterialData? = null,
+            public val laterals: Map<Int, MaterialData> = emptyMap(),
+            default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+        ) : PerFace(default) {
+
+            init {
+                require(laterals.keys.all { it in 0..3 }) {
+                    "PerFace.Pyramid.laterals keys must be 0..3, got ${laterals.keys}"
+                }
+            }
+
+            /** Returns the material for [face], falling back to [default] if unassigned. */
+            public fun resolve(face: PyramidFace): MaterialData = when (face) {
+                PyramidFace.BASE -> base ?: default
+                is PyramidFace.Lateral -> laterals[face.index] ?: default
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is Pyramid) return false
+                return base == other.base &&
+                    laterals == other.laterals &&
+                    default == other.default
+            }
+
+            override fun hashCode(): Int {
+                var result = base?.hashCode() ?: 0
+                result = 31 * result + laterals.hashCode()
+                result = 31 * result + default.hashCode()
+                return result
+            }
+
+            override fun toString(): String =
+                "PerFace.Pyramid(base=$base, laterals=$laterals, default=$default)"
+        }
+
+        /**
+         * Assigns different materials to the riser, tread, and side surfaces of a
+         * [io.github.jayteealao.isometric.shapes.Stairs] shape.
+         *
+         * All risers share [riser], all treads share [tread], and both zigzag side
+         * walls share [side]. This logical grouping is independent of `stepCount` —
+         * adding more steps does not change the material API.
+         *
+         * **Stub:** [resolve] always returns [default] until the `uv-generation-stairs`
+         * slice wires up per-face UV generation.
+         */
+        public class Stairs(
+            public val tread: MaterialData? = null,
+            public val riser: MaterialData? = null,
+            public val side: MaterialData? = null,
+            default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+        ) : PerFace(default) {
+
+            /** Returns the material for [face], falling back to [default] if unassigned. */
+            public fun resolve(face: StairsFace): MaterialData = when (face) {
+                StairsFace.TREAD -> tread ?: default
+                StairsFace.RISER -> riser ?: default
+                StairsFace.SIDE -> side ?: default
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is Stairs) return false
+                return tread == other.tread &&
+                    riser == other.riser &&
+                    side == other.side &&
+                    default == other.default
+            }
+
+            override fun hashCode(): Int {
+                var result = tread?.hashCode() ?: 0
+                result = 31 * result + (riser?.hashCode() ?: 0)
+                result = 31 * result + (side?.hashCode() ?: 0)
+                result = 31 * result + default.hashCode()
+                return result
+            }
+
+            override fun toString(): String =
+                "PerFace.Stairs(tread=$tread, riser=$riser, side=$side, default=$default)"
+        }
+
+        /**
+         * Assigns different materials to the eight triangular faces of an
+         * [io.github.jayteealao.isometric.shapes.Octahedron].
+         *
+         * [byIndex] maps an [OctahedronFace] to its material; unassigned faces use [default].
+         *
+         * **Stub:** [resolve] always returns [default] until the `uv-generation-octahedron`
+         * slice wires up per-face UV generation.
+         */
+        public class Octahedron(
+            public val byIndex: Map<OctahedronFace, MaterialData> = emptyMap(),
+            default: MaterialData = UNASSIGNED_FACE_DEFAULT,
+        ) : PerFace(default) {
+
+            /** Returns the material for [face], falling back to [default] if unassigned. */
+            public fun resolve(face: OctahedronFace): MaterialData =
+                byIndex[face] ?: default
+
+            override fun equals(other: Any?): Boolean {
+                if (this === other) return true
+                if (other !is Octahedron) return false
+                return byIndex == other.byIndex && default == other.default
+            }
+
+            override fun hashCode(): Int {
+                var result = byIndex.hashCode()
+                result = 31 * result + default.hashCode()
+                return result
+            }
+
+            override fun toString(): String =
+                "PerFace.Octahedron(byIndex=$byIndex, default=$default)"
         }
     }
 }
@@ -161,7 +367,11 @@ fun texturedBitmap(
     IsometricMaterial.Textured(source = TextureSource.Bitmap(bitmap), tint = tint, transform = transform)
 
 /**
- * Creates an [IsometricMaterial.PerFace] material via a builder with named face properties.
+ * Creates an [IsometricMaterial.PerFace.Prism] material via a builder with named face properties.
+ *
+ * The DSL produces a [IsometricMaterial.PerFace.Prism] specifically. For non-Prism
+ * shapes (Cylinder, Pyramid, Stairs, Octahedron), construct the matching
+ * `PerFace.<Shape>` subclass directly.
  *
  * ```kotlin
  * // Simple: grass top, dirt sides
@@ -181,7 +391,7 @@ fun texturedBitmap(
  */
 fun perFace(
     block: PerFaceMaterialScope.() -> Unit,
-): IsometricMaterial.PerFace =
+): IsometricMaterial.PerFace.Prism =
     PerFaceMaterialScope().apply(block).build()
 
 // -- Builder classes ----------------------------------------------------------
@@ -209,7 +419,7 @@ class PerFaceMaterialScope internal constructor() {
         get() = error("sides is write-only")
         set(value) { front = value; back = value; left = value; right = value }
 
-    internal fun build(): IsometricMaterial.PerFace {
+    internal fun build(): IsometricMaterial.PerFace.Prism {
         val map = buildMap {
             top?.let { put(PrismFace.TOP, it) }
             bottom?.let { put(PrismFace.BOTTOM, it) }
@@ -218,6 +428,6 @@ class PerFaceMaterialScope internal constructor() {
             left?.let { put(PrismFace.LEFT, it) }
             right?.let { put(PrismFace.RIGHT, it) }
         }
-        return IsometricMaterial.PerFace.of(faceMap = map, default = default)
+        return IsometricMaterial.PerFace.Prism.of(faceMap = map, default = default)
     }
 }

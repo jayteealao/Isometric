@@ -263,12 +263,16 @@ internal class GpuTextureManager(
         when (val m = material) {
             is IsometricMaterial.Textured -> out.add(m.source)
             is IsometricMaterial.PerFace -> {
-                for (sub in m.faceMap.values) {
-                    if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                // Sub-materials are only present on PerFace.Prism in this slice; other
+                // PerFace variants ship empty stubs until their uv-generation-<shape>
+                // slices wire up per-face resolution.
+                if (m is IsometricMaterial.PerFace.Prism) {
+                    for (sub in m.faceMap.values) {
+                        if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                    }
                 }
-                if (m.default is IsometricMaterial.Textured) {
-                    out.add((m.default as IsometricMaterial.Textured).source)
-                }
+                val default = m.default
+                if (default is IsometricMaterial.Textured) out.add(default.source)
             }
             else -> {}
         }
@@ -338,10 +342,13 @@ internal class GpuTextureManager(
      */
     private fun resolveEffectiveMaterial(cmd: RenderCommand): MaterialData? =
         when (val m = cmd.material) {
-            is IsometricMaterial.PerFace -> {
+            is IsometricMaterial.PerFace.Prism -> {
                 val face = cmd.faceType
                 if (face != null) m.faceMap[face] ?: m.default else m.default
             }
+            // Non-Prism PerFace variants are resolved by their own uv-generation-<shape>
+            // slices. Until those land, every face falls back to the PerFace default.
+            is IsometricMaterial.PerFace -> m.default
             else -> m
         }
 

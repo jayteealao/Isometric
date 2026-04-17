@@ -328,12 +328,12 @@ class IsometricMaterialTest {
 
     @Test
     fun `PerFace rejects nested PerFace in faceMap`() {
-        val inner = IsometricMaterial.PerFace.of(
+        val inner = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to IsoColor.RED),
             default = IsoColor.GRAY,
         )
         assertFailsWith<IllegalArgumentException> {
-            IsometricMaterial.PerFace.of(
+            IsometricMaterial.PerFace.Prism.of(
                 faceMap = mapOf(PrismFace.FRONT to inner),
                 default = IsoColor.GRAY,
             )
@@ -355,7 +355,7 @@ class IsometricMaterialTest {
     fun `PerFace faceMap lookup returns face material or default`() {
         val grass = IsoColor.GREEN
         val gray = IsoColor.GRAY
-        val mat = IsometricMaterial.PerFace.of(
+        val mat = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
@@ -404,7 +404,7 @@ class IsometricMaterialTest {
 
     @Test
     fun `baseColor_perFace_returnsDefaultBaseColor`() {
-        val mat = IsometricMaterial.PerFace.of(
+        val mat = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to IsoColor.RED),
             default = IsoColor.GRAY,
         )

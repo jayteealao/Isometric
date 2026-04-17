@@ -99,8 +99,7 @@ internal class TexturedCanvasDrawHook(
         return when (material) {
             is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, material)
             is IsometricMaterial.PerFace -> {
-                val face = command.faceType
-                val sub = material.faceMap[face] ?: material.default
+                val sub = resolvePerFaceSubMaterial(material, command)
                 when (sub) {
                     is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
                     // IsoColor or other MaterialData — delegate to the flat-color draw path
@@ -108,6 +107,26 @@ internal class TexturedCanvasDrawHook(
                 }
             }
         }
+    }
+
+    /**
+     * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for a
+     * single [RenderCommand]. Only `Prism` dispatches via [RenderCommand.faceType]; the
+     * other `PerFace` variants ship empty stubs in this slice and fall back to [default]
+     * until their `uv-generation-<shape>` slices land.
+     */
+    private fun resolvePerFaceSubMaterial(
+        material: IsometricMaterial.PerFace,
+        command: RenderCommand,
+    ): io.github.jayteealao.isometric.MaterialData = when (material) {
+        is IsometricMaterial.PerFace.Prism -> {
+            val face = command.faceType
+            if (face != null) material.faceMap[face] ?: material.default else material.default
+        }
+        is IsometricMaterial.PerFace.Cylinder,
+        is IsometricMaterial.PerFace.Pyramid,
+        is IsometricMaterial.PerFace.Stairs,
+        is IsometricMaterial.PerFace.Octahedron -> material.default
     }
 
     private fun drawTextured(

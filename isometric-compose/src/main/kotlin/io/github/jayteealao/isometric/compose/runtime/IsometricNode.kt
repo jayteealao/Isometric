@@ -288,6 +288,7 @@ class ShapeNode(
                     material = material,
                     uvCoords = uvProvider?.provide(shape, index),
                     faceType = if (isPrism) PrismFace.fromPathIndex(index) else null,
+                    faceVertexCount = path.points.size,
                 )
             )
         }
@@ -334,6 +335,7 @@ class PathNode(
                 originalShape = null,
                 ownerNodeId = nodeId,
                 material = material,
+                faceVertexCount = transformedPath.points.size,
             )
         )
     }
@@ -379,7 +381,8 @@ class BatchNode(
                         color = effectiveColor,
                         originalPath = path,
                         originalShape = transformedShape,
-                        ownerNodeId = nodeId
+                        ownerNodeId = nodeId,
+                        faceVertexCount = path.points.size,
                     )
                 )
             }
@@ -428,7 +431,11 @@ class CustomRenderNode(
                         color = cmd.color.withAlpha(alpha),
                         originalPath = cmd.originalPath,
                         originalShape = cmd.originalShape,
-                        ownerNodeId = cmd.ownerNodeId
+                        ownerNodeId = cmd.ownerNodeId,
+                        material = cmd.material,
+                        uvCoords = cmd.uvCoords,
+                        faceType = cmd.faceType,
+                        faceVertexCount = cmd.faceVertexCount,
                     )
                 )
             }

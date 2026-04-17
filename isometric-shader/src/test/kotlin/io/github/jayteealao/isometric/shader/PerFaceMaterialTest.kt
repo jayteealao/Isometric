@@ -15,7 +15,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `faceMap lookup returns face material when present`() {
-        val mat = IsometricMaterial.PerFace.of(
+        val mat = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to grass, PrismFace.FRONT to dirt),
             default = gray,
         )
@@ -25,7 +25,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `faceMap lookup returns default for faces not in faceMap`() {
-        val mat = IsometricMaterial.PerFace.of(
+        val mat = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
@@ -41,7 +41,7 @@ class PerFaceMaterialTest {
         val materials = PrismFace.values().associateWith {
             IsoColor(it.ordinal.toDouble() * 40, 0.0, 0.0, 255.0)
         }
-        val mat = IsometricMaterial.PerFace.of(faceMap = materials, default = gray)
+        val mat = IsometricMaterial.PerFace.Prism.of(faceMap = materials, default = gray)
         for (face in PrismFace.values()) {
             assertEquals(materials.getValue(face), mat.faceMap[face] ?: mat.default)
         }
@@ -92,7 +92,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `perFace_of_noDefault_usesFallback`() {
-        val mat = IsometricMaterial.PerFace.of(
+        val mat = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to grass),
         )
         assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.faceMap[PrismFace.FRONT] ?: mat.default)
@@ -111,12 +111,12 @@ class PerFaceMaterialTest {
 
     @Test
     fun `perFace_of_perFaceAsDefault_throws`() {
-        val inner = IsometricMaterial.PerFace.of(
+        val inner = IsometricMaterial.PerFace.Prism.of(
             faceMap = mapOf(PrismFace.TOP to grass),
             default = gray,
         )
         assertFailsWith<IllegalArgumentException> {
-            IsometricMaterial.PerFace.of(
+            IsometricMaterial.PerFace.Prism.of(
                 faceMap = mapOf(PrismFace.FRONT to dirt),
                 default = inner,
             )
