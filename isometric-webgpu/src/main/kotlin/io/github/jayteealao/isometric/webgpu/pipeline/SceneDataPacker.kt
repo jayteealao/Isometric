@@ -3,6 +3,7 @@ package io.github.jayteealao.isometric.webgpu.pipeline
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.resolveForFace
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
@@ -216,34 +217,13 @@ internal object SceneDataPacker {
      */
     private fun resolveTextureIndex(cmd: RenderCommand): Int {
         val effective = when (val m = cmd.material) {
-            is IsometricMaterial.PerFace -> resolvePerFaceSubMaterial(m, cmd)
+            is IsometricMaterial.PerFace -> m.resolveForFace(cmd.faceType)
             else -> m
         }
         return when (effective) {
             is IsometricMaterial.Textured -> 0
             else -> SceneDataLayout.NO_TEXTURE
         }
-    }
-
-    /**
-     * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material,
-     * using [RenderCommand.faceType] for `Prism` and falling back to [default] for
-     * non-Prism variants whose per-face UV dispatch is not yet wired up.
-     */
-    private fun resolvePerFaceSubMaterial(
-        m: IsometricMaterial.PerFace,
-        cmd: RenderCommand,
-    ): MaterialData = when (m) {
-        is IsometricMaterial.PerFace.Prism -> {
-            val face = cmd.faceType
-            if (face != null) m.faceMap[face] ?: m.default else m.default
-        }
-        // Non-Prism variants resolved by their own uv-generation-<shape> slices.
-        // Until those land, every face gets the default material.
-        is IsometricMaterial.PerFace.Cylinder,
-        is IsometricMaterial.PerFace.Pyramid,
-        is IsometricMaterial.PerFace.Stairs,
-        is IsometricMaterial.PerFace.Octahedron -> m.default
     }
 
     fun pack(commands: List<RenderCommand>): ByteBuffer {

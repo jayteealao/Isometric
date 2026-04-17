@@ -5,6 +5,7 @@ import androidx.annotation.DrawableRes
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.shapes.CylinderFace
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.PyramidFace
@@ -67,6 +68,31 @@ sealed interface IsometricMaterial : MaterialData {
      * Use the [perFace] DSL to construct a [Prism] instance. For non-Prism shapes,
      * construct the matching subclass directly, e.g. `PerFace.Cylinder(top = ..., default = ...)`.
      *
+     * ### Validation via `require()` rather than a compile-time builder
+     *
+     * Invariants (e.g. `default` not being a `PerFace`, `Pyramid.laterals` keys in 0..3,
+     * `RenderCommand.faceVertexCount` in 3..24) are enforced by `require()` in each
+     * class's init block rather than encoded in the type system via a staged builder
+     * or phantom types. This trade-off is deliberate:
+     *
+     * - **Ergonomics.** `PerFace.Cylinder(top = red)` reads as a single, familiar Kotlin
+     *   constructor call. A staged-builder or typestate encoding would require multiple
+     *   intermediate types (`EmptyPerFaceBuilder → ValidPerFaceBuilder`) to model the
+     *   same invariant, and would obscure the named-argument call-site style preferred
+     *   by this API (api-design-guideline §5).
+     * - **Coverage.** The invariants guarded here (no `PerFace` nesting, valid face
+     *   index ranges) are cheap runtime checks that fail at construction — well before
+     *   the material reaches the render path — and are triggered reliably by unit
+     *   tests, so compile-time encoding would duplicate coverage without catching new
+     *   classes of bug.
+     * - **Evolution.** Adding a future invariant (e.g. "all `Textured` slots share
+     *   the same `TextureTransform`") is a one-line change to an init block; the same
+     *   addition under a builder encoding would be a new intermediate type plus a new
+     *   transition method, a larger breaking change for downstream callers.
+     *
+     * If a future invariant cannot be cheaply verified at construction, revisit this
+     * choice for that specific case rather than migrating the whole hierarchy.
+     *
      * @property default Material used for faces not explicitly assigned. Must not itself
      *   be a [PerFace] instance. Defaults to mid-gray ([UNASSIGNED_FACE_DEFAULT]) so
      *   unassigned faces are visible.
@@ -92,11 +118,25 @@ sealed interface IsometricMaterial : MaterialData {
          * @property default Material used for faces not present in [faceMap].
          */
         public class Prism internal constructor(
-            public val faceMap: Map<PrismFace, MaterialData>,
+            faceMap: Map<PrismFace, MaterialData>,
             default: MaterialData = UNASSIGNED_FACE_DEFAULT,
         ) : PerFace(default) {
+            /**
+             * Backing storage for per-face materials. Stored as an [java.util.EnumMap]
+             * (or [emptyMap] when no slots are assigned) so per-frame lookup in
+             * `SceneDataPacker` / `GpuTextureManager` is an O(1) array indexing rather
+             * than a `LinkedHashMap` hash probe.
+             */
+            public val faceMap: Map<PrismFace, MaterialData> = if (faceMap.isEmpty()) {
+                emptyMap()
+            } else {
+                java.util.EnumMap<PrismFace, MaterialData>(PrismFace::class.java).apply {
+                    putAll(faceMap)
+                }
+            }
+
             init {
-                require(faceMap.values.none { it is PerFace }) {
+                require(this.faceMap.values.none { it is PerFace }) {
                     "PerFace.Prism: face materials cannot themselves be PerFace"
                 }
             }
@@ -140,9 +180,17 @@ sealed interface IsometricMaterial : MaterialData {
          * All side quads share the same [side] material (logical grouping). Any slot
          * left `null` falls back to [default].
          *
-         * **Stub:** [resolve] always returns [default] until the `uv-generation-cylinder`
-         * slice wires up per-face UV generation. Constructing a `Cylinder` variant today
-         * is legal but the caller will see only the default material at render time.
+         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
+         * three collaborators that this slice deliberately leaves empty:
+         *
+         * - TODO(uv-generation-cylinder): register a non-null provider in
+         *   [uvCoordProviderForShape] so `CylinderFace` faces get per-face UVs.
+         * - TODO(uv-generation-cylinder): add a `is Cylinder` branch to
+         *   [resolveForFace] so the render pipeline dispatches on `CylinderFace` rather
+         *   than falling back to [default].
+         * - TODO(uv-generation-cylinder): collect per-slot textures in
+         *   `GpuTextureManager.collectTextureSources`; a Log.w warning fires today
+         *   when Textured slots are present but not rendered.
          *
          * @property top Material for the top cap (path index 0)
          * @property bottom Material for the bottom cap (path index 1)
@@ -188,33 +236,35 @@ sealed interface IsometricMaterial : MaterialData {
          * Assigns different materials to the base and lateral triangles of a
          * [io.github.jayteealao.isometric.shapes.Pyramid].
          *
-         * [laterals] maps a lateral index (0..3) to its material. Missing indices fall
-         * back to [default]. [base] applies to the rectangular base quad (added by the
-         * `uv-generation-pyramid` slice).
+         * [laterals] maps a [PyramidFace.Lateral] slot to its material. Missing slots
+         * fall back to [default]. [base] applies to the rectangular base quad (added by
+         * the `uv-generation-pyramid` slice).
          *
-         * **Stub:** [resolve] always returns [default] until the `uv-generation-pyramid`
-         * slice wires up per-face UV generation.
+         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
+         * collaborators that this slice deliberately leaves empty:
+         *
+         * - TODO(uv-generation-pyramid): register a non-null provider in
+         *   [uvCoordProviderForShape].
+         * - TODO(uv-generation-pyramid): add a `is Pyramid` branch to [resolveForFace].
+         * - TODO(uv-generation-pyramid): collect per-slot textures in
+         *   `GpuTextureManager.collectTextureSources` (warning fires today).
          *
          * @property base Material for the rectangular base quad (path index 4)
-         * @property laterals Map from lateral index (0..3) to material for that lateral
+         * @property laterals Map from [PyramidFace.Lateral] to material for that lateral.
+         *   Using the typed key (rather than a raw `Int`) makes invalid slot indices a
+         *   compile-time error — `PyramidFace.Lateral`'s own `init` enforces the 0..3 range.
          * @property default Fallback for any slot left null or any lateral not in [laterals]
          */
         public class Pyramid(
             public val base: MaterialData? = null,
-            public val laterals: Map<Int, MaterialData> = emptyMap(),
+            public val laterals: Map<PyramidFace.Lateral, MaterialData> = emptyMap(),
             default: MaterialData = UNASSIGNED_FACE_DEFAULT,
         ) : PerFace(default) {
-
-            init {
-                require(laterals.keys.all { it in 0..3 }) {
-                    "PerFace.Pyramid.laterals keys must be 0..3, got ${laterals.keys}"
-                }
-            }
 
             /** Returns the material for [face], falling back to [default] if unassigned. */
             public fun resolve(face: PyramidFace): MaterialData = when (face) {
                 PyramidFace.BASE -> base ?: default
-                is PyramidFace.Lateral -> laterals[face.index] ?: default
+                is PyramidFace.Lateral -> laterals[face] ?: default
             }
 
             override fun equals(other: Any?): Boolean {
@@ -244,8 +294,14 @@ sealed interface IsometricMaterial : MaterialData {
          * walls share [side]. This logical grouping is independent of `stepCount` —
          * adding more steps does not change the material API.
          *
-         * **Stub:** [resolve] always returns [default] until the `uv-generation-stairs`
-         * slice wires up per-face UV generation.
+         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
+         * collaborators that this slice deliberately leaves empty:
+         *
+         * - TODO(uv-generation-stairs): register a non-null provider in
+         *   [uvCoordProviderForShape].
+         * - TODO(uv-generation-stairs): add a `is Stairs` branch to [resolveForFace].
+         * - TODO(uv-generation-stairs): collect per-slot textures in
+         *   `GpuTextureManager.collectTextureSources` (warning fires today).
          */
         public class Stairs(
             public val tread: MaterialData? = null,
@@ -288,8 +344,15 @@ sealed interface IsometricMaterial : MaterialData {
          *
          * [byIndex] maps an [OctahedronFace] to its material; unassigned faces use [default].
          *
-         * **Stub:** [resolve] always returns [default] until the `uv-generation-octahedron`
-         * slice wires up per-face UV generation.
+         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
+         * collaborators that this slice deliberately leaves empty:
+         *
+         * - TODO(uv-generation-octahedron): register a non-null provider in
+         *   [uvCoordProviderForShape].
+         * - TODO(uv-generation-octahedron): add a `is Octahedron` branch to
+         *   [resolveForFace].
+         * - TODO(uv-generation-octahedron): collect per-slot textures in
+         *   `GpuTextureManager.collectTextureSources` (warning fires today).
          */
         public class Octahedron(
             public val byIndex: Map<OctahedronFace, MaterialData> = emptyMap(),
@@ -316,6 +379,43 @@ sealed interface IsometricMaterial : MaterialData {
                 "PerFace.Octahedron(byIndex=$byIndex, default=$default)"
         }
     }
+}
+
+// -- Per-face resolution ------------------------------------------------------
+
+/**
+ * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for
+ * the face currently being rendered.
+ *
+ * Only [IsometricMaterial.PerFace.Prism] dispatches via [faceType] in this slice;
+ * the other variants (`Cylinder`, `Pyramid`, `Stairs`, `Octahedron`) ship empty
+ * stubs and return [IsometricMaterial.PerFace.default] until their
+ * `uv-generation-<shape>` slices wire up per-face resolution.
+ *
+ * Centralising this dispatch means each downstream shape slice adds exactly one
+ * `when` branch here — rather than updating the 3 consumer sites
+ * ([io.github.jayteealao.isometric.shader.render.TexturedCanvasDrawHook],
+ * `SceneDataPacker`, `GpuTextureManager`) in lockstep, which is a
+ * forgotten-update trap across the five shape UV slices.
+ */
+public fun IsometricMaterial.PerFace.resolveForFace(
+    faceType: FaceIdentifier?,
+): MaterialData = when (this) {
+    is IsometricMaterial.PerFace.Prism -> {
+        // Prism commands always carry a PrismFace (see IsometricNode.kt). Mismatched types
+        // (e.g. CylinderFace on a Prism command) fall back to default rather than crashing —
+        // a diagnostic surface is preferred once richer dispatch lands in the shape slices.
+        val prismFace = faceType as? PrismFace
+        if (prismFace != null) faceMap[prismFace] ?: default else default
+    }
+    // TODO(uv-generation-cylinder):   dispatch via faceType as? CylinderFace
+    // TODO(uv-generation-pyramid):    dispatch via faceType as? PyramidFace
+    // TODO(uv-generation-stairs):     dispatch via faceType as? StairsFace
+    // TODO(uv-generation-octahedron): dispatch via faceType as? OctahedronFace
+    is IsometricMaterial.PerFace.Cylinder,
+    is IsometricMaterial.PerFace.Pyramid,
+    is IsometricMaterial.PerFace.Stairs,
+    is IsometricMaterial.PerFace.Octahedron -> default
 }
 
 // -- DSL builders -------------------------------------------------------------
@@ -420,7 +520,7 @@ class PerFaceMaterialScope internal constructor() {
         set(value) { front = value; back = value; left = value; right = value }
 
     internal fun build(): IsometricMaterial.PerFace.Prism {
-        val map = buildMap {
+        val map = java.util.EnumMap<PrismFace, MaterialData>(PrismFace::class.java).apply {
             top?.let { put(PrismFace.TOP, it) }
             bottom?.let { put(PrismFace.BOTTOM, it) }
             front?.let { put(PrismFace.FRONT, it) }

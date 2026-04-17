@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.shader
 
+import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.Point
@@ -7,6 +8,7 @@ import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.CylinderFace
+import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
@@ -19,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -79,7 +82,10 @@ class PerFaceSharedApiTest {
     fun `PerFace_Pyramid resolves BASE and laterals`() {
         val mat = IsometricMaterial.PerFace.Pyramid(
             base = red,
-            laterals = mapOf(0 to green, 2 to blue),
+            laterals = mapOf(
+                PyramidFace.LATERAL_0 to green,
+                PyramidFace.LATERAL_2 to blue,
+            ),
             default = gray,
         )
         assertEquals(red, mat.resolve(PyramidFace.BASE))
@@ -90,13 +96,22 @@ class PerFaceSharedApiTest {
     }
 
     @Test
-    fun `PerFace_Pyramid rejects out-of-range lateral keys`() {
-        assertFailsWith<IllegalArgumentException> {
-            IsometricMaterial.PerFace.Pyramid(laterals = mapOf(4 to red))
-        }
-        assertFailsWith<IllegalArgumentException> {
-            IsometricMaterial.PerFace.Pyramid(laterals = mapOf(-1 to red))
-        }
+    fun `PyramidFace_Lateral rejects out-of-range indices`() {
+        // Slot validity is now enforced at the PyramidFace.Lateral constructor, not at
+        // the PerFace.Pyramid map level — invalid Int keys are a compile-time impossibility.
+        assertFailsWith<IllegalArgumentException> { PyramidFace.Lateral(4) }
+        assertFailsWith<IllegalArgumentException> { PyramidFace.Lateral(-1) }
+    }
+
+    @Test
+    fun `PyramidFace_Lateral accepts inclusive boundary indices 0 and 3`() {
+        // Complements the negative-boundary test above: proves the boundary is [0, 3]
+        // inclusive, not a stricter 1..2 range. Also pins the companion constants to
+        // the same identity as fresh constructions (equality via data class semantics).
+        assertEquals(0, PyramidFace.Lateral(0).index)
+        assertEquals(3, PyramidFace.Lateral(3).index)
+        assertEquals(PyramidFace.LATERAL_0, PyramidFace.Lateral(0))
+        assertEquals(PyramidFace.LATERAL_3, PyramidFace.Lateral(3))
     }
 
     // ---------- PerFace.Stairs ----------
@@ -164,6 +179,108 @@ class PerFaceSharedApiTest {
         }
     }
 
+    // ---------- Structural equality for PerFace.Prism ----------
+
+    @Test
+    fun `PerFace_Prism equals hashCode and toString cover all fields`() {
+        val a = IsometricMaterial.PerFace.Prism.of(
+            faceMap = mapOf(PrismFace.TOP to red, PrismFace.FRONT to green),
+            default = gray,
+        )
+        val b = IsometricMaterial.PerFace.Prism.of(
+            faceMap = mapOf(PrismFace.TOP to red, PrismFace.FRONT to green),
+            default = gray,
+        )
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        val s = a.toString()
+        assertTrue("faceMap=" in s && "default=" in s,
+            "toString must cover every field, got: $s")
+        assertNotEquals(a, IsometricMaterial.PerFace.Prism.of(
+            faceMap = mapOf(PrismFace.TOP to blue, PrismFace.FRONT to green),
+            default = gray,
+        ))
+        assertNotEquals(a, IsometricMaterial.PerFace.Prism.of(
+            faceMap = mapOf(PrismFace.TOP to red, PrismFace.FRONT to green),
+            default = red,
+        ))
+    }
+
+    // ---------- Structural equality for non-Prism PerFace subclasses ----------
+    // Each subclass ships a manually-written equals/hashCode/toString triple (they are
+    // not data classes — the `PerFace` sealed base makes data-class generation impossible).
+    // These tests pin the field list covered by each triple so a silently-dropped field
+    // is caught before it regresses.
+
+    @Test
+    fun `PerFace_Cylinder equals hashCode and toString cover all fields`() {
+        val a = IsometricMaterial.PerFace.Cylinder(top = red, bottom = green, side = blue, default = gray)
+        val b = IsometricMaterial.PerFace.Cylinder(top = red, bottom = green, side = blue, default = gray)
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        val s = a.toString()
+        assertTrue("top=" in s && "bottom=" in s && "side=" in s && "default=" in s,
+            "toString must cover every field, got: $s")
+        assertNotEquals(a, IsometricMaterial.PerFace.Cylinder(top = blue, bottom = green, side = blue, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Cylinder(top = red, bottom = red, side = blue, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Cylinder(top = red, bottom = green, side = red, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Cylinder(top = red, bottom = green, side = blue, default = red))
+    }
+
+    @Test
+    fun `PerFace_Pyramid equals hashCode and toString cover all fields`() {
+        val a = IsometricMaterial.PerFace.Pyramid(base = red, laterals = mapOf(PyramidFace.LATERAL_0 to green, PyramidFace.LATERAL_2 to blue), default = gray)
+        val b = IsometricMaterial.PerFace.Pyramid(base = red, laterals = mapOf(PyramidFace.LATERAL_0 to green, PyramidFace.LATERAL_2 to blue), default = gray)
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        val s = a.toString()
+        assertTrue("base=" in s && "laterals=" in s && "default=" in s,
+            "toString must cover every field, got: $s")
+        assertNotEquals(a, IsometricMaterial.PerFace.Pyramid(base = blue, laterals = mapOf(PyramidFace.LATERAL_0 to green, PyramidFace.LATERAL_2 to blue), default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Pyramid(base = red, laterals = mapOf(PyramidFace.LATERAL_0 to red), default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Pyramid(base = red, laterals = mapOf(PyramidFace.LATERAL_0 to green, PyramidFace.LATERAL_2 to blue), default = red))
+    }
+
+    @Test
+    fun `PerFace_Stairs equals hashCode and toString cover all fields`() {
+        val a = IsometricMaterial.PerFace.Stairs(tread = red, riser = green, side = blue, default = gray)
+        val b = IsometricMaterial.PerFace.Stairs(tread = red, riser = green, side = blue, default = gray)
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        val s = a.toString()
+        assertTrue("tread=" in s && "riser=" in s && "side=" in s && "default=" in s,
+            "toString must cover every field, got: $s")
+        assertNotEquals(a, IsometricMaterial.PerFace.Stairs(tread = blue, riser = green, side = blue, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Stairs(tread = red, riser = red, side = blue, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Stairs(tread = red, riser = green, side = red, default = gray))
+        assertNotEquals(a, IsometricMaterial.PerFace.Stairs(tread = red, riser = green, side = blue, default = red))
+    }
+
+    @Test
+    fun `PerFace_Octahedron equals hashCode and toString cover all fields`() {
+        val a = IsometricMaterial.PerFace.Octahedron(
+            byIndex = mapOf(OctahedronFace.UPPER_0 to red, OctahedronFace.LOWER_3 to blue),
+            default = gray,
+        )
+        val b = IsometricMaterial.PerFace.Octahedron(
+            byIndex = mapOf(OctahedronFace.UPPER_0 to red, OctahedronFace.LOWER_3 to blue),
+            default = gray,
+        )
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        val s = a.toString()
+        assertTrue("byIndex=" in s && "default=" in s,
+            "toString must cover every field, got: $s")
+        assertNotEquals(a, IsometricMaterial.PerFace.Octahedron(
+            byIndex = mapOf(OctahedronFace.UPPER_0 to green),
+            default = gray,
+        ))
+        assertNotEquals(a, IsometricMaterial.PerFace.Octahedron(
+            byIndex = mapOf(OctahedronFace.UPPER_0 to red, OctahedronFace.LOWER_3 to blue),
+            default = red,
+        ))
+    }
+
     // ---------- uvCoordProviderForShape() ----------
 
     @Test
@@ -176,12 +293,14 @@ class PerFaceSharedApiTest {
         assertEquals(8, uvs.size)
     }
 
+    @OptIn(ExperimentalIsometricApi::class)
     @Test
     fun `uvCoordProviderForShape returns null for non-Prism shapes pre-slice`() {
         assertNull(uvCoordProviderForShape(Cylinder()))
         assertNull(uvCoordProviderForShape(Pyramid()))
         assertNull(uvCoordProviderForShape(Stairs(stepCount = 3)))
         assertNull(uvCoordProviderForShape(Octahedron()))
+        assertNull(uvCoordProviderForShape(Knot()))
     }
 
     // ---------- RenderCommand.faceVertexCount ----------
@@ -196,6 +315,25 @@ class PerFaceSharedApiTest {
     fun `RenderCommand honors explicit faceVertexCount`() {
         val cmd = stubRenderCommand(faceVertexCount = 3)
         assertEquals(3, cmd.faceVertexCount)
+    }
+
+    @Test
+    fun `RenderCommand equality hashCode and toString distinguish by faceVertexCount`() {
+        // Round-trip the faceVertexCount field through equals/hashCode/toString so a
+        // future refactor that accidentally drops it from any of the three is caught
+        // here rather than surfacing as a silent render regression on non-quad shapes.
+        val quad = stubRenderCommand(faceVertexCount = 4)
+        val tri = stubRenderCommand(faceVertexCount = 3)
+        assertNotEquals(quad, tri)
+        assertNotEquals(quad.hashCode(), tri.hashCode(),
+            "hashCode must distinguish by faceVertexCount")
+        assertTrue("faceVertexCount=4" in quad.toString(),
+            "toString must include faceVertexCount, got: ${quad.toString()}")
+        assertTrue("faceVertexCount=3" in tri.toString())
+
+        val quadCopy = stubRenderCommand(faceVertexCount = 4)
+        assertEquals(quad, quadCopy)
+        assertEquals(quad.hashCode(), quadCopy.hashCode())
     }
 
     @Test

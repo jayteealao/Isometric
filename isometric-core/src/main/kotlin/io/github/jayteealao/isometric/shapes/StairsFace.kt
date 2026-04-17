@@ -15,7 +15,7 @@ package io.github.jayteealao.isometric.shapes
  * The three values intentionally group all risers, all treads, and both side walls
  * so per-face materials can address "all risers" without enumerating every step.
  */
-enum class StairsFace {
+enum class StairsFace : FaceIdentifier {
     RISER,
     TREAD,
     SIDE;
@@ -24,6 +24,18 @@ enum class StairsFace {
         /**
          * Returns the [StairsFace] for the given 0-based path index within `Stairs.paths`
          * for a staircase with [stepCount] steps.
+         *
+         * ### Why [stepCount] is required (and other face types don't take it)
+         *
+         * `StairsFace` is the only face type whose `fromPathIndex` takes a second parameter.
+         * Every other shape in this library has a fixed face count (Prism=6, Pyramid=5,
+         * Cylinder has a constant cap pattern, Octahedron=8), so its path-index → face
+         * mapping is a pure lookup. Stairs geometry scales with `stepCount`: the boundary
+         * between interleaved `RISER`/`TREAD` indices and the two trailing `SIDE` indices
+         * sits at `2 * stepCount`, which cannot be recovered from the index alone. Passing
+         * [stepCount] lets the mapping stay a constant-time calculation rather than
+         * forcing callers to walk a precomputed table. This asymmetry is intrinsic to the
+         * domain and not an API smell — leave it as-is.
          *
          * @param index path index in `Stairs.paths`
          * @param stepCount number of steps in the staircase (must be >= 1)

@@ -110,6 +110,32 @@ class ShapeFaceEnumTest {
         assertEquals(StairsFace.SIDE, StairsFace.fromPathIndex(3, stepCount = 1))
     }
 
+    @Test
+    fun `StairsFace large stepCount resolves every path index correctly`() {
+        // Stress the 2*stepCount + 2 arithmetic for a staircase that exceeds the
+        // smaller test's stepCount=3. stepCount=25 gives 52 total paths: risers at
+        // even [0..48], treads at odd [1..49], sides at 50 and 51.
+        val stepCount = 25
+        val totalPaths = 2 * stepCount + 2
+        for (i in 0 until totalPaths) {
+            val expected = when {
+                i >= 2 * stepCount -> StairsFace.SIDE
+                i % 2 == 0 -> StairsFace.RISER
+                else -> StairsFace.TREAD
+            }
+            assertEquals(expected, StairsFace.fromPathIndex(i, stepCount = stepCount),
+                "path index $i of stepCount=$stepCount")
+        }
+        // Final sanity spot-checks at exact boundaries.
+        assertEquals(StairsFace.RISER, StairsFace.fromPathIndex(48, stepCount = stepCount))
+        assertEquals(StairsFace.TREAD, StairsFace.fromPathIndex(49, stepCount = stepCount))
+        assertEquals(StairsFace.SIDE, StairsFace.fromPathIndex(50, stepCount = stepCount))
+        assertEquals(StairsFace.SIDE, StairsFace.fromPathIndex(51, stepCount = stepCount))
+        assertFailsWith<IllegalArgumentException> {
+            StairsFace.fromPathIndex(52, stepCount = stepCount)
+        }
+    }
+
     // ---------- OctahedronFace ----------
 
     @Test

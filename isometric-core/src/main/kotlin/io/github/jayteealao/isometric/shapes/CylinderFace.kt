@@ -11,7 +11,7 @@ package io.github.jayteealao.isometric.shapes
  * into a single logical face so callers writing per-face materials can target
  * "cap vs. barrel" without enumerating every side slice individually.
  */
-enum class CylinderFace {
+enum class CylinderFace : FaceIdentifier {
     TOP,
     BOTTOM,
     SIDE;

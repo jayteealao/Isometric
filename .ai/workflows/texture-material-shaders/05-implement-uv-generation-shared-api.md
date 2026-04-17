@@ -6,13 +6,14 @@ slice-slug: uv-generation-shared-api
 status: complete
 stage-number: 5
 created-at: "2026-04-17T11:16:37Z"
-updated-at: "2026-04-17T11:16:37Z"
+updated-at: "2026-04-17T16:50:41Z"
 metric-files-changed: 19
 metric-lines-added: 1430
 metric-lines-removed: 140
 metric-deviations-from-plan: 2
-metric-review-fixes-applied: 0
-commit-sha: "14edfbd43b92285fa48a8c7065589b09c5952dec"
+metric-review-fixes-applied: 20
+commit-sha: "99369ef82191a3407f99a7625d225bc9cba54e6a"
+review-fixes-commit-sha: "4d3d22cdb94db7736a15b22c73673580886b798f"
 tags: [uv, api, refactor, shared-infrastructure, sealed-class, face-enum]
 refs:
   index: 00-index.md
@@ -219,3 +220,125 @@ compile).
 - **Option C:** After verify + review merge, fan out to the five shape slices in
   whichever order the plan's `04-plan.md` specifies (recommended sequence: octahedron →
   pyramid → cylinder → stairs → knot, simple to complex).
+
+## Review Fixes Applied
+
+Second implementation pass on 2026-04-17 addressed 20 of 33 review findings flagged in
+`07-review-uv-generation-shared-api.md`. Scope matches the user's triage ("Triaged +
+LOW/NIT bundle"): all triaged `fix` findings (4 HIGH + 10 MED) plus cheap LOW/NIT
+cleanups (L-01, L-03, L-05, L-06, N-02, N-03). Deferrals and untriaged bundle items
+(H-03, H-06, L-02, L-04, L-07, L-08, L-09, N-01, N-04, N-05, N-06, N-07, N-08) remain
+tracked in the review rollup.
+
+### HIGH fixes (4)
+
+- **H-01 — `GpuUvCoordsBuffer.kt:52`:** Added `vertCount > 0` to the UV gate so empty
+  `FloatArray` with `faceVertexCount == 0` no longer takes the valid-UV branch.
+- **H-02 — `TexturedCanvasDrawHook.kt:138-142`:** Replaced hardcoded `uvCoords.size < 6`
+  with `uvCoords.size < maxOf(6, 2 * command.faceVertexCount)`. The `6` floor preserves
+  the affine-matrix invariant (`computeAffineMatrix` reads 3 UV pairs); the
+  `2 * faceVertexCount` term brings the guard back in sync with `GpuUvCoordsBuffer`.
+- **H-04 — leverage fix:** Introduced `public fun IsometricMaterial.PerFace.resolveForFace(faceType: FaceIdentifier?): MaterialData`
+  in `IsometricMaterial.kt` and migrated all three consumer sites
+  (`TexturedCanvasDrawHook.resolvePerFaceSubMaterial`, `SceneDataPacker.resolvePerFaceSubMaterial`,
+  `GpuTextureManager.resolveEffectiveMaterial` — 30+ LOC of triplicated code). Each of
+  the five downstream shape slices now adds one `when` branch to the shared extension
+  rather than updating 3–4 sites in lockstep. Marked each future branch with a
+  `TODO(uv-generation-<shape>)` comment. `collectTextureSources` remains intentionally
+  separate — it iterates *all* faceMap values for atlas collection, a different concern
+  from per-face dispatch.
+- **H-05 — `PerFaceSharedApiTest`:** Added four equality/hashCode/toString triples for
+  `PerFace.Cylinder`, `Pyramid`, `Stairs`, `Octahedron`. Each pins every field to the
+  three operations so a silently-dropped field fails the test.
+
+### MED fixes (10)
+
+- **M-01 — `PerFace.Pyramid.laterals`:** Retyped from `Map<Int, MaterialData>` to
+  `Map<PyramidFace.Lateral, MaterialData>`. Removed the redundant `require()` range
+  check (now enforced at the `PyramidFace.Lateral` constructor). Updated all call sites
+  and tests. Breaking change to the `PerFace.Pyramid` surface — no deprecation path per
+  `no-deprecation-cycles` memory.
+- **M-02 — `RenderCommand.faceVertexCount`:** Kept the default `= 4` (removing it would
+  break 11+ internal call sites) but added `require(faceVertexCount in 3..24)` in the
+  init block to catch invalid values. Strengthened KDoc to warn external
+  `SceneProjector` implementors that the default is a pragmatic Prism convenience, not
+  a universal value. *Deviation from review's preferred option (remove default) —
+  chose the less-invasive `require()` + KDoc path.*
+- **M-03 — `RenderCommand.faceType`:** Introduced `sealed interface FaceIdentifier` in
+  `io.github.jayteealao.isometric.shapes`, made all five face types
+  (`PrismFace`, `CylinderFace`, `PyramidFace`, `StairsFace`, `OctahedronFace`) declare
+  it, and retyped `RenderCommand.faceType`, `SceneGraph.SceneItem.faceType`,
+  `SceneProjector.add(...faceType)`, `IsometricEngine.add(...faceType)`, and
+  `resolveForFace`'s parameter from `PrismFace?` to `FaceIdentifier?`. Downcast via
+  `as? PrismFace` inside `resolveForFace`. Breaking change on public
+  `SceneProjector.add`.
+- **M-04 — `PerFaceSharedApiTest`:** Added equality triple for `PerFace.Prism`
+  (parallel to the H-05 non-Prism triples).
+- **M-05 — `PerFaceSharedApiTest`:** Added positive-boundary assertion that
+  `PyramidFace.Lateral(0)` and `PyramidFace.Lateral(3)` construct and that the companion
+  constants (`LATERAL_0`/`LATERAL_3`) are structurally equal to freshly-constructed
+  instances.
+- **M-06 — `ShapeFaceEnumTest`:** Added stepCount=25 stress test that walks every
+  path index 0..51, verifies RISER/TREAD/SIDE classification, and spot-checks the
+  `2 * stepCount` boundary.
+- **M-07 — `PerFaceSharedApiTest`:** Added `Knot` to the null-return test for
+  `uvCoordProviderForShape`. Gated the test with `@OptIn(ExperimentalIsometricApi::class)`
+  since `Knot` is experimental.
+- **M-08 — `GpuTextureManager.collectTextureSources`:** Extracted
+  `warnIfNonPrismPerFaceHasTexturedSlots(m)` helper and a `nonPrismPerFaceWarningsIssued`
+  dedup set. Emits a single `Log.w` per variant kind naming each skipped
+  `Textured.source` when a non-Prism `PerFace` carries textured slots that won't render
+  until the matching shape slice lands.
+- **M-09 — `PerFace.Prism` + `PerFaceMaterialScope.build`:** Swapped `LinkedHashMap`
+  for `EnumMap<PrismFace, MaterialData>(PrismFace::class.java)`. Backing store is now
+  O(1) array indexing per lookup (3 HashMap.get() calls per face per frame eliminated
+  in `SceneDataPacker`/`GpuTextureManager`). Internal-only; `Map.equals` semantics are
+  unchanged.
+- **M-10 — `PerFace` class KDoc:** Added a four-bullet rationale ("Ergonomics",
+  "Coverage", "Evolution") explaining why `require()` at construction is preferred over
+  a staged builder or phantom-type encoding for these invariants, with a pointer to
+  reconsider per-invariant if a future check is expensive.
+
+### LOW fixes (4)
+
+- **L-01 — file rename:** `UvCoordProviderFactory.kt` → `UvCoordProviderForShape.kt`
+  (via `git mv` so history follows). Function name `uvCoordProviderForShape` unchanged.
+- **L-03 — TODO markers:** Added explicit three-bullet TODO lists
+  (`uv-generation-<shape>`) to the KDoc of each non-Prism `PerFace` subclass naming the
+  three unwired collaborators: `uvCoordProviderForShape`, `resolveForFace`,
+  `GpuTextureManager.collectTextureSources`.
+- **L-05 — `PerFaceSharedApiTest`:** Added round-trip test that constructs two
+  `RenderCommand`s differing only by `faceVertexCount` and asserts distinct
+  equality/hashCode and `toString` contains `faceVertexCount=<n>`.
+- **L-06 — `IsometricMaterialTest`:** Narrowed `assertIs<IsometricMaterial.PerFace>(mat)`
+  to `assertIs<IsometricMaterial.PerFace.Prism>(mat)` in the `perFace` DSL test so a
+  future signature widening is caught.
+
+### NIT fixes (2)
+
+- **N-02 — `StairsFace.fromPathIndex` KDoc:** Added a "Why stepCount is required" block
+  justifying the asymmetry as intrinsic to Stairs geometry (scales with step count,
+  unlike fixed-face shapes).
+- **N-03 — `PrismFace`:** Added explicit `public` keyword on the `companion object`
+  and `fromPathIndex` to match the four newer face types.
+
+### Deferred / untriaged (13)
+
+- **H-03, H-06:** Pre-triaged `defer` in the review rollup. Revisit when each shape
+  slice wires up its `UvCoordProvider` (H-03) and when cylinder slice fills in real
+  resolution logic (H-06).
+- **L-02, L-04, L-07, L-08, L-09, N-01, N-04, N-05, N-06, N-07, N-08:** Remain
+  untriaged in the review rollup. Candidates for a future cleanup pass or bundling
+  with the next shape slice's implement phase.
+
+### `.api` dump changes
+
+- `isometric-core/api/isometric-core.api`: 25 line delta reflecting
+  `FaceIdentifier` interface addition, five face-type `: FaceIdentifier` declarations,
+  and three call-site retypings (`RenderCommand.getFaceType`, `SceneProjector.add`,
+  `IsometricEngine.add`).
+- `isometric-shader/api/isometric-shader.api`: 1 line added for the new
+  `resolveForFace` public extension.
+
+No changes to `isometric-compose.api` / `isometric-webgpu.api` / `isometric-android-view.api`
+(they use the retyped APIs but their own public surface is unchanged).

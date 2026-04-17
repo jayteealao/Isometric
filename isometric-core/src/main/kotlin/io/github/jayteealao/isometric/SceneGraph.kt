@@ -1,6 +1,6 @@
 package io.github.jayteealao.isometric
 
-import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
 
 /**
  * Mutable collection of scene items (paths with colors and metadata).
@@ -15,7 +15,7 @@ internal class SceneGraph {
         val ownerNodeId: String? = null,
         val material: MaterialData? = null,
         val uvCoords: FloatArray? = null,
-        val faceType: PrismFace? = null,
+        val faceType: FaceIdentifier? = null,
     )
 
     private val _items = mutableListOf<SceneItem>()
@@ -38,7 +38,7 @@ internal class SceneGraph {
         ownerNodeId: String? = null,
         material: MaterialData? = null,
         uvCoords: FloatArray? = null,
-        faceType: PrismFace? = null,
+        faceType: FaceIdentifier? = null,
     ) {
         _items.add(SceneItem(path, color, originalShape, id ?: "item_${nextId++}", ownerNodeId, material, uvCoords, faceType))
     }

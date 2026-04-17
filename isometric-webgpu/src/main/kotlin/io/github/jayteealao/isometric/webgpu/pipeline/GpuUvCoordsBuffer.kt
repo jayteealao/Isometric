@@ -49,7 +49,7 @@ internal class GpuUvCoordsBuffer(
             // exceed this (Cylinder caps when vertices > 6, Stairs zigzag sides when
             // stepCount > 2, Knot) silently truncate here. When those cases become
             // real, switch to variable-stride packing or a scatter-gather layout.
-            if (uv != null && uv.size >= 2 * vertCount) {
+            if (uv != null && vertCount > 0 && uv.size >= 2 * vertCount) {
                 for (j in 0 until 12) {
                     cpu.putFloat(if (j < uv.size) uv[j] else 0f)
                 }

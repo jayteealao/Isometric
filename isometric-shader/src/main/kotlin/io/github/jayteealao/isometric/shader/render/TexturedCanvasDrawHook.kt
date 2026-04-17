@@ -11,6 +11,7 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.compose.runtime.MaterialDrawHook
 import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.resolveForFace
 import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.shader.TextureTransform
 
@@ -99,34 +100,13 @@ internal class TexturedCanvasDrawHook(
         return when (material) {
             is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, material)
             is IsometricMaterial.PerFace -> {
-                val sub = resolvePerFaceSubMaterial(material, command)
-                when (sub) {
+                when (val sub = material.resolveForFace(command.faceType)) {
                     is IsometricMaterial.Textured -> drawTextured(nativeCanvas, command, nativePath, sub)
                     // IsoColor or other MaterialData — delegate to the flat-color draw path
                     else -> false
                 }
             }
         }
-    }
-
-    /**
-     * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for a
-     * single [RenderCommand]. Only `Prism` dispatches via [RenderCommand.faceType]; the
-     * other `PerFace` variants ship empty stubs in this slice and fall back to [default]
-     * until their `uv-generation-<shape>` slices land.
-     */
-    private fun resolvePerFaceSubMaterial(
-        material: IsometricMaterial.PerFace,
-        command: RenderCommand,
-    ): io.github.jayteealao.isometric.MaterialData = when (material) {
-        is IsometricMaterial.PerFace.Prism -> {
-            val face = command.faceType
-            if (face != null) material.faceMap[face] ?: material.default else material.default
-        }
-        is IsometricMaterial.PerFace.Cylinder,
-        is IsometricMaterial.PerFace.Pyramid,
-        is IsometricMaterial.PerFace.Stairs,
-        is IsometricMaterial.PerFace.Octahedron -> material.default
     }
 
     private fun drawTextured(
@@ -136,7 +116,11 @@ internal class TexturedCanvasDrawHook(
         material: IsometricMaterial.Textured,
     ): Boolean {
         val uvCoords = command.uvCoords
-        if (uvCoords == null || uvCoords.size < 6) return false
+        // Floor at 6 because computeAffineMatrix always reads 3 UV pairs (indices 0..5).
+        // Require 2*faceVertexCount to match GpuUvCoordsBuffer's invariant so pyramid /
+        // octahedron commands that ship exact-size UV arrays don't pass with a truncated buffer.
+        val minUvSize = maxOf(6, 2 * command.faceVertexCount)
+        if (uvCoords == null || uvCoords.size < minUvSize) return false
 
         val cached = resolveToCache(material.source)
         val texW = cached.bitmap.width

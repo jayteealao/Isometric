@@ -9,6 +9,7 @@ import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.resolveForFace
 import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.shader.TextureTransform
 import io.github.jayteealao.isometric.webgpu.GpuContext
@@ -255,6 +256,19 @@ internal class GpuTextureManager(
     /**
      * Recursively collect [TextureSource] references from a material, expanding
      * [IsometricMaterial.PerFace] into its constituent sub-materials.
+     *
+     * **Per-slot textures on non-Prism [IsometricMaterial.PerFace] variants are not yet
+     * collected into the atlas.** Each non-Prism variant (`Cylinder`, `Pyramid`,
+     * `Stairs`, `Octahedron`) currently ships as an empty dispatch stub: constructing
+     * one with per-slot [IsometricMaterial.Textured] entries is legal, but those
+     * textures never make it into the atlas and the faces render with the material's
+     * [IsometricMaterial.PerFace.default] at runtime. The corresponding
+     * `uv-generation-<shape>` slice will enable per-slot collection for each shape.
+     *
+     * To avoid silently dropping textures, this function emits a single Log.w warning
+     * the first time a non-Prism variant carrying at least one `Textured` slot is seen,
+     * naming the shape and listing the slot sources. Callers that need textured non-Prism
+     * rendering should wait for the corresponding shape slice.
      */
     private fun collectTextureSources(
         material: MaterialData?,
@@ -263,13 +277,12 @@ internal class GpuTextureManager(
         when (val m = material) {
             is IsometricMaterial.Textured -> out.add(m.source)
             is IsometricMaterial.PerFace -> {
-                // Sub-materials are only present on PerFace.Prism in this slice; other
-                // PerFace variants ship empty stubs until their uv-generation-<shape>
-                // slices wire up per-face resolution.
                 if (m is IsometricMaterial.PerFace.Prism) {
                     for (sub in m.faceMap.values) {
                         if (sub is IsometricMaterial.Textured) out.add(sub.source)
                     }
+                } else {
+                    warnIfNonPrismPerFaceHasTexturedSlots(m)
                 }
                 val default = m.default
                 if (default is IsometricMaterial.Textured) out.add(default.source)
@@ -277,6 +290,51 @@ internal class GpuTextureManager(
             else -> {}
         }
     }
+
+    /**
+     * Warn once per variant kind when a non-Prism [IsometricMaterial.PerFace] carries
+     * textured per-slot materials — those textures will not render until the
+     * corresponding `uv-generation-<shape>` slice wires up per-face resolution.
+     */
+    private fun warnIfNonPrismPerFaceHasTexturedSlots(m: IsometricMaterial.PerFace) {
+        val (kind, texturedSlots) = when (m) {
+            is IsometricMaterial.PerFace.Cylinder ->
+                "Cylinder" to listOfNotNull(
+                    (m.top as? IsometricMaterial.Textured)?.source,
+                    (m.bottom as? IsometricMaterial.Textured)?.source,
+                    (m.side as? IsometricMaterial.Textured)?.source,
+                )
+            is IsometricMaterial.PerFace.Pyramid ->
+                "Pyramid" to buildList {
+                    (m.base as? IsometricMaterial.Textured)?.let { add(it.source) }
+                    for (sub in m.laterals.values) {
+                        if (sub is IsometricMaterial.Textured) add(sub.source)
+                    }
+                }
+            is IsometricMaterial.PerFace.Stairs ->
+                "Stairs" to listOfNotNull(
+                    (m.tread as? IsometricMaterial.Textured)?.source,
+                    (m.riser as? IsometricMaterial.Textured)?.source,
+                    (m.side as? IsometricMaterial.Textured)?.source,
+                )
+            is IsometricMaterial.PerFace.Octahedron ->
+                "Octahedron" to m.byIndex.values
+                    .mapNotNull { (it as? IsometricMaterial.Textured)?.source }
+            is IsometricMaterial.PerFace.Prism -> return // handled by caller
+        }
+        if (texturedSlots.isNotEmpty() && nonPrismPerFaceWarningsIssued.add(kind)) {
+            Log.w(
+                "GpuTextureManager",
+                "IsometricMaterial.PerFace.$kind has ${texturedSlots.size} Textured slot(s) " +
+                    "(${texturedSlots.joinToString()}), but per-slot rendering is not yet " +
+                    "wired up for $kind — faces will render with default until the " +
+                    "uv-generation-${kind.lowercase()} slice lands.",
+            )
+        }
+    }
+
+    /** Set of non-Prism PerFace variant names for which a textured-slot warning has been issued. */
+    private val nonPrismPerFaceWarningsIssued: MutableSet<String> = HashSet(4)
 
     /**
      * Pack and upload the compact per-face texture index buffer for the emit shader.
@@ -342,13 +400,7 @@ internal class GpuTextureManager(
      */
     private fun resolveEffectiveMaterial(cmd: RenderCommand): MaterialData? =
         when (val m = cmd.material) {
-            is IsometricMaterial.PerFace.Prism -> {
-                val face = cmd.faceType
-                if (face != null) m.faceMap[face] ?: m.default else m.default
-            }
-            // Non-Prism PerFace variants are resolved by their own uv-generation-<shape>
-            // slices. Until those land, every face falls back to the PerFace default.
-            is IsometricMaterial.PerFace -> m.default
+            is IsometricMaterial.PerFace -> m.resolveForFace(cmd.faceType)
             else -> m
         }
 

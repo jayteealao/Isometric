@@ -270,7 +270,7 @@ class IsometricEngineProjectionTest {
     fun `SceneProjector default projectionVersion is zero`() {
         val projector = object : SceneProjector {
             override fun add(shape: Shape, color: IsoColor) {}
-            override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?, material: MaterialData?, uvCoords: FloatArray?, faceType: io.github.jayteealao.isometric.shapes.PrismFace?) {}
+            override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?, material: MaterialData?, uvCoords: FloatArray?, faceType: io.github.jayteealao.isometric.shapes.FaceIdentifier?) {}
             override fun clear() {}
             override fun projectScene(width: Int, height: Int, renderOptions: RenderOptions, lightDirection: Vector): PreparedScene =
                 PreparedScene(emptyList(), width, height,

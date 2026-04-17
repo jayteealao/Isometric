@@ -64,7 +64,10 @@ class IsometricMaterialTest {
             top = green
             default = gray
         }
-        assertIs<IsometricMaterial.PerFace>(mat)
+        // The `perFace` DSL narrows its return to `PerFace.Prism` (not just `PerFace`)
+        // so callers can access `faceMap` without a cast. Pin that narrowing here —
+        // if the signature ever widens back to `PerFace` this assertion fails.
+        assertIs<IsometricMaterial.PerFace.Prism>(mat)
         assertEquals(green, mat.faceMap[PrismFace.TOP])
         assertEquals(gray, mat.default)
         assertEquals(1, mat.faceMap.size)

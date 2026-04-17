@@ -7,9 +7,11 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-17T11:16:37Z"
+updated-at: "2026-04-17T16:50:41Z"
 selected-slice: "uv-generation-shared-api"
-current-stage-status: complete
+current-stage: implement
+stage-number: 5
+current-stage-status: review-fixes-applied
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-shared-api"
 branch-strategy: dedicated
@@ -130,6 +132,20 @@ workflow-files:
   - 04-plan-uv-generation-knot.md
   - 04-plan-uv-generation-octahedron.md
   - 05-implement-uv-generation-shared-api.md
+  - isometric-core/src/main/kotlin/io/github/jayteealao/isometric/shapes/FaceIdentifier.kt
+  - isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/UvCoordProviderForShape.kt
+  - 06-verify-uv-generation-shared-api.md
+  - 07-review-uv-generation-shared-api.md
+  - 07-review-uv-generation-shared-api-correctness.md
+  - 07-review-uv-generation-shared-api-security.md
+  - 07-review-uv-generation-shared-api-code-simplification.md
+  - 07-review-uv-generation-shared-api-testing.md
+  - 07-review-uv-generation-shared-api-maintainability.md
+  - 07-review-uv-generation-shared-api-reliability.md
+  - 07-review-uv-generation-shared-api-refactor-safety.md
+  - 07-review-uv-generation-shared-api-api-contracts.md
+  - 07-review-uv-generation-shared-api-architecture.md
+  - 07-review-uv-generation-shared-api-performance.md
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -148,7 +164,7 @@ progress:
   api-design-fixes: verify-complete
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
-  uv-generation-shared-api: implement-complete
+  uv-generation-shared-api: review-fixes-applied
   uv-generation-cylinder: plan-complete
   uv-generation-pyramid: plan-complete
   uv-generation-stairs: plan-complete

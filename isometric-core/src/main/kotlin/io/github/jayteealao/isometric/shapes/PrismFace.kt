@@ -6,7 +6,7 @@ package io.github.jayteealao.isometric.shapes
  * Face roles map to stable path indices in the order produced by [Prism.createPaths]:
  * index 0 = FRONT, 1 = BACK, 2 = LEFT, 3 = RIGHT, 4 = BOTTOM, 5 = TOP.
  */
-enum class PrismFace {
+enum class PrismFace : FaceIdentifier {
     FRONT,
     BACK,
     LEFT,
@@ -14,13 +14,13 @@ enum class PrismFace {
     BOTTOM,
     TOP;
 
-    companion object {
+    public companion object {
         /**
          * Returns the [PrismFace] for the given 0-based path index within [Prism.paths].
          *
          * @throws IllegalArgumentException if [index] is outside 0..5
          */
-        fun fromPathIndex(index: Int): PrismFace = when (index) {
+        public fun fromPathIndex(index: Int): PrismFace = when (index) {
             0 -> FRONT
             1 -> BACK
             2 -> LEFT

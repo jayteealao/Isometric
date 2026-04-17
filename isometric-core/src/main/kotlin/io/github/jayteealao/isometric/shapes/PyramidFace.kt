@@ -29,7 +29,7 @@ package io.github.jayteealao.isometric.shapes
  * adjacency (e.g. cube-map UVs, shared seams) must consult the 3D geometry rather
  * than relying on index order.
  */
-sealed class PyramidFace {
+sealed class PyramidFace : FaceIdentifier {
     /** The rectangular base quad of the pyramid. */
     public object BASE : PyramidFace()
 

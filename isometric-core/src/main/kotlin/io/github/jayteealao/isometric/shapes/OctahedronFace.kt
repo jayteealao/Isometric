@@ -19,7 +19,7 @@ package io.github.jayteealao.isometric.shapes
  *
  * `UPPER_i` and `LOWER_i` share an edge on the equator for each quadrant `i`.
  */
-enum class OctahedronFace {
+enum class OctahedronFace : FaceIdentifier {
     UPPER_0,
     LOWER_0,
     UPPER_1,

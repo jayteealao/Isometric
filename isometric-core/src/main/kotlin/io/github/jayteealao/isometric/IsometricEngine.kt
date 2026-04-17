@@ -1,6 +1,6 @@
 package io.github.jayteealao.isometric
 
-import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
 import kotlin.math.PI
 
 /**
@@ -183,7 +183,7 @@ class IsometricEngine @JvmOverloads constructor(
         ownerNodeId: String?,
         material: MaterialData?,
         uvCoords: FloatArray?,
-        faceType: PrismFace?,
+        faceType: FaceIdentifier?,
     ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId, material, uvCoords, faceType)
 
     /**
