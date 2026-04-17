@@ -367,10 +367,11 @@ class PerFaceSharedApiTest {
         assertTrue(mat.baseColor() == gray.baseColor())
     }
 
-    private fun stubRenderCommand(faceVertexCount: Int = 4): RenderCommand {
-        val p0 = Point(0.0, 0.0, 0.0)
-        val path = Path(p0, p0, p0, p0)
-        return RenderCommand(
+    private fun stubRenderCommand(
+        faceVertexCount: Int = 4,
+        path: Path = sharedStubPath,
+    ): RenderCommand =
+        RenderCommand(
             commandId = "test",
             points = DoubleArray(0),
             color = red,
@@ -378,5 +379,12 @@ class PerFaceSharedApiTest {
             originalShape = null,
             faceVertexCount = faceVertexCount,
         )
+
+    private companion object {
+        // Path uses identity equality; sharing one instance across stubRenderCommand
+        // calls lets the RenderCommand round-trip assertions round-trip cleanly.
+        private val sharedStubPath: Path = Point(0.0, 0.0, 0.0).let { p0 ->
+            Path(p0, p0, p0, p0)
+        }
     }
 }

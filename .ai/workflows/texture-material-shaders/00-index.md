@@ -7,11 +7,11 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-17T16:50:41Z"
+updated-at: "2026-04-17T17:12:24Z"
 selected-slice: "uv-generation-shared-api"
 current-stage: implement
 stage-number: 5
-current-stage-status: review-fixes-applied
+current-stage-status: verify-fix-applied
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-shared-api"
 branch-strategy: dedicated
@@ -164,7 +164,7 @@ progress:
   api-design-fixes: verify-complete
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
-  uv-generation-shared-api: review-fixes-applied
+  uv-generation-shared-api: verify-fix-applied
   uv-generation-cylinder: plan-complete
   uv-generation-pyramid: plan-complete
   uv-generation-stairs: plan-complete
