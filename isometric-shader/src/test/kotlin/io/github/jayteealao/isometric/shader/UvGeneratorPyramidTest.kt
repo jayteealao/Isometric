@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class UvGeneratorPyramidTest {
 
@@ -57,13 +58,37 @@ class UvGeneratorPyramidTest {
     }
 
     @Test
-    fun `lateral UVs are returned as independent copies per call`() {
-        // The shared LATERAL_CANONICAL_UVS constant is copied defensively on each call so
-        // that mutating one returned array cannot poison subsequent lateral reads.
+    fun `lateral UVs return the same shared array on every call`() {
+        // After the H-4 perf fix we return the shared LATERAL_CANONICAL_UVS directly
+        // (no defensive copy) because neither Canvas nor WebGPU callers mutate the
+        // returned array. Pin the shared-identity contract here so a future refactor
+        // that re-introduces `.copyOf()` fails CI rather than silently regressing
+        // the hot-path allocation (~9.4 KB/frame at 100 pyramids).
         val a = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 0)
-        a[0] = 42.0f
-        val b = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 0)
-        assertEquals(0.0f, b[0], absoluteTolerance = 0.0001f)
+        val b = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 1)
+        val c = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 3)
+        assertTrue(a === b, "lateral 0 and lateral 1 share the canonical array")
+        assertTrue(a === c, "lateral 0 and lateral 3 share the canonical array")
+    }
+
+    @Test
+    fun `base UVs are identity-cached per Pyramid instance`() {
+        // H-5 perf fix: the base quad UVs are computed once per Pyramid instance and
+        // reused. Same-instance repeat calls return the same FloatArray. Different
+        // Pyramid instances get their own fresh array (no stale cache leak).
+        val first = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 4)
+        val second = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 4)
+        assertTrue(first === second, "same Pyramid → same cached FloatArray")
+
+        val other = Pyramid(
+            position = Point(5.0, 5.0, 0.0),
+            width = 2.0, depth = 2.0, height = 2.0,
+        )
+        val third = UvGenerator.forPyramidFace(other, faceIndex = 4)
+        assertTrue(
+            first !== third,
+            "different Pyramid instance → fresh FloatArray (cache invalidated)",
+        )
     }
 
     @Test

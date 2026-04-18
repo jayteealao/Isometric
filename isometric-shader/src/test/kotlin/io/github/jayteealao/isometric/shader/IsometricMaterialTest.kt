@@ -57,14 +57,14 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `perFace creates PerFace with face map and default`() {
+    fun `prismPerFace creates PerFace with face map and default`() {
         val green = IsoColor.GREEN
         val gray = IsoColor.GRAY
-        val mat = perFace {
+        val mat = prismPerFace {
             top = green
             default = gray
         }
-        // The `perFace` DSL narrows its return to `PerFace.Prism` (not just `PerFace`)
+        // The `prismPerFace` DSL narrows its return to `PerFace.Prism` (not just `PerFace`)
         // so callers can access `faceMap` without a cast. Pin that narrowing here —
         // if the signature ever widens back to `PerFace` this assertion fails.
         assertIs<IsometricMaterial.PerFace.Prism>(mat)
@@ -74,8 +74,8 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `perFace default is mid-gray`() {
-        val mat = perFace { top = IsoColor.BLUE }
+    fun `prismPerFace default is mid-gray`() {
+        val mat = prismPerFace { top = IsoColor.BLUE }
         assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
@@ -344,9 +344,9 @@ class IsometricMaterialTest {
     }
 
     @Test
-    fun `perFace sides sets all four side faces`() {
+    fun `prismPerFace sides sets all four side faces`() {
         val dirt = IsoColor.RED
-        val mat = perFace { sides = dirt }
+        val mat = prismPerFace { sides = dirt }
         assertEquals(dirt, mat.faceMap[PrismFace.FRONT])
         assertEquals(dirt, mat.faceMap[PrismFace.BACK])
         assertEquals(dirt, mat.faceMap[PrismFace.LEFT])

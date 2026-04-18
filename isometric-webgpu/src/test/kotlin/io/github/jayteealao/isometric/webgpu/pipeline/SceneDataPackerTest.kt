@@ -4,6 +4,9 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
+import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.TextureSource
+import io.github.jayteealao.isometric.shapes.PyramidFace
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.test.Test
@@ -107,5 +110,99 @@ class SceneDataPackerTest {
     @Test
     fun `face data byte size matches six vertex layout`() {
         assertEquals(144, SceneDataLayout.FACE_DATA_BYTES)
+    }
+
+    // ── Per-face `resolveEffectiveColor` coverage (BL-2 from review) ──────────
+    //
+    // Before this pair of tests existed, `SceneDataPacker.resolveEffectiveColor` had
+    // zero unit coverage — the only PerFace-related dispatch in the whole packer was
+    // untested. A regression that returned `cmd.baseColor` for all PerFace cases
+    // (reintroducing the I-03 "flat-gray pyramid" bug on WebGPU) would pass CI.
+
+    @Test
+    fun `packInto writes per-face IsoColor for PerFace Pyramid with IsoColor slot`() {
+        // A pyramid lateral face carrying IsoColor.RED. Expected: the packed vec4 at
+        // offset 96 is red — NOT the PerFace default gray, NOT the command's baseColor.
+        val path = trianglePath()
+        val red = IsoColor(255.0, 0.0, 0.0, 255.0)
+        val grayBase = IsoColor(128.0, 128.0, 128.0, 255.0)
+        val material = IsometricMaterial.PerFace.Pyramid(
+            laterals = mapOf(PyramidFace.Lateral(0) to red),
+            default = grayBase,
+        )
+        val command = RenderCommand(
+            commandId = "pyramidPerFaceIsoColor",
+            points = doubleArrayOf(0.0, 0.0, 1.0, 0.0, 1.0, 1.0),
+            color = grayBase,
+            originalPath = path,
+            originalShape = null,
+            baseColor = grayBase,
+            material = material,
+            faceType = PyramidFace.Lateral(0),
+            faceVertexCount = 3,
+        )
+
+        val packed = packSingle(command)
+
+        packed.position(96)
+        assertEquals(1.0f, packed.getFloat(), "R is 255/255 = 1.0 (red, not default gray)")
+        assertEquals(0.0f, packed.getFloat(), "G is 0/255 = 0.0")
+        assertEquals(0.0f, packed.getFloat(), "B is 0/255 = 0.0")
+        assertEquals(1.0f, packed.getFloat(), "A is 255/255 = 1.0")
+    }
+
+    @Test
+    fun `packInto writes Textured tint for PerFace Pyramid with Textured slot`() {
+        // A pyramid lateral face carrying Textured(tint=BLUE). The fragment shader
+        // multiplies `sample * vertex.color`, so the per-face tint must arrive in the
+        // packed vertex-color slot or textured faces render uniformly darkened with
+        // the PerFace default.
+        val path = trianglePath()
+        val blueTint = IsoColor(0.0, 0.0, 255.0, 255.0)
+        val grayDefault = IsoColor(128.0, 128.0, 128.0, 255.0)
+        val material = IsometricMaterial.PerFace.Pyramid(
+            laterals = mapOf(
+                PyramidFace.Lateral(0) to IsometricMaterial.Textured(
+                    source = TextureSource.Resource(1),
+                    tint = blueTint,
+                ),
+            ),
+            default = grayDefault,
+        )
+        val command = RenderCommand(
+            commandId = "pyramidPerFaceTextured",
+            points = doubleArrayOf(0.0, 0.0, 1.0, 0.0, 1.0, 1.0),
+            color = grayDefault,
+            originalPath = path,
+            originalShape = null,
+            baseColor = grayDefault,
+            material = material,
+            faceType = PyramidFace.Lateral(0),
+            faceVertexCount = 3,
+        )
+
+        val packed = packSingle(command)
+
+        packed.position(96)
+        assertEquals(0.0f, packed.getFloat(), "R is tint.r / 255 = 0.0 (blue tint, not default gray)")
+        assertEquals(0.0f, packed.getFloat(), "G is tint.g / 255 = 0.0")
+        assertEquals(1.0f, packed.getFloat(), "B is tint.b / 255 = 1.0")
+        assertEquals(1.0f, packed.getFloat(), "A is tint.a / 255 = 1.0")
+    }
+
+    private fun trianglePath(): Path = Path(
+        listOf(
+            Point(0.0, 0.0, 0.0),
+            Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0),
+        ),
+    )
+
+    private fun packSingle(command: RenderCommand): ByteBuffer {
+        val buffer = ByteBuffer
+            .allocateDirect(SceneDataLayout.FACE_DATA_BYTES)
+            .order(ByteOrder.nativeOrder())
+        SceneDataPacker.packInto(listOf(command), buffer)
+        return buffer
     }
 }

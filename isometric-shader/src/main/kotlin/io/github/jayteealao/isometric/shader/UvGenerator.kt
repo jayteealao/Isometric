@@ -87,9 +87,20 @@ internal object UvGenerator {
      * the pyramid's peak. The BASE face (index 4) uses a planar top-down
      * projection yielding `(0,0)–(1,0)–(1,1)–(0,1)` for any unit pyramid.
      *
+     * ## Mutation contract
+     *
+     * Returns a **shared read-only array**. Callers must not mutate the returned
+     * `FloatArray`; the same instance is returned for every lateral call of every
+     * pyramid, and for the base slot for every call against the same pyramid.
+     * The render hot path (Canvas `computeAffineMatrix`, WebGPU
+     * `GpuUvCoordsBuffer.uploadUvCoordsBuffer`) only reads the array; no in-tree
+     * caller mutates it. Returning shared instances keeps `forPyramidFace` allocation-free
+     * on the hot path — ~9.4 KB/frame at 100 pyramids previously allocated by the
+     * defensive copy / per-call `FloatArray(8)`.
+     *
      * @param pyramid The source Pyramid (provides dimensional extents for base normalization)
      * @param faceIndex 0..3 for laterals, 4 for the rectangular base
-     * @return [FloatArray] of 6 floats for laterals, 8 floats for the base
+     * @return shared read-only [FloatArray] — do not mutate. 6 floats for laterals, 8 floats for the base.
      * @throws IllegalArgumentException if [faceIndex] is outside `0 until pyramid.paths.size`
      */
     fun forPyramidFace(pyramid: Pyramid, faceIndex: Int): FloatArray {
@@ -97,9 +108,9 @@ internal object UvGenerator {
             "faceIndex $faceIndex out of bounds for Pyramid with ${pyramid.paths.size} faces (valid range: 0 until ${pyramid.paths.size})"
         }
         return if (faceIndex == 4) {
-            computePyramidBaseUvs(pyramid)
+            getOrComputeBaseUvs(pyramid)
         } else {
-            LATERAL_CANONICAL_UVS.copyOf()
+            LATERAL_CANONICAL_UVS
         }
     }
 
@@ -115,6 +126,24 @@ internal object UvGenerator {
         1.0f, 1.0f,   // v[1] base-right
         0.5f, 0.0f,   // v[2] apex
     )
+
+    // Single-slot identity cache for the base-face UVs. Pyramid is immutable after
+    // construction, so `computePyramidBaseUvs` is referentially transparent per
+    // Pyramid instance; the last-computed result is reused until a different Pyramid
+    // arrives. Per-scene renders typically touch one or a few Pyramid instances per
+    // frame, so hit rate is high. Not thread-safe, but UvGenerator is only called
+    // from the UI / render thread in `ShapeNode.renderTo`.
+    @Volatile private var lastBasePyramid: Pyramid? = null
+    @Volatile private var lastBaseUvs: FloatArray? = null
+
+    private fun getOrComputeBaseUvs(pyramid: Pyramid): FloatArray {
+        val cached = lastBaseUvs
+        if (lastBasePyramid === pyramid && cached != null) return cached
+        val fresh = computePyramidBaseUvs(pyramid)
+        lastBasePyramid = pyramid
+        lastBaseUvs = fresh
+        return fresh
+    }
 
     private fun computePyramidBaseUvs(pyramid: Pyramid): FloatArray {
         val ox = pyramid.position.x

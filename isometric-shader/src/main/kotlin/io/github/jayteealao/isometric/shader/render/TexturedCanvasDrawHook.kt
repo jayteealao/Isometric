@@ -126,14 +126,7 @@ internal class TexturedCanvasDrawHook(
         nativePath: android.graphics.Path,
         color: IsoColor,
     ): Boolean {
-        // Mirror NativeSceneRenderer.toAndroidColor: Android's Color.argb expects
-        // alpha-red-green-blue channel order; IsoColor stores each as a [0..255] Double.
-        flatPaint.color = android.graphics.Color.argb(
-            color.a.toInt().coerceIn(0, 255),
-            color.r.toInt().coerceIn(0, 255),
-            color.g.toInt().coerceIn(0, 255),
-            color.b.toInt().coerceIn(0, 255),
-        )
+        flatPaint.color = color.toAndroidArgbInt()
         nativeCanvas.drawPath(nativePath, flatPaint)
         return true
     }
@@ -293,6 +286,28 @@ internal fun createCheckerboardBitmap(): Bitmap {
  */
 private fun isWhite(color: IsoColor): Boolean =
     color.r >= 255.0 && color.g >= 255.0 && color.b >= 255.0
+
+/**
+ * Convert an [IsoColor] (a/r/g/b `Double` channels in `[0..255]`) to Android's packed
+ * ARGB `Int` layout (`0xAARRGGBB`). Mirrors `NativeSceneRenderer.toAndroidColor` and
+ * factored out so the conversion is unit-testable on the JVM without the Android
+ * graphics framework: the computation is pure bit-shifting and depends on no Android
+ * APIs. The `Color.argb` call inside `drawFlatColor` itself still needs a live
+ * Android runtime to paint to a `Canvas` — but the color-derivation step, which is
+ * what the I-03 fix depends on, is now fully testable here.
+ *
+ * Each channel is `coerceIn(0, 255)` as defence-in-depth; `IsoColor.init` already
+ * enforces this range at construction, but the DSL can only enforce it on `IsoColor`
+ * instances. A third-party [MaterialData] implementation returning out-of-range
+ * values would otherwise silently overflow into neighbouring channels.
+ */
+internal fun IsoColor.toAndroidArgbInt(): Int {
+    val a = a.toInt().coerceIn(0, 255)
+    val r = r.toInt().coerceIn(0, 255)
+    val g = g.toInt().coerceIn(0, 255)
+    val b = b.toInt().coerceIn(0, 255)
+    return (a shl 24) or (r shl 16) or (g shl 8) or b
+}
 
 /**
  * Returns a multiplicative color filter for the given tint, or `null` for white (no-op).

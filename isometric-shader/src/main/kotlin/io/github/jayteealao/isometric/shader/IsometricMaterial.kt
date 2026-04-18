@@ -65,8 +65,10 @@ sealed interface IsometricMaterial : MaterialData {
      * [default] invariant — a `PerFace` material cannot itself be a `PerFace` — is
      * enforced in the base [init] block and applies to every subclass.
      *
-     * Use the [perFace] DSL to construct a [Prism] instance. For non-Prism shapes,
-     * construct the matching subclass directly, e.g. `PerFace.Cylinder(top = ..., default = ...)`.
+     * Each wired-up shape has its own per-face DSL: [prismPerFace] for [Prism],
+     * [pyramidPerFace] for [Pyramid], [octahedronPerFace] for [Octahedron]. Stubbed
+     * shapes (Cylinder, Stairs) construct the matching subclass directly until their
+     * `uv-generation-<shape>` slices ship a DSL.
      *
      * ### Validation via `require()` rather than a compile-time builder
      *
@@ -159,7 +161,7 @@ sealed interface IsometricMaterial : MaterialData {
                 /**
                  * Creates a [Prism] per-face material.
                  *
-                 * Prefer the [perFace] DSL for typical usage; use this factory when you
+                 * Prefer the [prismPerFace] DSL for typical usage; use this factory when you
                  * already have a `Map<PrismFace, MaterialData>` in hand (e.g. loading
                  * from data).
                  *
@@ -349,6 +351,9 @@ sealed interface IsometricMaterial : MaterialData {
          * and `GpuTextureManager.collectTextureSources` aggregates textures from [byIndex].
          * All 8 faces map to the same canonical triangle UV `(0,0)–(1,0)–(0.5,1)` —
          * per-face textures differ in material content, not UV layout.
+         *
+         * Prefer the [octahedronPerFace] DSL for construction — it accepts enum-keyed slot
+         * assignments without the `byIndex = mapOf(...)` boilerplate.
          */
         public class Octahedron(
             public val byIndex: Map<OctahedronFace, MaterialData> = emptyMap(),
@@ -470,19 +475,18 @@ fun texturedBitmap(
 /**
  * Creates an [IsometricMaterial.PerFace.Prism] material via a builder with named face properties.
  *
- * The DSL produces a [IsometricMaterial.PerFace.Prism] specifically. For non-Prism
- * shapes (Cylinder, Pyramid, Stairs, Octahedron), construct the matching
- * `PerFace.<Shape>` subclass directly.
+ * Pairs with [pyramidPerFace] and [octahedronPerFace] — one shape-specific DSL per
+ * per-face-supporting shape, named `<shape>PerFace` for discoverability.
  *
  * ```kotlin
  * // Simple: grass top, dirt sides
- * Shape(Prism(origin), material = perFace {
+ * Shape(Prism(origin), material = prismPerFace {
  *     top = texturedResource(R.drawable.grass)
  *     sides = texturedResource(R.drawable.dirt)
  * })
  *
  * // Fine-grained: different materials per side
- * Shape(Prism(origin), material = perFace {
+ * Shape(Prism(origin), material = prismPerFace {
  *     top = texturedResource(R.drawable.grass)
  *     front = texturedResource(R.drawable.dirt_shadow)
  *     left = texturedResource(R.drawable.dirt_light)
@@ -490,10 +494,10 @@ fun texturedBitmap(
  * })
  * ```
  */
-fun perFace(
-    block: PerFaceMaterialScope.() -> Unit,
+fun prismPerFace(
+    block: PrismPerFaceMaterialScope.() -> Unit,
 ): IsometricMaterial.PerFace.Prism =
-    PerFaceMaterialScope().apply(block).build()
+    PrismPerFaceMaterialScope().apply(block).build()
 
 /**
  * Creates an [IsometricMaterial.PerFace.Pyramid] via a builder with named face slots.
@@ -523,14 +527,41 @@ fun pyramidPerFace(
 ): IsometricMaterial.PerFace.Pyramid =
     PyramidPerFaceMaterialScope().apply(block).build()
 
+/**
+ * Creates an [IsometricMaterial.PerFace.Octahedron] via a builder with enum-keyed face slots.
+ *
+ * Octahedron has eight individually addressable triangular faces. Use
+ * [OctahedronPerFaceMaterialScope.face] to assign a material to a specific
+ * [OctahedronFace] slot, or [OctahedronPerFaceMaterialScope.allFaces] to paint every
+ * face with the same material.
+ *
+ * ```kotlin
+ * Shape(Octahedron(origin), material = octahedronPerFace {
+ *     allFaces(texturedResource(R.drawable.stone))
+ * })
+ *
+ * Shape(Octahedron(origin), material = octahedronPerFace {
+ *     face(OctahedronFace.UPPER_0, IsoColor.RED)
+ *     face(OctahedronFace.UPPER_1, IsoColor.GREEN)
+ *     face(OctahedronFace.UPPER_2, IsoColor.BLUE)
+ *     face(OctahedronFace.UPPER_3, IsoColor.YELLOW)
+ *     default = IsoColor.GRAY
+ * })
+ * ```
+ */
+fun octahedronPerFace(
+    block: OctahedronPerFaceMaterialScope.() -> Unit,
+): IsometricMaterial.PerFace.Octahedron =
+    OctahedronPerFaceMaterialScope().apply(block).build()
+
 // -- Builder classes ----------------------------------------------------------
 
-/** DSL marker that prevents nesting [PerFaceMaterialScope] calls inadvertently. */
+/** DSL marker that prevents nesting per-face scope calls inadvertently. */
 @DslMarker
 annotation class IsometricMaterialDsl
 
 @IsometricMaterialDsl
-class PerFaceMaterialScope internal constructor() {
+class PrismPerFaceMaterialScope internal constructor() {
     var top: MaterialData? = null
     var bottom: MaterialData? = null
     var front: MaterialData? = null
@@ -590,6 +621,30 @@ class PyramidPerFaceMaterialScope internal constructor() {
         IsometricMaterial.PerFace.Pyramid(
             base = base,
             laterals = lateralMap.toMap(),
+            default = default,
+        )
+}
+
+@IsometricMaterialDsl
+class OctahedronPerFaceMaterialScope internal constructor() {
+    /** Fallback for any face not explicitly assigned via [face] or [allFaces]. */
+    var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
+
+    private val faceMap = java.util.EnumMap<OctahedronFace, MaterialData>(OctahedronFace::class.java)
+
+    /** Assigns [material] to the given [OctahedronFace] slot. */
+    fun face(face: OctahedronFace, material: MaterialData) {
+        faceMap[face] = material
+    }
+
+    /** Convenience: assigns [material] to every one of the eight faces. */
+    fun allFaces(material: MaterialData) {
+        for (f in OctahedronFace.entries) faceMap[f] = material
+    }
+
+    internal fun build(): IsometricMaterial.PerFace.Octahedron =
+        IsometricMaterial.PerFace.Octahedron(
+            byIndex = if (faceMap.isEmpty()) emptyMap() else faceMap.toMap(),
             default = default,
         )
 }

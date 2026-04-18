@@ -7,11 +7,14 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-17T23:24:00Z"
+updated-at: "2026-04-18T11:53:46Z"
 selected-slice: "uv-generation-pyramid"
 current-stage: implement
 stage-number: 5
 current-stage-status: complete
+review-verdict: ship-with-caveats
+review-triage-status: partially-triaged
+review-fix-status: blockers-and-cheap-highs-fixed
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
 branch-strategy: dedicated
@@ -134,6 +137,18 @@ workflow-files:
   - 05-implement-uv-generation-shared-api.md
   - 05-implement-uv-generation-pyramid.md
   - 06-verify-uv-generation-pyramid.md
+  - 07-review-uv-generation-pyramid.md
+  - 07-review-uv-generation-pyramid-correctness.md
+  - 07-review-uv-generation-pyramid-security.md
+  - 07-review-uv-generation-pyramid-code-simplification.md
+  - 07-review-uv-generation-pyramid-testing.md
+  - 07-review-uv-generation-pyramid-maintainability.md
+  - 07-review-uv-generation-pyramid-reliability.md
+  - 07-review-uv-generation-pyramid-architecture.md
+  - 07-review-uv-generation-pyramid-api-contracts.md
+  - 07-review-uv-generation-pyramid-performance.md
+  - 07-review-uv-generation-pyramid-refactor-safety.md
+  - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHookColorTest.kt
   - .maestro/verify-pyramid.yaml
   - isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/ShapeNodeFaceTypeTest.kt
   - isometric-shader/src/main/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHook.kt
@@ -172,7 +187,7 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: plan-complete
-  uv-generation-pyramid: implement-verify-fix-complete
+  uv-generation-pyramid: review-fixes-applied
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete
   uv-generation-octahedron: review-ship-with-caveats

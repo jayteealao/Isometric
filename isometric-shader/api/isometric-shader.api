@@ -109,7 +109,8 @@ public abstract interface annotation class io/github/jayteealao/isometric/shader
 }
 
 public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
-	public static final fun perFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Prism;
+	public static final fun octahedronPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Octahedron;
+	public static final fun prismPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Prism;
 	public static final fun pyramidPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Pyramid;
 	public static final fun resolveForFace (Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace;Lio/github/jayteealao/isometric/shapes/FaceIdentifier;)Lio/github/jayteealao/isometric/MaterialData;
 	public static final fun texturedAsset (Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
@@ -120,7 +121,15 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
 	public static synthetic fun texturedResource$default (ILio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
 }
 
-public final class io/github/jayteealao/isometric/shader/PerFaceMaterialScope {
+public final class io/github/jayteealao/isometric/shader/OctahedronPerFaceMaterialScope {
+	public static final field $stable I
+	public final fun allFaces (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun face (Lio/github/jayteealao/isometric/shapes/OctahedronFace;Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun setDefault (Lio/github/jayteealao/isometric/MaterialData;)V
+}
+
+public final class io/github/jayteealao/isometric/shader/PrismPerFaceMaterialScope {
 	public static final field $stable I
 	public final fun getBack ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getBottom ()Lio/github/jayteealao/isometric/MaterialData;

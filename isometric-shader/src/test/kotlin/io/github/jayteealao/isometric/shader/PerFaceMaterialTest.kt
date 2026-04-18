@@ -49,7 +49,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `empty faceMap returns default for every face`() {
-        val mat = perFace {
+        val mat = prismPerFace {
             default = gray
         }
         for (face in PrismFace.values()) {
@@ -58,15 +58,15 @@ class PerFaceMaterialTest {
     }
 
     @Test
-    fun `perFace DSL default is mid-gray`() {
-        val mat = perFace { }
+    fun `prismPerFace DSL default is mid-gray`() {
+        val mat = prismPerFace {}
         assertIs<IsoColor>(mat.default)
         assertEquals(IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT, mat.default)
     }
 
     @Test
-    fun `perFace sides setter sets all four side faces`() {
-        val mat = perFace {
+    fun `prismPerFace sides setter sets all four side faces`() {
+        val mat = prismPerFace {
             sides = dirt
             top = grass
         }
@@ -80,7 +80,7 @@ class PerFaceMaterialTest {
     @Test
     fun `individual face overrides sides`() {
         val stone = IsoColor.BLUE
-        val mat = perFace {
+        val mat = prismPerFace {
             sides = dirt
             front = stone  // overrides sides for FRONT
         }
@@ -100,7 +100,7 @@ class PerFaceMaterialTest {
 
     @Test
     fun `faceMap lookup is pure and idempotent`() {
-        val mat = perFace {
+        val mat = prismPerFace {
             top = grass
             default = gray
         }

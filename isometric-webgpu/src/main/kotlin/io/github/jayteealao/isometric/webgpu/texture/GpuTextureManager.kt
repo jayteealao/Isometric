@@ -307,9 +307,17 @@ internal class GpuTextureManager(
     }
 
     /**
-     * Warn once per variant kind when a non-Prism [IsometricMaterial.PerFace] carries
-     * textured per-slot materials — those textures will not render until the
-     * corresponding `uv-generation-<shape>` slice wires up per-face resolution.
+     * Warn once per variant kind when a still-stubbed non-Prism
+     * [IsometricMaterial.PerFace] (Cylinder, Stairs) carries textured per-slot materials
+     * — those textures will not render until the corresponding `uv-generation-<shape>`
+     * slice wires up per-face resolution.
+     *
+     * Only Cylinder and Stairs reach this helper: Prism/Pyramid/Octahedron are already
+     * routed to their live `collectTextureSources` branches. The `Prism` /
+     * `Pyramid` / `Octahedron` arms that previously lived here were unreachable dead
+     * code after the Pyramid + Octahedron slices landed; removed as part of the
+     * uv-generation-pyramid review H-1 fix. This function itself is slated for
+     * deletion alongside the Cylinder slice (final live arm goes away with Stairs).
      */
     private fun warnIfNonPrismPerFaceHasTexturedSlots(m: IsometricMaterial.PerFace) {
         val (kind, texturedSlots) = when (m) {
@@ -319,23 +327,17 @@ internal class GpuTextureManager(
                     (m.bottom as? IsometricMaterial.Textured)?.source,
                     (m.side as? IsometricMaterial.Textured)?.source,
                 )
-            is IsometricMaterial.PerFace.Pyramid ->
-                "Pyramid" to buildList {
-                    (m.base as? IsometricMaterial.Textured)?.let { add(it.source) }
-                    for (sub in m.laterals.values) {
-                        if (sub is IsometricMaterial.Textured) add(sub.source)
-                    }
-                }
             is IsometricMaterial.PerFace.Stairs ->
                 "Stairs" to listOfNotNull(
                     (m.tread as? IsometricMaterial.Textured)?.source,
                     (m.riser as? IsometricMaterial.Textured)?.source,
                     (m.side as? IsometricMaterial.Textured)?.source,
                 )
-            is IsometricMaterial.PerFace.Octahedron ->
-                "Octahedron" to m.byIndex.values
-                    .mapNotNull { (it as? IsometricMaterial.Textured)?.source }
-            is IsometricMaterial.PerFace.Prism -> return // handled by caller
+            // Prism, Pyramid, Octahedron are routed to their live arms in
+            // collectTextureSources and never reach this helper.
+            is IsometricMaterial.PerFace.Prism,
+            is IsometricMaterial.PerFace.Pyramid,
+            is IsometricMaterial.PerFace.Octahedron -> return
         }
         if (texturedSlots.isNotEmpty() && nonPrismPerFaceWarningsIssued.add(kind)) {
             Log.w(

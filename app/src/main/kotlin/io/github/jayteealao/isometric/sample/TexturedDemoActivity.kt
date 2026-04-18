@@ -35,7 +35,8 @@ import io.github.jayteealao.isometric.compose.runtime.GestureConfig
 import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.RenderMode
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
-import io.github.jayteealao.isometric.shader.perFace
+import io.github.jayteealao.isometric.shader.octahedronPerFace
+import io.github.jayteealao.isometric.shader.prismPerFace
 import io.github.jayteealao.isometric.shader.pyramidPerFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
@@ -84,7 +85,7 @@ private fun TexturedDemoScreen() {
     var shapeTab by remember { mutableStateOf(ShapeTab.Prism) }
 
     val tileMaterial = remember {
-        perFace {
+        prismPerFace {
             top = texturedBitmap(TextureAssets.grassTop)
             sides = texturedBitmap(TextureAssets.dirtSide)
             default = texturedBitmap(TextureAssets.dirtSide)
@@ -93,7 +94,7 @@ private fun TexturedDemoScreen() {
 
     // Tiling 2×2 on top, tiling 1×2 on sides — exercises TextureTransform path (AC1 / AC4)
     val tilingMaterial = remember {
-        perFace {
+        prismPerFace {
             top = texturedBitmap(TextureAssets.grassTop, transform = TextureTransform.tiling(2f, 2f))
             sides = texturedBitmap(TextureAssets.dirtSide, transform = TextureTransform.tiling(1f, 2f))
             default = texturedBitmap(TextureAssets.dirtSide, transform = TextureTransform.tiling(1f, 2f))
@@ -101,20 +102,18 @@ private fun TexturedDemoScreen() {
     }
 
     val octahedronTextured = remember { texturedBitmap(TextureAssets.grassTop) }
-    val octahedronPerFace = remember {
-        IsometricMaterial.PerFace.Octahedron(
-            byIndex = mapOf(
-                OctahedronFace.UPPER_0 to IsoColor(220, 50, 50),
-                OctahedronFace.UPPER_1 to IsoColor(50, 180, 50),
-                OctahedronFace.UPPER_2 to IsoColor(50, 80, 220),
-                OctahedronFace.UPPER_3 to IsoColor(220, 200, 50),
-                OctahedronFace.LOWER_0 to IsoColor(220, 120, 220),
-                OctahedronFace.LOWER_1 to IsoColor(120, 220, 220),
-                OctahedronFace.LOWER_2 to IsoColor(220, 180, 120),
-                OctahedronFace.LOWER_3 to IsoColor(120, 180, 220),
-            ),
-            default = IsoColor(150, 150, 150),
-        )
+    val octahedronPerFaceMat = remember {
+        octahedronPerFace {
+            face(OctahedronFace.UPPER_0, IsoColor(220, 50, 50))
+            face(OctahedronFace.UPPER_1, IsoColor(50, 180, 50))
+            face(OctahedronFace.UPPER_2, IsoColor(50, 80, 220))
+            face(OctahedronFace.UPPER_3, IsoColor(220, 200, 50))
+            face(OctahedronFace.LOWER_0, IsoColor(220, 120, 220))
+            face(OctahedronFace.LOWER_1, IsoColor(120, 220, 220))
+            face(OctahedronFace.LOWER_2, IsoColor(220, 180, 120))
+            face(OctahedronFace.LOWER_3, IsoColor(120, 180, 220))
+            default = IsoColor(150, 150, 150)
+        }
     }
 
     val pyramidTextured = remember {
@@ -196,7 +195,7 @@ private fun TexturedDemoScreen() {
                 ShapeTab.Octahedron -> TexturedOctahedronScene(
                     renderMode = renderMode,
                     texturedMaterial = octahedronTextured,
-                    perFaceMaterial = octahedronPerFace,
+                    perFaceMaterial = octahedronPerFaceMat,
                 )
                 ShapeTab.Pyramid -> TexturedPyramidScene(
                     renderMode = renderMode,

@@ -27,7 +27,20 @@ internal class SceneGraph {
     fun add(shape: Shape, color: IsoColor) {
         val paths = shape.orderedPaths()
         for (path in paths) {
-            add(path, color, shape)
+            // Derive faceVertexCount from the actual path rather than defaulting to 4 —
+            // shapes with mixed face topology (e.g. Pyramid: 3-vertex laterals +
+            // 4-vertex base) would otherwise all be mislabelled as quads, breaking
+            // UV/vertex bookkeeping for downstream WebGPU packing.
+            //
+            // High-vertex caps (Cylinder with 30 sides → 30-vertex cap polygons)
+            // exceed the `RenderCommand.faceVertexCount` validator's 3..24 ceiling;
+            // clamp at 24 to match the validator. Paths above the cap still render
+            // correctly on Canvas (which reads `path.points` directly); WebGPU
+            // paths use per-shape UV providers that cap at the shader-side limit
+            // independently, so truncating the metadata field here does not lose
+            // vertex data in either renderer.
+            val vertexCount = path.points.size.coerceIn(3, 24)
+            add(path, color, shape, faceVertexCount = vertexCount)
         }
     }
 
