@@ -15,12 +15,12 @@ class ShapeFaceEnumTest {
     // ---------- CylinderFace ----------
 
     @Test
-    fun `CylinderFace maps path index 0 to TOP`() =
-        assertEquals(CylinderFace.TOP, CylinderFace.fromPathIndex(0))
+    fun `CylinderFace maps path index 0 to BOTTOM`() =
+        assertEquals(CylinderFace.BOTTOM, CylinderFace.fromPathIndex(0))
 
     @Test
-    fun `CylinderFace maps path index 1 to BOTTOM`() =
-        assertEquals(CylinderFace.BOTTOM, CylinderFace.fromPathIndex(1))
+    fun `CylinderFace maps path index 1 to TOP`() =
+        assertEquals(CylinderFace.TOP, CylinderFace.fromPathIndex(1))
 
     @Test
     fun `CylinderFace maps any index gte 2 to SIDE`() {

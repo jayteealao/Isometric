@@ -66,9 +66,9 @@ sealed interface IsometricMaterial : MaterialData {
      * enforced in the base [init] block and applies to every subclass.
      *
      * Each wired-up shape has its own per-face DSL: [prismPerFace] for [Prism],
-     * [pyramidPerFace] for [Pyramid], [octahedronPerFace] for [Octahedron]. Stubbed
-     * shapes (Cylinder, Stairs) construct the matching subclass directly until their
-     * `uv-generation-<shape>` slices ship a DSL.
+     * [pyramidPerFace] for [Pyramid], [octahedronPerFace] for [Octahedron],
+     * [cylinderPerFace] for [Cylinder]. Stubbed shapes (Stairs) construct the matching
+     * subclass directly until their `uv-generation-<shape>` slices ship a DSL.
      *
      * ### Validation via `require()` rather than a compile-time builder
      *
@@ -182,20 +182,25 @@ sealed interface IsometricMaterial : MaterialData {
          * All side quads share the same [side] material (logical grouping). Any slot
          * left `null` falls back to [default].
          *
-         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
-         * three collaborators that this slice deliberately leaves empty:
+         * Per-face rendering is fully wired: [uvCoordProviderForShape] registers the
+         * Cylinder UV provider (sides use seam-duplicated `u = k/N` mapping, caps use
+         * planar disk projection centered at `(0.5, 0.5)`); [resolveForFace] dispatches
+         * via `faceType as? CylinderFace`; and `GpuTextureManager.collectTextureSources`
+         * aggregates textures from [top], [bottom], and [side].
          *
-         * - TODO(uv-generation-cylinder): register a non-null provider in
-         *   [uvCoordProviderForShape] so `CylinderFace` faces get per-face UVs.
-         * - TODO(uv-generation-cylinder): add a `is Cylinder` branch to
-         *   [resolveForFace] so the render pipeline dispatches on `CylinderFace` rather
-         *   than falling back to [default].
-         * - TODO(uv-generation-cylinder): collect per-slot textures in
-         *   `GpuTextureManager.collectTextureSources`; a Log.w warning fires today
-         *   when Textured slots are present but not rendered.
+         * Prefer the `cylinderPerFace { }` DSL over this constructor for readability:
          *
-         * @property top Material for the top cap (path index 0)
-         * @property bottom Material for the bottom cap (path index 1)
+         * ```kotlin
+         * val material = cylinderPerFace {
+         *     top = texturedResource(R.drawable.grass)
+         *     bottom = texturedResource(R.drawable.dirt)
+         *     side = texturedResource(R.drawable.brick)
+         *     default = IsoColor.GRAY
+         * }
+         * ```
+         *
+         * @property top Material for the top cap (path index 1)
+         * @property bottom Material for the bottom cap (path index 0)
          * @property side Material for every side quad (path indices 2..)
          * @property default Fallback for any slot left null
          */
@@ -388,11 +393,11 @@ sealed interface IsometricMaterial : MaterialData {
  * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for
  * the face currently being rendered.
  *
- * [IsometricMaterial.PerFace.Prism], [IsometricMaterial.PerFace.Octahedron], and
- * [IsometricMaterial.PerFace.Pyramid] dispatch via [faceType] today; the remaining
- * variants (`Cylinder`, `Stairs`) ship empty stubs and return
- * [IsometricMaterial.PerFace.default] until their `uv-generation-<shape>` slices
- * wire up per-face resolution.
+ * [IsometricMaterial.PerFace.Prism], [IsometricMaterial.PerFace.Octahedron],
+ * [IsometricMaterial.PerFace.Pyramid], and [IsometricMaterial.PerFace.Cylinder]
+ * dispatch via [faceType] today; the remaining variant (`Stairs`) ships an empty
+ * stub and returns [IsometricMaterial.PerFace.default] until its
+ * `uv-generation-stairs` slice wires up per-face resolution.
  *
  * Centralising this dispatch means each downstream shape slice adds exactly one
  * `when` branch here — rather than updating the 3 consumer sites
@@ -418,9 +423,11 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         val pyramidFace = faceType as? PyramidFace
         if (pyramidFace != null) resolve(pyramidFace) else default
     }
-    // TODO(uv-generation-cylinder): dispatch via faceType as? CylinderFace
-    // TODO(uv-generation-stairs):   dispatch via faceType as? StairsFace
-    is IsometricMaterial.PerFace.Cylinder,
+    is IsometricMaterial.PerFace.Cylinder -> {
+        val cylinderFace = faceType as? CylinderFace
+        if (cylinderFace != null) resolve(cylinderFace) else default
+    }
+    // TODO(uv-generation-stairs): dispatch via faceType as? StairsFace
     is IsometricMaterial.PerFace.Stairs -> default
 }
 
@@ -554,6 +561,28 @@ fun octahedronPerFace(
 ): IsometricMaterial.PerFace.Octahedron =
     OctahedronPerFaceMaterialScope().apply(block).build()
 
+/**
+ * Creates an [IsometricMaterial.PerFace.Cylinder] via a builder with named face slots.
+ *
+ * Cylinder has three named face regions: the [CylinderPerFaceMaterialScope.top] cap,
+ * the [CylinderPerFaceMaterialScope.bottom] cap, and the [CylinderPerFaceMaterialScope.side]
+ * barrel (which covers every side quad at once — per-band addressability is not
+ * exposed here; use a textured material with a `TextureTransform` for that).
+ *
+ * ```kotlin
+ * Shape(Cylinder(origin), material = cylinderPerFace {
+ *     top = texturedResource(R.drawable.grass)
+ *     bottom = texturedResource(R.drawable.dirt)
+ *     side = texturedResource(R.drawable.brick)
+ *     default = IsoColor.GRAY
+ * })
+ * ```
+ */
+fun cylinderPerFace(
+    block: CylinderPerFaceMaterialScope.() -> Unit,
+): IsometricMaterial.PerFace.Cylinder =
+    CylinderPerFaceMaterialScope().apply(block).build()
+
 // -- Builder classes ----------------------------------------------------------
 
 /** DSL marker that prevents nesting per-face scope calls inadvertently. */
@@ -645,6 +674,29 @@ class OctahedronPerFaceMaterialScope internal constructor() {
     internal fun build(): IsometricMaterial.PerFace.Octahedron =
         IsometricMaterial.PerFace.Octahedron(
             byIndex = if (faceMap.isEmpty()) emptyMap() else faceMap.toMap(),
+            default = default,
+        )
+}
+
+@IsometricMaterialDsl
+class CylinderPerFaceMaterialScope internal constructor() {
+    /** Material for the top cap (path index 1). */
+    var top: MaterialData? = null
+
+    /** Material for the bottom cap (path index 0). */
+    var bottom: MaterialData? = null
+
+    /** Material for every side quad (path indices 2..). */
+    var side: MaterialData? = null
+
+    /** Fallback for any slot left null. */
+    var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
+
+    internal fun build(): IsometricMaterial.PerFace.Cylinder =
+        IsometricMaterial.PerFace.Cylinder(
+            top = top,
+            bottom = bottom,
+            side = side,
             default = default,
         )
 }

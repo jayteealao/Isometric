@@ -4,6 +4,8 @@ import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
+import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.CylinderFace
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
@@ -166,6 +168,69 @@ class ShapeNodeFaceTypeTest {
     }
 
     // ---- Parent-group accumulated transform ----
+
+    // ---- Cylinder coverage (uv-generation-cylinder) ----
+
+    @Test
+    fun `cylinder emits typed CylinderFace faceType under identity transform`() {
+        val node = ShapeNode(shape = Cylinder(Point.ORIGIN, vertices = 6), color = IsoColor.WHITE)
+        val commands = node.collect()
+        assertEquals("Cylinder(N=6) should emit 8 face commands (2 caps + 6 sides)", 8, commands.size)
+        for ((i, cmd) in commands.withIndex()) {
+            val ft = cmd.faceType
+            assertNotNull("faceType must be non-null for Cylinder face $i", ft)
+            assertTrue(
+                "faceType for face $i must be CylinderFace, got ${ft!!::class.simpleName}",
+                ft is CylinderFace,
+            )
+            assertEquals(CylinderFace.fromPathIndex(i), ft)
+        }
+    }
+
+    @Test
+    fun `cylinder scale emits typed CylinderFace faceType after scale transform`() {
+        // I-03 regression pattern: Shape.scale erases Cylinder to base Shape.
+        // Dispatching on the pre-transform `shape` field preserves the concrete type.
+        val node = ShapeNode(shape = Cylinder(Point.ORIGIN, vertices = 6), color = IsoColor.WHITE).apply {
+            scale = 2.5
+        }
+        val commands = node.collect()
+        assertEquals(8, commands.size)
+        for ((i, cmd) in commands.withIndex()) {
+            assertNotNull(
+                "Under scale=2.5, faceType must still resolve to CylinderFace (I-03 regression)",
+                cmd.faceType,
+            )
+            assertEquals(CylinderFace.fromPathIndex(i), cmd.faceType)
+        }
+    }
+
+    @Test
+    fun `cylinder rotateZ emits typed CylinderFace faceType after rotation`() {
+        val node = ShapeNode(shape = Cylinder(Point.ORIGIN, vertices = 6), color = IsoColor.WHITE).apply {
+            rotation = PI / 4.0
+        }
+        val commands = node.collect()
+        assertEquals(8, commands.size)
+        for ((i, cmd) in commands.withIndex()) {
+            assertNotNull(cmd.faceType)
+            assertEquals(CylinderFace.fromPathIndex(i), cmd.faceType)
+        }
+    }
+
+    @Test
+    fun `cylinder faceVertexCount is 4 for sides and N for caps even under scale`() {
+        // Mixed-vertex-count stress: 4-vertex side quads and N-vertex caps.
+        val node = ShapeNode(shape = Cylinder(Point.ORIGIN, vertices = 6), color = IsoColor.WHITE).apply {
+            scale = 2.0
+        }
+        val commands = node.collect()
+        assertEquals("Bottom cap must carry faceVertexCount=6", 6, commands[0].faceVertexCount)
+        assertEquals("Top cap must carry faceVertexCount=6", 6, commands[1].faceVertexCount)
+        for (k in 0 until 6) {
+            assertEquals("Side $k must carry faceVertexCount=4", 4, commands[2 + k].faceVertexCount)
+        }
+    }
 
     @Test
     fun `pyramid under rotated GroupNode parent still emits typed PyramidFace`() {

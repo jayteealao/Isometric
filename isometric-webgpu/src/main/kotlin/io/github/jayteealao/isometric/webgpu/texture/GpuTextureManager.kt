@@ -257,18 +257,18 @@ internal class GpuTextureManager(
      * Recursively collect [TextureSource] references from a material, expanding
      * [IsometricMaterial.PerFace] into its constituent sub-materials.
      *
-     * **Per-slot textures on `Cylinder` and `Stairs` `PerFace` variants are not yet
-     * collected into the atlas.** Each still-stubbed variant ships as an empty dispatch
-     * stub: constructing one with per-slot [IsometricMaterial.Textured] entries is legal,
-     * but those textures never make it into the atlas and the faces render with the
-     * material's [IsometricMaterial.PerFace.default] at runtime. The corresponding
-     * `uv-generation-<shape>` slice enables per-slot collection for each shape; `Prism`,
-     * `Octahedron`, and `Pyramid` are already wired.
+     * **Per-slot textures on the `Stairs` `PerFace` variant are not yet collected into
+     * the atlas.** Stairs ships as an empty dispatch stub: constructing one with
+     * per-slot [IsometricMaterial.Textured] entries is legal, but those textures never
+     * make it into the atlas and the faces render with the material's
+     * [IsometricMaterial.PerFace.default] at runtime. The corresponding
+     * `uv-generation-stairs` slice will enable per-slot collection. `Prism`, `Octahedron`,
+     * `Pyramid`, and `Cylinder` are already wired.
      *
      * To avoid silently dropping textures, this function emits a single Log.w warning
-     * the first time a still-stubbed variant carrying at least one `Textured` slot is
-     * seen, naming the shape and listing the slot sources. Callers that need textured
-     * non-Prism rendering should wait for the corresponding shape slice.
+     * the first time Stairs is seen carrying at least one `Textured` slot, listing
+     * the slot sources. Callers that need textured Stairs rendering should wait for
+     * the `uv-generation-stairs` slice.
      */
     private fun collectTextureSources(
         material: MaterialData?,
@@ -294,7 +294,11 @@ internal class GpuTextureManager(
                             if (sub is IsometricMaterial.Textured) out.add(sub.source)
                         }
                     }
-                    is IsometricMaterial.PerFace.Cylinder,
+                    is IsometricMaterial.PerFace.Cylinder -> {
+                        (m.top as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                        (m.bottom as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                        (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    }
                     is IsometricMaterial.PerFace.Stairs -> {
                         warnIfNonPrismPerFaceHasTexturedSlots(m)
                     }
@@ -307,37 +311,29 @@ internal class GpuTextureManager(
     }
 
     /**
-     * Warn once per variant kind when a still-stubbed non-Prism
-     * [IsometricMaterial.PerFace] (Cylinder, Stairs) carries textured per-slot materials
-     * — those textures will not render until the corresponding `uv-generation-<shape>`
-     * slice wires up per-face resolution.
+     * Warn once when the still-stubbed `Stairs` [IsometricMaterial.PerFace] carries
+     * textured per-slot materials — those textures will not render until the
+     * `uv-generation-stairs` slice wires up per-face resolution.
      *
-     * Only Cylinder and Stairs reach this helper: Prism/Pyramid/Octahedron are already
-     * routed to their live `collectTextureSources` branches. The `Prism` /
-     * `Pyramid` / `Octahedron` arms that previously lived here were unreachable dead
-     * code after the Pyramid + Octahedron slices landed; removed as part of the
-     * uv-generation-pyramid review H-1 fix. This function itself is slated for
-     * deletion alongside the Cylinder slice (final live arm goes away with Stairs).
+     * Only Stairs reaches this helper: Prism/Pyramid/Octahedron/Cylinder are already
+     * routed to their live `collectTextureSources` branches. The helper is slated for
+     * deletion together with the `uv-generation-stairs` slice; the remaining
+     * `PerFace.<shape>` arms below unreachable-guard the `when` against future stub shapes.
      */
     private fun warnIfNonPrismPerFaceHasTexturedSlots(m: IsometricMaterial.PerFace) {
         val (kind, texturedSlots) = when (m) {
-            is IsometricMaterial.PerFace.Cylinder ->
-                "Cylinder" to listOfNotNull(
-                    (m.top as? IsometricMaterial.Textured)?.source,
-                    (m.bottom as? IsometricMaterial.Textured)?.source,
-                    (m.side as? IsometricMaterial.Textured)?.source,
-                )
             is IsometricMaterial.PerFace.Stairs ->
                 "Stairs" to listOfNotNull(
                     (m.tread as? IsometricMaterial.Textured)?.source,
                     (m.riser as? IsometricMaterial.Textured)?.source,
                     (m.side as? IsometricMaterial.Textured)?.source,
                 )
-            // Prism, Pyramid, Octahedron are routed to their live arms in
+            // Prism, Pyramid, Octahedron, Cylinder are routed to their live arms in
             // collectTextureSources and never reach this helper.
             is IsometricMaterial.PerFace.Prism,
             is IsometricMaterial.PerFace.Pyramid,
-            is IsometricMaterial.PerFace.Octahedron -> return
+            is IsometricMaterial.PerFace.Octahedron,
+            is IsometricMaterial.PerFace.Cylinder -> return
         }
         if (texturedSlots.isNotEmpty() && nonPrismPerFaceWarningsIssued.add(kind)) {
             Log.w(

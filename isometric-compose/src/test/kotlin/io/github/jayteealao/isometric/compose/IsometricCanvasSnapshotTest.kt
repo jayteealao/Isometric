@@ -241,7 +241,9 @@ class IsometricCanvasSnapshotTest {
         paparazzi.snapshot {
             Box(modifier = Modifier.size(680.dp, 440.dp)) {
                 IsometricScene {
-                    Shape(geometry = Cylinder(Point(1.0, 1.0, 1.0), 0.5, 2.0, 30), material = BLUE)
+                    // vertices = 20 (default); the uv-generation-cylinder slice caps at 24
+                    // for RenderCommand.faceVertexCount validator compatibility.
+                    Shape(geometry = Cylinder(Point(1.0, 1.0, 1.0), 0.5, 2.0, 20), material = BLUE)
                 }
             }
         }

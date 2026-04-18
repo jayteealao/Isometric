@@ -45,10 +45,16 @@ internal class GpuUvCoordsBuffer(
             val cmd = scene.commands[i]
             val uv = cmd.uvCoords
             val vertCount = cmd.faceVertexCount
-            // TODO(uv-variable-stride): 48-byte slot caps faces at 6 verts. Shapes that
-            // exceed this (Cylinder caps when vertices > 6, Stairs zigzag sides when
-            // stepCount > 2, Knot) silently truncate here. When those cases become
-            // real, switch to variable-stride packing or a scatter-gather layout.
+            // TODO(uv-variable-stride): 48-byte slot caps faces at 6 verts / 12 floats.
+            // Shapes that exceed this silently truncate the UV tail:
+            //   - Cylinder caps when vertices > 6: vertices 7..N-1 render with UV (0,0)
+            //     in WebGPU mode — disk projection fails on the outer ring. Canvas path
+            //     unaffected (3-point affine uses only the first 3 UV pairs).
+            //   - Stairs zigzag sides when stepCount > 2 (8+ verts per side).
+            //   - Knot — variable per face.
+            // Workaround for Cylinder WebGPU correctness: construct with vertices <= 6,
+            // or accept degraded cap texturing for higher-poly cylinders.
+            // Follow-up slice: variable-stride UV buffer + per-face offset table + WGSL changes.
             if (uv != null && vertCount > 0 && uv.size >= 2 * vertCount) {
                 for (j in 0 until 12) {
                     cpu.putFloat(if (j < uv.size) uv[j] else 0f)

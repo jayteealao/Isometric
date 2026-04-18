@@ -1,10 +1,14 @@
 package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.Path
+import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.Pyramid
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Generates per-vertex UV coordinates for [Prism] faces. Internal implementation detail.
@@ -120,6 +124,93 @@ internal object UvGenerator {
      */
     fun forAllPyramidFaces(pyramid: Pyramid): List<FloatArray> =
         pyramid.paths.indices.map { forPyramidFace(pyramid, it) }
+
+    /**
+     * Generates UV coordinates for a single [Cylinder] face.
+     *
+     * Face index layout (N = [Cylinder.vertices]):
+     * - `0`              — bottom cap (N-gon, planar disk projection, reversed winding)
+     * - `1`              — top cap (N-gon, planar disk projection)
+     * - `2..(N + 1)`     — side quad `k = faceIndex - 2` (4-vertex wrap strip)
+     *
+     * Side UV convention: `u = k/N` at the left edge, `(k+1)/N` at the right edge;
+     * `v = 0` at the top ring, `v = 1` at the base ring. The seam at `u = 1` is
+     * produced correctly because [Cylinder] duplicates the geometric vertex at
+     * angle 0 — `basePoints[N]` is identity-distinct from `basePoints[0]`, so slot
+     * assignment emits `u = 0` for quad 0 and `u = 1` for quad N-1 without aliasing.
+     *
+     * Cap UV convention: planar disk projection centered at `(0.5, 0.5)` with
+     * radius `0.5`, matching Unity's built-in Cylinder mesh convention. Cap results
+     * are cached by identity on the [Cylinder] instance (H-5 pattern from pyramid)
+     * — the cache covers both caps of the same instance.
+     *
+     * Note: Cylinder side `v = 0` is at the top ring, which is the opposite of
+     * [PrismFace.FRONT] (which places `v = 0` at the bottom). Documented as a
+     * known cross-shape inconsistency; correcting it would break the Prism baseline.
+     *
+     * @param cylinder The source Cylinder (provides `vertices` for N)
+     * @param faceIndex 0-based index into [Cylinder.paths] (`0 until cylinder.paths.size`)
+     * @return [FloatArray] of `N*2` floats for caps, 8 floats for sides
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until cylinder.paths.size`
+     */
+    fun forCylinderFace(cylinder: Cylinder, faceIndex: Int): FloatArray {
+        require(faceIndex in cylinder.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Cylinder with ${cylinder.paths.size} faces (valid range: 0 until ${cylinder.paths.size})"
+        }
+        val n = cylinder.vertices
+        return when (faceIndex) {
+            0 -> getOrComputeCapUvs(cylinder, reversed = true)
+            1 -> getOrComputeCapUvs(cylinder, reversed = false)
+            else -> cylinderSideUvs(faceIndex - 2, n)
+        }
+    }
+
+    /**
+     * Generates UV coordinates for all `N + 2` Cylinder faces in `Cylinder.paths` order.
+     */
+    fun forAllCylinderFaces(cylinder: Cylinder): List<FloatArray> =
+        cylinder.paths.indices.map { forCylinderFace(cylinder, it) }
+
+    @Volatile private var lastCapCylinder: Cylinder? = null
+    @Volatile private var lastBottomCapUvs: FloatArray? = null
+    @Volatile private var lastTopCapUvs: FloatArray? = null
+
+    private fun getOrComputeCapUvs(cylinder: Cylinder, reversed: Boolean): FloatArray {
+        if (lastCapCylinder !== cylinder) {
+            lastCapCylinder = cylinder
+            lastBottomCapUvs = null
+            lastTopCapUvs = null
+        }
+        val cached = if (reversed) lastBottomCapUvs else lastTopCapUvs
+        if (cached != null) return cached
+        val fresh = computeCylinderCapUvs(cylinder.vertices, reversed)
+        if (reversed) lastBottomCapUvs = fresh else lastTopCapUvs = fresh
+        return fresh
+    }
+
+    private fun computeCylinderCapUvs(n: Int, reversed: Boolean): FloatArray {
+        val result = FloatArray(n * 2)
+        val order = if (reversed) (n - 1 downTo 0) else (0 until n)
+        var slot = 0
+        for (i in order) {
+            val theta = i * 2.0 * PI / n
+            result[slot * 2] = (0.5 + 0.5 * cos(theta)).toFloat()
+            result[slot * 2 + 1] = (0.5 + 0.5 * sin(theta)).toFloat()
+            slot++
+        }
+        return result
+    }
+
+    private fun cylinderSideUvs(k: Int, n: Int): FloatArray {
+        val u0 = k.toFloat() / n
+        val u1 = (k + 1).toFloat() / n
+        return floatArrayOf(
+            u0, 0f,
+            u0, 1f,
+            u1, 1f,
+            u1, 0f,
+        )
+    }
 
     private val LATERAL_CANONICAL_UVS: FloatArray = floatArrayOf(
         0.0f, 1.0f,   // v[0] base-left

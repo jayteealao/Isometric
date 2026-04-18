@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-17T23:24:00Z"
-slices-implemented: 12
+updated-at: "2026-04-18T14:06:20Z"
+slices-implemented: 13
 slices-total: 15
-metric-total-files-changed: 121
-metric-total-lines-added: 4881
-metric-total-lines-removed: 1107
+metric-total-files-changed: 137
+metric-total-lines-added: 5423
+metric-total-lines-removed: 1223
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
 ---
 
 # Implement Index
@@ -88,6 +88,29 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
 - Deviations: `pyramidPerFace { }` DSL added to `IsometricMaterial.kt` next to `perFace { }` rather than the plan-suggested `IsometricMaterialComposables.kt` (the latter only hosts the `Shape()` composable); no Paparazzi `pyramidTextured()` snapshot (compose→shader dep inversion).
 - Record: [05-implement-uv-generation-pyramid.md](05-implement-uv-generation-pyramid.md)
 
+### `uv-generation-cylinder` — complete
+- Files: 16 modified + 2 new (UvGeneratorCylinderTest, .maestro/verify-cylinder.yaml).
+- Summary: Full Cylinder per-face texturing and material dispatch. `Cylinder` now
+  emits seam-duplicated `Point` instances so the lateral strip wraps without a u=1→0
+  smear; `CylinderFace.fromPathIndex` mapping corrected to `0→BOTTOM, 1→TOP` matching
+  `Shape.extrude` actual output; `UvGenerator.forCylinderFace` adds side + cap UV
+  generation with a shared identity cache for both caps; `uvCoordProviderForShape`,
+  `resolveForFace`, `IsometricNode.faceType` emission, and `GpuTextureManager.collectTextureSources`
+  each gain a new `is Cylinder`/`is PerFace.Cylinder` arm. **New public API:**
+  `cylinderPerFace { }` DSL + `CylinderPerFaceMaterialScope` class. **Breaking change:**
+  `Cylinder(vertices > 24)` now throws at construction to surface `RenderCommand`
+  ceiling at the earliest moment (existing snapshot test updated from vertices=30 to 20).
+  `TexturedDemoActivity` gains a Cylinder tab with a procedural brick texture and a
+  `cylinderPerFace { }` red-top / blue-bottom / brick-side demo. 16 new UV unit tests,
+  4 new `ShapeNodeFaceTypeTest` regression cases (I-03 pattern), 3 new
+  `IsometricEngineTest` cases (path layout, seam identity-distinct, vertices>24 rejection).
+  Removed 4 `TODO(uv-generation-cylinder)` markers; removed the now-dead Cylinder arm
+  from `warnIfNonPrismPerFaceHasTexturedSlots` (only Stairs remains).
+- Deviations: added a procedural `TextureAssets.brick` that the plan assumed existed;
+  updated existing `cylinder()` Paparazzi to `vertices = 20` because the new
+  `require(vertices in 3..24)` validator rejected the prior `vertices = 30`.
+- Record: [05-implement-uv-generation-cylinder.md](05-implement-uv-generation-cylinder.md)
+
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`
 - `isometric-compose` has zero shader imports — fully usable standalone
@@ -97,6 +120,6 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
 - **After `uv-generation-shared-api` (this slice):** five shape UV slices become purely additive — each adds a new `PerFace.<Shape>.resolve()` implementation, a new `when` branch in `uvCoordProviderForShape()`, and per-shape UV generator logic. No further changes to `IsometricMaterial.kt`, `RenderCommand.kt`, or the WebGPU/Canvas consumer dispatches.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-pyramid` — confirm AC1–AC5 for the freshly-landed slice, with special attention to the mixed-vertex-count I-02 stress (3 for laterals, 4 for base) on both Canvas and WebGPU backends.
-- **Option B:** `/wf-review texture-material-shaders uv-generation-pyramid` — skip verify; the slice has strong unit-test coverage (15 new cases) and apiCheck is green. Review focus: interactive mixed-vertex-count render evidence, new DSL ergonomics, the `GpuTextureManager` dead-arm question.
-- **Option C:** Begin next shape slice (`/wf-implement texture-material-shaders uv-generation-cylinder` or `uv-generation-stairs`). Not recommended until pyramid reaches at least verify — each shape slice touches the same 4 files, so bundling verify-first keeps merge-conflict risk low. Plan sequence: octahedron (done) → pyramid (done) → cylinder → stairs → knot.
+- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-cylinder` — confirm AC1–AC5 for the freshly-landed slice with special attention to seam wrap continuity at u=1/u=0, cap UV disk projection, and the vertices>24 ceiling. Compile + `isometric-core:test`, `isometric-shader:test`, `isometric-compose:test` + Paparazzi regression + Maestro interactive flow all have new coverage. **Consider `/compact` first** — implementation context is noise for verify.
+- **Option B:** `/wf-review texture-material-shaders uv-generation-cylinder` — skip verify; unit coverage is strong (16 new cases + 4 `ShapeNodeFaceTypeTest` + 3 `IsometricEngineTest`) and `apiDump` reflects the surface. Review focus: seam-identity correctness, cap-cache invalidation semantics, `vertices in 3..24` breaking-change blast radius.
+- **Option C:** Begin next shape slice (`/wf-implement texture-material-shaders uv-generation-stairs` or `uv-generation-knot`). Not recommended until cylinder reaches at least verify — each shape slice touches the same integration sites. Plan sequence: octahedron (done) → pyramid (done) → cylinder (done) → stairs → knot.

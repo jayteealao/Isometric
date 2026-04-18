@@ -7,6 +7,8 @@ import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.CylinderFace
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
@@ -300,6 +302,7 @@ class ShapeNode(
                         is Prism -> PrismFace.fromPathIndex(index)
                         is Octahedron -> OctahedronFace.fromPathIndex(index)
                         is Pyramid -> PyramidFace.fromPathIndex(index)
+                        is Cylinder -> CylinderFace.fromPathIndex(index)
                         else -> null
                     },
                     faceVertexCount = path.points.size,

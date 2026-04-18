@@ -7,16 +7,16 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-18T11:53:46Z"
-selected-slice: "uv-generation-pyramid"
-current-stage: implement
-stage-number: 5
+updated-at: "2026-04-18T14:06:20Z"
+selected-slice: "uv-generation-cylinder"
 current-stage-status: complete
 review-verdict: ship-with-caveats
 review-triage-status: partially-triaged
 review-fix-status: blockers-and-cheap-highs-fixed
+verify-pass: 3
+verify-result: pass
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-pyramid"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -167,6 +167,9 @@ workflow-files:
   - 07-review-uv-generation-shared-api-api-contracts.md
   - 07-review-uv-generation-shared-api-architecture.md
   - 07-review-uv-generation-shared-api-performance.md
+  - 05-implement-uv-generation-cylinder.md
+  - .maestro/verify-cylinder.yaml
+  - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorCylinderTest.kt
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -186,8 +189,8 @@ progress:
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
-  uv-generation-cylinder: plan-complete
-  uv-generation-pyramid: review-fixes-applied
+  uv-generation-cylinder: implement-complete
+  uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete
   uv-generation-octahedron: review-ship-with-caveats

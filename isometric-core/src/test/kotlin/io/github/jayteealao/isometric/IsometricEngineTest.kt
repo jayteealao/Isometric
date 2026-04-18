@@ -301,4 +301,32 @@ class IsometricEngineTest {
         assertEquals(8, Octahedron().paths.size)
         assertTrue(Knot().paths.isNotEmpty())
     }
+
+    @Test
+    fun `cylinder path layout has expected counts for N=6`() {
+        val cyl = io.github.jayteealao.isometric.shapes.Cylinder(vertices = 6)
+        assertEquals(8, cyl.paths.size)
+        assertEquals(6, cyl.paths[0].points.size)
+        assertEquals(6, cyl.paths[1].points.size)
+        assertEquals(4, cyl.paths[2].points.size)
+        assertEquals(4, cyl.paths[7].points.size)
+    }
+
+    @Test
+    fun `cylinder seam duplicates point at angle zero for distinct UV slots`() {
+        val cyl = io.github.jayteealao.isometric.shapes.Cylinder(vertices = 6)
+        val quad0 = cyl.paths[2].points
+        val quadLast = cyl.paths[7].points
+        assertEquals(quad0[1].x, quadLast[2].x, 1e-10)
+        assertEquals(quad0[1].y, quadLast[2].y, 1e-10)
+        assertEquals(quad0[1].z, quadLast[2].z, 1e-10)
+        assertTrue(quad0[1] !== quadLast[2], "seam vertex must be identity-distinct")
+    }
+
+    @Test
+    fun `cylinder rejects vertices above 24 at construction`() {
+        assertFailsWith<IllegalArgumentException> {
+            io.github.jayteealao.isometric.shapes.Cylinder(vertices = 25)
+        }
+    }
 }

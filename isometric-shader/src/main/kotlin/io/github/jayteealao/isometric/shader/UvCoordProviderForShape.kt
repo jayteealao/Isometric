@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
+import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
@@ -22,16 +23,16 @@ import io.github.jayteealao.isometric.shapes.Pyramid
  * ## Extension
  *
  * Each shape slice adds a `when` branch here:
- * - `uv-generation-cylinder` → `is Cylinder`
  * - `uv-generation-stairs`   → `is Stairs`
  * - `uv-generation-knot`     → `is Knot`
  *
- * Until those slices land, the remaining non-Prism shapes return `null` and texturing
+ * Until those slices land, the remaining shapes return `null` and texturing
  * is a no-op for them at the renderer level.
  */
 internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (shape) {
     is Prism -> UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(shape, faceIndex) }
     is Octahedron -> UvCoordProvider { _, faceIndex -> UvGenerator.forOctahedronFace(shape, faceIndex) }
     is Pyramid -> UvCoordProvider { _, faceIndex -> UvGenerator.forPyramidFace(shape, faceIndex) }
+    is Cylinder -> UvCoordProvider { _, faceIndex -> UvGenerator.forCylinderFace(shape, faceIndex) }
     else -> null
 }

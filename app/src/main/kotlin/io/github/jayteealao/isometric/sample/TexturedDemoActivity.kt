@@ -35,12 +35,14 @@ import io.github.jayteealao.isometric.compose.runtime.GestureConfig
 import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.RenderMode
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
+import io.github.jayteealao.isometric.shader.cylinderPerFace
 import io.github.jayteealao.isometric.shader.octahedronPerFace
 import io.github.jayteealao.isometric.shader.prismPerFace
 import io.github.jayteealao.isometric.shader.pyramidPerFace
 import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shader.TextureTransform
+import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
@@ -76,6 +78,10 @@ private enum class ShapeTab(val label: String, val description: String) {
     Pyramid(
         label = "Pyramid",
         description = "Left: grass texture on 4 laterals + dirt base \u2014 Right: PerFace with 4 distinct lateral colors + gray base",
+    ),
+    Cylinder(
+        label = "Cylinder",
+        description = "Left: brick wraps the barrel with seam-duplicated UVs \u2014 Right: PerFace with red top, blue bottom, brick sides",
     ),
 }
 
@@ -130,6 +136,16 @@ private fun TexturedDemoScreen() {
             lateral(3, IsoColor(220, 200, 50))
             base = IsoColor(150, 150, 150)
             default = IsoColor(100, 100, 100)
+        }
+    }
+
+    val cylinderTextured = remember { texturedBitmap(TextureAssets.brick) }
+    val cylinderPerFaceMat = remember {
+        cylinderPerFace {
+            top = IsoColor(220, 50, 50)
+            bottom = IsoColor(50, 80, 220)
+            side = texturedBitmap(TextureAssets.brick)
+            default = IsoColor(150, 150, 150)
         }
     }
 
@@ -201,6 +217,11 @@ private fun TexturedDemoScreen() {
                     renderMode = renderMode,
                     texturedMaterial = pyramidTextured,
                     perFaceMaterial = pyramidPerFaceMat,
+                )
+                ShapeTab.Cylinder -> TexturedCylinderScene(
+                    renderMode = renderMode,
+                    texturedMaterial = cylinderTextured,
+                    perFaceMaterial = cylinderPerFaceMat,
                 )
             }
         }
@@ -305,6 +326,49 @@ private fun TexturedPyramidScene(
                 geometry = Pyramid(Point(1.5, 0.0, 0.0)),
                 material = perFaceMaterial,
                 scale = 3.0,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TexturedCylinderScene(
+    renderMode: RenderMode,
+    texturedMaterial: IsometricMaterial,
+    perFaceMaterial: IsometricMaterial,
+) {
+    ProvideTextureRendering {
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(
+                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+                renderMode = renderMode,
+                useNativeCanvas = false,
+                gestures = GestureConfig.Disabled,
+            ),
+        ) {
+            // Left: textured barrel with seam-duplicated UV wrap (Canvas-correct at any N;
+            // caps degrade in WebGPU for N > 6 — documented in GpuUvCoordsBuffer).
+            Shape(
+                geometry = Cylinder(
+                    position = Point(-1.5, 0.0, 0.0),
+                    radius = 0.5,
+                    height = 1.5,
+                    vertices = 12,
+                ),
+                material = texturedMaterial,
+                scale = 2.5,
+            )
+            // Right: per-face colors exercising resolveForFace dispatch via CylinderFace.
+            Shape(
+                geometry = Cylinder(
+                    position = Point(1.5, 0.0, 0.0),
+                    radius = 0.5,
+                    height = 1.5,
+                    vertices = 12,
+                ),
+                material = perFaceMaterial,
+                scale = 2.5,
             )
         }
     }
