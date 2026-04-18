@@ -4,17 +4,18 @@ type: index
 slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
-current-stage: implement
-stage-number: 5
 created-at: "2026-04-11T22:00:00Z"
 updated-at: "2026-04-18T14:06:20Z"
 selected-slice: "uv-generation-cylinder"
 current-stage-status: complete
+current-stage: implement
+stage-number: 5
 review-verdict: ship-with-caveats
 review-triage-status: partially-triaged
 review-fix-status: blockers-and-cheap-highs-fixed
-verify-pass: 3
-verify-result: pass
+verify-pass: 1
+verify-result: partial
+verify-fix-applied: VF-1
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
 branch-strategy: dedicated
@@ -170,6 +171,7 @@ workflow-files:
   - 05-implement-uv-generation-cylinder.md
   - .maestro/verify-cylinder.yaml
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorCylinderTest.kt
+  - 06-verify-uv-generation-cylinder.md
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -189,7 +191,7 @@ progress:
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
-  uv-generation-cylinder: implement-complete
+  uv-generation-cylinder: vf1-fixed-awaiting-verify-pass-2
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete

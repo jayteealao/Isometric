@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-17T22:50:00Z"
-slices-verified: 12
-slices-total: 12
+updated-at: "2026-04-18T22:45:00Z"
+slices-verified: 13
+slices-total: 13
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
+next-invocation: "/wf-implement texture-material-shaders uv-generation-cylinder"
 ---
 
 # Verify Index
@@ -102,16 +102,25 @@ next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
 - Issues: **1 HIGH (I-02)** — `faceVertexCount` drops through `SceneGraph.SceneItem` + both `IsometricEngine.projectScene()` RenderCommand reconstruction sites. Canvas hook's UV-size gate (`2 * faceVertexCount = 8`) rejects Octahedron's 6-float UV, falling through to `Textured.tint = WHITE`. Shared-api scope (5 sites in isometric-core + 1 in isometric-compose). Will also block the remaining 4 non-quad shape slices (pyramid/cylinder/stairs/knot).
 - Record: [06-verify-uv-generation-octahedron.md](06-verify-uv-generation-octahedron.md)
 
-### `uv-generation-pyramid` — FAIL (2/5 ACs met, 3/5 not met; I-03 surfaced)
-- One verify pass: `2026-04-17T22:50Z` (automated + interactive on `emulator-5554` with Maestro 2.2.0).
-- Checks: 5/5 passed (457 tests green across 4 modules — +15 new `UvGeneratorPyramidTest` cases; apiCheck green; `:app:assembleDebug` green).
-- Acceptance: AC4, AC5 MET via unit tests + apiCheck + Paparazzi. AC1, AC2, AC3 NOT MET — both Canvas and WebGPU render the textured Pyramid AND the per-face-colored Pyramid as flat gray (only engine directional shading visible). Assigned bright colors (220,50,50 red / 50,180,50 green / ...) and grass/dirt textures never reach pixels.
-- Interactive: 1 Maestro run + adb-fallback screenshots. Maestro `tapOn: "Pyramid"` (text selector) did not route to the Compose `ScrollableTabRow` Tab onClick — substituted `tapOn: { point: "73%,4%" }` (workaround, not a project bug). Evidence: `screenshots/verify-pyramid-canvas.png`, `screenshots/verify-pyramid-webgpu.png`, `screenshots/verify-pyramid-canvas-gpusort.png`, `screenshots/verify-pyramid-canvas-cycle-back.png`, and adb fallbacks `verify-pyramid-03b-canvas.png`, `verify-pyramid-04-webgpu.png`. Flow: `.maestro/verify-pyramid.yaml`.
-- Issues: **1 CRITICAL (I-03)** — Pyramid textured + per-face materials do not render at runtime, invariant across Canvas, Canvas+GPU-Sort, and Full WebGPU backends. The mixed-vertex-count stress that plan Risk 1 (HIGH) flagged has materialised. Unit tests for `resolve`/`resolveForFace`/`uvCoordProviderForShape`/DSL are green — the bug lives between `RenderCommand` construction and the draw hooks. Three candidate root causes (see verify record): CR-5 `SceneGraph.add(shape, color)` convenience overload hard-coding `faceVertexCount=4`, a missing Pyramid branch in `SceneDataPacker`/`NativeSceneRenderer`, or a BatchNode faceType gap (pre-existing M-02). Regression gap: no JVM-level test projects a Pyramid scene and asserts the resulting `RenderCommand[]` shape.
-- Record: [06-verify-uv-generation-pyramid.md](06-verify-uv-generation-pyramid.md)
+### `uv-generation-pyramid` — PASS on pass 3 (5/5 ACs met; 3/3 BLOCKERs + 6/12 HIGHs verified; commit `f8ec440`)
+- Three verify passes: pass 1 `2026-04-17T22:50Z` (**FAIL**, surfaced I-03), pass 2 `2026-04-17T23:41Z` (**PASS**, post-I-03-fix `b411de9`), pass 3 `2026-04-18T12:05Z` (**PASS**, post-review-fix `f8ec440`).
+- **Pass 3 checks:** 6/6 passed. 476 unit tests / 0 failures / 0 errors / 7 skipped (core 204 + shader 136+7 + compose 102 + webgpu 34; +10 over pass-2's 466 from BL-2 SceneDataPackerTest +2, BL-3 TexturedCanvasDrawHookColorTest +7, H-5 UvGeneratorPyramidTest identity-cache +1). apiCheck green on all 4 modules (BL-1 rename + new `octahedronPerFace` surface intentional). `:app:assembleDebug` green.
+- **Pass 3 acceptance:** AC1, AC2 (with camera-visibility caveat), AC3, AC4, AC5 — all MET.
+- **Pass 3 interactive:** 4 Maestro runs on `emulator-5554` via `.maestro/verify-pyramid.yaml` — Canvas, Full WebGPU, Canvas+GPU Sort, and Canvas cycle-back all render correctly and pixel-equivalently. Left pyramid shows green speckled grass texture; right pyramid shows bright blue (LATERAL_2) + bright red (LATERAL_0). Zero logcat warnings. Evidence: `verify-evidence/screenshots/verify-pyramid-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}-post-review-fix.png`.
+- **Pass 3 review-fix verification:** 3/3 BLOCKERs verified structurally (BL-1 DSL rename surface in `.api`; BL-2 `resolveEffectiveColor` + 2 new test cases; BL-3 `IsoColor.toAndroidArgbInt` JVM-testable extension + 7 new test cases). 6/12 HIGHs verified structurally (H-1 dead-arm removal, H-4 no-copyOf hot path, H-5 base-UV identity cache, H-7 `SceneGraph.add` `faceVertexCount` derivation, H-9 Pyramid KDoc path layout, H-12 CHANGELOG Canvas IsoColor entry). 6/12 HIGHs deferred to follow-up architectural / test-hardening slices per user triage (H-2, H-3, H-6, H-8, H-10, H-11).
+- **Pass 3 issues:** 0 new. I-03 and review BLOCKERs all resolved.
+- Record: [06-verify-uv-generation-pyramid.md](06-verify-uv-generation-pyramid.md) (pass-3 body plus archival pass-1 FAIL + pass-2 PASS summaries).
+
+### `uv-generation-cylinder` — PARTIAL (5/5 ACs met; VF-1 doc-test regression surfaced)
+- Checks: 3/4 passed. `:app:assembleDebug` ✓, `./gradlew apiCheck` ✓ (additive `cylinderPerFace` + scope), Maestro `verify-cylinder.yaml` 4 screenshots ✓. Unit tests **FAIL**: 499/501 pass (core 205/207 with 2 VF-1 failures; shader 154/154; compose 106/106; webgpu 34/34).
+- Acceptance: AC1 (seam wrap) MET, AC2 (caps) MET Canvas with documented WebGPU cap-truncation caveat, AC3 (per-face) MET, AC4 (unit tests) MET (18/18 UvGeneratorCylinderTest cases), AC5 (no Prism regression) MET strict.
+- Interactive: 4 Maestro runs on `emulator-5554` — Canvas, Full WebGPU, Canvas+GPU Sort, Canvas cycle-back. Brick texture wraps continuously on left cylinder; right cylinder shows red top + brick sides (blue bottom hidden by camera angle but math tested). WebGPU sides pixel-equivalent to Canvas; caps show documented N>6 star truncation. Zero app-tag logcat warnings.
+- Issues: **1 MEDIUM (VF-1)** — `DocScreenshotGenerator.shapeCylinder` at `isometric-core/.../DocScreenshotGenerator.kt:232` still uses `Cylinder(vertices = 30)`, tripping the new `require(vertices in 3..24)` guard in `Cylinder.init`. Implement stage's "Deviations from Plan" entry updated `IsometricCanvasSnapshotTest.cylinder()` from 30→20 but missed this second caller. Cascades to `DocScreenshotGenerator.generateAll`. One-line fix.
+- Evidence: `verify-evidence/screenshots/verify-cylinder-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}.png`
+- Record: [06-verify-uv-generation-cylinder.md](06-verify-uv-generation-cylinder.md)
 
 ## Recommended Next Stage
-- **Option A (recommended):** `/wf-implement texture-material-shaders uv-generation-pyramid` — fix I-03. Investigate the three candidate root causes (SceneGraph.add convenience overload, SceneDataPacker Pyramid branch, BatchNode faceType). Add a JVM-level regression test that projects a Pyramid scene and asserts `RenderCommand[]` carries correct `faceType`, `faceVertexCount` (3 for laterals, 4 for base), and `uvCoords.size` (6/8). Re-run `.maestro/verify-pyramid.yaml` for the re-verify.
-- **Option B:** `/wf-plan texture-material-shaders uv-generation-pyramid` — only if implement-investigation reveals a design flaw rather than a wiring bug. Unlikely given evidence points at a small, specific dispatch gap.
-- **Option C:** `/wf-review` — **not recommended** with CRITICAL render defect outstanding.
-- **Option D:** `/wf-handoff` — **not recommended**; slice cannot ship in this state.
+- **Option A (recommended):** `/wf-implement texture-material-shaders uv-generation-cylinder` — apply the VF-1 one-line fix (`30 → 20` at `DocScreenshotGenerator.kt:232`), then re-run verify (pass 2). Trivial in-scope fix; all 5 ACs structurally met.
+- **Option B:** `/wf-review texture-material-shaders uv-generation-cylinder` — only if user accepts shipping with the Doc-test regression outstanding. Not recommended — CI would fail on `:isometric-core:test`.
+- **Option C:** `/wf-handoff texture-material-shaders uv-generation-cylinder` — **not recommended**. Fix VF-1 first.
+- **Option D:** `/wf-plan texture-material-shaders uv-generation-cylinder` — **not recommended**. Plan is sound; VF-1 is a missed-caller bug, not a plan flaw.

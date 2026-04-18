@@ -229,7 +229,7 @@ class DocScreenshotGenerator {
     @Test
     fun shapeCylinder() {
         AwtRenderer.renderToPng(360, 320, File(outputDir, "shape-cylinder.png")) {
-            add(Cylinder(Point.ORIGIN, 1.0, 2.0, 30), BLUE)
+            add(Cylinder(Point.ORIGIN, 1.0, 2.0, 20), BLUE)
         }
     }
 
