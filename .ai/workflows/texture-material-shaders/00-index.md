@@ -5,16 +5,17 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-18T14:06:20Z"
+updated-at: "2026-04-19T07:59:56Z"
 selected-slice: "uv-generation-cylinder"
 current-stage-status: complete
 current-stage: implement
 stage-number: 5
-review-verdict: ship-with-caveats
-review-triage-status: partially-triaged
-review-fix-status: blockers-and-cheap-highs-fixed
-verify-pass: 1
-verify-result: partial
+review-verdict: dont-ship
+review-triage-status: triaged
+review-fix-status: blocker-fixed
+review-fix-applied: API-01
+verify-pass: 2
+verify-result: pass
 verify-fix-applied: VF-1
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
@@ -172,6 +173,19 @@ workflow-files:
   - .maestro/verify-cylinder.yaml
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorCylinderTest.kt
   - 06-verify-uv-generation-cylinder.md
+  - 07-review-uv-generation-cylinder-reliability.md
+  - 07-review-uv-generation-cylinder-performance.md
+  - 07-review-uv-generation-cylinder-backend-concurrency.md
+  - 07-review-uv-generation-cylinder.md
+  - 07-review-uv-generation-cylinder-correctness.md
+  - 07-review-uv-generation-cylinder-security.md
+  - 07-review-uv-generation-cylinder-code-simplification.md
+  - 07-review-uv-generation-cylinder-testing.md
+  - 07-review-uv-generation-cylinder-maintainability.md
+  - 07-review-uv-generation-cylinder-refactor-safety.md
+  - 07-review-uv-generation-cylinder-architecture.md
+  - 07-review-uv-generation-cylinder-api-contracts.md
+  - 03-slice-webgpu-ngon-faces.md
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -191,7 +205,8 @@ progress:
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
-  uv-generation-cylinder: vf1-fixed-awaiting-verify-pass-2
+  uv-generation-cylinder: review-blocker-fixed-pending-verify-3
+  webgpu-ngon-faces: defined
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: plan-complete
   uv-generation-knot: plan-complete

@@ -23,6 +23,12 @@ enum class CylinderFace : FaceIdentifier {
          *
          * @param index 0 = bottom cap (reversed base ring), 1 = top cap, >= 2 = side quad
          * @throws IllegalArgumentException if [index] is negative
+         *
+         * **Breaking change:** earlier releases returned the inverted mapping
+         * (`0 → TOP, 1 → BOTTOM`), which did not match the cylinder's actual
+         * path layout. The current mapping is the corrected one; callers that
+         * hard-coded `fromPathIndex(0) == TOP` must be updated to expect
+         * `BOTTOM` (and conversely for index 1).
          */
         public fun fromPathIndex(index: Int): CylinderFace = when {
             index < 0 -> throw IllegalArgumentException(
