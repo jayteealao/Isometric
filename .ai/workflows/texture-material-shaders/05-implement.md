@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-18T14:06:20Z"
-slices-implemented: 13
+updated-at: "2026-04-20T15:24:08Z"
+slices-implemented: 14
 slices-total: 15
-metric-total-files-changed: 137
-metric-total-lines-added: 5423
-metric-total-lines-removed: 1223
+metric-total-files-changed: 145
+metric-total-lines-added: 5795
+metric-total-lines-removed: 1281
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
 ---
 
 # Implement Index
@@ -88,6 +88,35 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
 - Deviations: `pyramidPerFace { }` DSL added to `IsometricMaterial.kt` next to `perFace { }` rather than the plan-suggested `IsometricMaterialComposables.kt` (the latter only hosts the `Shape()` composable); no Paparazzi `pyramidTextured()` snapshot (compose→shader dep inversion).
 - Record: [05-implement-uv-generation-pyramid.md](05-implement-uv-generation-pyramid.md)
 
+### `uv-generation-stairs` — complete
+- Files: 8 (1 new test, 7 modified).
+- Summary: Full Stairs per-face texturing and material dispatch filling in the
+  six extension points pre-wired by the shared-api, pyramid, and cylinder slices.
+  `UvGenerator.forStairsFace` emits planar `(x, z)` for risers, `(x, y)` for treads
+  (each normalised against `1/stepCount`), and `(y, z)` for the two zigzag side
+  faces (right side u-mirrored). `forAllStairsFaces` returns `2 * stepCount + 2`
+  FloatArrays. `uvCoordProviderForShape`, `IsometricNode.faceType`, and
+  `resolveForFace` each gain a new `is Stairs`/`is PerFace.Stairs` arm.
+  `GpuTextureManager.collectTextureSources` switches the warn-stub Stairs arm to
+  a real tread/riser/side collector; now-dead
+  `warnIfNonPrismPerFaceHasTexturedSlots` + `nonPrismPerFaceWarningsIssued` Set
+  deleted (-37 lines). `SceneDataPacker.packInto` gains a KDoc caveat
+  documenting Stairs side-face truncation at `stepCount >= 3` under the
+  6-vertex cap. 13 new UV unit tests (riser/tread canonical, tiling, side
+  sizes across stepCount ∈ {1,2,5,10}, left/right u-mirror with reversed
+  vertex order, classification, out-of-range failure, translation invariance,
+  `resolveForFace` dispatch). Zero public-API drift (`UvGenerator` is
+  `internal object`).
+- Deviations: the plan-described `IsometricNode.kt` snippet used
+  `shape.stepCount` directly, but the compiler rejects it (mutable `shape`
+  property → no smart-cast). Resolved with an explicit `(shape as Stairs)`
+  cast — noted in the per-slice record as a compile-time-only fix for future
+  variable-geometry sibling plans.
+- No `stairsPerFace { }` DSL this slice (plan scope; direct constructor with
+  named args covers all three logical slots). No sample-app Stairs tab or
+  Maestro flow (plan §"Interactive" is optional; deferred to verify).
+- Record: [05-implement-uv-generation-stairs.md](05-implement-uv-generation-stairs.md)
+
 ### `uv-generation-cylinder` — complete
 - Files: 16 modified + 2 new (UvGeneratorCylinderTest, .maestro/verify-cylinder.yaml).
 - Summary: Full Cylinder per-face texturing and material dispatch. `Cylinder` now
@@ -120,6 +149,6 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
 - **After `uv-generation-shared-api` (this slice):** five shape UV slices become purely additive — each adds a new `PerFace.<Shape>.resolve()` implementation, a new `when` branch in `uvCoordProviderForShape()`, and per-shape UV generator logic. No further changes to `IsometricMaterial.kt`, `RenderCommand.kt`, or the WebGPU/Canvas consumer dispatches.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-cylinder` — confirm AC1–AC5 for the freshly-landed slice with special attention to seam wrap continuity at u=1/u=0, cap UV disk projection, and the vertices>24 ceiling. Compile + `isometric-core:test`, `isometric-shader:test`, `isometric-compose:test` + Paparazzi regression + Maestro interactive flow all have new coverage. **Consider `/compact` first** — implementation context is noise for verify.
-- **Option B:** `/wf-review texture-material-shaders uv-generation-cylinder` — skip verify; unit coverage is strong (16 new cases + 4 `ShapeNodeFaceTypeTest` + 3 `IsometricEngineTest`) and `apiDump` reflects the surface. Review focus: seam-identity correctness, cap-cache invalidation semantics, `vertices in 3..24` breaking-change blast radius.
-- **Option C:** Begin next shape slice (`/wf-implement texture-material-shaders uv-generation-stairs` or `uv-generation-knot`). Not recommended until cylinder reaches at least verify — each shape slice touches the same integration sites. Plan sequence: octahedron (done) → pyramid (done) → cylinder (done) → stairs → knot.
+- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-stairs` — confirm AC1–AC6 for the freshly-landed stairs slice. 13 new tests plus updated `PerFaceSharedApiTest` provide a strong automated surface; Canvas AC1/AC2/AC3 and WebGPU AC4 parity need interactive confirmation. **Consider `/compact` first** — implementation-pass debugging context (smart-cast fix, FP-tolerance fix, plan revision) is noise for verify.
+- **Option B:** `/wf-review texture-material-shaders uv-generation-stairs` — skip verify if the user accepts 13 new green tests + `apiCheck` + four-module test suite as sufficient. Review focus: explicit `(shape as Stairs)` cast idiom, `warnIfNonPrismPerFaceHasTexturedSlots` deletion, right-side zigzag UV correctness under `.reversed()` + `.translate(1,0,0)`, and the `SceneDataPacker` KDoc truthfulness against `coerceAtMost(6)`.
+- **Option C:** Begin `/wf-implement texture-material-shaders uv-generation-knot` — the last remaining planned shape slice. Knot is already plan-complete. Recommended only after stairs reaches at least verify-green.

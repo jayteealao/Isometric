@@ -114,6 +114,13 @@ internal object SceneDataPacker {
 
         for ((index, cmd) in commands.withIndex()) {
             val pts3d = cmd.originalPath.points
+            // KNOWN LIMITATION: faces with more than 6 vertices are truncated to the
+            // first 6 slots. Affected shapes today: Cylinder caps with `vertices > 6`
+            // and Stairs side (zigzag) faces with `stepCount >= 3` (the zigzag
+            // produces `2 * stepCount + 2` vertices). Canvas rendering is unaffected.
+            // Workaround: use `stepCount <= 2` for Stairs under WebGPU if side-face
+            // fidelity matters. A future `webgpu-ngon-faces` slice will lift the cap
+            // via a variable-stride vertex emit pipeline.
             val n = pts3d.size.coerceAtMost(6)
 
             // v0–v5: vec3<f32> each, padded to 16 bytes (vec4 alignment).

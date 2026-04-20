@@ -301,14 +301,11 @@ sealed interface IsometricMaterial : MaterialData {
          * walls share [side]. This logical grouping is independent of `stepCount` —
          * adding more steps does not change the material API.
          *
-         * **Stub:** [resolve] works for direct calls but per-slot rendering requires
-         * collaborators that this slice deliberately leaves empty:
-         *
-         * - TODO(uv-generation-stairs): register a non-null provider in
-         *   [uvCoordProviderForShape].
-         * - TODO(uv-generation-stairs): add a `is Stairs` branch to [resolveForFace].
-         * - TODO(uv-generation-stairs): collect per-slot textures in
-         *   `GpuTextureManager.collectTextureSources` (warning fires today).
+         * Per-face rendering is live: [uvCoordProviderForShape] returns a provider
+         * for [io.github.jayteealao.isometric.shapes.Stairs], [resolveForFace]
+         * dispatches via [StairsFace], and `GpuTextureManager.collectTextureSources`
+         * collects the `tread`/`riser`/`side` textures alongside the other shape
+         * variants.
          */
         public class Stairs(
             public val tread: MaterialData? = null,
@@ -393,11 +390,10 @@ sealed interface IsometricMaterial : MaterialData {
  * Resolve a [IsometricMaterial.PerFace] instance to its per-face sub-material for
  * the face currently being rendered.
  *
- * [IsometricMaterial.PerFace.Prism], [IsometricMaterial.PerFace.Octahedron],
- * [IsometricMaterial.PerFace.Pyramid], and [IsometricMaterial.PerFace.Cylinder]
- * dispatch via [faceType] today; the remaining variant (`Stairs`) ships an empty
- * stub and returns [IsometricMaterial.PerFace.default] until its
- * `uv-generation-stairs` slice wires up per-face resolution.
+ * All [IsometricMaterial.PerFace] variants dispatch via [faceType] today
+ * ([IsometricMaterial.PerFace.Prism], [IsometricMaterial.PerFace.Octahedron],
+ * [IsometricMaterial.PerFace.Pyramid], [IsometricMaterial.PerFace.Cylinder],
+ * and [IsometricMaterial.PerFace.Stairs]).
  *
  * Centralising this dispatch means each downstream shape slice adds exactly one
  * `when` branch here — rather than updating the 3 consumer sites
@@ -427,8 +423,10 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         val cylinderFace = faceType as? CylinderFace
         if (cylinderFace != null) resolve(cylinderFace) else default
     }
-    // TODO(uv-generation-stairs): dispatch via faceType as? StairsFace
-    is IsometricMaterial.PerFace.Stairs -> default
+    is IsometricMaterial.PerFace.Stairs -> {
+        val stairsFace = faceType as? StairsFace
+        if (stairsFace != null) resolve(stairsFace) else default
+    }
 }
 
 // -- DSL builders -------------------------------------------------------------

@@ -5,8 +5,8 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-19T07:59:56Z"
-selected-slice: "uv-generation-cylinder"
+updated-at: "2026-04-20T15:24:08Z"
+selected-slice: "uv-generation-stairs"
 current-stage-status: complete
 current-stage: implement
 stage-number: 5
@@ -14,11 +14,12 @@ review-verdict: dont-ship
 review-triage-status: triaged
 review-fix-status: blocker-fixed
 review-fix-applied: API-01
-verify-pass: 2
+review-fix-verified: API-01
+verify-pass: 3
 verify-result: pass
 verify-fix-applied: VF-1
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-cylinder"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -150,6 +151,8 @@ workflow-files:
   - 07-review-uv-generation-pyramid-api-contracts.md
   - 07-review-uv-generation-pyramid-performance.md
   - 07-review-uv-generation-pyramid-refactor-safety.md
+  - 05-implement-uv-generation-stairs.md
+  - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorStairsTest.kt
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHookColorTest.kt
   - .maestro/verify-pyramid.yaml
   - isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/ShapeNodeFaceTypeTest.kt
@@ -205,10 +208,10 @@ progress:
   webgpu-uv-transforms: verify-complete
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
-  uv-generation-cylinder: review-blocker-fixed-pending-verify-3
+  uv-generation-cylinder: verify-pass-3-complete
   webgpu-ngon-faces: defined
   uv-generation-pyramid: verify-pass-3-complete
-  uv-generation-stairs: plan-complete
+  uv-generation-stairs: implement-complete
   uv-generation-knot: plan-complete
   uv-generation-octahedron: review-ship-with-caveats
 ---

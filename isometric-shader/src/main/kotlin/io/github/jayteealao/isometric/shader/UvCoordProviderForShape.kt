@@ -6,6 +6,7 @@ import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
+import io.github.jayteealao.isometric.shapes.Stairs
 
 /**
  * Returns a [UvCoordProvider] that generates per-face UVs for [shape], or `null` if
@@ -23,7 +24,6 @@ import io.github.jayteealao.isometric.shapes.Pyramid
  * ## Extension
  *
  * Each shape slice adds a `when` branch here:
- * - `uv-generation-stairs`   → `is Stairs`
  * - `uv-generation-knot`     → `is Knot`
  *
  * Until those slices land, the remaining shapes return `null` and texturing
@@ -34,5 +34,6 @@ internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (sha
     is Octahedron -> UvCoordProvider { _, faceIndex -> UvGenerator.forOctahedronFace(shape, faceIndex) }
     is Pyramid -> UvCoordProvider { _, faceIndex -> UvGenerator.forPyramidFace(shape, faceIndex) }
     is Cylinder -> UvCoordProvider { _, faceIndex -> UvGenerator.forCylinderFace(shape, faceIndex) }
+    is Stairs -> UvCoordProvider { _, faceIndex -> UvGenerator.forStairsFace(shape, faceIndex) }
     else -> null
 }

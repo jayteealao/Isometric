@@ -6,6 +6,8 @@ import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.Pyramid
+import io.github.jayteealao.isometric.shapes.Stairs
+import io.github.jayteealao.isometric.shapes.StairsFace
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -250,6 +252,93 @@ internal object UvGenerator {
         }
         return result
     }
+
+    /**
+     * Generates UV coordinates for a single [Stairs] face.
+     *
+     * Stairs always occupy a `1 x 1 x 1` bounding box regardless of
+     * [Stairs.stepCount], so every per-face UV calculation normalises directly
+     * against the local step extent without consulting the shape's dimensions.
+     *
+     * Face index layout for `N = stairs.stepCount`:
+     * - even `0..2N-2` — RISER (vertical quad, 4 vertices)
+     * - odd `1..2N-1`  — TREAD (horizontal quad, 4 vertices)
+     * - `2N`            — SIDE, left zigzag (`2N + 2` vertices)
+     * - `2N + 1`        — SIDE, right zigzag (`2N + 2` vertices, `u` mirrored)
+     *
+     * UV conventions:
+     * - RISER: `u = (x - pos.x)`, `v = (z - zBot) / riserHeight`. v0..v3 produce
+     *   `(0,1), (0,0), (1,0), (1,1)`. `v = 0` is at the bottom of the riser,
+     *   matching [PrismFace.FRONT] (unlike [forCylinderFace]'s `v = 0` at the top).
+     * - TREAD: `u = (x - pos.x)`, `v = (y - yStart) / treadDepth`. v0..v3 produce
+     *   `(0,0), (1,0), (1,1), (0,1)`.
+     * - SIDE: planar `(y, z)` projection over the unit `1 x 1` extent. The right
+     *   side uses `u = 1 - (y - pos.y)` so both walls read the texture
+     *   left-to-right when viewed from outside the staircase.
+     *
+     * @param stairs The source Stairs (provides `position` and `stepCount`)
+     * @param faceIndex 0-based index into [Stairs.paths] (`0 until stairs.paths.size`)
+     * @return [FloatArray] of 8 floats for RISER/TREAD; `2 * (2 * stepCount + 2)`
+     *   floats for SIDE faces
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until stairs.paths.size`
+     */
+    fun forStairsFace(stairs: Stairs, faceIndex: Int): FloatArray {
+        require(faceIndex in stairs.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Stairs with ${stairs.paths.size} faces (valid range: 0 until ${stairs.paths.size})"
+        }
+        val face = StairsFace.fromPathIndex(faceIndex, stairs.stepCount)
+        val path = stairs.paths[faceIndex]
+        val pos = stairs.position
+        val n = stairs.stepCount
+
+        return when (face) {
+            StairsFace.RISER -> {
+                val stepI = faceIndex / 2
+                val riserHeight = 1.0 / n
+                val zBot = pos.z + stepI * riserHeight
+                val result = FloatArray(8)
+                for (k in 0..3) {
+                    val pt = path.points[k]
+                    result[k * 2] = (pt.x - pos.x).toFloat()
+                    result[k * 2 + 1] = ((pt.z - zBot) / riserHeight).toFloat()
+                }
+                result
+            }
+            StairsFace.TREAD -> {
+                val stepI = faceIndex / 2
+                val treadDepth = 1.0 / n
+                val yStart = pos.y + stepI * treadDepth
+                val result = FloatArray(8)
+                for (k in 0..3) {
+                    val pt = path.points[k]
+                    result[k * 2] = (pt.x - pos.x).toFloat()
+                    result[k * 2 + 1] = ((pt.y - yStart) / treadDepth).toFloat()
+                }
+                result
+            }
+            StairsFace.SIDE -> {
+                val isRightSide = faceIndex == 2 * n + 1
+                val vertCount = 2 * n + 2
+                val result = FloatArray(2 * vertCount)
+                for (k in 0 until vertCount) {
+                    val pt = path.points[k]
+                    val uNorm = pt.y - pos.y
+                    val vNorm = pt.z - pos.z
+                    result[k * 2] = (if (isRightSide) 1.0 - uNorm else uNorm).toFloat()
+                    result[k * 2 + 1] = vNorm.toFloat()
+                }
+                result
+            }
+        }
+    }
+
+    /**
+     * Generates UV coordinates for every face of [stairs] in `Stairs.paths` order
+     * (`2 * stepCount` interleaved riser/tread quads, followed by the left and
+     * right zigzag side faces).
+     */
+    fun forAllStairsFaces(stairs: Stairs): List<FloatArray> =
+        stairs.paths.indices.map { forStairsFace(stairs, it) }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
         val ox = prism.position.x

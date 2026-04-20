@@ -15,6 +15,8 @@ import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.PyramidFace
+import io.github.jayteealao.isometric.shapes.Stairs
+import io.github.jayteealao.isometric.shapes.StairsFace
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
 
@@ -303,6 +305,7 @@ class ShapeNode(
                         is Octahedron -> OctahedronFace.fromPathIndex(index)
                         is Pyramid -> PyramidFace.fromPathIndex(index)
                         is Cylinder -> CylinderFace.fromPathIndex(index)
+                        is Stairs -> StairsFace.fromPathIndex(index, (shape as Stairs).stepCount)
                         else -> null
                     },
                     faceVertexCount = path.points.size,
