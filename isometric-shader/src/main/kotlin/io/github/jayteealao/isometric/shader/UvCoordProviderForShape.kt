@@ -1,8 +1,10 @@
 package io.github.jayteealao.isometric.shader
 
+import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.compose.runtime.UvCoordProvider
 import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
@@ -21,19 +23,18 @@ import io.github.jayteealao.isometric.shapes.Stairs
  *   floats per face in `[u0,v0, u1,v1, ...]` order matching the shape's path
  *   vertex order.
  *
- * ## Extension
- *
- * Each shape slice adds a `when` branch here:
- * - `uv-generation-knot`     → `is Knot`
- *
- * Until those slices land, the remaining shapes return `null` and texturing
- * is a no-op for them at the renderer level.
+ * All stock shapes (`Prism`, `Octahedron`, `Pyramid`, `Cylinder`, `Stairs`, `Knot`)
+ * now return a non-null provider. Shapes outside this list — including any
+ * user-defined subclasses of [Shape] — return `null` and texturing is a no-op
+ * for them at the renderer level.
  */
+@OptIn(ExperimentalIsometricApi::class)
 internal fun uvCoordProviderForShape(shape: Shape): UvCoordProvider? = when (shape) {
     is Prism -> UvCoordProvider { _, faceIndex -> UvGenerator.forPrismFace(shape, faceIndex) }
     is Octahedron -> UvCoordProvider { _, faceIndex -> UvGenerator.forOctahedronFace(shape, faceIndex) }
     is Pyramid -> UvCoordProvider { _, faceIndex -> UvGenerator.forPyramidFace(shape, faceIndex) }
     is Cylinder -> UvCoordProvider { _, faceIndex -> UvGenerator.forCylinderFace(shape, faceIndex) }
     is Stairs -> UvCoordProvider { _, faceIndex -> UvGenerator.forStairsFace(shape, faceIndex) }
+    is Knot -> UvCoordProvider { _, faceIndex -> UvGenerator.forKnotFace(shape, faceIndex) }
     else -> null
 }

@@ -441,6 +441,7 @@ public final class io/github/jayteealao/isometric/shapes/Knot : io/github/jaytee
 	public fun <init> (Lio/github/jayteealao/isometric/Point;)V
 	public synthetic fun <init> (Lio/github/jayteealao/isometric/Point;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getPosition ()Lio/github/jayteealao/isometric/Point;
+	public final fun getSourcePrisms ()Ljava/util/List;
 	public synthetic fun translate (DDD)Lio/github/jayteealao/isometric/Shape;
 	public fun translate (DDD)Lio/github/jayteealao/isometric/shapes/Knot;
 }

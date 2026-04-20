@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-20T15:24:08Z"
-slices-implemented: 14
+updated-at: "2026-04-20T21:02:21Z"
+slices-implemented: 15
 slices-total: 15
-metric-total-files-changed: 145
-metric-total-lines-added: 5795
-metric-total-lines-removed: 1281
+metric-total-files-changed: 151
+metric-total-lines-added: 6076
+metric-total-lines-removed: 1292
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-knot"
 ---
 
 # Implement Index
@@ -117,6 +117,31 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
   Maestro flow (plan §"Interactive" is optional; deferred to verify).
 - Record: [05-implement-uv-generation-stairs.md](05-implement-uv-generation-stairs.md)
 
+### `uv-generation-knot` — complete
+- Files: 6 (1 new test, 5 modified: 4 production code + 1 api dump).
+- Summary: Full Knot per-face texturing via bag-of-primitives delegation.
+  `Knot.sourcePrisms` (new `@ExperimentalIsometricApi` public val) exposes the
+  three source Prisms composing the shape; `UvGenerator.forKnotFace` delegates
+  faces 0..17 to `UvGenerator.forPrismFace(sourcePrisms[i/6], i%6)` and
+  handles the two custom closing quads (18, 19) with axis-aligned
+  bounding-box planar projection via a new private `quadBboxUvs` helper.
+  `uvCoordProviderForShape` gains the final `is Knot` arm (file-level `@OptIn`).
+  `perFace {}` remains silently unsupported on Knot — `IsometricNode.renderTo`
+  has no `is Knot` branch in its `faceType` dispatch, so all Knot commands see
+  `faceType = null` and route through `PerFace.default`. Documentation added
+  to `Knot` KDoc; no guard code needed. 11 new unit tests covering sub-prism
+  delegation identity, bbox range, `forAllKnotFaces` sizing, invalid indices,
+  and a `sourcePrisms`-vs-`createPaths` drift regression guard.
+  `PerFaceSharedApiTest` null-for-Knot test replaced with a positive provider
+  test plus a `CustomShape : Shape(...)` local class exercising the remaining
+  `else -> null` branch. apiDump: `+Knot.getSourcePrisms()` only —
+  `UvGenerator` is `internal object`, so the shader api is unchanged.
+- Deviations: `knotTextured()` Paparazzi snapshot deferred, matching the
+  precedent set by every sibling `<shape>Textured()` (compose→shader
+  dependency inversion blocks the call site). Interactive verification
+  belongs to the verify stage.
+- Record: [05-implement-uv-generation-knot.md](05-implement-uv-generation-knot.md)
+
 ### `uv-generation-cylinder` — complete
 - Files: 16 modified + 2 new (UvGeneratorCylinderTest, .maestro/verify-cylinder.yaml).
 - Summary: Full Cylinder per-face texturing and material dispatch. `Cylinder` now
@@ -149,6 +174,6 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
 - **After `uv-generation-shared-api` (this slice):** five shape UV slices become purely additive — each adds a new `PerFace.<Shape>.resolve()` implementation, a new `when` branch in `uvCoordProviderForShape()`, and per-shape UV generator logic. No further changes to `IsometricMaterial.kt`, `RenderCommand.kt`, or the WebGPU/Canvas consumer dispatches.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-stairs` — confirm AC1–AC6 for the freshly-landed stairs slice. 13 new tests plus updated `PerFaceSharedApiTest` provide a strong automated surface; Canvas AC1/AC2/AC3 and WebGPU AC4 parity need interactive confirmation. **Consider `/compact` first** — implementation-pass debugging context (smart-cast fix, FP-tolerance fix, plan revision) is noise for verify.
-- **Option B:** `/wf-review texture-material-shaders uv-generation-stairs` — skip verify if the user accepts 13 new green tests + `apiCheck` + four-module test suite as sufficient. Review focus: explicit `(shape as Stairs)` cast idiom, `warnIfNonPrismPerFaceHasTexturedSlots` deletion, right-side zigzag UV correctness under `.reversed()` + `.translate(1,0,0)`, and the `SceneDataPacker` KDoc truthfulness against `coerceAtMost(6)`.
-- **Option C:** Begin `/wf-implement texture-material-shaders uv-generation-knot` — the last remaining planned shape slice. Knot is already plan-complete. Recommended only after stairs reaches at least verify-green.
+- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-knot` — confirm AC1–AC5 for the freshly-landed knot slice. 11 new shader unit tests plus passing sibling suites (180 tests green in `:isometric-shader:testDebugUnitTest`) and sibling module test suites give strong automated coverage; Canvas AC1/AC2 and WebGPU AC3 parity still need interactive confirmation. **Consider `/compact` first** — implementation-pass debugging context (CustomShape-fixture discovery, PerFaceSharedApiTest pivot) is noise for verify.
+- **Option B:** `/wf-review texture-material-shaders uv-generation-knot` — skip verify if 11 green tests + `apiCheck` + four-module test suite is sufficient evidence. Review focus: the bag-of-primitives delegation idiom, `sourcePrisms` drift-guard, `quadBboxUvs` non-canonical-winding acceptance, `perFace {}` silent-fallback documentation.
+- **Option C:** All 15 slices implement-complete. Sibling follow-ups that are tracked elsewhere: stairs/octahedron review verdicts (`ship-with-caveats`); `webgpu-ngon-faces` slice (defined but not planned) for lifting the 6-vertex WebGPU face cap that truncates stairs sides at stepCount ≥ 3.

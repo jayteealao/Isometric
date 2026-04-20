@@ -295,11 +295,23 @@ class PerFaceSharedApiTest {
 
     @OptIn(ExperimentalIsometricApi::class)
     @Test
+    fun `uvCoordProviderForShape returns non-null provider for Knot`() {
+        val knot = Knot()
+        val provider = uvCoordProviderForShape(knot)
+        assertNotNull(provider)
+        val uvs = provider.provide(knot, 0)
+        assertNotNull(uvs)
+        assertEquals(8, uvs.size)
+    }
+
+    @Test
     fun `uvCoordProviderForShape returns null for shapes without per-face UV support`() {
-        // Shapes not yet wired by their uv-generation-<shape> slice still return null.
-        // Octahedron, Pyramid, Cylinder, and Stairs dropped from this list as their
-        // shape slices landed.
-        assertNull(uvCoordProviderForShape(Knot()))
+        // All stock shapes (Prism, Octahedron, Pyramid, Cylinder, Stairs, Knot) now
+        // dispatch to a dedicated UV generator. Shapes outside the stock set — including
+        // user-defined Shape subclasses — fall through the when to `else -> null`, which
+        // signals the renderer to skip UV computation for them.
+        class CustomShape : Shape(listOf(Path(Point.ORIGIN, Point.ORIGIN, Point.ORIGIN)))
+        assertNull(uvCoordProviderForShape(CustomShape()))
     }
 
     // ---------- RenderCommand.faceVertexCount ----------

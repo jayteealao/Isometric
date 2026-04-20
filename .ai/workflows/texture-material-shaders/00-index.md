@@ -5,21 +5,21 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-20T15:24:08Z"
-selected-slice: "uv-generation-stairs"
+updated-at: "2026-04-20T21:13:50Z"
+selected-slice: "uv-generation-knot"
 current-stage-status: complete
 current-stage: implement
 stage-number: 5
-review-verdict: dont-ship
+review-verdict: ship-with-caveats
 review-triage-status: triaged
-review-fix-status: blocker-fixed
-review-fix-applied: API-01
-review-fix-verified: API-01
-verify-pass: 3
-verify-result: pass
-verify-fix-applied: VF-1
+review-fix-status: all-deferred
+review-fix-applied: ""
+review-fix-verified: ""
+verify-pass: 0
+verify-result: ""
+verify-fix-applied: ""
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-stairs"
+next-invocation: "/wf-verify texture-material-shaders uv-generation-knot"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -152,6 +152,19 @@ workflow-files:
   - 07-review-uv-generation-pyramid-performance.md
   - 07-review-uv-generation-pyramid-refactor-safety.md
   - 05-implement-uv-generation-stairs.md
+  - 06-verify-uv-generation-stairs.md
+  - 07-review-uv-generation-stairs.md
+  - 07-review-uv-generation-stairs-correctness.md
+  - 07-review-uv-generation-stairs-security.md
+  - 07-review-uv-generation-stairs-code-simplification.md
+  - 07-review-uv-generation-stairs-testing.md
+  - 07-review-uv-generation-stairs-maintainability.md
+  - 07-review-uv-generation-stairs-reliability.md
+  - 07-review-uv-generation-stairs-refactor-safety.md
+  - 07-review-uv-generation-stairs-performance.md
+  - 07-review-uv-generation-stairs-architecture.md
+  - 07-review-uv-generation-stairs-api-contracts.md
+  - .maestro/verify-stairs.yaml
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorStairsTest.kt
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/render/TexturedCanvasDrawHookColorTest.kt
   - .maestro/verify-pyramid.yaml
@@ -192,6 +205,8 @@ workflow-files:
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
+  - 05-implement-uv-generation-knot.md
+  - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorKnotTest.kt
 progress:
   intake: complete
   shape: complete
@@ -211,7 +226,7 @@ progress:
   uv-generation-cylinder: verify-pass-3-complete
   webgpu-ngon-faces: defined
   uv-generation-pyramid: verify-pass-3-complete
-  uv-generation-stairs: implement-complete
-  uv-generation-knot: plan-complete
+  uv-generation-stairs: review-ship-with-caveats
+  uv-generation-knot: implement-complete
   uv-generation-octahedron: review-ship-with-caveats
 ---

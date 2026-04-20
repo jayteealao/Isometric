@@ -1,7 +1,9 @@
 package io.github.jayteealao.isometric.shader
 
+import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.PrismFace
@@ -339,6 +341,96 @@ internal object UvGenerator {
      */
     fun forAllStairsFaces(stairs: Stairs): List<FloatArray> =
         stairs.paths.indices.map { forStairsFace(stairs, it) }
+
+    /**
+     * Generates UV coordinates for a single [Knot] face.
+     *
+     * `Knot` is a bag-of-primitives composite: 18 sub-prism faces (three
+     * [Prism]s stored in [Knot.sourcePrisms]) followed by 2 custom quads that
+     * close the shape. UV generation mirrors that decomposition:
+     *
+     * - faces `0..5`   delegate to `forPrismFace(knot.sourcePrisms[0], faceIndex)`
+     * - faces `6..11`  delegate to `forPrismFace(knot.sourcePrisms[1], faceIndex - 6)`
+     * - faces `12..17` delegate to `forPrismFace(knot.sourcePrisms[2], faceIndex - 12)`
+     * - faces `18..19` use axis-aligned bounding-box planar projection
+     *   ([quadBboxUvs]) in post-transform path space
+     *
+     * Sub-prism delegation uses the pre-transform `sourcePrisms` because the
+     * prism dimensions are required for UV normalisation, and those dimensions
+     * are not recoverable from the scaled+translated paths that [Knot.paths]
+     * exposes at runtime.
+     *
+     * @param knot The source Knot
+     * @param faceIndex 0-based index into [Knot.paths] (`0 until 20`)
+     * @return [FloatArray] of 8 floats `[u0,v0, u1,v1, u2,v2, u3,v3]`
+     * @throws IllegalArgumentException if [faceIndex] is outside `0 until knot.paths.size`
+     */
+    @OptIn(ExperimentalIsometricApi::class)
+    @ExperimentalIsometricApi
+    fun forKnotFace(knot: Knot, faceIndex: Int): FloatArray {
+        require(faceIndex in knot.paths.indices) {
+            "faceIndex $faceIndex out of bounds for Knot with ${knot.paths.size} faces (valid range: 0 until ${knot.paths.size})"
+        }
+        return when (faceIndex) {
+            in 0..17 -> {
+                val prismIndex = faceIndex / 6
+                val localFaceIndex = faceIndex % 6
+                forPrismFace(knot.sourcePrisms[prismIndex], localFaceIndex)
+            }
+            18, 19 -> quadBboxUvs(knot.paths[faceIndex])
+            else -> throw IllegalArgumentException(
+                "Knot has exactly 20 faces (indices 0..19); got $faceIndex"
+            )
+        }
+    }
+
+    /**
+     * Generates UV coordinates for every face of [knot] in [Knot.paths] order
+     * (20 arrays: 18 sub-prism faces followed by 2 custom quads).
+     */
+    @OptIn(ExperimentalIsometricApi::class)
+    @ExperimentalIsometricApi
+    fun forAllKnotFaces(knot: Knot): List<FloatArray> =
+        knot.paths.indices.map { forKnotFace(knot, it) }
+
+    // Axis-aligned bounding-box planar projection for a 4-vertex path. Projects
+    // onto the two largest-extent axes; winding order is preserved from the
+    // source path, which may not produce a canonical (0,0)(1,0)(1,1)(0,1)
+    // ordering — callers must accept non-canonical winding. Degenerate spans
+    // collapse to 0 to avoid division-by-zero.
+    private fun quadBboxUvs(path: Path): FloatArray {
+        val pts = path.points
+        val minX = pts.minOf { it.x }; val maxX = pts.maxOf { it.x }
+        val minY = pts.minOf { it.y }; val maxY = pts.maxOf { it.y }
+        val minZ = pts.minOf { it.z }; val maxZ = pts.maxOf { it.z }
+
+        val spanX = maxX - minX; val spanY = maxY - minY; val spanZ = maxZ - minZ
+
+        val result = FloatArray(8)
+        for (i in 0..3) {
+            val pt = pts[i]
+            val (u, v) = when {
+                spanZ <= spanX && spanZ <= spanY ->
+                    Pair(
+                        if (spanX > 0.0) (pt.x - minX) / spanX else 0.0,
+                        if (spanY > 0.0) (pt.y - minY) / spanY else 0.0,
+                    )
+                spanY <= spanX ->
+                    Pair(
+                        if (spanX > 0.0) (pt.x - minX) / spanX else 0.0,
+                        if (spanZ > 0.0) (pt.z - minZ) / spanZ else 0.0,
+                    )
+                else ->
+                    Pair(
+                        if (spanY > 0.0) (pt.y - minY) / spanY else 0.0,
+                        if (spanZ > 0.0) (pt.z - minZ) / spanZ else 0.0,
+                    )
+            }
+            result[i * 2] = u.toFloat()
+            result[i * 2 + 1] = v.toFloat()
+        }
+        return result
+    }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
         val ox = prism.position.x
