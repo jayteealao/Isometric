@@ -5,73 +5,89 @@ import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.webgpu.GpuContext
 
 /**
- * Manages the per-vertex UV coordinates GPU buffer for the emit shader (binding 6).
+ * Manages the per-vertex UV coordinates for the M5 emit shader via a **variable-stride
+ * offset+length layout** (bindings 6 and 7).
  *
- * Each face gets 3 × vec4<f32> = 48 bytes, packing up to 6 UV pairs:
- * `(u0,v0,u1,v1)`, `(u2,v2,u3,v3)`, `(u4,v4,u5,v5)`.
+ * Post `webgpu-ngon-faces`: faces with `faceVertexCount in 3..24` render full UVs.
+ * The previous fixed 48-byte-per-face slot (max 6 UV pairs) is replaced by:
+ *
+ * - **Pool buffer** (binding 6) — `array<vec2<f32>>` holding every face's UV pairs
+ *   concatenated in scene order. Size = `sumOf { faceVertexCount } × 8 bytes`.
+ * - **Table buffer** (binding 7) — `array<vec2<u32>>` with one entry per face:
+ *   `(offsetPairs, vertCount)`. The shader indexes `table[originalIndex]` and then
+ *   loops `uvPool[offsetPairs + k]` for `k in 0..vertCount-1`.
+ *
+ * ## Invariants
+ *
+ * - **Slot i ↔ originalIndex = i.** `table[i]` MUST describe the UV range for
+ *   `scene.commands[i]`. Violating this produces silently-wrong UVs — AC5 tests
+ *   exercise this across heterogeneous face-vertex counts.
+ * - **Monotonic offsets.** `table[i].offsetPairs = sum(commands[0..i-1].vertCount)`.
+ *   The packing walk computes this cumulatively so the pool is tightly packed.
+ * - **Default fallback.** When a command has `uvCoords == null`, the pool receives
+ *   4 UV pairs `(0,0)(1,0)(1,1)(0,1)` (a standard quad) and `table[i].vertCount = 4`.
  *
  * This is a geometry/projection concern (how the texture wraps a face), not a
  * texture-atlas concern (where the texture lives in the atlas). Kept separate from
  * [io.github.jayteealao.isometric.webgpu.texture.GpuTextureManager] which owns
  * atlas state.
- *
- * **Invariant:** UV slot `i` must correspond to the face at GPU sort key
- * `originalIndex = i`. This holds when `scene.commands` is in the same
- * traversal order as the `SceneDataPacker` output.
  */
 internal class GpuUvCoordsBuffer(
     ctx: GpuContext,
 ) : AutoCloseable {
 
-    private val buf = GrowableGpuStagingBuffer(ctx, label = "IsometricUvCoords")
+    /** Flat concatenated UV pool, `array<vec2<f32>>` — binding 6. */
+    private val pool = GrowableGpuStagingBuffer(ctx, label = "IsometricUvPool")
+
+    /** Per-face `(offsetPairs, vertCount)` table, `array<vec2<u32>>` — binding 7. */
+    private val table = GrowableGpuStagingBuffer(ctx, label = "IsometricUvTable")
+
     private val ctx = ctx
 
-    val gpuBuffer: GPUBuffer? get() = buf.gpuBuffer
+    /** Pool GPU buffer — bind at group 0 binding 6. */
+    val poolBuffer: GPUBuffer? get() = pool.gpuBuffer
+
+    /** Offset+length table GPU buffer — bind at group 0 binding 7. */
+    val tableBuffer: GPUBuffer? get() = table.gpuBuffer
+
+    /**
+     * Total `vec2<f32>` entries written into the pool during the last [upload].
+     *
+     * Used to size dispatches / validate downstream invariants. Not read by the
+     * shader — shader uses only `table[originalIndex].vertCount`.
+     */
+    var totalUvPairs: Int = 0
+        private set
 
     fun upload(scene: PreparedScene, faceCount: Int) {
-        if (faceCount == 0) return
+        if (faceCount == 0) {
+            totalUvPairs = 0
+            return
+        }
         require(faceCount <= scene.commands.size) {
             "faceCount $faceCount > scene.commands.size ${scene.commands.size}"
         }
 
-        val entryBytes = 48 // 3 × vec4<f32> = 12 floats × 4 bytes
-        buf.ensureCapacity(faceCount, entryBytes)
+        // Compute total pool size first so both GPU buffers can be grown exactly once.
+        // UvFaceTablePacker's `totalEffectiveVertCount` is the single source of truth
+        // for "how many vec2 slots will the pool contain" — same function the packer
+        // uses internally, so no drift between sizing and packing.
+        val totalPairs = UvFaceTablePacker.totalEffectiveVertCount(scene.commands, faceCount)
+        totalUvPairs = totalPairs
 
-        val requiredBytes = faceCount * entryBytes
-        val cpu = buf.cpuBuffer!!
-        cpu.rewind()
-        cpu.limit(requiredBytes)
-        for (i in 0 until faceCount) {
-            val cmd = scene.commands[i]
-            val uv = cmd.uvCoords
-            val vertCount = cmd.faceVertexCount
-            // TODO(uv-variable-stride): 48-byte slot caps faces at 6 verts / 12 floats.
-            // Shapes that exceed this silently truncate the UV tail:
-            //   - Cylinder caps when vertices > 6: vertices 7..N-1 render with UV (0,0)
-            //     in WebGPU mode — disk projection fails on the outer ring. Canvas path
-            //     unaffected (3-point affine uses only the first 3 UV pairs).
-            //   - Stairs zigzag sides when stepCount > 2 (8+ verts per side).
-            //   - Knot — variable per face.
-            // Workaround for Cylinder WebGPU correctness: construct with vertices <= 6,
-            // or accept degraded cap texturing for higher-poly cylinders.
-            // Follow-up slice: variable-stride UV buffer + per-face offset table + WGSL changes.
-            if (uv != null && vertCount > 0 && uv.size >= 2 * vertCount) {
-                for (j in 0 until 12) {
-                    cpu.putFloat(if (j < uv.size) uv[j] else 0f)
-                }
-            } else {
-                // Default quad UVs: (0,0)(1,0)(1,1)(0,1)(0,0)(0,0)
-                cpu.putFloat(0f); cpu.putFloat(0f); cpu.putFloat(1f); cpu.putFloat(0f)
-                cpu.putFloat(1f); cpu.putFloat(1f); cpu.putFloat(0f); cpu.putFloat(1f)
-                cpu.putFloat(0f); cpu.putFloat(0f); cpu.putFloat(0f); cpu.putFloat(0f)
-            }
-        }
-        cpu.rewind()
+        pool.ensureCapacity(totalPairs, SceneDataLayout.UV_POOL_STRIDE)
+        table.ensureCapacity(faceCount, SceneDataLayout.UV_TABLE_STRIDE)
 
-        ctx.queue.writeBuffer(buf.gpuBuffer!!, 0L, cpu)
+        val poolCpu = pool.cpuBuffer!!
+        val tableCpu = table.cpuBuffer!!
+        UvFaceTablePacker.packInto(scene.commands, faceCount, poolCpu, tableCpu)
+
+        ctx.queue.writeBuffer(pool.gpuBuffer!!, 0L, poolCpu)
+        ctx.queue.writeBuffer(table.gpuBuffer!!, 0L, tableCpu)
     }
 
     override fun close() {
-        buf.close()
+        pool.close()
+        table.close()
     }
 }

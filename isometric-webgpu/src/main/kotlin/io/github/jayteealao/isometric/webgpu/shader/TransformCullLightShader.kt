@@ -21,14 +21,13 @@ package io.github.jayteealao.isometric.webgpu.shader
  * `VkCommandBuffer` when both passes access the same buffer via non-sequential addresses.
  *
  * Writing to `transformed[i]` (each thread writes its own slot) is sequential and safe.
- * The `visible` field replaces `_p3` so downstream passes can filter culled entries without
- * an atomic counter. No struct size change — `TRANSFORMED_FACE_BYTES` remains 96.
+ * The `visible` field lets downstream passes filter culled entries without an atomic counter.
  *
  * ## Struct layouts
  *
  * All structs must be kept in sync with their Kotlin counterparts:
- * - `FaceData` ← [SceneDataPacker] / [SceneDataLayout] (144 bytes, stride 144)
- * - `TransformedFace` ← [SceneDataLayout.TRANSFORMED_FACE_BYTES] (96 bytes, stride 96)
+ * - `FaceData` ← [SceneDataPacker] / [SceneDataLayout] (448 bytes, stride 448)
+ * - `TransformedFace` ← [SceneDataLayout.TRANSFORMED_FACE_BYTES] (240 bytes, stride 240)
  * - `SceneUniforms` ← [GpuSceneUniforms] (96 bytes, 6 × vec4)
  *
  * ## Projection formula
@@ -73,51 +72,42 @@ internal object TransformCullLightShader {
 
     val WGSL: String = """
         // ── FaceData ──────────────────────────────────────────────────────────────
-        // 144 bytes per face.  Matches SceneDataPacker byte-for-byte.
+        // 448 bytes per face.  Matches SceneDataPacker byte-for-byte.
         //
         //  offset  size  field
-        //    0-15   16   v0 (vec3<f32>) + _p0 (f32 pad)
-        //   16-31   16   v1 + _p1
-        //   32-47   16   v2 + _p2
-        //   48-63   16   v3 + _p3
-        //   64-79   16   v4 + _p4
-        //   80-95   16   v5 + vertexCount (u32 in v5's pad slot)
-        //   96-111  16   baseColor (vec4<f32>, RGBA in [0,1])
-        //  112-123  12   normal (vec3<f32>, pre-normalised)
-        //  124-127   4   textureIndex (u32; 0xFFFFFFFF = no texture)
-        //  128-131   4   faceIndex (u32)
-        //  132-143  12   padding (3 × u32) → struct stride = 144
+        //    0-383 384   v: array<vec3<f32>, 24>  (element stride 16)
+        //  384-387   4   vertexCount (u32)
+        //  388-399  12   _f0..f2 padding (3 × u32) → 16-byte align for next vec4
+        //  400-415  16   baseColor (vec4<f32>, RGBA in [0,1])
+        //  416-427  12   normal (vec3<f32>, pre-normalised)
+        //  428-431   4   textureIndex (u32; 0xFFFFFFFF = no texture)
+        //  432-435   4   faceIndex (u32)
+        //  436-447  12   _p0..p2 padding (3 × u32) → struct stride = 448
         struct FaceData {
-            v0: vec3<f32>,  _p0: f32,
-            v1: vec3<f32>,  _p1: f32,
-            v2: vec3<f32>,  _p2: f32,
-            v3: vec3<f32>,  _p3: f32,
-            v4: vec3<f32>,  _p4: f32,
-            v5: vec3<f32>,  vertexCount: u32,
+            v:           array<vec3<f32>, 24>,
+            vertexCount: u32,
+            _f0: u32, _f1: u32, _f2: u32,
             baseColor:   vec4<f32>,
             normal:      vec3<f32>,
             textureIndex: u32,
             faceIndex:   u32,
-            _f0: u32, _f1: u32, _f2: u32,
+            _p0: u32, _p1: u32, _p2: u32,
         }
 
         // ── TransformedFace ───────────────────────────────────────────────────────
-        // 96 bytes per face.  Matches SceneDataLayout.TRANSFORMED_FACE_BYTES.
+        // 240 bytes per face.  Matches SceneDataLayout.TRANSFORMED_FACE_BYTES.
         //
         //  offset  size  field
-        //    0-47   48   s0–s5 (6 × vec2<f32>)
-        //   48-63   16   vertexCount + _p0–_p2 (4 × u32)
-        //                └─ _p0–_p2 are explicit padding so litColor lands at 64 (16-align)
-        //   64-79   16   litColor (vec4<f32>, RGBA in [0,1])
-        //   80-95   16   depthKey (f32) + faceIndex (u32) + visible (u32) + _p4 (u32)
-        //                └─ visible: 1 = passed cull tests, 0 = back-faced or frustum-culled
+        //    0-191 192   s: array<vec2<f32>, 24>  (element stride 8)
+        //  192-195   4   vertexCount (u32)
+        //  196-207  12   _p0..p2 padding (3 × u32) → 16-byte align for litColor
+        //  208-223  16   litColor (vec4<f32>, RGBA in [0,1])
+        //  224-227   4   depthKey (f32)
+        //  228-231   4   faceIndex (u32)
+        //  232-235   4   visible (u32)   ← 1 = passed cull tests, 0 = culled
+        //  236-239   4   _p4 (u32)
         struct TransformedFace {
-            s0: vec2<f32>,
-            s1: vec2<f32>,
-            s2: vec2<f32>,
-            s3: vec2<f32>,
-            s4: vec2<f32>,
-            s5: vec2<f32>,
+            s: array<vec2<f32>, 24>,
             vertexCount: u32,
             _p0: u32,
             _p1: u32,
@@ -173,63 +163,49 @@ internal object TransformCullLightShader {
             let face = scene[i];
             let vc   = face.vertexCount;
 
-            // ── 1. Project all vertices ────────────────────────────────────────
-            let s0 = projectPoint(face.v0);
-            let s1 = projectPoint(face.v1);
-            let s2 = projectPoint(face.v2);
-            // v3 is only valid when vc >= 4; select avoids projecting a zero-vector
-            let s3 = select(vec2<f32>(0.0), projectPoint(face.v3), vc >= 4u);
-            let s4 = select(vec2<f32>(0.0), projectPoint(face.v4), vc >= 5u);
-            let s5 = select(vec2<f32>(0.0), projectPoint(face.v5), vc >= 6u);
+            // ── 1. Project all vertices + compute AABB + depth accumulator ───
+            // Single pass: project, fold into min/max for frustum AABB, and sum
+            // (x + y − 2z) for the centroid depth key. All three are accumulated
+            // in one loop so vertices beyond vc are never touched.
+            var screen: array<vec2<f32>, 24>;
+            var minX: f32 =  1e30;
+            var maxX: f32 = -1e30;
+            var minY: f32 =  1e30;
+            var maxY: f32 = -1e30;
+            var depthSum: f32 = 0.0;
+
+            for (var k: u32 = 0u; k < vc; k = k + 1u) {
+                let p  = face.v[k];
+                let sp = projectPoint(p);
+                screen[k] = sp;
+                minX = min(minX, sp.x);
+                maxX = max(maxX, sp.x);
+                minY = min(minY, sp.y);
+                maxY = max(maxY, sp.y);
+                depthSum = depthSum + (p.x + p.y - 2.0 * p.z);
+            }
 
             // ── 2. Back-face cull ─────────────────────────────────────────────
             // Signed area of the first triangle (s0, s1, s2) in screen space.
             // Matches IsometricProjection.cullPath: area > 0 → back-facing → cull.
+            let s0 = screen[0];
+            let s1 = screen[1];
+            let s2 = screen[2];
             let area = s0.x * s1.y + s1.x * s2.y + s2.x * s0.y
                      - s1.x * s0.y - s2.x * s1.y - s0.x * s2.y;
             let backFaced = area > 0.0;
 
             // ── 3. Frustum cull (AABB vs viewport) ───────────────────────────
-            // Matches IsometricProjection.itemInDrawingBounds: any vertex in bounds
-            // → keep.  Inverted here: if AABB entirely outside → cull.
             let vw = f32(uniforms.viewport.x);
             let vh = f32(uniforms.viewport.y);
-
-            var minX = min(s0.x, min(s1.x, s2.x));
-            var maxX = max(s0.x, max(s1.x, s2.x));
-            var minY = min(s0.y, min(s1.y, s2.y));
-            var maxY = max(s0.y, max(s1.y, s2.y));
-            if (vc >= 4u) {
-                minX = min(minX, s3.x); maxX = max(maxX, s3.x);
-                minY = min(minY, s3.y); maxY = max(maxY, s3.y);
-            }
-            if (vc >= 5u) {
-                minX = min(minX, s4.x); maxX = max(maxX, s4.x);
-                minY = min(minY, s4.y); maxY = max(maxY, s4.y);
-            }
-            if (vc >= 6u) {
-                minX = min(minX, s5.x); maxX = max(maxX, s5.x);
-                minY = min(minY, s5.y); maxY = max(maxY, s5.y);
-            }
             let frustumCulled = maxX < 0.0 || minX > vw || maxY < 0.0 || minY > vh;
 
             let culled = backFaced || frustumCulled;
 
             // ── 4. Depth sort key ─────────────────────────────────────────────
-            // Centroid of (x + y − 2z) over all 3D vertices.
-            // Matches IsometricEngine.projectSceneAsync depth key formula.
-            let d0 = face.v0.x + face.v0.y - 2.0 * face.v0.z;
-            let d1 = face.v1.x + face.v1.y - 2.0 * face.v1.z;
-            let d2 = face.v2.x + face.v2.y - 2.0 * face.v2.z;
-            let d3 = select(0.0, face.v3.x + face.v3.y - 2.0 * face.v3.z, vc >= 4u);
-            let d4 = select(0.0, face.v4.x + face.v4.y - 2.0 * face.v4.z, vc >= 5u);
-            let d5 = select(0.0, face.v5.x + face.v5.y - 2.0 * face.v5.z, vc >= 6u);
-            let depthKey = (d0 + d1 + d2 + d3 + d4 + d5) / f32(vc);
+            let depthKey = depthSum / f32(vc);
 
             // ── 5. Diffuse lighting ───────────────────────────────────────────
-            // Normal is pre-computed and normalised by SceneDataPacker — no GPU
-            // recomputation needed.  Simplified RGB approximation of the CPU's
-            // IsoColor.lighten(brightness * colorDifference, lightColor) path.
             let lightDir   = uniforms.lightDirAndDiff.xyz;
             let colorDiff  = uniforms.lightDirAndDiff.w;
             let brightness = max(dot(face.normal, lightDir), 0.0);
@@ -239,16 +215,13 @@ internal object TransformCullLightShader {
             let litColor   = vec4<f32>(litRgb, face.baseColor.a);
 
             // ── 6. Sequential write ───────────────────────────────────────────
-            // Always write to transformed[i] (this thread's own slot) to avoid
-            // scatter writes that trigger the Adreno compute→compute barrier bug.
-            // The visible flag lets downstream passes filter culled entries.
+            // Each thread writes transformed[i] (its own slot) — no scatter, no
+            // atomic, safe on Adreno. Unused slots beyond vc retain zero (default
+            // init of array<vec2<f32>,24> on the stack).
             var result: TransformedFace;
-            result.s0          = s0;
-            result.s1          = s1;
-            result.s2          = s2;
-            result.s3          = s3;
-            result.s4          = s4;
-            result.s5          = s5;
+            for (var k: u32 = 0u; k < 24u; k = k + 1u) {
+                result.s[k] = select(vec2<f32>(0.0), screen[k], k < vc);
+            }
             result.vertexCount = vc;
             result._p0         = 0u;
             result._p1         = 0u;

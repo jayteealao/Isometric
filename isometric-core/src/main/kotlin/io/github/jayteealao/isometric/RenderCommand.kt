@@ -39,9 +39,8 @@ import io.github.jayteealao.isometric.shapes.FaceIdentifier
  *   **External `SceneProjector` implementors must set this explicitly for non-quad
  *   faces.** The default of 4 is a pragmatic convenience for the common Prism case;
  *   passing it for a triangle would silently truncate UV data. Values outside 3..24
- *   are rejected at construction — a 2D face needs at least 3 vertices and `GpuUvCoordsBuffer`
- *   caps per-face UV storage at 6 pairs (12 floats), so values above 24 would exceed
- *   even the variable-stride future layout.
+ *   are rejected at construction — a 2D face needs at least 3 vertices, and the
+ *   WebGPU pipeline's `TransformedFace.s` / `FaceData.v` arrays are sized for 24.
  */
 class RenderCommand(
     val commandId: String,
@@ -59,7 +58,8 @@ class RenderCommand(
     init {
         require(faceVertexCount in 3..24) {
             "RenderCommand.faceVertexCount must be in 3..24 (faces need >= 3 vertices; " +
-                "GpuUvCoordsBuffer caps storage at 6 UV pairs), got $faceVertexCount"
+                "GPU FaceData and TransformedFace vertex arrays are sized for 24), " +
+                "got $faceVertexCount"
         }
     }
     /** Number of 2D vertices in [points]. */

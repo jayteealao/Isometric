@@ -12,39 +12,73 @@ import kotlin.math.sqrt
 /**
  * Layout constants for the `FaceData` and `TransformedFace` GPU storage buffer structs.
  *
- * These values must match the WGSL struct definitions in `transform_cull_light.wgsl` exactly.
+ * These values must match the WGSL struct definitions in `TransformCullLightShader` exactly.
  * Any change here requires a matching change to the shader.
  *
- * ## FaceData memory layout (144 bytes per face)
+ * ## FaceData memory layout (448 bytes per face)
+ *
+ * Post `webgpu-ngon-faces`: supports up to [MAX_FACE_VERTICES] = 24 vertices per face.
+ * WGSL's `array<vec3<f32>, 24>` element stride is 16 (vec3 pads to vec4 in storage arrays),
+ * so the vertex block occupies exactly `24 × 16 = 384` bytes.
  *
  * ```
  *  offset  size  field
- *    0      12   v0.xyz  (vec3<f32>)
- *   12       4   _p0     (f32 padding — vec4 alignment)
- *   16      12   v1.xyz
- *   28       4   _p1
- *   32      12   v2.xyz
- *   44       4   _p2
- *   48      12   v3.xyz
- *   60       4   _p3
- *   64      12   v4.xyz
- *   76       4   _p4
- *   80      12   v5.xyz
- *   92       4   vertexCount (u32 — packed into v5's padding slot)
- *   96      16   baseColor   (vec4<f32>, RGBA in [0,1])
- *  112      12   normal      (vec3<f32>)
- *  124       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
- *  128       4   faceIndex   (u32)
- *  132      12   _padding    (3 × u32, to reach 144 = 9 × 16-byte alignment)
- * 144  →   144
+ *    0    384   v: array<vec3<f32>, 24>  (element stride 16, xyz packed at +0/+4/+8, +12 pad)
+ *  384      4   vertexCount (u32)
+ *  388     12   _f0, _f1, _f2  (padding to 16-byte align for vec4 that follows)
+ *  400     16   baseColor  (vec4<f32>, RGBA in [0,1])
+ *  416     12   normal     (vec3<f32>)
+ *  428      4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
+ *  432      4   faceIndex   (u32)
+ *  436     12   _pad        (3 × u32 — struct stride multiple of 16)
+ * 448  →  448
+ * ```
+ *
+ * ## TransformedFace memory layout (240 bytes per face)
+ *
+ * `s: array<vec2<f32>, 24>` packs tightly at 8-byte stride → 192 bytes for screen coords.
+ *
+ * ```
+ *  offset  size  field
+ *    0    192   s: array<vec2<f32>, 24>  (element stride 8)
+ *  192      4   vertexCount (u32)
+ *  196     12   _p0, _p1, _p2 (pad to 16-byte align for vec4)
+ *  208     16   litColor (vec4<f32>)
+ *  224      4   depthKey (f32)
+ *  228      4   faceIndex (u32)
+ *  232      4   visible (u32)  ← 1 = passed cull, 0 = culled
+ *  236      4   _p4 (u32)
+ * 240  →  240
  * ```
  */
 internal object SceneDataLayout {
+    /**
+     * Maximum vertices a single face can carry.
+     *
+     * Matches `RenderCommand.faceVertexCount in 3..24` validator bound. Shared by
+     * [FaceData] / [TransformedFace] struct sizes, the packer loop, and the WGSL
+     * shader's per-face vertex array lengths.
+     */
+    const val MAX_FACE_VERTICES = 24
+
     /** Bytes per FaceData struct in the GPU scene-data storage buffer. */
-    const val FACE_DATA_BYTES = 144
+    const val FACE_DATA_BYTES = 448
 
     /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
-    const val TRANSFORMED_FACE_BYTES = 96
+    const val TRANSFORMED_FACE_BYTES = 240
+
+    /**
+     * Bytes per entry in the per-face UV offset+count table (binding 7).
+     *
+     * One `vec2<u32>` per face: `(offsetPairs: u32, vertCount: u32)`.
+     * - `offsetPairs` — index into the flat UV pool (in vec2-units, not bytes).
+     * - `vertCount`   — number of UV pairs for this face (1..[MAX_FACE_VERTICES], or 4
+     *   for the default-quad fallback).
+     */
+    const val UV_TABLE_STRIDE = 8
+
+    /** Bytes per UV pool entry (binding 6) — one `vec2<f32>` = 8 bytes. */
+    const val UV_POOL_STRIDE = 8
 
     /**
      * Bytes per entry in the per-face UV region buffer.
@@ -114,18 +148,13 @@ internal object SceneDataPacker {
 
         for ((index, cmd) in commands.withIndex()) {
             val pts3d = cmd.originalPath.points
-            // KNOWN LIMITATION: faces with more than 6 vertices are truncated to the
-            // first 6 slots. Affected shapes today: Cylinder caps with `vertices > 6`
-            // and Stairs side (zigzag) faces with `stepCount >= 3` (the zigzag
-            // produces `2 * stepCount + 2` vertices). Canvas rendering is unaffected.
-            // Workaround: use `stepCount <= 2` for Stairs under WebGPU if side-face
-            // fidelity matters. A future `webgpu-ngon-faces` slice will lift the cap
-            // via a variable-stride vertex emit pipeline.
-            val n = pts3d.size.coerceAtMost(6)
+            // Post webgpu-ngon-faces: supports up to MAX_FACE_VERTICES (=24) per face.
+            // `RenderCommand.init` enforces faceVertexCount in 3..24 — this matches.
+            val n = pts3d.size.coerceAtMost(SceneDataLayout.MAX_FACE_VERTICES)
 
-            // v0–v5: vec3<f32> each, padded to 16 bytes (vec4 alignment).
-            // v5's padding slot is repurposed for vertexCount.
-            for (i in 0 until 6) {
+            // v: array<vec3<f32>, 24> — each element is 16-byte aligned (xyz + 4-byte pad).
+            // Total block size: 24 × 16 = 384 bytes.
+            for (i in 0 until SceneDataLayout.MAX_FACE_VERTICES) {
                 if (i < n) {
                     val pt = pts3d[i]
                     buffer.putFloat(pt.x.toFloat())
@@ -136,12 +165,14 @@ internal object SceneDataPacker {
                     buffer.putFloat(0f)
                     buffer.putFloat(0f)
                 }
-                if (i < 5) {
-                    buffer.putFloat(0f)    // _p0…_p4 — alignment padding
-                } else {
-                    buffer.putInt(n)       // vertexCount packed into v5's padding slot
-                }
+                buffer.putFloat(0f)    // vec3 padding to 16-byte stride
             }
+
+            // vertexCount (u32) + 3 × u32 pad — aligns the next vec4 (baseColor) to 400.
+            buffer.putInt(n)
+            buffer.putInt(0)
+            buffer.putInt(0)
+            buffer.putInt(0)
 
             // baseColor: vec4<f32> RGBA in [0, 1] — use raw material color (pre-lighting)
             // so the GPU M3 shader applies lighting exactly once. For PerFace materials

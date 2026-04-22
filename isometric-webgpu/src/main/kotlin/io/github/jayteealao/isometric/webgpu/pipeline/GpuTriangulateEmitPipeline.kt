@@ -139,7 +139,8 @@ internal class GpuTriangulateEmitPipeline(
     private var lastSortedKeysBuffer: GPUBuffer? = null
     private var lastTexIndexBuffer: GPUBuffer? = null
     private var lastUvRegionBuffer: GPUBuffer? = null
-    private var lastUvCoordsBuffer: GPUBuffer? = null
+    private var lastUvPoolBuffer: GPUBuffer? = null
+    private var lastUvTableBuffer: GPUBuffer? = null
 
     // ── Exposed buffers ───────────────────────────────────────────────────────
 
@@ -196,11 +197,12 @@ internal class GpuTriangulateEmitPipeline(
         //   binding 2 — vertices       (Storage, read_write)
         //   binding 4 — sceneTexIndices (ReadOnlyStorage)
         //   binding 5 — sceneUvRegions  (ReadOnlyStorage)
-        //   binding 6 — sceneUvCoords   (ReadOnlyStorage)
-        // Total: 6 of 8 storage-buffer slots used; 2 slots remain.
+        //   binding 6 — uvPool          (ReadOnlyStorage, array<vec2<f32>>)
+        //   binding 7 — uvFaceTable     (ReadOnlyStorage, array<vec2<u32>>)
+        // Total: 7 of 8 storage-buffer slots used; 1 slot remains.
         // Binding 3 is a Uniform buffer and does not count against this limit.
-        // If approaching the limit, consider consolidating sceneTexIndices + sceneUvRegions
-        // into a single interleaved buffer (5 u32 per face, ~20 bytes, still < 32 b alignment).
+        // GpuContext requests maxStorageBuffersPerShaderStage >= 8 explicitly and
+        // fails loud at init if the adapter cannot provide it.
         val bgl = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(
                 entries = arrayOf(
@@ -240,9 +242,15 @@ internal class GpuTriangulateEmitPipeline(
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
                     ),
-                    // binding 6 — per-vertex UV coordinates (read-only, 3 × vec4 per face)
+                    // binding 6 — flat UV pool (array<vec2<f32>>, variable stride)
                     GPUBindGroupLayoutEntry(
                         binding = 6,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
+                    ),
+                    // binding 7 — per-face UV offset+count table (array<vec2<u32>>)
+                    GPUBindGroupLayoutEntry(
+                        binding = 7,
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
                     ),
@@ -287,9 +295,11 @@ internal class GpuTriangulateEmitPipeline(
      * @param sortedKeysBuffer  M4 [GpuBitonicSort.resultBuffer].
      * @param texIndexBuffer    Compact per-face texture index buffer (binding 4).
      * @param uvRegionBuffer   Compact per-face UV region buffer (binding 5). Each entry
-     *                         is 4 floats: [uvOffsetU, uvOffsetV, uvScaleU, uvScaleV].
-     * @param uvCoordsBuffer   Per-vertex UV coordinates buffer (binding 6). Each face
-     *                         gets 3 × vec4<f32> = 48 bytes: [(u0,v0,u1,v1),(u2,v2,u3,v3),(u4,v4,u5,v5)].
+     *                         is 10 floats: user transform + atlas region.
+     * @param uvPoolBuffer     Flat UV pool buffer (binding 6). `array<vec2<f32>>` packed
+     *                         in scene order; total length = `sumOf { faceVertexCount }`.
+     * @param uvTableBuffer    Per-face UV offset+count table (binding 7). `array<vec2<u32>>`
+     *                         with entry `i` = `(offsetPairs, vertCount)` for `commands[i]`.
      */
     fun ensureBuffers(
         paddedCount: Int,
@@ -299,7 +309,8 @@ internal class GpuTriangulateEmitPipeline(
         sortedKeysBuffer: GPUBuffer,
         texIndexBuffer: GPUBuffer,
         uvRegionBuffer: GPUBuffer,
-        uvCoordsBuffer: GPUBuffer,
+        uvPoolBuffer: GPUBuffer,
+        uvTableBuffer: GPUBuffer,
     ) {
         require(paddedCount > 0) { "paddedCount must be > 0, got $paddedCount" }
 
@@ -310,7 +321,8 @@ internal class GpuTriangulateEmitPipeline(
             sortedKeysBuffer         === lastSortedKeysBuffer &&
             texIndexBuffer           === lastTexIndexBuffer &&
             uvRegionBuffer           === lastUvRegionBuffer &&
-            uvCoordsBuffer           === lastUvCoordsBuffer
+            uvPoolBuffer             === lastUvPoolBuffer &&
+            uvTableBuffer            === lastUvTableBuffer
         if (same) return
 
         // Release stale bind group before rebuilding.
@@ -379,7 +391,8 @@ internal class GpuTriangulateEmitPipeline(
                     GPUBindGroupEntry(binding = 3, buffer = paramsBuffer!!),
                     GPUBindGroupEntry(binding = 4, buffer = texIndexBuffer),
                     GPUBindGroupEntry(binding = 5, buffer = uvRegionBuffer),
-                    GPUBindGroupEntry(binding = 6, buffer = uvCoordsBuffer),
+                    GPUBindGroupEntry(binding = 6, buffer = uvPoolBuffer),
+                    GPUBindGroupEntry(binding = 7, buffer = uvTableBuffer),
                 )
             )
         )
@@ -391,7 +404,8 @@ internal class GpuTriangulateEmitPipeline(
         lastSortedKeysBuffer  = sortedKeysBuffer
         lastTexIndexBuffer    = texIndexBuffer
         lastUvRegionBuffer    = uvRegionBuffer
-        lastUvCoordsBuffer    = uvCoordsBuffer
+        lastUvPoolBuffer      = uvPoolBuffer
+        lastUvTableBuffer     = uvTableBuffer
 
         Log.d(
             TAG,
@@ -477,6 +491,7 @@ internal class GpuTriangulateEmitPipeline(
         lastSortedKeysBuffer  = null
         lastTexIndexBuffer    = null
         lastUvRegionBuffer    = null
-        lastUvCoordsBuffer    = null
+        lastUvPoolBuffer      = null
+        lastUvTableBuffer     = null
     }
 }

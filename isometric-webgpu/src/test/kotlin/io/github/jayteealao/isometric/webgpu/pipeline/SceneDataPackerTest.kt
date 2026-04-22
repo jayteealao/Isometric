@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 class SceneDataPackerTest {
 
     @Test
-    fun `packInto preserves six vertices and stores vertexCount in final slot`() {
+    fun `packInto preserves six vertices and stores vertexCount after v array`() {
         val path = Path(
             listOf(
                 Point(0.0, 0.0, 0.0),
@@ -49,14 +49,50 @@ class SceneDataPackerTest {
 
         assertEquals(SceneDataLayout.FACE_DATA_BYTES, buffer.limit())
 
-        // v5.xyz starts at byte offset 80.
+        // v[5].xyz starts at byte offset 80 (element stride 16 × index 5).
         buffer.position(80)
         assertEquals(-1.0f, buffer.getFloat())
         assertEquals(0.0f, buffer.getFloat())
         assertEquals(0.0f, buffer.getFloat())
 
-        // vertexCount is packed into v5's padding slot at byte offset 92.
+        // vertexCount is the first u32 after the 24-element v array, at offset 384.
+        buffer.position(384)
         assertEquals(6, buffer.getInt())
+    }
+
+    @Test
+    fun `packInto zero-fills unused vertex slots past vertexCount`() {
+        // Regression guard for the slot-i invariant: a 4-vertex command must leave
+        // v[4]..v[23] as all zeros. Non-zero residue here would corrupt the WGSL
+        // single-pass projection loop which reads `face.v[k]` for k in 0..vc-1.
+        val path = Path(
+            listOf(
+                Point(1.0, 2.0, 3.0),
+                Point(4.0, 5.0, 6.0),
+                Point(7.0, 8.0, 9.0),
+                Point(10.0, 11.0, 12.0),
+            )
+        )
+        val command = RenderCommand(
+            commandId = "quad",
+            points = doubleArrayOf(1.0, 2.0, 4.0, 5.0, 7.0, 8.0, 10.0, 11.0),
+            color = IsoColor(200.0, 200.0, 200.0, 255.0),
+            originalPath = path,
+            originalShape = null,
+        )
+
+        val buffer = ByteBuffer
+            .allocateDirect(SceneDataLayout.FACE_DATA_BYTES)
+            .order(ByteOrder.nativeOrder())
+        SceneDataPacker.packInto(listOf(command), buffer)
+
+        // v[4] onward (bytes 64..384) must be zero.
+        for (byteOffset in 64 until 384) {
+            buffer.position(byteOffset)
+            assertEquals(0.toByte(), buffer.get(), "expected zero padding at offset $byteOffset")
+        }
+        buffer.position(384)
+        assertEquals(4, buffer.getInt(), "vertexCount at offset 384 must equal 4")
     }
 
     @Test
@@ -90,8 +126,8 @@ class SceneDataPackerTest {
 
         SceneDataPacker.packInto(listOf(command), buffer)
 
-        // baseColor is written at byte offset 96 (vec4<f32>, 4 × 4 bytes = 16 bytes).
-        buffer.position(96)
+        // baseColor lands at offset 400 — after v[0..23] (384) + vertexCount + 3 u32 pad (16).
+        buffer.position(400)
         val packedR = buffer.getFloat()
         val packedG = buffer.getFloat()
         val packedB = buffer.getFloat()
@@ -108,8 +144,10 @@ class SceneDataPackerTest {
     }
 
     @Test
-    fun `face data byte size matches six vertex layout`() {
-        assertEquals(144, SceneDataLayout.FACE_DATA_BYTES)
+    fun `face data byte size matches 24 vertex layout`() {
+        assertEquals(448, SceneDataLayout.FACE_DATA_BYTES)
+        assertEquals(240, SceneDataLayout.TRANSFORMED_FACE_BYTES)
+        assertEquals(24, SceneDataLayout.MAX_FACE_VERTICES)
     }
 
     // ── Per-face `resolveEffectiveColor` coverage (BL-2 from review) ──────────
@@ -144,7 +182,7 @@ class SceneDataPackerTest {
 
         val packed = packSingle(command)
 
-        packed.position(96)
+        packed.position(400)
         assertEquals(1.0f, packed.getFloat(), "R is 255/255 = 1.0 (red, not default gray)")
         assertEquals(0.0f, packed.getFloat(), "G is 0/255 = 0.0")
         assertEquals(0.0f, packed.getFloat(), "B is 0/255 = 0.0")
@@ -183,7 +221,7 @@ class SceneDataPackerTest {
 
         val packed = packSingle(command)
 
-        packed.position(96)
+        packed.position(400)
         assertEquals(0.0f, packed.getFloat(), "R is tint.r / 255 = 0.0 (blue tint, not default gray)")
         assertEquals(0.0f, packed.getFloat(), "G is tint.g / 255 = 0.0")
         assertEquals(1.0f, packed.getFloat(), "B is tint.b / 255 = 1.0")

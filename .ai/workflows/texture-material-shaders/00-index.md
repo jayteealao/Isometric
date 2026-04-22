@@ -5,9 +5,9 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-22T21:18:56Z"
+updated-at: "2026-04-22T21:47:18Z"
 selected-slice: "webgpu-ngon-faces"
-current-stage-status: partial
+current-stage-status: complete
 current-stage: implement
 stage-number: 5
 review-verdict: ship-with-caveats
@@ -19,8 +19,9 @@ verify-pass: 1
 verify-result: pass
 verify-fix-applied: ""
 implement-commit-a-sha: "04afdd9"
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
+implement-commit-b-sha: ""
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -203,6 +204,8 @@ workflow-files:
   - 07-review-uv-generation-cylinder-architecture.md
   - 07-review-uv-generation-cylinder-api-contracts.md
   - 03-slice-webgpu-ngon-faces.md
+  - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/UvFaceTablePacker.kt
+  - isometric-webgpu/src/test/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/UvFaceTablePackerTest.kt
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -250,7 +253,7 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: verify-pass-3-complete
-  webgpu-ngon-faces: implement-commit-a-partial
+  webgpu-ngon-faces: implement-complete
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: review-ship-with-caveats
   uv-generation-knot: review-ship-with-caveats

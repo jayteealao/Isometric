@@ -24,17 +24,24 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * 5. Screen-space to NDC: `ndcX = (sx / viewportWidth) * 2 - 1`,
  *    `ndcY = 1 - (sy / viewportHeight) * 2`. Matches [RenderCommandTriangulator] exactly.
  *
- * ## UV coordinates
+ * ## UV coordinates (variable-stride offset+length indirection)
  *
- * Per-vertex UVs are read from `sceneUvCoords` (binding 6), packed as 3 × vec4 per face.
+ * Per-vertex UVs use a two-binding indirection:
+ * - `uvFaceTable` (binding 7) — `array<vec2<u32>>`; `table[originalIndex] = (offsetPairs, vertCount)`.
+ * - `uvPool` (binding 6) — flat `array<vec2<f32>>` holding every face's UV pairs concatenated.
+ *
+ * Per-face fetch: `let entry = uvFaceTable[originalIndex]; uv[k] = uvPool[entry.x + k]`
+ * for `k in 0..entry.y - 1`. This replaces the pre-`webgpu-ngon-faces` fixed 48-byte slot
+ * (max 6 UV pairs) and lets any face with `faceVertexCount <= 24` render full UVs.
+ *
  * The user transform is applied per-vertex (`rawUV = userMatrix * vec3(baseUV, 1.0)`)
- * without `fract()`. The atlas region (scaleU, scaleV, offsetU, offsetV) from `sceneUvRegions`
- * (binding 5) is emitted as a flat `vec4<f32>` vertex attribute. The fragment shader applies
+ * without `fract()`. The atlas region from `sceneUvRegions` (binding 5) is emitted as a
+ * flat `vec4<f32>` vertex attribute; the fragment shader applies
  * `atlasUV = fract(rawUV) * atlasScale + atlasOffset` per-fragment. Applying `fract()`
  * per-fragment (rather than per-vertex) is required for correct tiling: per-vertex fract
  * collapses all corners with UV=1.0 to UV=0.0, making the entire face sample one texel.
- * Faces without UV data receive default quad UVs `(0,0)(1,0)(1,1)(0,1)` padded to 6 vertex
- * slots by the CPU-side packer.
+ * Faces without UV data receive default quad UVs `(0,0)(1,0)(1,1)(0,1)` (4 pairs) from
+ * the CPU-side packer fallback.
  *
  * ## Why fixed stride (no atomicAdd)?
  *
@@ -47,11 +54,13 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * Degenerate triangles (three vertices at the same position) produce no visible pixels
  * and are discarded by the rasterizer at negligible cost.
  *
- * ## Why fully unrolled (no loop, no array)?
+ * ## Loop-based emit (post `webgpu-ngon-faces`)
  *
- * The final emit path is kept fully unrolled up to the current face cap (6 vertices → 4
- * triangles). This avoids driver-sensitive dynamic indexing in WGSL and keeps the emitted
- * triangle fan deterministic and easy to validate.
+ * The emit path now loops over `triCount = vertexCount - 2` triangles, up to 22
+ * (for a 24-vertex face). Each triangle writes `(s[0], s[t+1], s[t+2])` using dynamic
+ * indexing into the `TransformedFace.s` array and the UV pool. Dynamic indexing into
+ * struct arrays is well-supported on Dawn/Vulkan; unused slot writes are bounded by
+ * `triCount`, and slots after `triCount * 3` are filled with degenerates as before.
  *
  * ## Vertex buffer layout
  *
@@ -80,7 +89,8 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * @group(0) @binding(3) var<uniform>              params:           EmitUniforms
  * @group(0) @binding(4) var<storage, read>        sceneTexIndices:  array<u32>
  * @group(0) @binding(5) var<storage, read>        sceneUvRegions:   array<UvRegion>
- * @group(0) @binding(6) var<storage, read>        sceneUvCoords:    array<vec4<f32>>
+ * @group(0) @binding(6) var<storage, read>        uvPool:           array<vec2<f32>>
+ * @group(0) @binding(7) var<storage, read>        uvFaceTable:      array<vec2<u32>>
  * ```
  *
  * ## Struct compatibility
@@ -104,33 +114,31 @@ internal object TriangulateEmitShader {
     const val BYTES_PER_VERTEX = RenderCommandTriangulator.BYTES_PER_VERTEX
 
     /**
-     * Maximum triangles producible from a single face (6-vertex hexagonal face → 4 triangles).
-     * Used to size the output vertex buffer conservatively.
+     * Maximum triangles producible from a single face.
+     *
+     * Post `webgpu-ngon-faces`: a 24-vertex face produces a triangle fan of
+     * `vertexCount - 2 = 22` triangles. Used to size the output vertex buffer.
      */
-    const val MAX_TRIANGLES_PER_FACE = 4
+    const val MAX_TRIANGLES_PER_FACE = 22
 
-    /** Maximum vertices a single face can emit. */
-    const val MAX_VERTICES_PER_FACE = MAX_TRIANGLES_PER_FACE * 3  // = 12
+    /** Maximum vertices a single face can emit into the vertex buffer. */
+    const val MAX_VERTICES_PER_FACE = MAX_TRIANGLES_PER_FACE * 3  // = 66
 
     val WGSL: String = """
         // ── TransformedFace ───────────────────────────────────────────────────────
-        // 96 bytes per face.  Must match TransformCullLightShader.WGSL exactly.
+        // 240 bytes per face.  Must match TransformCullLightShader.WGSL exactly.
         //
         //  offset  size  field
-        //    0-47   48   s0–s5 (6 × vec2<f32>)
-        //   48-63   16   vertexCount + _p0–_p2 (4 × u32)
-        //   64-79   16   litColor (vec4<f32>)
-        //   80-83    4   depthKey (f32)
-        //   84-87    4   faceIndex (u32)
-        //   88-91    4   visible (u32)   ← 1 = passed cull, 0 = culled; not read here
-        //   92-95    4   _p4 (u32)
+        //    0-191 192   s: array<vec2<f32>, 24>   (element stride 8)
+        //  192-195   4   vertexCount (u32)
+        //  196-207  12   _p0..p2 padding (3 × u32)
+        //  208-223  16   litColor (vec4<f32>)
+        //  224-227   4   depthKey (f32)
+        //  228-231   4   faceIndex (u32)
+        //  232-235   4   visible (u32)   ← 1 = passed cull, 0 = culled
+        //  236-239   4   _p4 (u32)
         struct TransformedFace {
-            s0: vec2<f32>,
-            s1: vec2<f32>,
-            s2: vec2<f32>,
-            s3: vec2<f32>,
-            s4: vec2<f32>,
-            s5: vec2<f32>,
+            s: array<vec2<f32>, 24>,
             vertexCount: u32,
             _p0: u32,
             _p1: u32,
@@ -171,16 +179,10 @@ internal object TriangulateEmitShader {
             atlasOffset : vec2<f32>,
         }
 
-        // Read transformed data as a flat vec4<f32> array. TransformedFace is 96 bytes = 6 ×
-        // vec4<f32>, so the layout is:
-        // TransformedFace is 96 bytes = 6 × vec4<f32>, so:
-        //   raw[i*6+0] = (s0.x, s0.y, s1.x, s1.y)
-        //   raw[i*6+1] = (s2.x, s2.y, s3.x, s3.y)
-        //   raw[i*6+2] = (s4.x, s4.y, s5.x, s5.y)
-        //   raw[i*6+3] = (bitcast vertexCount, _p0, _p1, _p2)
-        //   raw[i*6+4] = litColor (r, g, b, a)
-        //   raw[i*6+5] = (depthKey, bitcast faceIndex, bitcast visible, _p4)
-        @group(0) @binding(0) var<storage, read>       transformedRaw: array<vec4<f32>>;
+        // TransformedFace is 240 bytes; bind as a typed struct array so the shader can
+        // read variable-length `s: array<vec2<f32>, 24>` directly without byte-offset
+        // arithmetic across the flat vec4 payload.
+        @group(0) @binding(0) var<storage, read>       transformed: array<TransformedFace>;
         @group(0) @binding(1) var<storage, read>        sortedKeys:  array<SortKey>;
         // Flat u32 array: 14 u32 per vertex (56 bytes), written via bitcast<u32>(f32) to
         // preserve the render pipeline's vertex layout without WGSL struct-alignment gaps.
@@ -192,8 +194,10 @@ internal object TriangulateEmitShader {
         // Each UvRegion stores the user TextureTransform and atlas sub-region separately.
         // Apply as: fract(userMatrix * vec3(baseUV, 1.0)) * atlasScale + atlasOffset
         @group(0) @binding(5) var<storage, read>        sceneUvRegions: array<UvRegion>;
-        // Per-vertex UV coordinates: 3 × vec4 per face = (u0,v0,u1,v1)(u2,v2,u3,v3)(u4,v4,u5,v5)
-        @group(0) @binding(6) var<storage, read>        sceneUvCoords: array<vec4<f32>>;
+        // Flat UV pool: concatenated per-face UV pairs, indexed via uvFaceTable entries.
+        @group(0) @binding(6) var<storage, read>        uvPool:      array<vec2<f32>>;
+        // Per-face offset+count table: entry[i] = (offsetPairs, vertCount) for commands[i].
+        @group(0) @binding(7) var<storage, read>        uvFaceTable: array<vec2<u32>>;
 
         // Writes one vertex at flat u32 offset [base] (base must be a multiple of 14).
         // Vertex layout (56 bytes, 14 × u32, matches GpuRenderPipeline vertex attributes):
@@ -226,115 +230,92 @@ internal object TriangulateEmitShader {
             let i = gid.x;
             if (i >= params.paddedCount) { return; }
 
-            // Fixed-stride slot: each sort entry owns exactly MAX_VERTICES_PER_FACE=12
-            // vertex positions.  No atomicAdd — no contention, no Adreno TDR.
-            let base = i * 12u;
+            // Fixed-stride slot: each sort entry owns exactly MAX_VERTICES_PER_FACE=66
+            // vertex positions (22 triangles × 3 verts). No atomicAdd — no contention,
+            // no Adreno TDR.
+            let base = i * ${MAX_VERTICES_PER_FACE}u;
             let key = sortedKeys[i];
             if (key.originalIndex == 0xFFFFFFFFu) {
-                for (var j = 0u; j < 12u; j++) {
+                for (var j = 0u; j < ${MAX_VERTICES_PER_FACE}u; j = j + 1u) {
                     writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
 
-            let ri = key.originalIndex * 6u;
             let wF = f32(params.viewportWidth);
             let hF = f32(params.viewportHeight);
 
-            let v01 = transformedRaw[ri + 0u];  // (s0.x, s0.y, s1.x, s1.y)
-            let v23 = transformedRaw[ri + 1u];  // (s2.x, s2.y, s3.x, s3.y)
-            let v45 = transformedRaw[ri + 2u];  // (s4.x, s4.y, s5.x, s5.y)
-            let metaVec = transformedRaw[ri + 3u];
-            let clr = transformedRaw[ri + 4u];  // litColor
-            let tail = transformedRaw[ri + 5u];
-
-            let vertexCount = bitcast<u32>(metaVec.x);
-            let visible = bitcast<u32>(tail.z);
-            if (visible == 0u || vertexCount < 3u) {
-                for (var j = 0u; j < 12u; j++) {
+            // Typed struct read — simpler than flat vec4 offset math now that the struct
+            // grew from 96 bytes (6 vec4s) to 240 bytes (15 vec4s).
+            let face = transformed[key.originalIndex];
+            let vertexCount = face.vertexCount;
+            if (face.visible == 0u || vertexCount < 3u) {
+                for (var j = 0u; j < ${MAX_VERTICES_PER_FACE}u; j = j + 1u) {
                     writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
                 }
                 return;
             }
 
-            // Read per-face texture index and UV region from compact buffers
+            // Per-face texture index and UV region from compact buffers
             let texIdx   = sceneTexIndices[key.originalIndex];
             let uvRegion = sceneUvRegions[key.originalIndex];
-
-            let nx0 = (v01.x / wF) * 2.0 - 1.0;
-            let ny0 = 1.0 - (v01.y / hF) * 2.0;
-            let nx1 = (v01.z / wF) * 2.0 - 1.0;
-            let ny1 = 1.0 - (v01.w / hF) * 2.0;
-            let nx2 = (v23.x / wF) * 2.0 - 1.0;
-            let ny2 = 1.0 - (v23.y / hF) * 2.0;
-            let nx3 = (v23.z / wF) * 2.0 - 1.0;
-            let ny3 = 1.0 - (v23.w / hF) * 2.0;
-            let nx4 = (v45.x / wF) * 2.0 - 1.0;
-            let ny4 = 1.0 - (v45.y / hF) * 2.0;
-            let nx5 = (v45.z / wF) * 2.0 - 1.0;
-            let ny5 = 1.0 - (v45.w / hF) * 2.0;
-
-            let r = clr.x;
-            let g = clr.y;
-            let b = clr.z;
-            let a = clr.w;
-
-            // Write real triangles first, then fill remaining slots with degenerates.
-            // This avoids the previous pattern of clearing all 12 slots then overwriting,
-            // reducing storage writes by ~33% for the common quad case.
-
-            // Per-vertex UVs from UvGenerator, packed as 3 × vec4 per face.
-            // Apply user matrix per-vertex without fract(). fract() must happen per-fragment in
-            // the render pass because fract(1.0) == 0.0 — applying it per-vertex collapses all
-            // face corners (UV = 1.0) to UV = 0.0, making the entire face sample one texel.
-            // The atlas region is emitted as a flat vertex attribute for the fragment shader.
-            let uvBase   = key.originalIndex * 3u;
-            let uvPack0  = sceneUvCoords[uvBase + 0u]; // (u0,v0,u1,v1)
-            let uvPack1  = sceneUvCoords[uvBase + 1u]; // (u2,v2,u3,v3)
-            let uvPack2  = sceneUvCoords[uvBase + 2u]; // (u4,v4,u5,v5)
-            let uv0 = uvRegion.userMatrix * vec3<f32>(uvPack0.x, uvPack0.y, 1.0);
-            let uv1 = uvRegion.userMatrix * vec3<f32>(uvPack0.z, uvPack0.w, 1.0);
-            let uv2 = uvRegion.userMatrix * vec3<f32>(uvPack1.x, uvPack1.y, 1.0);
-            let uv3 = uvRegion.userMatrix * vec3<f32>(uvPack1.z, uvPack1.w, 1.0);
-            let uv4 = uvRegion.userMatrix * vec3<f32>(uvPack2.x, uvPack2.y, 1.0);
-            let uv5 = uvRegion.userMatrix * vec3<f32>(uvPack2.z, uvPack2.w, 1.0);
             let asU = uvRegion.atlasScale.x;
             let asV = uvRegion.atlasScale.y;
             let aoU = uvRegion.atlasOffset.x;
             let aoV = uvRegion.atlasOffset.y;
 
-            // Triangle 0: (s0, s1, s2) — always present (vertexCount >= 3)
-            writeVertex((base + 0u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
-            writeVertex((base + 1u) * 14u, nx1, ny1, r, g, b, a, uv1.x, uv1.y, asU, asV, aoU, aoV, texIdx);
-            writeVertex((base + 2u) * 14u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, asU, asV, aoU, aoV, texIdx);
+            let r = face.litColor.x;
+            let g = face.litColor.y;
+            let b = face.litColor.z;
+            let a = face.litColor.w;
 
-            // Compute how many real triangles we have (1–4 based on vertexCount 3–6)
+            // ── Indirect UV lookup (offset + count table) ─────────────────────
+            // entry.x = offsetPairs into flat uvPool; entry.y = vertCount for this face.
+            // vertCount may differ from face.vertexCount only for the uvCoords==null
+            // fallback (always 4). In that case we repeat default-quad UVs; geometry
+            // still triangulates per vertexCount.
+            let uvEntry      = uvFaceTable[key.originalIndex];
+            let uvBaseOffset = uvEntry.x;
+            let uvCount      = uvEntry.y;
+
+            // Precompute NDC + transformed UV per vertex (0..vertexCount-1).
+            // Stack arrays are default-zero-initialized; slots beyond vertexCount
+            // are never read during the triangle loop below.
+            var ndc: array<vec2<f32>, 24>;
+            var uvs: array<vec2<f32>, 24>;
+            for (var k: u32 = 0u; k < vertexCount; k = k + 1u) {
+                let sp = face.s[k];
+                ndc[k] = vec2<f32>((sp.x / wF) * 2.0 - 1.0, 1.0 - (sp.y / hF) * 2.0);
+                // If the face used the default-quad fallback (uvCount == 4 and
+                // vertexCount may be larger), clamp lookup so we always cycle within
+                // the 4 fallback pairs rather than reading past the pool entry.
+                let uvIdx = select(k, k % uvCount, uvCount == 4u && vertexCount > 4u);
+                let pair = uvPool[uvBaseOffset + uvIdx];
+                let h = uvRegion.userMatrix * vec3<f32>(pair.x, pair.y, 1.0);
+                uvs[k] = vec2<f32>(h.x, h.y);
+            }
+
+            // ── Triangle-fan emit (loop over triCount = vertexCount - 2) ──────
+            // Triangle t writes (vertex 0, vertex t+1, vertex t+2) — a classic fan
+            // from vertex 0 valid for convex polygons. Non-convex face emission is
+            // handled by the CPU triangulator on the Canvas path; GPU faces come
+            // from UvGenerator outputs that are all convex (cylinder caps,
+            // pyramid/octahedron tris, knot quads, stairs zigzag — zigzag is the
+            // non-convex case, routed via ear-clipping on CPU).
             let triCount = vertexCount - 2u;
-
-            // Triangle 1: (s0, s2, s3)
-            if (triCount >= 2u) {
-                writeVertex((base + 3u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 4u) * 14u, nx2, ny2, r, g, b, a, uv2.x, uv2.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 5u) * 14u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, asU, asV, aoU, aoV, texIdx);
+            for (var t: u32 = 0u; t < triCount; t = t + 1u) {
+                let outBase = (base + t * 3u) * 14u;
+                let n0 = ndc[0];        let u0 = uvs[0];
+                let n1 = ndc[t + 1u];   let u1 = uvs[t + 1u];
+                let n2 = ndc[t + 2u];   let u2 = uvs[t + 2u];
+                writeVertex(outBase + 0u  * 14u, n0.x, n0.y, r, g, b, a, u0.x, u0.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex(outBase + 1u  * 14u, n1.x, n1.y, r, g, b, a, u1.x, u1.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex(outBase + 2u  * 14u, n2.x, n2.y, r, g, b, a, u2.x, u2.y, asU, asV, aoU, aoV, texIdx);
             }
 
-            // Triangle 2: (s0, s3, s4) — for 5+ vertex faces (pentagon)
-            if (triCount >= 3u) {
-                writeVertex((base + 6u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 7u) * 14u, nx3, ny3, r, g, b, a, uv3.x, uv3.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 8u) * 14u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, asU, asV, aoU, aoV, texIdx);
-            }
-
-            // Triangle 3: (s0, s4, s5) — for 6-vertex faces (hexagon)
-            if (triCount >= 4u) {
-                writeVertex((base + 9u) * 14u, nx0, ny0, r, g, b, a, uv0.x, uv0.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 10u) * 14u, nx4, ny4, r, g, b, a, uv4.x, uv4.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex((base + 11u) * 14u, nx5, ny5, r, g, b, a, uv5.x, uv5.y, asU, asV, aoU, aoV, texIdx);
-            }
-
-            // Fill remaining degenerate slots (from triCount*3 to 11)
+            // Fill remaining degenerate slots (from triCount*3 to MAX_VERTICES_PER_FACE-1)
             let firstDegen = triCount * 3u;
-            for (var j = firstDegen; j < 12u; j++) {
+            for (var j = firstDegen; j < ${MAX_VERTICES_PER_FACE}u; j = j + 1u) {
                 writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
             }
         }

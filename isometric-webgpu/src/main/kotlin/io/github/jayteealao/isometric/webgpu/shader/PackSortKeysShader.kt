@@ -36,23 +36,19 @@ internal object PackSortKeysShader {
 
     val WGSL: String = """
         // ── TransformedFace ───────────────────────────────────────────────────────
-        // 96 bytes per face.  Must match TransformCullLightShader.WGSL exactly.
+        // 240 bytes per face.  Must match TransformCullLightShader.WGSL exactly.
         //
         //  offset  size  field
-        //    0-47   48   s0–s5 (6 × vec2<f32>)
-        //   48-63   16   vertexCount + _p0–_p2 (4 × u32)
-        //   64-79   16   litColor (vec4<f32>)
-        //   80-83    4   depthKey (f32)   ← extracted here
-        //   84-87    4   faceIndex (u32)
-        //   88-91    4   visible (u32)    ← 1 = passed cull, 0 = culled
-        //   92-95    4   _p4 (u32)
+        //    0-191 192   s: array<vec2<f32>, 24>   (element stride 8)
+        //  192-195   4   vertexCount (u32)
+        //  196-207  12   _p0..p2 padding (3 × u32)
+        //  208-223  16   litColor (vec4<f32>)
+        //  224-227   4   depthKey (f32)   ← extracted here
+        //  228-231   4   faceIndex (u32)
+        //  232-235   4   visible (u32)    ← 1 = passed cull, 0 = culled
+        //  236-239   4   _p4 (u32)
         struct TransformedFace {
-            s0: vec2<f32>,
-            s1: vec2<f32>,
-            s2: vec2<f32>,
-            s3: vec2<f32>,
-            s4: vec2<f32>,
-            s5: vec2<f32>,
+            s: array<vec2<f32>, 24>,
             vertexCount: u32,
             _p0: u32,
             _p1: u32,

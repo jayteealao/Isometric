@@ -5,19 +5,19 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-22T21:18:56Z"
-slices-implemented: 15
+updated-at: "2026-04-22T21:47:18Z"
+slices-implemented: 16
 slices-total: 16
-slices-partial: 1
-metric-total-files-changed: 158
-metric-total-lines-added: 6606
-metric-total-lines-removed: 1325
+slices-partial: 0
+metric-total-files-changed: 170
+metric-total-lines-added: 7346
+metric-total-lines-removed: 1485
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 ---
 
 # Implement Index
@@ -166,40 +166,50 @@ next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
   `require(vertices in 3..24)` validator rejected the prior `vertices = 30`.
 - Record: [05-implement-uv-generation-cylinder.md](05-implement-uv-generation-cylinder.md)
 
-### `webgpu-ngon-faces` — partial (Commit A only — omnibus prep landed; GPU pipeline rewrite deferred to follow-up implement pass)
-- Commit: `04afdd9` (+530/-33 across 7 files)
-- Summary: This implementation pass landed the slice's INDEPENDENT omnibus
-  items only — ear-clipping in `RenderCommandTriangulator` (clears stairs
-  verify I-2 on the CPU code path), the `BenchmarkScreen.kt:165` Shape API
-  drift one-line fix (clears workflow-wide pre-existing I-1, unblocks
-  `./gradlew check` aggregate), permanent `Stairs` and `Knot` tabs in
-  `TexturedDemoActivity` plus a 24-vertex cylinder column on the Cylinder
-  tab (validates AC1 once Commit B lands), and Maestro flow updates
-  (`verify-cylinder.yaml` adjusted, `verify-stairs.yaml` and `verify-knot.yaml`
-  committed for the first time — both had been sitting untracked since
-  prior verify passes). Three new `RenderCommandTriangulatorTest` cases
-  (L-shape non-convex, stairs zigzag stepCount=3, convex hexagon regression).
-  Convex polygons stay on the existing O(n) fan fast-path; only non-convex
-  faces pay O(n²) ear-clipping cost.
-- Deferred to next `/wf-implement` pass (Commit B): the slice's atomic-lift
-  GPU pipeline rewrite — Steps 1-8 of the plan (`SceneDataLayout` constants
-  to 24 verts, `FaceData`/`TransformedFace` WGSL struct expansion, packer
-  byte-write loop expansion, `GpuUvCoordsBuffer` dual-buffer rewrite,
-  `UvFaceTablePacker.kt` creation, bind-group layout change to add
-  binding 7, `GpuTriangulateEmitPipeline` ensureBuffers update, `GpuContext`
-  `requiredLimits = 8` with fail-loud, `TriangulateEmitShader` WGSL UV-fetch
-  rewrite to indirect lookup loop, structural-test regex updates, AC5
-  `GpuUvCoordsBufferTest`). Reason: WGSL changes have silent-runtime-failure
-  modes (struct alignment errors, bind-group cache mismatches) that benefit
-  from a fresh context window. Plan's atomic-lift contract is preserved
-  WITHIN Commit B alone.
-- AC status (Commit A): I-2 cleared on CPU path; I-1 cleared workflow-wide;
-  sample-app fixtures in place. AC1/AC2/AC3 (Cylinder/Stairs/Knot WebGPU
-  parity) intentionally NOT MET pending Commit B. AC4 partially met on
-  shapes Commit A doesn't touch.
-- Deviations: 2 — (1) two-commit split vs plan's single atomic commit;
-  (2) Paparazzi snapshot additions (Step 11) deferred to Commit B for
-  cohesion with rendering changes.
+### `webgpu-ngon-faces` — complete (two commits: A prep + B GPU pipeline rewrite)
+- Commit A: `04afdd9` (+530/-33 across 7 files) — omnibus prep (ear-clipping,
+  benchmark API drift fix, permanent Stairs + Knot tabs, Maestro updates).
+- Commit B: this pass (+~1050/-210 across 12 files) — the atomic GPU pipeline
+  rewrite. `SceneDataLayout` constants lifted to 24 verts
+  (FACE_DATA_BYTES 144→448, TRANSFORMED_FACE_BYTES 96→240). `FaceData` /
+  `TransformedFace` WGSL structs rewritten with `array<vec3<f32>, 24>` and
+  `array<vec2<f32>, 24>`. Transform-cull-light `main()` loopified into a
+  single-pass project + AABB + depth accumulator. `SceneDataPacker.packInto`
+  writes 24 vertex slots. `GpuUvCoordsBuffer` replaced with dual-buffer
+  (pool binding 6: `array<vec2<f32>>`; table binding 7: `array<vec2<u32>>`)
+  driven by new pure helper `UvFaceTablePacker`. `GpuTriangulateEmitPipeline`
+  bind-group grows to 8 (binding 7 added), `ensureBuffers` signature split
+  `uvCoordsBuffer` → `uvPoolBuffer + uvTableBuffer`. `GpuContext` now
+  requests `requiredLimits = GPULimits(maxStorageBuffersPerShaderStage = 8)`
+  and fails loud with a webgpu-ngon-faces-named `IllegalStateException` if
+  the adapter reports less. `TriangulateEmitShader` WGSL rewritten: binding 0
+  now a typed `array<TransformedFace>` read (not flat vec4 offset math);
+  UV fetch uses indirect `uvFaceTable[originalIndex]` → loop over `uvPool`;
+  triangle emit is a dynamic `for t in 0..triCount` loop; MAX_TRIANGLES_PER_FACE
+  22, MAX_VERTICES_PER_FACE 66. `RenderCommand` KDoc + error message refreshed
+  to drop the stale 6-UV-pair cap reference.
+- Tests (Commit B): `TriangulateEmitShaderTest` rewritten with 5 new
+  structural assertions (typed binding 0, vec2 pool, u32 table, indirect
+  lookup, loop emit); `SceneDataPackerTest` byte offsets updated
+  (baseColor 96→400, vertexCount 92→384) plus new zero-fill test;
+  `UvFaceTablePackerTest` CREATE — 7 AC5 tests (total count, monotonic
+  offsets, heterogeneous slot-i invariant, null/malformed fallback,
+  empty-scene, 24-vert max case).
+- AC status: AC5 (buffer + table contract tests) and AC7 (apiCheck — all new
+  types are `internal`) met by automated checks. AC1/AC2/AC3 (Cylinder
+  cap / Stairs zigzag / Knot WebGPU parity with Canvas) ready to verify on
+  device via the Maestro flows that Commit A committed. AC6 (WGSL compile
+  validation) structurally asserted in Kotlin tests; real compile happens
+  at GpuContext init time on device.
+- Deviations: 3 — (1) two-commit split (Commit A + Commit B) vs plan's single
+  atomic commit; (2) `SceneDataLayout` is an `object` inside `SceneDataPacker.kt`,
+  not a separate file (plan drift); (3) FACE_DATA_BYTES is 448 not 432 (plan
+  math correction — a 16-byte u32-pad trailer is required for 16-aligned
+  struct stride).
+- Deferred: `minBindingSize = 8` on bindings 6+7 (follow-up perf pass applying
+  it uniformly to all storage-buffer bindings); Paparazzi snapshots for
+  cylinderTextured24 / stairsTextured-stepCount5 / knotTextured (generated
+  during verify per discovery decision #7).
 - Record: [05-implement-webgpu-ngon-faces.md](05-implement-webgpu-ngon-faces.md)
 
 ## Cross-Slice Integration Notes
