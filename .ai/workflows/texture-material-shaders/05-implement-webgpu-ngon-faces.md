@@ -13,7 +13,7 @@ metric-lines-removed: 210
 metric-deviations-from-plan: 3
 metric-review-fixes-applied: 0
 commit-sha-a: "04afdd9"
-commit-sha-b: ""
+commit-sha-b: "f14a78d"
 implementation-mode: two-commit
 tags: [webgpu, uv, ngon, omnibus, ear-clipping, gpu-pipeline-rewrite]
 refs:

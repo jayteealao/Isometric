@@ -19,7 +19,7 @@ verify-pass: 1
 verify-result: pass
 verify-fix-applied: ""
 implement-commit-a-sha: "04afdd9"
-implement-commit-b-sha: ""
+implement-commit-b-sha: "f14a78d"
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 branch-strategy: dedicated
