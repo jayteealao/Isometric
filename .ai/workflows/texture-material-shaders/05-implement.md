@@ -5,18 +5,19 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
-updated-at: "2026-04-20T21:02:21Z"
+updated-at: "2026-04-22T21:18:56Z"
 slices-implemented: 15
-slices-total: 15
-metric-total-files-changed: 151
-metric-total-lines-added: 6076
-metric-total-lines-removed: 1292
+slices-total: 16
+slices-partial: 1
+metric-total-files-changed: 158
+metric-total-lines-added: 6606
+metric-total-lines-removed: 1325
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-knot"
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
 ---
 
 # Implement Index
@@ -164,6 +165,42 @@ next-invocation: "/wf-verify texture-material-shaders uv-generation-knot"
   updated existing `cylinder()` Paparazzi to `vertices = 20` because the new
   `require(vertices in 3..24)` validator rejected the prior `vertices = 30`.
 - Record: [05-implement-uv-generation-cylinder.md](05-implement-uv-generation-cylinder.md)
+
+### `webgpu-ngon-faces` — partial (Commit A only — omnibus prep landed; GPU pipeline rewrite deferred to follow-up implement pass)
+- Commit: `04afdd9` (+530/-33 across 7 files)
+- Summary: This implementation pass landed the slice's INDEPENDENT omnibus
+  items only — ear-clipping in `RenderCommandTriangulator` (clears stairs
+  verify I-2 on the CPU code path), the `BenchmarkScreen.kt:165` Shape API
+  drift one-line fix (clears workflow-wide pre-existing I-1, unblocks
+  `./gradlew check` aggregate), permanent `Stairs` and `Knot` tabs in
+  `TexturedDemoActivity` plus a 24-vertex cylinder column on the Cylinder
+  tab (validates AC1 once Commit B lands), and Maestro flow updates
+  (`verify-cylinder.yaml` adjusted, `verify-stairs.yaml` and `verify-knot.yaml`
+  committed for the first time — both had been sitting untracked since
+  prior verify passes). Three new `RenderCommandTriangulatorTest` cases
+  (L-shape non-convex, stairs zigzag stepCount=3, convex hexagon regression).
+  Convex polygons stay on the existing O(n) fan fast-path; only non-convex
+  faces pay O(n²) ear-clipping cost.
+- Deferred to next `/wf-implement` pass (Commit B): the slice's atomic-lift
+  GPU pipeline rewrite — Steps 1-8 of the plan (`SceneDataLayout` constants
+  to 24 verts, `FaceData`/`TransformedFace` WGSL struct expansion, packer
+  byte-write loop expansion, `GpuUvCoordsBuffer` dual-buffer rewrite,
+  `UvFaceTablePacker.kt` creation, bind-group layout change to add
+  binding 7, `GpuTriangulateEmitPipeline` ensureBuffers update, `GpuContext`
+  `requiredLimits = 8` with fail-loud, `TriangulateEmitShader` WGSL UV-fetch
+  rewrite to indirect lookup loop, structural-test regex updates, AC5
+  `GpuUvCoordsBufferTest`). Reason: WGSL changes have silent-runtime-failure
+  modes (struct alignment errors, bind-group cache mismatches) that benefit
+  from a fresh context window. Plan's atomic-lift contract is preserved
+  WITHIN Commit B alone.
+- AC status (Commit A): I-2 cleared on CPU path; I-1 cleared workflow-wide;
+  sample-app fixtures in place. AC1/AC2/AC3 (Cylinder/Stairs/Knot WebGPU
+  parity) intentionally NOT MET pending Commit B. AC4 partially met on
+  shapes Commit A doesn't touch.
+- Deviations: 2 — (1) two-commit split vs plan's single atomic commit;
+  (2) Paparazzi snapshot additions (Step 11) deferred to Commit B for
+  cohesion with rendering changes.
+- Record: [05-implement-webgpu-ngon-faces.md](05-implement-webgpu-ngon-faces.md)
 
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`

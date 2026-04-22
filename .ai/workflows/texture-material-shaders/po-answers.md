@@ -192,3 +192,69 @@ Per-slice plans focus on code changes only.
 **Slice total:** 6 slices to plan (1 prereq + 5 shape slices). Implementation order: prereq → octahedron →
 pyramid → cylinder → stairs → knot (simple to complex).
 
+## 2026-04-19 — Extend (webgpu-ngon-faces)
+
+Surfaced during `uv-generation-cylinder` verify pass 2 (Maestro re-run on user request):
+Full WebGPU screenshot shows the cylinder top cap rendered as a partial wedge — the
+documented `vertices > 6` truncation in `GpuUvCoordsBuffer`'s fixed 48-byte stride.
+User explicitly chose to queue a follow-up slice rather than accept the caveat or
+lower the sample's vertex count.
+
+**Shape scope:** **All N-gon faces** — cylinder caps + stairs zigzag sides + knot.
+Fix the general N>6 case once rather than in separate slices. The TODO in
+`GpuUvCoordsBuffer.kt:48-56` explicitly lists all three as current victims of the
+stride cap; one slice avoids repeated touches of the buffer.
+
+**Approach:** **Offset + length indirection.** Pack UVs tightly into one linear
+buffer; maintain a parallel per-face `(offsetBytes, lengthFloats)` table. WGSL
+does one table lookup per face, then indexes into the packed buffer. Rejected:
+variable-stride (wastes memory when a single 24-gon forces all ~100 quads to use
+192-byte stride) and defer-to-plan (user wanted direction locked at slice level).
+
+**Max vertex count:** **24** — matches existing `require(faceVertexCount in 3..24)`
+in `RenderCommand.init` and `require(vertices in 3..24)` in `Cylinder.init`. No
+new upper bound to introduce; any shape the library can currently construct fits.
+
+**Dependencies:** **Wait for `uv-generation-stairs` and `uv-generation-knot`** to
+land before planning this slice. Rationale: the buffer redesign should be
+measured against the full UV-emission surface (stairs zigzag sides with real UVs,
+knot per-face UVs), not against placeholders. Avoids re-reworking after the UV
+generators arrive with their actual UV shapes. Also depends on
+`uv-generation-cylinder` (landed, verify-pass-2-complete).
+
+**Slice slug:** `webgpu-ngon-faces` (user-proposed; alternative `webgpu-uv-variable-stride`
+considered but rejected — offset+length indirection isn't a stride at all).
+
+**Evidence:** `.ai/workflows/texture-material-shaders/verify-evidence/screenshots/verify-cylinder-webgpu-pass2.png`
+— partial-wedge cap visible on both textured (brick) and cylinderPerFace (red) tops.
+
+## 2026-04-22 — Plan (webgpu-ngon-faces)
+
+Discovery interview, 9 questions across 3 AskUserQuestion rounds.
+
+**Round 1 (4 questions):**
+
+1. **Scope of lift:** **Lift everything atomically.** Single coordinated rewrite of GpuUvCoordsBuffer + SceneDataPacker + TransformedFace struct + TransformCullLightShader.WGSL + TriangulateEmitShader.WGSL — all to 24 vertices. Larger surface but matches AC1-AC3 truthfully. Sub-agent confirmed 6-vert cap is mirrored in the M3 transform shader's output struct, so lifting only the UV buffer is necessary but not sufficient.
+
+2. **Compat mode handling:** **Request maxStorageBuffersPerShaderStage=8, fail loud.** GpuContext init requests `requiredLimits = { maxStorageBuffersPerShaderStage: 8 }`. If adapter can't satisfy, throw at init with a clear error. Most users on Vulkan path; explicit failure beats silent degradation. Rejected: header-in-buffer single-binding (more shader arithmetic) and detect+dual-path (two code paths to maintain).
+
+3. **Offset table entry layout:** **`vec2<u32>(offsetPairs, vertCount)`.** Offset in UV-pair units (each = 8 bytes), count in vertex count. Matches `RenderCommand.faceVertexCount` directly; shader does `pool[offset + vIdx]`. 8 bytes per face. Rejected: bytes-only (extra arithmetic per fetch) and packed u32 with bitmask (future-incompatible if N ever > 256).
+
+4. **WGSL test approach:** **Extended regex/structural tests.** Match the existing TriangulateEmitShaderTest pattern — assert binding declarations, type names, structural invariants via regex on the WGSL string. Zero new tooling. AC6 becomes "structural validation" not "compile validation". Rejected: Naga CLI subprocess (binary dependency on dev + CI machines) and snapshot-only (regression-only, no semantic check).
+
+**Round 2 (4 questions):**
+
+5. **Step sequencing:** **Bottom-up: structs → packer → shaders.** Order: (1) Expand TransformedFace + FACE_DATA_BYTES constants. (2) Update SceneDataPacker (lift coerceAtMost). (3) Rewrite GpuUvCoordsBuffer to dual-buffer. (4) Update WGSL bindings + indirect lookup. Each step compilable; shader changes last so the full WGSL story is told once with all CPU-side scaffolding in place. Rejected: top-down (intermediate states won't compile) and TDD (slower for a known-design rewrite).
+
+6. **Sample fixture:** **Add a third cylinder at vertices=24.** Three columns in `TexturedCylinderScene`: textured 12-vert (existing), perFace 12-vert (existing), textured 24-vert (new). Updated caption notes the new cap rendering. Maestro flow already taps the Cylinder tab — extend assertions only. Rejected: replacing the right cylinder (loses 12-vert per-face baseline) and dedicated N-gon tab (broader UI churn).
+
+7. **Paparazzi strategy:** **Add new snapshots only for changed shapes.** Add cylinderTextured24 + stairsTextured-stepCount5 + knotTextured snapshots; skip regenerating uncommitted baselines (only 2 of ~15 are committed today). Smallest scope. AC4 weakens to "changed-shape coverage + Canvas inspection for unchanged"; documented as such in the verify plan. Rejected: regenerate-all (out-of-scope baseline cleanup) and defer-baselines-doc-slice (postpones the only meaningful regression guard for this rewrite).
+
+8. **Adjacent fixes scope:** **Omnibus cleanup — fix BOTH I-2 and the benchmark.** Slice expands to include: (a) RenderCommandTriangulator non-convex fan defect (stairs verify I-2 — CPU triangulator path) and (b) `:isometric-benchmark/BenchmarkScreen.kt:165` Shape API drift (color → material). User explicitly chose the broader scope over keeping the slice tight. Rationale: both have been deferred across multiple slice cycles; bundling avoids another round of context-loading. Rejected: neither (kicks the can again) and benchmark-only (leaves I-2 still pending).
+
+**Round 3 (1 question):**
+
+9. **I-2 fix approach:** **Ear-clipping triangulation in `RenderCommandTriangulator`.** General O(n²) algorithm, handles any simple polygon. ~50 lines. Future-proof for any non-convex face that may appear. Slight CPU cost but only on the CPU triangulator path (used by tests + Canvas fallback paths). Rejected: shape-aware Stairs decomposition (Stairs-only fix; doesn't generalize) and both (over-engineered for current scope — start with the general fix).
+
+**Slice scope after plan interview:** Original scope (UV buffer + WGSL + transform shader struct expansion + sample fixture + Maestro + Paparazzi for 3 changed shapes) PLUS omnibus additions (RenderCommandTriangulator ear-clipping + benchmark BenchmarkScreen.kt:165 Shape API repair). Complexity remains `l` but the surface has grown — plan must reflect the broader set in §Likely Files / Areas to Touch and §Step-by-Step Plan.
+

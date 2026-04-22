@@ -5,8 +5,8 @@ slug: texture-material-shaders
 status: active
 stage-number: 3
 created-at: "2026-04-11T22:30:00Z"
-updated-at: "2026-04-14T17:30:20Z"
-total-slices: 14
+updated-at: "2026-04-19T00:20:00Z"
+total-slices: 15
 best-first-slice: api-design-fixes
 tags: [texture, material, shader, canvas, webgpu]
 slices:
@@ -80,6 +80,12 @@ slices:
     depends-on: [uv-generation, api-design-fixes]
     source: extension
     extension-round: 2
+  - slug: webgpu-ngon-faces
+    status: defined
+    complexity: l
+    depends-on: [uv-generation-cylinder, uv-generation-stairs, uv-generation-knot]
+    source: extension
+    extension-round: 3
 refs:
   index: 00-index.md
   shape: 02-shape.md
@@ -191,3 +197,36 @@ Two capability gaps identified: (1) `onTextureLoadError` was wired into the Canv
 silent. (2) UV generation exists only for Prism; all other shapes fall back to flat-color
 rendering when a textured material is applied. All UV gen slices are independent of each
 other and can be planned and implemented in parallel after `api-design-fixes` completes.
+
+---
+
+## Extension Round 3 — 2026-04-19
+Source: user request (wf-extend, following `uv-generation-cylinder` verify pass 2)
+
+### New Slices Added
+
+| Slice | Goal | Complexity | Depends On |
+|-------|------|------------|------------|
+| `webgpu-ngon-faces` | Rewrite `GpuUvCoordsBuffer` to offset+length indirection so cylinder caps, stairs zigzag, and knot faces render full UVs on WebGPU (no `vertices > 6` truncation) | l | uv-generation-cylinder, uv-generation-stairs, uv-generation-knot |
+
+### Motivation
+
+`GpuUvCoordsBuffer` uses a fixed 48-byte-per-face stride that holds exactly 6 UV
+pairs. Faces with more than 6 vertices silently clamp the tail to UV(0,0) on the
+WebGPU path. The defect is called out in-source at
+`isometric-webgpu/.../pipeline/GpuUvCoordsBuffer.kt:48-56` (`TODO(uv-variable-stride)`)
+and has been accepted as a known caveat across all five per-shape UV-generation
+slices (cylinder, pyramid, octahedron, stairs, knot).
+
+Surfaced visibly during `uv-generation-cylinder` verify pass 2 (Maestro re-run,
+2026-04-19): the sample's 12-vertex cylinder caps render as partial wedges on
+Full WebGPU while rendering correctly on Canvas and Canvas+GPU Sort. User
+explicitly chose to queue a dedicated follow-up slice rather than accept the
+caveat or lower the sample's vertex count.
+
+The slice targets **all three current N>6 victims** from the TODO (cylinder caps,
+stairs zigzag sides, knot per-face UVs) in one coordinated rewrite using
+**offset+length indirection** (not variable-stride — rejected by PO due to
+heterogeneous-face memory waste). Depends on `uv-generation-stairs` and
+`uv-generation-knot` landing first so the buffer is designed against the real
+UV-emission surface of every currently-scoped shape.

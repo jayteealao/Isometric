@@ -5,18 +5,18 @@ slug: texture-material-shaders
 status: complete
 stage-number: 4
 created-at: "2026-04-11T22:40:00Z"
-updated-at: "2026-04-17T21:27:19Z"
+updated-at: "2026-04-22T19:01:04Z"
 planning-mode: all
-slices-planned: 15
-slices-total: 15
-implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes, webgpu-uv-transforms, webgpu-texture-error-callback, uv-generation-shared-api, uv-generation-octahedron, uv-generation-pyramid, uv-generation-cylinder, uv-generation-stairs, uv-generation-knot]
+slices-planned: 16
+slices-total: 16
+implementation-order: [material-types, uv-generation, canvas-textures, webgpu-textures, per-face-materials, sample-demo, api-design-fixes, webgpu-uv-transforms, webgpu-texture-error-callback, uv-generation-shared-api, uv-generation-octahedron, uv-generation-pyramid, uv-generation-cylinder, uv-generation-stairs, uv-generation-knot, webgpu-ngon-faces]
 conflicts-found: 3
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   slice-index: 03-slice.md
 next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
+next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
 ---
 
 # Plan Index
@@ -181,36 +181,56 @@ next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
   Not fixed by this slice per user triage.
 - **Plan:** `04-plan-uv-generation-pyramid.md` (revision 1)
 
-### `uv-generation-cylinder` (new — 2026-04-17, BREAKING CHANGE)
-- **Files:** 9 (1 modify core Cylinder, 4 modify shader, 1 modify webgpu doc, 1 modify test, 2 apiDump)
-- **Steps:** 9
-- **Strategy:** Seam vertex duplication in `Cylinder.kt` via new `buildCylinderPaths()`
-  private function — generates N+1 base/top `Point` objects where index N is a geometric
-  copy of index 0 but distinct identity. Side quad k=N-1 references `basePoints[N-1..N]`,
-  giving UV u=(N-1)/N and u=1.0 at the seam (no smear). Path count unchanged (N+2). Side
-  UV: `u = k/N` left / `(k+1)/N` right; v=0 at top, v=1 at base (**convention differs from
-  Prism** — documented). Cap UV: planar disk projection `(0.5+0.5·cos(θ), 0.5+0.5·sin(θ))`.
-- **Key risk:** `GpuUvCoordsBuffer` fixed 12-float (6 UV pair) stride truncates cap UV for
-  N>6 in WebGPU mode. Canvas unaffected (3-point affine). Documented as known limitation;
-  defer variable-stride fix to a dedicated WebGPU slice.
-- **Cross-cutting:** v=0-at-top for Cylinder sides vs v=0-at-bottom for Prism is a real
-  inconsistency for users mixing shapes with the same texture — documented for user
-  feedback. Flagged under "Cross-Cutting Concerns" below.
-- **Plan:** `04-plan-uv-generation-cylinder.md`
+### `uv-generation-cylinder` (revised 2026-04-18T13:34Z — Auto-Review revision 1)
+- **Files:** 12 source + 1 new Maestro flow + 2 apiDump (up from 9)
+- **Steps:** 13 (up from 9)
+- **Strategy:** Seam vertex duplication in `Cylinder.kt` via new `buildCylinderPaths()` —
+  generates N+1 base/top `Point` objects where index N is a geometric copy of index 0 but
+  identity-distinct. Side quad k=N-1 references `basePoints[N-1..N]`, giving UV u=(N-1)/N
+  and u=1.0 at the seam (no smear). Path count unchanged (N+2). Side UV: u=k/N left /
+  (k+1)/N right; v=0 at top. Cap UV: planar disk projection `(0.5+0.5·cos(θ), 0.5+0.5·sin(θ))`
+  with **H-5 single-slot identity cache** keyed on `Cylinder ===` (pyramid pattern; 40-float
+  cap × 60fps × N shapes savings). Wires five integration points: `is Cylinder` in
+  `uvCoordProviderForShape`, real dispatch in `resolveForFace`, `is Cylinder -> CylinderFace.fromPathIndex(index)`
+  in `IsometricNode.kt` (on pre-transform `shape`, not `transformedShape` — I-03 invariant),
+  `is PerFace.Cylinder` collection in `GpuTextureManager.collectTextureSources`, and 4 TODO
+  marker removals. Ships new `cylinderPerFace { }` DSL (mandatory post pyramid BL-1). Fixes
+  prereq `CylinderFace.fromPathIndex` semantic bug (0→TOP but `Shape.extrude` puts bottom at 0).
+  Removes dead `is PerFace.Cylinder` arm from `warnIfNonPrismPerFaceHasTexturedSlots`
+  (leaving only Stairs).
+- **Key risks:** (1) `GpuUvCoordsBuffer` 12-float stride unchanged — N>6 cap truncation in
+  WebGPU (known limitation, updated `TODO(uv-variable-stride)` comment). (2)
+  `RenderCommand.faceVertexCount in 3..24` ceiling — `Cylinder(vertices > 24)` caps would
+  crash via `IsometricNode` path; plan recommends `require(vertices <= 24)` in `Cylinder.init`.
+  (3) v=0-at-top Cylinder sides vs v=0-at-bottom Prism — cross-cutting documentation.
+  (4) `CylinderFace.fromPathIndex` prereq bug — Step 2 fixes it (zero `.api` diff).
+  (5) Mixed-vertex-count (4 sides + N caps) is the second I-02 stress test after pyramid.
+- **Inherits 6 deferred HIGHs from pyramid review** (H-2, H-3, H-6, H-8, H-10, H-11) — not
+  fixed by this slice.
+- **Plan:** `04-plan-uv-generation-cylinder.md` (revision 1)
 
-### `uv-generation-stairs` (new — 2026-04-17)
-- **Files:** 8
-- **Steps:** 7
+### `uv-generation-stairs` (revised 2026-04-20T15:16Z — Auto-Review revision 1)
+- **Files:** 8 source + 1 new shader test + apiDump (no-diff expected)
+- **Steps:** 8 (up from 7; Step 2 "fill in resolve()" removed as obsolete,
+  Steps 3–5 expanded to cover `IsometricNode`, `resolveForFace`, `GpuTextureManager`
+  integration points that sibling cylinder/pyramid slices established).
 - **Strategy:** Riser (even path indices, 4 verts): u=x, v=z normalized over riser height.
   Tread (odd indices, 4 verts): u=x, v=y normalized over tread depth. Side (indices 2N, 2N+1,
   variable 2N+2 verts): planar bounding-box projection on (y,z) plane; right side u-mirrored.
-  Fill in `PerFace.Stairs.resolve(face: StairsFace)` — logical groups tread/riser/side.
-  Wire `is Stairs ->` in `uvCoordProviderForShape()`. Variable `faceVertexCount` per path
-  handled by prereq's field.
-- **Key risk:** `SceneDataPacker.packInto()` has `coerceAtMost(6)` — side faces with
-  stepCount ≥ 3 (8+ verts) are truncated in WebGPU, producing a visible "notch" artifact.
-  Canvas mode correct for all stepCounts. Same root cause as Cylinder cap limitation.
-- **Plan:** `04-plan-uv-generation-stairs.md`
+  Wire `is Stairs ->` in `uvCoordProviderForShape()`. Add `is Stairs ->
+  StairsFace.fromPathIndex(index, shape.stepCount)` to `IsometricNode.kt:301–307`.
+  Replace `TODO(uv-generation-stairs)` arm in `resolveForFace` (`IsometricMaterial.kt:430`)
+  with `faceType as? StairsFace` dispatch. Replace warn-stub `PerFace.Stairs` arm in
+  `GpuTextureManager.collectTextureSources` with real texture collection (mirror Cylinder
+  arm); delete now-orphaned `warnIfNonPrismPerFaceHasTexturedSlots` helper.
+  `PerFace.Stairs.resolve()` is already fully implemented by shared-api — no stub to fill.
+- **Key risks:** (1) `SceneDataPacker.packInto():117` `coerceAtMost(6)` — side faces with
+  stepCount ≥ 3 (8+ verts) truncated in WebGPU, visible "notch" artifact. Canvas correct
+  at all stepCounts. Same root cause as Cylinder cap limitation.
+  (2) Right-side zigzag is `Path(zigzagPoints.reversed()).translate(1,0,0)` — vertex
+  order is mirrored before translation, so right-side UV tests must assert in reversed-
+  point order. Plan adds left-vs-right vertex-order assertion.
+- **Plan:** `04-plan-uv-generation-stairs.md` (revision 1)
 
 ### `uv-generation-knot` (new — 2026-04-17, EXPERIMENTAL)
 - **Files:** 7
@@ -224,6 +244,30 @@ next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
 - **Key risk:** `sourcePrisms` duplicates constants from `createPaths()` — dimension unit
   test is the regression guard against drift.
 - **Plan:** `04-plan-uv-generation-knot.md`
+
+### `webgpu-ngon-faces` (new — 2026-04-22, OMNIBUS)
+- **Files:** 14 (4 new, 10 modified) across `:isometric-webgpu` (8), `:isometric-compose`
+  (1), `:app` (4 incl. 3 Maestro flows), `:isometric-benchmark` (1)
+- **Steps:** 11
+- **Strategy:** Atomic lift of the entire 6-vertex chain — `GpuUvCoordsBuffer` becomes a
+  dual-buffer (flat `array<vec2<f32>>` UV pool at binding 6 + new `array<vec2<u32>>` per-face
+  offset+count table at binding 7), with `SceneDataPacker.coerceAtMost(6)` and
+  `TransformedFace`'s 96-byte struct (6×vec2 screen coords) lifted in lockstep to 24 verts.
+  Bind-group goes 7→8 entries; device init requests `requiredLimits.maxStorageBuffersPerShaderStage = 8`
+  with fail-loud rejection on compat-mode adapters. Bottom-up sequencing: structs → packer →
+  shaders. **Omnibus additions per discovery #8:** ear-clipping triangulation in
+  `RenderCommandTriangulator.kt` (fixes stairs-verify I-2 non-convex fan defect, ~50 LOC,
+  convex-fast-path preserves O(n) for in-budget cases) + one-line `BenchmarkScreen.kt:165`
+  `color → material` repair (clears pre-existing I-1 unblocking `./gradlew check` aggregate).
+  `TexturedDemoActivity` gains permanent Stairs + Knot tabs alongside the existing four,
+  plus a 24-vert cylinder column.
+- **Key risks:** (1) `maxStorageBuffersPerShaderStage = 4` rejection on OpenGL ES 3.1
+  compat-mode (HIGH on baseline mobile; LOW on Vulkan path) — accepted fail-loud per
+  discovery #2; (2) `slot i ↔ originalIndex = i` invariant violation produces silently-wrong
+  UVs (HIGH if violated — AC5 unit tests pin this); (3) `androidx.webgpu` alpha04 descriptor
+  field-name churn (MEDIUM — verify against vendor snapshot); (4) bind-group cache
+  invalidation when going 7→8 bindings (MEDIUM — explicit pipeline layouts, never auto).
+- **Plan:** `04-plan-webgpu-ngon-faces.md`
 
 ### `webgpu-uv-transforms` (new — 2026-04-15)
 - **Files:** 7 (4 modified, 3 new)
@@ -335,12 +379,18 @@ next-invocation: "/wf-implement texture-material-shaders uv-generation-pyramid"
 12. `uv-generation-pyramid` — adds 5th path (BREAKING), snapshot regeneration
 13. `uv-generation-cylinder` — seam duplication in Cylinder shape (BREAKING to vertex count)
 14. `uv-generation-stairs` — variable-vertex side faces (WebGPU truncation for stepCount > 2)
-15. `uv-generation-knot` — EXPERIMENTAL, bag-of-prisms reuse, `textured()`-only
+15. `uv-generation-knot` — EXPERIMENTAL, bag-of-prisms reuse, `textured()`-only ✓ complete
+16. **`webgpu-ngon-faces`** — atomic 6→24 vertex lift across UV buffer + transform shader
+    + emit shader; omnibus cleanup of stairs-verify I-2 (RenderCommandTriangulator
+    ear-clipping) + `:isometric-benchmark` Shape API drift. Depends on slices 13/14/15
+    (cylinder/stairs/knot UV emission shapes). ← NEXT TO IMPLEMENT
 
 Slices 11–15 can be implemented in parallel after slice 10 merges, since they only share
 the additive extension points established by `uv-generation-shared-api` (each slice fills
 in its own `PerFace.<Shape>.resolve()` body, adds its `UvGenerator.forXxxFace()` method,
-and wires its `is <Shape> ->` branch in `uvCoordProviderForShape()`).
+and wires its `is <Shape> ->` branch in `uvCoordProviderForShape()`). Slice 16
+(webgpu-ngon-faces) MUST come after 13/14/15 because it measures the new buffer layout
+against the actual UV emission shapes those slices produce, not placeholders.
 
 ## Conflicts Found
 

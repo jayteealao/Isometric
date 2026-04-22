@@ -5,9 +5,9 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-20T21:13:50Z"
-selected-slice: "uv-generation-knot"
-current-stage-status: complete
+updated-at: "2026-04-22T21:18:56Z"
+selected-slice: "webgpu-ngon-faces"
+current-stage-status: partial
 current-stage: implement
 stage-number: 5
 review-verdict: ship-with-caveats
@@ -15,11 +15,12 @@ review-triage-status: triaged
 review-fix-status: all-deferred
 review-fix-applied: ""
 review-fix-verified: ""
-verify-pass: 0
-verify-result: ""
+verify-pass: 1
+verify-result: pass
 verify-fix-applied: ""
-next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders uv-generation-knot"
+implement-commit-a-sha: "04afdd9"
+next-command: wf-implement
+next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -207,6 +208,31 @@ workflow-files:
   - 90-resume.md
   - 05-implement-uv-generation-knot.md
   - isometric-shader/src/test/kotlin/io/github/jayteealao/isometric/shader/UvGeneratorKnotTest.kt
+  - 06-verify-uv-generation-knot.md
+  - .maestro/verify-knot.yaml
+  - .ai/workflows/texture-material-shaders/verify-evidence/screenshots/verify-knot-canvas.png
+  - .ai/workflows/texture-material-shaders/verify-evidence/screenshots/verify-knot-webgpu.png
+  - .ai/workflows/texture-material-shaders/verify-evidence/screenshots/verify-knot-canvas-gpusort.png
+  - .ai/workflows/texture-material-shaders/verify-evidence/screenshots/verify-knot-canvas-cycle-back.png
+  - 07-review-uv-generation-knot.md
+  - 07-review-uv-generation-knot-correctness.md
+  - 07-review-uv-generation-knot-security.md
+  - 07-review-uv-generation-knot-code-simplification.md
+  - 07-review-uv-generation-knot-testing.md
+  - 07-review-uv-generation-knot-maintainability.md
+  - 07-review-uv-generation-knot-reliability.md
+  - 07-review-uv-generation-knot-refactor-safety.md
+  - 07-review-uv-generation-knot-performance.md
+  - 07-review-uv-generation-knot-api-contracts.md
+  - 07-review-uv-generation-knot-architecture.md
+  - 04-plan-webgpu-ngon-faces.md
+  - 05-implement-webgpu-ngon-faces.md
+  - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/triangulation/RenderCommandTriangulator.kt
+  - isometric-webgpu/src/test/kotlin/io/github/jayteealao/isometric/webgpu/triangulation/RenderCommandTriangulatorTest.kt
+  - isometric-benchmark/src/main/kotlin/io/github/jayteealao/isometric/benchmark/BenchmarkScreen.kt
+  - app/src/main/kotlin/io/github/jayteealao/isometric/sample/TexturedDemoActivity.kt
+  - .maestro/verify-stairs.yaml
+  - .maestro/verify-knot.yaml
 progress:
   intake: complete
   shape: complete
@@ -224,9 +250,9 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: verify-pass-3-complete
-  webgpu-ngon-faces: defined
+  webgpu-ngon-faces: implement-commit-a-partial
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: review-ship-with-caveats
-  uv-generation-knot: implement-complete
+  uv-generation-knot: review-ship-with-caveats
   uv-generation-octahedron: review-ship-with-caveats
 ---

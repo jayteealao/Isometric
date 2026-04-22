@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-18T22:45:00Z"
-slices-verified: 13
-slices-total: 13
+updated-at: "2026-04-20T22:08:29Z"
+slices-verified: 15
+slices-total: 15
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
-next-command: wf-implement
-next-invocation: "/wf-implement texture-material-shaders uv-generation-cylinder"
+next-command: wf-review
+next-invocation: "/wf-review texture-material-shaders uv-generation-knot"
 ---
 
 # Verify Index
@@ -111,16 +111,33 @@ next-invocation: "/wf-implement texture-material-shaders uv-generation-cylinder"
 - **Pass 3 issues:** 0 new. I-03 and review BLOCKERs all resolved.
 - Record: [06-verify-uv-generation-pyramid.md](06-verify-uv-generation-pyramid.md) (pass-3 body plus archival pass-1 FAIL + pass-2 PASS summaries).
 
-### `uv-generation-cylinder` — PARTIAL (5/5 ACs met; VF-1 doc-test regression surfaced)
-- Checks: 3/4 passed. `:app:assembleDebug` ✓, `./gradlew apiCheck` ✓ (additive `cylinderPerFace` + scope), Maestro `verify-cylinder.yaml` 4 screenshots ✓. Unit tests **FAIL**: 499/501 pass (core 205/207 with 2 VF-1 failures; shader 154/154; compose 106/106; webgpu 34/34).
-- Acceptance: AC1 (seam wrap) MET, AC2 (caps) MET Canvas with documented WebGPU cap-truncation caveat, AC3 (per-face) MET, AC4 (unit tests) MET (18/18 UvGeneratorCylinderTest cases), AC5 (no Prism regression) MET strict.
-- Interactive: 4 Maestro runs on `emulator-5554` — Canvas, Full WebGPU, Canvas+GPU Sort, Canvas cycle-back. Brick texture wraps continuously on left cylinder; right cylinder shows red top + brick sides (blue bottom hidden by camera angle but math tested). WebGPU sides pixel-equivalent to Canvas; caps show documented N>6 star truncation. Zero app-tag logcat warnings.
-- Issues: **1 MEDIUM (VF-1)** — `DocScreenshotGenerator.shapeCylinder` at `isometric-core/.../DocScreenshotGenerator.kt:232` still uses `Cylinder(vertices = 30)`, tripping the new `require(vertices in 3..24)` guard in `Cylinder.init`. Implement stage's "Deviations from Plan" entry updated `IsometricCanvasSnapshotTest.cylinder()` from 30→20 but missed this second caller. Cascades to `DocScreenshotGenerator.generateAll`. One-line fix.
-- Evidence: `verify-evidence/screenshots/verify-cylinder-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}.png`
-- Record: [06-verify-uv-generation-cylinder.md](06-verify-uv-generation-cylinder.md)
+### `uv-generation-cylinder` — PASS (after API-01 review-BLOCKER fix, pass 3)
+- Checks: **4/4 passed in pass 3** (pass 1: 3/4; pass 2: 4/4; pass 3: 4/4 byte-identical to pass 2). `:isometric-core:test` ✓ (`compileKotlin` UP-TO-DATE — KDoc-only edit, no bytecode change), shader/compose/webgpu tests ✓ (all UP-TO-DATE), `apiCheck` ✓ (no `.api` diff), `:app:assembleDebug` ✓. Aggregate across 4 modules: **501/501 tests green, 7 skipped, 0 failures** — identical to pass 2.
+- Acceptance: AC1 (seam wrap) MET, AC2 (caps) MET Canvas with documented WebGPU cap-truncation caveat, AC3 (per-face) MET, AC4 (unit tests) MET (18/18 UvGeneratorCylinderTest), AC5 (no Prism regression) **MET unconditional**.
+- Interactive: **8/8 (pass 1 + pass 2)** — not re-run on pass 3. Justification: API-01 fix is KDoc-only at `CylinderFace.fromPathIndex`; zero `.class` diff (compileKotlin UP-TO-DATE); cannot alter rendered pixels. Pass-2 evidence preserved and authoritative for AC1–AC3.
+- Review-fix verified: **API-01 (BLOCKER)** — `**Breaking change:**` KDoc paragraph added at `CylinderFace.kt:27-32` (commit `f98a982`), documenting the inverted prior mapping. No code change; `apiCheck` green; no bytecode diff; no test regression. 18 deferred findings (5 HIGH + 13 MED) remain deferred per user triage.
+- Issues: **0 in pass 3.** Historical: VF-1 (MEDIUM) resolved pass 2, API-01 (BLOCKER) resolved pass 3.
+- Evidence: `verify-evidence/screenshots/verify-cylinder-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}{,-pass2}.png` (pass 1 + pass 2).
+- Record: [06-verify-uv-generation-cylinder.md](06-verify-uv-generation-cylinder.md) (pass-3 body plus archival pass-1/pass-2 summaries).
+
+### `uv-generation-stairs` — PASS (all 6 ACs met on pass 1 with full interactive evidence; 1 NEW issue surfaced by visual diff)
+- Checks: **6/6 passed** — targeted `UvGeneratorStairsTest` (15/15 tests, 0 failures, 0.044s), shader debug + release variants, core test, compose debug + release, webgpu test, apiCheck on all four slice modules (zero `.api` diff — `UvGenerator` stays `internal`). Aggregate across slice-relevant modules: **825 tests / 77 suites / 0 failures / 0 errors / 14 pre-existing skips**.
+- Acceptance: 6/6 met. AC1 (tread canonical quad), AC2 (riser canonical quad), AC3 (per-face addressing via `PerFace.Stairs` + `resolveForFace`), AC4 (WebGPU parity for TREAD + RISER — AC is scoped to those two face types and they render pixel-clean; side-face non-convex artifact is tracked as I-2 below), AC5 (15 tests, +2 over plan's stated 13), AC6 (825-test regression clean + apiCheck green).
+- Interactive: **4 Maestro runs on `Medium_Phone_API_36.0` (emulator-5554)** via new `.maestro/verify-stairs.yaml` — Canvas, Full WebGPU, Canvas + GPU Sort, Canvas cycle-back. Temporary Stairs tab added to `TexturedDemoActivity.kt` (stepCount=2), captured, then fixture reverted (0-line diff vs. committed). Pixel diff confirmed: Canvas↔Canvas-cycle-back 0 diff, Canvas↔Canvas+GPU-Sort differ only in toggle-pill UI (y=480..575), Canvas↔WebGPU differ in scene region. First Maestro attempt failed on `tapOn: "Stairs"` (text-match on `ScrollableTabRow` Tab doesn't route onClick — same bug `verify-cylinder.yaml` documents); fixed with coordinate-point tap at `"76%,3%"`. Evidence: `verify-evidence/screenshots/verify-stairs-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}.png` + `verify-evidence/diffs/side-face-triptych.png`.
+- Issues: **1 NEW (I-2, MEDIUM)** + **1 PRE-EXISTING (I-1, out-of-scope)**.
+  - **I-2 — WebGPU side-face non-convex triangulation artifact (NEW).** Full WebGPU renders the Stairs zigzag side face with a diagonal slash across the step-notch; Canvas renders correctly. Root cause identified at `isometric-webgpu/.../triangulation/RenderCommandTriangulator.kt:75` — triangle fan `for (i in 1 until pointCount - 1)` emits `(v0, v[i], v[i+1])`, which only works on convex polygons. Stairs side is the first non-convex face polygon in the codebase (prism/pyramid/cylinder/octahedron are all convex), so this latent defect predates the slice but became visible only now. Distinct from Risk 1 (SceneDataPacker 6-vertex cap): at stepCount=2 the zigzag has exactly 6 vertices so nothing is truncated — the fan is simply the wrong algorithm. Fix recommendation: ear-clipping triangulation in `RenderCommandTriangulator` OR shape-aware rectangle decomposition at `ShapeNode.renderTo` layer. Owner: fold into `webgpu-ngon-faces` or new `webgpu-nonconvex-faces` slice. Not blocking for this slice's ACs.
+  - **I-1 — PRE-EXISTING compile failure in :isometric-benchmark.** `BenchmarkScreen.kt:165` calls `Shape(color = …)`; parameter was renamed to `material` by `api-design-fixes` slice. Unrelated to Stairs (commit `8f06ed6` touches 0 files under `isometric-benchmark/`).
+- Record: [06-verify-uv-generation-stairs.md](06-verify-uv-generation-stairs.md)
+
+### `uv-generation-knot` — PASS (all 5 ACs met on pass 1; zero new issues)
+- Checks: **5/5 passed** — targeted `UvGeneratorKnotTest` (11/11 tests, 0 failures, 0.047s), shader debug + release variants, core / compose debug+release / webgpu test, apiCheck on all four slice modules. Aggregate across slice-relevant modules: **849 tests / 79 suites / 0 failures / 0 errors / 14 pre-existing skips**. apiCheck delta: single planned addition `+Knot.getSourcePrisms(): List` in `isometric-core.api`; `UvGenerator` stays `internal` as planned.
+- Acceptance: 5/5 met. AC1 (texture renders on Knot, Canvas), AC2 (no UV discontinuity), AC3 (WebGPU parity — pixel-equivalent to Canvas across all four backends), AC4 (11 tests cover all 4 distinct mesh regions: sub-prism 0/1/2 + custom quads 18/19), AC5 (zero regression across 849 sibling tests, Paparazzi golden images regenerated cleanly).
+- Interactive: **4 Maestro runs on `Medium_Phone_API_36.0` (emulator-5554)** via new `.maestro/verify-knot.yaml` — Canvas, Full WebGPU, Canvas + GPU Sort, Canvas cycle-back. Brick (left, `Knot(Point(-1.5,0,0))`) + grass (right, `Knot(Point(1.5,0,0))`) at `scale = 3.0`. Temporary Knot tab added to `TexturedDemoActivity.kt`, captured, then fixture reverted (0-line diff vs. committed). All four backends render pixel-equivalently for both Knots — no I-2-style triangulation slash (Knot's 20 face polygons are all convex). Maestro flow scrolls the `ScrollableTabRow` via `swipe: 97%,4% → 5%,4%` (1500ms) then taps the Knot tab at `point: "76%,3%"` (text-match unreliable; same precedent as cylinder/stairs). Evidence: `verify-evidence/screenshots/verify-knot-{canvas,webgpu,canvas-gpusort,canvas-cycle-back}.png`.
+- Issues: **0 new.** Pre-existing: depth-sort artifact in every screenshot (Knot's documented depth-sort bug, slice Risk 1) — UV-correct on visible arms, sort-occluded elsewhere. Stairs-surfaced I-2 (non-convex triangulation) does NOT affect Knot because all Knot face polygons are convex. Stairs-surfaced I-1 (`:isometric-benchmark` pre-existing compile failure) unchanged and out of slice scope.
+- Record: [06-verify-uv-generation-knot.md](06-verify-uv-generation-knot.md)
 
 ## Recommended Next Stage
-- **Option A (recommended):** `/wf-implement texture-material-shaders uv-generation-cylinder` — apply the VF-1 one-line fix (`30 → 20` at `DocScreenshotGenerator.kt:232`), then re-run verify (pass 2). Trivial in-scope fix; all 5 ACs structurally met.
-- **Option B:** `/wf-review texture-material-shaders uv-generation-cylinder` — only if user accepts shipping with the Doc-test regression outstanding. Not recommended — CI would fail on `:isometric-core:test`.
-- **Option C:** `/wf-handoff texture-material-shaders uv-generation-cylinder` — **not recommended**. Fix VF-1 first.
-- **Option D:** `/wf-plan texture-material-shaders uv-generation-cylinder` — **not recommended**. Plan is sound; VF-1 is a missed-caller bug, not a plan flaw.
+- **Option A (recommended):** `/wf-review texture-material-shaders uv-generation-knot` — latest slice is fully green; code review is the natural next gate. Consider `/compact` first to drop tab-coordinate-discovery and APK-rebuild debugging context from this verify.
+- **Option B:** `/wf-handoff texture-material-shaders uv-generation-knot` — skip review only if already externally pair-reviewed against sibling cylinder / pyramid / stairs slices. Formal review is cheap; recommend Option A instead.
+- **Option C:** `/wf-plan texture-material-shaders uv-generation-knot` — **not applicable**. Plan rev 0 is sound and fully implemented; verify surfaced no plan-level gaps.
+- **Option D (orthogonal cleanup):** a one-line hotfix slice to repair `:isometric-benchmark/BenchmarkScreen.kt:165` (Shape `color`→`material`) so that `./gradlew check` / `build` aggregates unblock. Not required for this slice's review gate; same rationale as in stairs verify.
