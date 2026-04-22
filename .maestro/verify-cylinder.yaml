@@ -11,20 +11,25 @@ name: "uv-generation-cylinder verification"
 - assertVisible: "Textured Materials"
 - assertVisible: "Full WebGPU"
 
-# Cylinder tab is the 4th (scrollable) tab — Prism, Octahedron, Pyramid, Cylinder.
-# Tap by explicit point because Maestro's text-match on the ScrollableTabRow Tab
-# does not route to the Tab onClick on this device. Coordinate derived from
-# `uiautomator dump` tab bounds on 1080x2400 (Cylinder sits at roughly x=93%).
+# Cylinder tab is the 4th (scrollable) tab — Prism, Octahedron, Pyramid,
+# Cylinder, Stairs, Knot (post-webgpu-ngon-faces 6 tabs total). Cylinder is
+# still visible without a swipe in the default tab-row layout because it sits
+# at the right edge of the initial viewport. Tap by explicit point because
+# Maestro text-match on ScrollableTabRow Tab does not route to onClick.
 - tapOn:
     point: "93%,4%"
 - waitForAnimationToEnd
 
+# Three cylinders in this scene (post-webgpu-ngon-faces): textured 12-vert,
+# perFace 12-vert, textured 24-vert (rightmost — validates AC1 of
+# webgpu-ngon-faces).
 # Canvas mode — AC1 (side wraps without seam smear at u=1/u=0 boundary),
 # AC2 (top/bottom caps), AC3 (per-face red/blue colors + brick sides).
 - takeScreenshot: screenshots/verify-cylinder-canvas
 
-# Full WebGPU mode — side-face parity expected; caps degrade at N > 6 per
-# the documented GpuUvCoordsBuffer N>6 cap truncation.
+# Full WebGPU mode — POST-webgpu-ngon-faces this MUST render the 24-vert cap
+# as a full brick disk (the offset+length UV table now serves all N up to 24).
+# Pre-slice this rendered as a partial wedge.
 - tapOn: "Full WebGPU"
 - waitForAnimationToEnd
 - takeScreenshot: screenshots/verify-cylinder-webgpu

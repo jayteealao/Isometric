@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.shader.IsometricMaterial
 import io.github.jayteealao.isometric.Point
@@ -43,10 +44,12 @@ import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
 import io.github.jayteealao.isometric.shader.texturedBitmap
 import io.github.jayteealao.isometric.shader.TextureTransform
 import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
+import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.shader.Shape
 
 class TexturedDemoActivity : ComponentActivity() {
@@ -81,7 +84,15 @@ private enum class ShapeTab(val label: String, val description: String) {
     ),
     Cylinder(
         label = "Cylinder",
-        description = "Left: brick wraps the barrel with seam-duplicated UVs \u2014 Right: PerFace with red top, blue bottom, brick sides",
+        description = "Left: brick (12-vert) \u2014 Mid: PerFace red/blue/brick (12-vert) \u2014 Right: brick (24-vert, demonstrates webgpu-ngon-faces cap fix)",
+    ),
+    Stairs(
+        label = "Stairs",
+        description = "Left: tread/riser/side per-face textures (stepCount=5) \u2014 Right: red/green/blue per-face palette",
+    ),
+    Knot(
+        label = "Knot",
+        description = "Left: brick on all 20 faces (18 sub-prism + 2 custom quads) \u2014 Right: grass texture; depth-sort artifacts are pre-existing",
     ),
 }
 
@@ -148,6 +159,26 @@ private fun TexturedDemoScreen() {
             default = IsoColor(150, 150, 150)
         }
     }
+
+    val stairsTexturedMat = remember {
+        IsometricMaterial.PerFace.Stairs(
+            tread = texturedBitmap(TextureAssets.grassTop),
+            riser = texturedBitmap(TextureAssets.brick),
+            side = texturedBitmap(TextureAssets.dirtSide),
+            default = texturedBitmap(TextureAssets.dirtSide),
+        )
+    }
+    val stairsPerFaceMat = remember {
+        IsometricMaterial.PerFace.Stairs(
+            tread = IsoColor(220, 50, 50),
+            riser = IsoColor(50, 180, 50),
+            side = IsoColor(50, 80, 220),
+            default = IsoColor(150, 150, 150),
+        )
+    }
+
+    val knotBrickMaterial = remember { texturedBitmap(TextureAssets.brick) }
+    val knotGrassMaterial = remember { texturedBitmap(TextureAssets.grassTop) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Shape tabs — matches the ScrollableTabRow pattern used by ComposeActivity
@@ -222,6 +253,16 @@ private fun TexturedDemoScreen() {
                     renderMode = renderMode,
                     texturedMaterial = cylinderTextured,
                     perFaceMaterial = cylinderPerFaceMat,
+                )
+                ShapeTab.Stairs -> TexturedStairsScene(
+                    renderMode = renderMode,
+                    texturedMaterial = stairsTexturedMat,
+                    perFaceMaterial = stairsPerFaceMat,
+                )
+                ShapeTab.Knot -> TexturedKnotScene(
+                    renderMode = renderMode,
+                    leftMaterial = knotBrickMaterial,
+                    rightMaterial = knotGrassMaterial,
                 )
             }
         }
@@ -347,28 +388,109 @@ private fun TexturedCylinderScene(
                 gestures = GestureConfig.Disabled,
             ),
         ) {
-            // Left: textured barrel with seam-duplicated UV wrap (Canvas-correct at any N;
-            // caps degrade in WebGPU for N > 6 — documented in GpuUvCoordsBuffer).
+            // Left: textured barrel at 12 verts. Pre-webgpu-ngon-faces this rendered with a
+            // partial-wedge cap in Full WebGPU because GpuUvCoordsBuffer's 48-byte stride
+            // truncated UV indices 6..N-1 to (0,0).
             Shape(
                 geometry = Cylinder(
-                    position = Point(-1.5, 0.0, 0.0),
+                    position = Point(-2.5, 0.0, 0.0),
                     radius = 0.5,
                     height = 1.5,
                     vertices = 12,
                 ),
                 material = texturedMaterial,
-                scale = 2.5,
+                scale = 2.0,
             )
-            // Right: per-face colors exercising resolveForFace dispatch via CylinderFace.
+            // Mid: per-face colors at 12 verts exercising resolveForFace dispatch via CylinderFace.
             Shape(
                 geometry = Cylinder(
-                    position = Point(1.5, 0.0, 0.0),
+                    position = Point(0.0, 0.0, 0.0),
                     radius = 0.5,
                     height = 1.5,
                     vertices = 12,
                 ),
                 material = perFaceMaterial,
-                scale = 2.5,
+                scale = 2.0,
+            )
+            // Right: 24-vertex cylinder. Validates AC1 of webgpu-ngon-faces — the cap should
+            // render as a complete brick disk in Full WebGPU, pixel-equivalent to Canvas.
+            Shape(
+                geometry = Cylinder(
+                    position = Point(2.5, 0.0, 0.0),
+                    radius = 0.5,
+                    height = 1.5,
+                    vertices = 24,
+                ),
+                material = texturedMaterial,
+                scale = 2.0,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TexturedStairsScene(
+    renderMode: RenderMode,
+    texturedMaterial: IsometricMaterial,
+    perFaceMaterial: IsometricMaterial,
+) {
+    ProvideTextureRendering {
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(
+                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+                renderMode = renderMode,
+                useNativeCanvas = false,
+                gestures = GestureConfig.Disabled,
+            ),
+        ) {
+            // Left: stepCount=5 staircase with grass treads, brick risers, dirt sides.
+            // The 12-vertex zigzag side face validates AC2 of webgpu-ngon-faces — should
+            // render with full UV pattern (no truncation, no I-2 triangulation slash).
+            Shape(
+                geometry = Stairs(Point(-1.5, 0.0, 0.0), stepCount = 5),
+                material = texturedMaterial,
+                scale = 2.0,
+            )
+            // Right: per-face palette exercises StairsFace dispatch.
+            Shape(
+                geometry = Stairs(Point(1.5, 0.0, 0.0), stepCount = 5),
+                material = perFaceMaterial,
+                scale = 2.0,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalIsometricApi::class)
+@Composable
+private fun TexturedKnotScene(
+    renderMode: RenderMode,
+    leftMaterial: IsometricMaterial,
+    rightMaterial: IsometricMaterial,
+) {
+    ProvideTextureRendering {
+        IsometricScene(
+            modifier = Modifier.fillMaxSize(),
+            config = SceneConfig(
+                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
+                renderMode = renderMode,
+                useNativeCanvas = false,
+                gestures = GestureConfig.Disabled,
+            ),
+        ) {
+            // Left: brick texture across all 20 Knot faces — exercises the full
+            // bag-of-primitives delegation (forPrismFace x18 + quadBboxUvs x2).
+            Shape(
+                geometry = Knot(Point(-1.5, 0.0, 0.0)),
+                material = leftMaterial,
+                scale = 3.0,
+            )
+            // Right: grass texture for visual contrast on the same geometry.
+            Shape(
+                geometry = Knot(Point(1.5, 0.0, 0.0)),
+                material = rightMaterial,
+                scale = 3.0,
             )
         }
     }

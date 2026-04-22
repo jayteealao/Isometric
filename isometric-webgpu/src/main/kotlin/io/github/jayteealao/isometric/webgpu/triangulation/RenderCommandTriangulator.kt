@@ -57,8 +57,6 @@ internal class RenderCommandTriangulator {
             val pointCount = command.pointCount
             if (pointCount < 3) continue
 
-            val x0 = toNdcX(command.pointX(0), scene.width)
-            val y0 = toNdcY(command.pointY(0), scene.height)
             val r = (command.color.r / 255.0).toFloat()
             val g = (command.color.g / 255.0).toFloat()
             val b = (command.color.b / 255.0).toFloat()
@@ -72,27 +70,175 @@ internal class RenderCommandTriangulator {
                 offsetV = region?.uvOffset?.get(1) ?: 0f,
             )
 
-            for (i in 1 until pointCount - 1) {
-                writeVertex(buffer, x0, y0, r, g, b, a, atlasUv = atlasUv)
-                writeVertex(
-                    buffer,
-                    toNdcX(command.pointX(i), scene.width),
-                    toNdcY(command.pointY(i), scene.height),
-                    r, g, b, a,
-                    atlasUv = atlasUv,
-                )
-                writeVertex(
-                    buffer,
-                    toNdcX(command.pointX(i + 1), scene.width),
-                    toNdcY(command.pointY(i + 1), scene.height),
-                    r, g, b, a,
-                    atlasUv = atlasUv,
-                )
+            // Convex fast-path: triangle fan from v0. Cheap O(n) winding check first.
+            // Non-convex (e.g., Stairs zigzag side faces) requires ear-clipping to
+            // avoid emitting triangles outside the polygon footprint — the fan would
+            // cover the concave step-notch with bad geometry.
+            if (isConvex(command, pointCount)) {
+                val x0 = toNdcX(command.pointX(0), scene.width)
+                val y0 = toNdcY(command.pointY(0), scene.height)
+                for (i in 1 until pointCount - 1) {
+                    writeVertex(buffer, x0, y0, r, g, b, a, atlasUv = atlasUv)
+                    writeVertex(
+                        buffer,
+                        toNdcX(command.pointX(i), scene.width),
+                        toNdcY(command.pointY(i), scene.height),
+                        r, g, b, a,
+                        atlasUv = atlasUv,
+                    )
+                    writeVertex(
+                        buffer,
+                        toNdcX(command.pointX(i + 1), scene.width),
+                        toNdcY(command.pointY(i + 1), scene.height),
+                        r, g, b, a,
+                        atlasUv = atlasUv,
+                    )
+                }
+            } else {
+                val triangles = earClipTriangulate(command, pointCount)
+                for (tri in triangles) {
+                    val (a0, b0, c0) = tri
+                    writeVertex(
+                        buffer,
+                        toNdcX(command.pointX(a0), scene.width),
+                        toNdcY(command.pointY(a0), scene.height),
+                        r, g, b, a,
+                        atlasUv = atlasUv,
+                    )
+                    writeVertex(
+                        buffer,
+                        toNdcX(command.pointX(b0), scene.width),
+                        toNdcY(command.pointY(b0), scene.height),
+                        r, g, b, a,
+                        atlasUv = atlasUv,
+                    )
+                    writeVertex(
+                        buffer,
+                        toNdcX(command.pointX(c0), scene.width),
+                        toNdcY(command.pointY(c0), scene.height),
+                        r, g, b, a,
+                        atlasUv = atlasUv,
+                    )
+                }
             }
         }
 
         buffer.flip()
         return PackedVertices(buffer = buffer, vertexCount = vertexCount)
+    }
+
+    /**
+     * O(n) convexity test using the sign of edge cross products in 2D screen space.
+     * A polygon is convex iff all consecutive edge cross products have the same sign.
+     * Collinear vertices (zero cross product) are treated as compatible with either sign.
+     */
+    private fun isConvex(command: RenderCommand, n: Int): Boolean {
+        if (n < 4) return true  // triangle is always convex
+        var sign = 0
+        for (i in 0 until n) {
+            val ax = command.pointX(i)
+            val ay = command.pointY(i)
+            val bx = command.pointX((i + 1) % n)
+            val by = command.pointY((i + 1) % n)
+            val cx = command.pointX((i + 2) % n)
+            val cy = command.pointY((i + 2) % n)
+            val cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
+            if (cross > 0.0) {
+                if (sign < 0) return false
+                sign = 1
+            } else if (cross < 0.0) {
+                if (sign > 0) return false
+                sign = -1
+            }
+        }
+        return true
+    }
+
+    /**
+     * Ear-clipping triangulation for simple (non-self-intersecting) polygons.
+     * O(n²) algorithm: repeatedly find a vertex whose triangle (prev, v, next) is
+     * a valid ear (correct winding direction and contains no other polygon vertex),
+     * emit it, remove v, repeat until 3 vertices remain.
+     *
+     * Returns triangles as IntArray triples of original-polygon vertex indices.
+     */
+    private fun earClipTriangulate(command: RenderCommand, n: Int): List<IntArray> {
+        val triangles = ArrayList<IntArray>(n - 2)
+        // Working list of remaining polygon vertex indices (into command.pointX/Y).
+        val remaining = ArrayList<Int>(n)
+        for (i in 0 until n) remaining.add(i)
+
+        // Determine the polygon's overall winding direction via signed area.
+        // Positive shoelace → counter-clockwise; negative → clockwise.
+        var doubleArea = 0.0
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            doubleArea += command.pointX(i) * command.pointY(j) -
+                command.pointX(j) * command.pointY(i)
+        }
+        val ccw = doubleArea > 0.0
+
+        var guard = remaining.size * 2
+        while (remaining.size > 3 && guard-- > 0) {
+            var earFound = false
+            for (k in remaining.indices) {
+                val prev = remaining[(k + remaining.size - 1) % remaining.size]
+                val cur = remaining[k]
+                val next = remaining[(k + 1) % remaining.size]
+                if (isEar(command, prev, cur, next, remaining, ccw)) {
+                    triangles.add(intArrayOf(prev, cur, next))
+                    remaining.removeAt(k)
+                    earFound = true
+                    break
+                }
+            }
+            if (!earFound) break  // degenerate polygon — bail with what we have
+        }
+        if (remaining.size == 3) {
+            triangles.add(intArrayOf(remaining[0], remaining[1], remaining[2]))
+        }
+        return triangles
+    }
+
+    private fun isEar(
+        command: RenderCommand,
+        prev: Int,
+        cur: Int,
+        next: Int,
+        remaining: List<Int>,
+        ccw: Boolean,
+    ): Boolean {
+        val ax = command.pointX(prev); val ay = command.pointY(prev)
+        val bx = command.pointX(cur);  val by = command.pointY(cur)
+        val cx = command.pointX(next); val cy = command.pointY(next)
+        // Triangle must be wound the same direction as the polygon (convex vertex).
+        val cross = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+        if (ccw && cross <= 0.0) return false
+        if (!ccw && cross >= 0.0) return false
+        // No other remaining polygon vertex may lie strictly inside the triangle.
+        for (idx in remaining) {
+            if (idx == prev || idx == cur || idx == next) continue
+            if (pointInTriangle(
+                    command.pointX(idx), command.pointY(idx),
+                    ax, ay, bx, by, cx, cy,
+                )
+            ) return false
+        }
+        return true
+    }
+
+    private fun pointInTriangle(
+        px: Double, py: Double,
+        ax: Double, ay: Double,
+        bx: Double, by: Double,
+        cx: Double, cy: Double,
+    ): Boolean {
+        val d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by)
+        val d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy)
+        val d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay)
+        val hasNeg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0
+        val hasPos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0
+        return !(hasNeg && hasPos)
     }
 
     private fun ensureBuffer(requiredBytes: Int): ByteBuffer {

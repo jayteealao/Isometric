@@ -1,0 +1,51 @@
+appId: io.github.jayteealao.isometric.sample
+name: "uv-generation-stairs verification"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate to Textured Materials demo from the chooser.
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Stairs is the 5th tab in the ScrollableTabRow — Prism, Octahedron, Pyramid,
+# Cylinder, Stairs, Knot. Scroll the tab row so Stairs is on-screen, then tap
+# by explicit point (Maestro text-match on ScrollableTabRow Tab does not route
+# to Tab onClick — same workaround the cylinder flow documents).
+# After webgpu-ngon-faces, Stairs is a PERMANENT tab in TexturedDemoActivity
+# at stepCount=5 (12-vertex zigzag side face — AC2 of webgpu-ngon-faces).
+# Tab bounds at roughly [769,41]-[881,84] on 1080x2400 after swipe → ~76%, 3%.
+- swipe:
+    start: "90%,4%"
+    end: "10%,4%"
+    duration: 400
+- waitForAnimationToEnd
+- tapOn:
+    point: "76%,3%"
+- waitForAnimationToEnd
+
+# Canvas mode — AC1 (tread canonical UV, grass top-down), AC2 (riser canonical
+# UV, brick horizontal bands on vertical face), AC3 (per-face dispatch: red
+# tread / green riser / blue side on the right staircase).
+- takeScreenshot: screenshots/verify-stairs-canvas
+
+# Full WebGPU mode — AC4 parity at stepCount=5 (post-webgpu-ngon-faces). The
+# 12-vertex zigzag side face MUST render with full UV pattern and correct
+# polygon footprint (no I-2 triangulation slash, no SceneDataPacker truncation).
+- tapOn: "Full WebGPU"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-stairs-webgpu
+
+# Hybrid Canvas + GPU-sort path (same texturing pipeline as Canvas, different
+# sort source).
+- tapOn: "Canvas + GPU Sort"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-stairs-canvas-gpusort
+
+# Cycle back to Canvas to confirm no state corruption after toggling backends.
+- tapOn: "Canvas"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-stairs-canvas-cycle-back
