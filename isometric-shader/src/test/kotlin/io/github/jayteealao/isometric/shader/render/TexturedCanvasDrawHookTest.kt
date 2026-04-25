@@ -1,7 +1,9 @@
 package io.github.jayteealao.isometric.shader.render
 
 import io.github.jayteealao.isometric.shader.TextureSource
-import org.junit.Ignore
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -9,21 +11,16 @@ import kotlin.test.assertSame
 /**
  * Unit tests for [TexturedCanvasDrawHook].
  *
- * ## Android API note (TST-06)
- * These tests require an Android runtime because [TexturedCanvasDrawHook] creates a
- * [android.graphics.Paint] object in its constructor, which calls the native [Paint.nInit()]
- * method not available in the JVM test runner. Running them here causes [UnsatisfiedLinkError].
- *
- * TODO: Migrate these tests to `src/androidTest/` as instrumented tests, or add Robolectric
- *       to the `isometric-shader` module (testImplementation("org.robolectric:robolectric:..."))
- *       and annotate the class with @RunWith(RobolectricTestRunner::class).
+ * Runs under Robolectric so that [android.graphics.Paint], [android.graphics.Bitmap], and
+ * related Android graphics types are available without a physical device or emulator.
  *
  * [TexturedCanvasDrawHook.resolveToCache] is the callback-wiring path under test. When the
  * loader returns `null`, the hook:
  *  1. Invokes `onTextureLoadError` with the failed [TextureSource].
  *  2. Returns the checkerboard [CachedTexture] as a per-frame fallback (not cached).
  */
-@Ignore("Requires Android runtime — run as instrumented test in androidTest/")
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class TexturedCanvasDrawHookTest {
 
     // TST-06: onTextureLoadError is invoked when TextureLoader.load() returns null ----------

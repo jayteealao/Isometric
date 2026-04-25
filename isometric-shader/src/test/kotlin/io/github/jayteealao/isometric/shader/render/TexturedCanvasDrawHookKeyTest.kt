@@ -2,30 +2,21 @@ package io.github.jayteealao.isometric.shader.render
 
 import android.graphics.Bitmap
 import android.graphics.Shader
-import org.junit.Ignore
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 /**
- * JVM unit tests for [TextureShaderKey] data-class equality and hashCode behaviour.
+ * Unit tests for [TextureShaderKey] data-class equality and hashCode behaviour.
  *
- * ## Android API note (TST-KEY-01)
- * [TextureShaderKey] holds a [Bitmap] field (non-null) and a [Shader.TileMode] field
- * (Android enum). Neither type is available in the JVM test runner — [Bitmap] requires
- * native Android runtime and [Shader.TileMode] is part of the `android.graphics` stubs.
- * Mockito is not a declared test dependency in `isometric-shader/build.gradle.kts`, and
- * Robolectric is not yet configured for this module.
- *
- * TODO (Step 12 / G5): add Robolectric to `isometric-shader` testImplementation and
- * remove the @Ignore annotation from each test. Reference:
- * `isometric-webgpu/src/androidTest/.../diagnostics/WgslDiagnosticsInstrumentedTest.kt`
- * and the G5 coverage gap tracker in the cleanup plan.
- *
- * The tests are written in full so they serve as a compilable spec and are immediately
- * runnable once Robolectric (or an equivalent Android-stub shim) is wired in.
+ * Runs under Robolectric so that [Bitmap] and [Shader.TileMode] are available without
+ * a physical device. Added in Step 12 (G5) of the webgpu-pipeline-cleanup slice.
  */
-@Ignore("Requires Android runtime — Bitmap/Shader.TileMode unavailable on JVM. Lift in Step 12 (G5/Robolectric).")
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
 class TexturedCanvasDrawHookKeyTest {
 
     // --- helpers ---------------------------------------------------------------

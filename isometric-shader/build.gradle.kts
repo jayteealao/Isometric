@@ -19,6 +19,12 @@ android {
     defaultConfig {
         consumerProguardFiles("consumer-rules.pro")
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 mavenPublishing {
@@ -46,4 +52,5 @@ dependencies {
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.mockito.core)
+    testImplementation(libs.robolectric)
 }

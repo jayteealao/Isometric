@@ -35,6 +35,76 @@ internal fun resolveSourceToBitmap(source: TextureSource): android.graphics.Bitm
 }
 
 /**
+ * Recursively collect [TextureSource] references from a material, expanding
+ * [IsometricMaterial.PerFace] into its constituent sub-materials.
+ *
+ * All five [IsometricMaterial.PerFace] variants are fully wired: `Prism`,
+ * `Octahedron`, `Pyramid`, `Cylinder`, and `Stairs` each contribute their
+ * per-slot texture sources to the atlas. Missing slots (null) are silently
+ * skipped; [IsometricMaterial.PerFace.default] is also collected when it is
+ * a [IsometricMaterial.Textured].
+ *
+ * Extracted as a package-internal function so the source-collection logic can be
+ * unit-tested on the JVM without a [GpuContext] or Android Looper (D-13, H-11, H-06).
+ */
+internal fun collectTextureSourcesFromMaterial(
+    material: MaterialData?,
+    out: MutableSet<TextureSource>,
+) {
+    // CR-3/R-05: outer when uses explicit `else -> {}` to document the intentional
+    // no-op for IsoColor and null (neither carries a TextureSource).
+    // Inner when on sealed PerFace is expression-form so Kotlin enforces exhaustiveness:
+    // a 6th PerFace subclass that forgets to add an arm will fail at compile time
+    // rather than silently skipping its texture sources from the atlas.
+    when (val m = material) {
+        is IsometricMaterial.Textured -> out.add(m.source)
+        is IsometricMaterial.PerFace -> {
+            // Expression-form when: every PerFace subclass must have an arm.
+            // Add an `else` with error() so an unhandled future subclass is caught
+            // immediately at runtime during development rather than silently
+            // omitting its sources from the atlas (which would cause missing-texture
+            // artifacts that could look like a UV or atlas-packing bug).
+            @Suppress("UNUSED_EXPRESSION")
+            when (m) {
+                is IsometricMaterial.PerFace.Prism -> {
+                    for (sub in m.faceMap.values) {
+                        if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                    }
+                }
+                is IsometricMaterial.PerFace.Octahedron -> {
+                    for (sub in m.byIndex.values) {
+                        if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                    }
+                }
+                is IsometricMaterial.PerFace.Pyramid -> {
+                    (m.base as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    for (sub in m.laterals.values) {
+                        if (sub is IsometricMaterial.Textured) out.add(sub.source)
+                    }
+                }
+                is IsometricMaterial.PerFace.Cylinder -> {
+                    (m.top as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    (m.bottom as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                }
+                is IsometricMaterial.PerFace.Stairs -> {
+                    (m.tread as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    (m.riser as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                    (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
+                }
+                // NOTE: If a 6th PerFace subclass is ever added, this else arm fires
+                // immediately with a clear error. Remove the else arm at that point and
+                // add the new explicit arm above so the compiler re-enforces exhaustiveness.
+                else -> error("Unknown PerFace subclass: ${m::class.simpleName}. Add an explicit arm to collectTextureSourcesFromMaterial.")
+            }
+            val default = m.default
+            if (default is IsometricMaterial.Textured) out.add(default.source)
+        }
+        else -> {} // IsoColor and null carry no TextureSource; intentional no-op.
+    }
+}
+
+/**
  * Encapsulates all texture-related concerns for the GPU pipeline:
  * - Atlas management ([TextureAtlasManager])
  * - Texture bind group lifecycle ([GpuTextureBinder])
@@ -270,71 +340,11 @@ internal class GpuTextureManager(
     }
 
     /**
-     * Recursively collect [TextureSource] references from a material, expanding
-     * [IsometricMaterial.PerFace] into its constituent sub-materials.
-     *
-     * All five [IsometricMaterial.PerFace] variants are fully wired: `Prism`,
-     * `Octahedron`, `Pyramid`, `Cylinder`, and `Stairs` each contribute their
-     * per-slot texture sources to the atlas. Missing slots (null) are silently
-     * skipped; [IsometricMaterial.PerFace.default] is also collected when it is
-     * a [IsometricMaterial.Textured].
+     * Delegates to the package-level [collectTextureSourcesFromMaterial] function. Kept as a
+     * private member shim so [uploadAtlasAndBindGroup] call sites are unchanged.
      */
-    private fun collectTextureSources(
-        material: MaterialData?,
-        out: MutableSet<TextureSource>,
-    ) {
-        // CR-3/R-05: outer when uses explicit `else -> {}` to document the intentional
-        // no-op for IsoColor and null (neither carries a TextureSource).
-        // Inner when on sealed PerFace is expression-form so Kotlin enforces exhaustiveness:
-        // a 6th PerFace subclass that forgets to add an arm will fail at compile time
-        // rather than silently skipping its texture sources from the atlas.
-        when (val m = material) {
-            is IsometricMaterial.Textured -> out.add(m.source)
-            is IsometricMaterial.PerFace -> {
-                // Expression-form when: every PerFace subclass must have an arm.
-                // Add an `else` with error() so an unhandled future subclass is caught
-                // immediately at runtime during development rather than silently
-                // omitting its sources from the atlas (which would cause missing-texture
-                // artifacts that could look like a UV or atlas-packing bug).
-                @Suppress("UNUSED_EXPRESSION")
-                when (m) {
-                    is IsometricMaterial.PerFace.Prism -> {
-                        for (sub in m.faceMap.values) {
-                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
-                        }
-                    }
-                    is IsometricMaterial.PerFace.Octahedron -> {
-                        for (sub in m.byIndex.values) {
-                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
-                        }
-                    }
-                    is IsometricMaterial.PerFace.Pyramid -> {
-                        (m.base as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                        for (sub in m.laterals.values) {
-                            if (sub is IsometricMaterial.Textured) out.add(sub.source)
-                        }
-                    }
-                    is IsometricMaterial.PerFace.Cylinder -> {
-                        (m.top as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                        (m.bottom as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                        (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                    }
-                    is IsometricMaterial.PerFace.Stairs -> {
-                        (m.tread as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                        (m.riser as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                        (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
-                    }
-                    // NOTE: If a 6th PerFace subclass is ever added, this else arm fires
-                    // immediately with a clear error. Remove the else arm at that point and
-                    // add the new explicit arm above so the compiler re-enforces exhaustiveness.
-                    else -> error("Unknown PerFace subclass: ${m::class.simpleName}. Add an explicit arm to collectTextureSources.")
-                }
-                val default = m.default
-                if (default is IsometricMaterial.Textured) out.add(default.source)
-            }
-            else -> {} // IsoColor and null carry no TextureSource; intentional no-op.
-        }
-    }
+    private fun collectTextureSources(material: MaterialData?, out: MutableSet<TextureSource>) =
+        collectTextureSourcesFromMaterial(material, out)
 
     /**
      * Pack and upload the compact per-face texture index buffer for the emit shader.
