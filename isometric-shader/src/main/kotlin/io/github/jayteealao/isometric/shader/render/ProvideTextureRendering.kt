@@ -19,11 +19,25 @@ import io.github.jayteealao.isometric.shader.TextureSource
  *
  *   **Sizing guidance:** count distinct [TextureSource] keys your scene uses. 20 covers
  *   most isometric tile sets (e.g., a 4×4 grid of 3 distinct textures uses 3 slots).
- *   Increase for large tile sets with many unique textures.
+ *   Increase for large tile sets with many unique textures. Maximum allowed value is
+ *   [MAX_CACHE_SIZE] (1024).
+ *
+ * @param maxBytes Optional total decoded-byte cap for the cache. When set, the cache
+ *   evicts LRU entries until both [maxSize] and [maxBytes] constraints are satisfied.
+ *   Defaults to `null` (no byte cap). Use this to bound memory usage on low-RAM devices.
  */
-data class TextureCacheConfig(val maxSize: Int = 20) {
+data class TextureCacheConfig(val maxSize: Int = 20, val maxBytes: Long? = null) {
+
+    companion object {
+        /** Maximum allowed [maxSize] value. Requests above this are rejected at construction. */
+        const val MAX_CACHE_SIZE = 1024
+    }
+
     init {
         require(maxSize > 0) { "maxSize must be positive, got $maxSize" }
+        require(maxSize <= MAX_CACHE_SIZE) {
+            "maxSize must be <= MAX_CACHE_SIZE ($MAX_CACHE_SIZE), got $maxSize"
+        }
     }
 }
 
@@ -108,8 +122,11 @@ fun ProvideTextureRendering(
     content: @Composable () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val hook = remember(context, cacheConfig, loader, onTextureLoadError) {
-        val cache = TextureCache(cacheConfig.maxSize)
+    // CT-CR-10: key on applicationContext (stable across rotations) instead of the
+    // Activity context, which churns on every configuration change and would cause
+    // the cache to be reconstructed — and all textures reloaded — on rotation.
+    val hook = remember(context.applicationContext, cacheConfig, loader, onTextureLoadError) {
+        val cache = TextureCache(cacheConfig.maxSize, cacheConfig.maxBytes)
         val effectiveLoader = loader ?: defaultTextureLoader(context.applicationContext)
         TexturedCanvasDrawHook(cache, effectiveLoader, onTextureLoadError)
     }

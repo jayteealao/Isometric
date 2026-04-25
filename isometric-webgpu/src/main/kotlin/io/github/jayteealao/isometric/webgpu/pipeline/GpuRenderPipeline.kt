@@ -108,93 +108,109 @@ internal class GpuRenderPipeline(
     /**
      * Create the render pipeline asynchronously if not already built.
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
+     *
+     * On any partial failure during pipeline assembly, all partially-allocated handles are
+     * closed and nulled so the next [ensurePipeline] call starts from a clean state.
      */
     suspend fun ensurePipeline() {
         ctx.assertGpuThread()
         if (pipeline != null && compiledFormatVersion == VERTEX_FORMAT_VERSION) return
 
-        vertexModule = device.createShaderModule(
-            GPUShaderModuleDescriptor(
-                label = "IsometricVertexShader",
-                shaderSourceWGSL = GPUShaderSourceWGSL(IsometricVertexShader.WGSL),
-            )
-        )
-        WgslDiagnostics.logCompilation(vertexModule!!, TAG)
-        fragmentModule = device.createShaderModule(
-            GPUShaderModuleDescriptor(
-                label = "IsometricFragmentShader",
-                shaderSourceWGSL = GPUShaderSourceWGSL(IsometricFragmentShader.WGSL),
-            )
-        )
-        WgslDiagnostics.logCompilation(fragmentModule!!, TAG)
-
-        val vertexState = GPUVertexState(
-            module = vertexModule!!,
-            entryPoint = IsometricVertexShader.ENTRY_POINT,
-            buffers = arrayOf(
-                GPUVertexBufferLayout(
-                    arrayStride = RenderCommandTriangulator.BYTES_PER_VERTEX.toLong(),
-                    stepMode = VertexStepMode.Vertex,
-                    attributes = arrayOf(
-                        GPUVertexAttribute(
-                            format = VertexFormat.Float32x2,
-                            offset = ATTR_POSITION_OFFSET,
-                            shaderLocation = 0,
-                        ),
-                        GPUVertexAttribute(
-                            format = VertexFormat.Float32x4,
-                            offset = ATTR_COLOR_OFFSET,
-                            shaderLocation = 1,
-                        ),
-                        GPUVertexAttribute(
-                            format = VertexFormat.Float32x2,
-                            offset = ATTR_UV_OFFSET,
-                            shaderLocation = 2,
-                        ),
-                        GPUVertexAttribute(
-                            // atlasRegion: (scaleU, scaleV, offsetU, offsetV) flat per face.
-                            // Fragment shader applies fract(uv) * atlasRegion.xy + atlasRegion.zw
-                            format = VertexFormat.Float32x4,
-                            offset = ATTR_ATLAS_REGION_OFFSET,
-                            shaderLocation = 3,
-                        ),
-                        GPUVertexAttribute(
-                            format = VertexFormat.Uint32,
-                            offset = ATTR_TEXTURE_INDEX_OFFSET,
-                            shaderLocation = 4,
-                        ),
-                    ),
+        var ok = false
+        try {
+            vertexModule = device.createShaderModule(
+                GPUShaderModuleDescriptor(
+                    label = "IsometricVertexShader",
+                    shaderSourceWGSL = GPUShaderSourceWGSL(IsometricVertexShader.WGSL),
                 )
-            ),
-        )
+            )
+            WgslDiagnostics.logCompilation(vertexModule!!, TAG)
+            fragmentModule = device.createShaderModule(
+                GPUShaderModuleDescriptor(
+                    label = "IsometricFragmentShader",
+                    shaderSourceWGSL = GPUShaderSourceWGSL(IsometricFragmentShader.WGSL),
+                )
+            )
+            WgslDiagnostics.logCompilation(fragmentModule!!, TAG)
 
-        val fragmentState = GPUFragmentState(
-            module = fragmentModule!!,
-            entryPoint = IsometricFragmentShader.ENTRY_POINT,
-            targets = arrayOf(
-                GPUColorTargetState(format = surfaceFormat)
-            ),
-        )
+            val vertexState = GPUVertexState(
+                module = vertexModule!!,
+                entryPoint = IsometricVertexShader.ENTRY_POINT,
+                buffers = arrayOf(
+                    GPUVertexBufferLayout(
+                        arrayStride = RenderCommandTriangulator.BYTES_PER_VERTEX.toLong(),
+                        stepMode = VertexStepMode.Vertex,
+                        attributes = arrayOf(
+                            GPUVertexAttribute(
+                                format = VertexFormat.Float32x2,
+                                offset = ATTR_POSITION_OFFSET,
+                                shaderLocation = 0,
+                            ),
+                            GPUVertexAttribute(
+                                format = VertexFormat.Float32x4,
+                                offset = ATTR_COLOR_OFFSET,
+                                shaderLocation = 1,
+                            ),
+                            GPUVertexAttribute(
+                                format = VertexFormat.Float32x2,
+                                offset = ATTR_UV_OFFSET,
+                                shaderLocation = 2,
+                            ),
+                            GPUVertexAttribute(
+                                // atlasRegion: (scaleU, scaleV, offsetU, offsetV) flat per face.
+                                // Fragment shader applies fract(uv) * atlasRegion.xy + atlasRegion.zw
+                                format = VertexFormat.Float32x4,
+                                offset = ATTR_ATLAS_REGION_OFFSET,
+                                shaderLocation = 3,
+                            ),
+                            GPUVertexAttribute(
+                                format = VertexFormat.Uint32,
+                                offset = ATTR_TEXTURE_INDEX_OFFSET,
+                                shaderLocation = 4,
+                            ),
+                        ),
+                    )
+                ),
+            )
 
-        val descriptor = GPURenderPipelineDescriptor(
-            label = "IsometricRenderPipeline",
-            vertex = vertexState,
-            primitive = GPUPrimitiveState(
-                topology = PrimitiveTopology.TriangleList,
-                cullMode = CullMode.None,
-            ),
-            fragment = fragmentState,
-        )
+            val fragmentState = GPUFragmentState(
+                module = fragmentModule!!,
+                entryPoint = IsometricFragmentShader.ENTRY_POINT,
+                targets = arrayOf(
+                    GPUColorTargetState(format = surfaceFormat)
+                ),
+            )
 
-        // Use async API — the sync createRenderPipeline triggers a Scudo double-free
-        // on Adreno 750 (Dawn alpha04) when the fragment shader declares texture bindings.
-        val rp = device.createRenderPipelineAndAwait(descriptor)
-        rp.setLabel("IsometricRenderPipeline")
-        pipeline = rp
+            val descriptor = GPURenderPipelineDescriptor(
+                label = "IsometricRenderPipeline",
+                vertex = vertexState,
+                primitive = GPUPrimitiveState(
+                    topology = PrimitiveTopology.TriangleList,
+                    cullMode = CullMode.None,
+                ),
+                fragment = fragmentState,
+            )
 
-        // Extract the auto-derived bind group layout for @group(0).
-        textureBindGroupLayout = rp.getBindGroupLayout(0)
-        compiledFormatVersion = VERTEX_FORMAT_VERSION
+            // Use async API — the sync createRenderPipeline triggers a Scudo double-free
+            // on Adreno 750 (Dawn alpha04) when the fragment shader declares texture bindings.
+            val rp = device.createRenderPipelineAndAwait(descriptor)
+            rp.setLabel("IsometricRenderPipeline")
+            pipeline = rp
+
+            // Extract the auto-derived bind group layout for @group(0).
+            textureBindGroupLayout = rp.getBindGroupLayout(0)
+            compiledFormatVersion = VERTEX_FORMAT_VERSION
+            ok = true
+        } finally {
+            if (!ok) {
+                // Close any partially-allocated handles so the next ensurePipeline() call
+                // starts from a clean slate and does not hold dangling GPU object references.
+                vertexModule?.close(); vertexModule = null
+                fragmentModule?.close(); fragmentModule = null
+                textureBindGroupLayout?.close(); textureBindGroupLayout = null
+                pipeline?.close(); pipeline = null
+            }
+        }
     }
 
     override fun close() {

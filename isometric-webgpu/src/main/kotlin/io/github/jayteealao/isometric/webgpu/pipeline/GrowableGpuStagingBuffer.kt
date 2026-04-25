@@ -50,7 +50,10 @@ internal class GrowableGpuStagingBuffer(
         val requiredBytes = entryCount.toLong() * entryBytes.toLong()
         val cpu = cpuBuffer
         if (cpu == null || cpu.capacity().toLong() < requiredBytes) {
-            cpuBuffer = ByteBuffer.allocateDirect((requiredBytes * 2L).toInt()).order(ByteOrder.nativeOrder())
+            // N-05: clamp to Int.MAX_VALUE before converting to Int to prevent silent
+            // overflow at ~2.1 GB (requiredBytes * 2L can overflow Int range).
+            val allocBytes = (requiredBytes * 2L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            cpuBuffer = ByteBuffer.allocateDirect(allocBytes).order(ByteOrder.nativeOrder())
         }
     }
 

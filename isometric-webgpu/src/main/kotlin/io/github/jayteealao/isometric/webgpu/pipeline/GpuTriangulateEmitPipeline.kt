@@ -460,6 +460,26 @@ internal class GpuTriangulateEmitPipeline(
         emitPass.close()   // release JNI wrapper immediately (GPU_OBJECT_LIFETIME.md)
     }
 
+    // ── Scene lifecycle ───────────────────────────────────────────────────────
+
+    /**
+     * Reset change-detection caches so that the next [ensureBuffers] call sees a clean
+     * state. Call this whenever the scene is cleared (e.g. from [GpuFullPipeline.clearScene])
+     * so that stale buffer references do not prevent bind-group rebuilds after the next
+     * non-empty upload.
+     */
+    internal fun reset() {
+        lastPaddedCount       = 0
+        lastViewportWidth     = 0
+        lastViewportHeight    = 0
+        lastTransformedBuffer = null
+        lastSortedKeysBuffer  = null
+        lastTexIndexBuffer    = null
+        lastUvRegionBuffer    = null
+        lastUvPoolBuffer      = null
+        lastUvTableBuffer     = null
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun close() {

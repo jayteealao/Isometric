@@ -59,6 +59,14 @@ private fun buildCylinderPaths(
     height: Double,
     vertices: Int,
 ): List<Path> {
+    // D-09: validate vertices before allocation so that an out-of-range value produces
+    // an IllegalArgumentException at construction rather than an ArrayIndexOutOfBoundsException
+    // or silent wrong-geometry inside the Array constructor. The init block's require() runs
+    // AFTER the super-constructor call (which invokes buildCylinderPaths), so this guard
+    // is the earliest possible validation point for vertices.
+    require(vertices in 3..24) {
+        "Cylinder vertices must be in 3..24 for textured rendering; got $vertices"
+    }
     val basePoints = Array(vertices + 1) { i ->
         val angle = (i % vertices) * 2.0 * PI / vertices
         Point(

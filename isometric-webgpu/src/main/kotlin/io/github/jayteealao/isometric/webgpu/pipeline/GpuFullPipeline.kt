@@ -293,7 +293,9 @@ internal class GpuFullPipeline(
         indirectArgsStagingBuf.rewind()
         ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
 
+        emit.reset()
         textureManager.resetToFallback()
+        Log.d(TAG, "clearScene: scene cleared, emit caches reset")
     }
 
     // ── Per-frame dispatch ────────────────────────────────────────────────────

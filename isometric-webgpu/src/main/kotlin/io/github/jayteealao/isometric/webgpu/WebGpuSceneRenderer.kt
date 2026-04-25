@@ -442,109 +442,114 @@ internal class WebGpuSceneRenderer : AutoCloseable {
             when (surfaceTexture.status) {
                 SurfaceGetCurrentTextureStatus.SuccessOptimal,
                 SurfaceGetCurrentTextureStatus.SuccessSuboptimal -> {
-                    val textureView = surfaceTexture.texture.createView()
-                    frameCallback?.onAcquireEnd(acquireNanos)
+                    // R-17: close surfaceTexture.texture in a finally block so it is
+                    // released regardless of any exception thrown during rendering
+                    // (e.g. from present() on a device-lost surface).
+                    var textureView = surfaceTexture.texture.createView()
+                    try {
+                        frameCallback?.onAcquireEnd(acquireNanos)
 
-                    val gp = fullPipeline
-                    val shouldDraw = !DEBUG_SKIP_COMPUTE && gp != null && gp.hasScene
-                    if (DEBUG_SKIP_COMPUTE) {
-                        Log.d(TAG, "DEBUG_SKIP_COMPUTE=true — bypassing compute dispatch")
-                    }
-
-                    // A1: Submit compute (M3→M5) and render in SEPARATE command buffers.
-                    //
-                    // On Adreno, using a compute-written buffer as a vertex/indirect buffer
-                    // within the same VkCommandBuffer causes VK_ERROR_DEVICE_LOST (GPU TDR).
-                    // This is a confirmed Adreno driver bug where Dawn's implicit barriers
-                    // for Storage→Vertex and Storage→Indirect usage transitions are not
-                    // honoured when compute and render passes share one command stream.
-                    //
-                    // A2 (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS): also submit each compute stage
-                    // in its own command buffer. This additionally works around the Adreno
-                    // bug where compute→compute barriers within a single VkCommandBuffer are
-                    // broken (each sort stage needs to see the previous stage's writes).
-                    if (shouldDraw) {
-                        if (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS) {
-                            gp!!.dispatchIndividualSubmits()
-                        } else {
-                            val computeEncoder = ctx.device.createCommandEncoder()
-                            gp!!.dispatch(computeEncoder, profiler)
-                            val computeCmdBuf = computeEncoder.finish()
-                            ctx.queue.submit(arrayOf(computeCmdBuf))
-                            computeCmdBuf.close()
-                            computeEncoder.close()
+                        val gp = fullPipeline
+                        val shouldDraw = !DEBUG_SKIP_COMPUTE && gp != null && gp.hasScene
+                        if (DEBUG_SKIP_COMPUTE) {
+                            Log.d(TAG, "DEBUG_SKIP_COMPUTE=true — bypassing compute dispatch")
                         }
-                    }
-                    val t2 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
-                    val renderEncoder = ctx.device.createCommandEncoder()
-                    val pass = renderEncoder.beginRenderPass(
-                        GPURenderPassDescriptor(
-                            colorAttachments = arrayOf(
-                                GPURenderPassColorAttachment(
-                                    // White clear so the WebGPU surface matches the Compose
-                                    // Surface background. Transparent (0,0,0,0) composites as
-                                    // black because the SurfaceView is not alpha-composited.
-                                    clearValue = GPUColor(1.0, 1.0, 1.0, 1.0),
-                                    view = textureView,
-                                    loadOp = LoadOp.Clear,
-                                    storeOp = StoreOp.Store,
-                                )
-                            ),
-                            timestampWrites = profiler?.timestampWritesFor(4),
+                        // A1: Submit compute (M3→M5) and render in SEPARATE command buffers.
+                        //
+                        // On Adreno, using a compute-written buffer as a vertex/indirect buffer
+                        // within the same VkCommandBuffer causes VK_ERROR_DEVICE_LOST (GPU TDR).
+                        // This is a confirmed Adreno driver bug where Dawn's implicit barriers
+                        // for Storage→Vertex and Storage→Indirect usage transitions are not
+                        // honoured when compute and render passes share one command stream.
+                        //
+                        // A2 (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS): also submit each compute stage
+                        // in its own command buffer. This additionally works around the Adreno
+                        // bug where compute→compute barriers within a single VkCommandBuffer are
+                        // broken (each sort stage needs to see the previous stage's writes).
+                        if (shouldDraw) {
+                            if (DEBUG_INDIVIDUAL_COMPUTE_SUBMITS) {
+                                gp!!.dispatchIndividualSubmits()
+                            } else {
+                                val computeEncoder = ctx.device.createCommandEncoder()
+                                gp!!.dispatch(computeEncoder, profiler)
+                                val computeCmdBuf = computeEncoder.finish()
+                                ctx.queue.submit(arrayOf(computeCmdBuf))
+                                computeCmdBuf.close()
+                                computeEncoder.close()
+                            }
+                        }
+                        val t2 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
+
+                        val renderEncoder = ctx.device.createCommandEncoder()
+                        val pass = renderEncoder.beginRenderPass(
+                            GPURenderPassDescriptor(
+                                colorAttachments = arrayOf(
+                                    GPURenderPassColorAttachment(
+                                        // White clear so the WebGPU surface matches the Compose
+                                        // Surface background. Transparent (0,0,0,0) composites as
+                                        // black because the SurfaceView is not alpha-composited.
+                                        clearValue = GPUColor(1.0, 1.0, 1.0, 1.0),
+                                        view = textureView,
+                                        loadOp = LoadOp.Clear,
+                                        storeOp = StoreOp.Store,
+                                    )
+                                ),
+                                timestampWrites = profiler?.timestampWritesFor(4),
+                            )
                         )
-                    )
 
-                    pass.setPipeline(checkNotNull(pipeline.pipeline) {
-                        "Render pipeline not ready — ensurePipeline() not called"
-                    })
-                    if (shouldDraw) {
-                        // Bind texture + sampler at @group(0) for the fragment shader.
-                        pass.setBindGroup(0, gp!!.textureBindGroup)
-                        // Vertex buffer written by M5a; vertex count written by M5b.
-                        // drawIndirect reads the vertex count from indirectArgsBuffer without
-                        // any CPU readback — the count stays entirely on the GPU.
-                        pass.setVertexBuffer(0, gp.vertexBuffer)
-                        pass.drawIndirect(gp.indirectArgsBuffer, 0L)
-                    }
-                    pass.end()
-                    pass.close()
+                        pass.setPipeline(checkNotNull(pipeline.pipeline) {
+                            "Render pipeline not ready — ensurePipeline() not called"
+                        })
+                        if (shouldDraw) {
+                            // Bind texture + sampler at @group(0) for the fragment shader.
+                            pass.setBindGroup(0, gp!!.textureBindGroup)
+                            // Vertex buffer written by M5a; vertex count written by M5b.
+                            // drawIndirect reads the vertex count from indirectArgsBuffer without
+                            // any CPU readback — the count stays entirely on the GPU.
+                            pass.setVertexBuffer(0, gp.vertexBuffer)
+                            pass.drawIndirect(gp.indirectArgsBuffer, 0L)
+                        }
+                        pass.end()
+                        pass.close()
 
-                    val renderCmdBuf = renderEncoder.finish()
-                    ctx.queue.submit(arrayOf(renderCmdBuf))
-                    renderCmdBuf.close()
-                    renderEncoder.close()
-                    val t3 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
+                        val renderCmdBuf = renderEncoder.finish()
+                        ctx.queue.submit(arrayOf(renderCmdBuf))
+                        renderCmdBuf.close()
+                        renderEncoder.close()
+                        val t3 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
-                    // Resolve timestamp queries → readback buffer (after compute+render)
-                    if (profiler != null) {
-                        val resolveEncoder = ctx.device.createCommandEncoder()
-                        profiler.encodeResolveAndCopy(resolveEncoder)
-                        val resolveCmdBuf = resolveEncoder.finish()
-                        ctx.queue.submit(arrayOf(resolveCmdBuf))
-                        resolveCmdBuf.close()
-                        resolveEncoder.close()
-                    }
-                    val t4 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
+                        // Resolve timestamp queries → readback buffer (after compute+render)
+                        if (profiler != null) {
+                            val resolveEncoder = ctx.device.createCommandEncoder()
+                            profiler.encodeResolveAndCopy(resolveEncoder)
+                            val resolveCmdBuf = resolveEncoder.finish()
+                            ctx.queue.submit(arrayOf(resolveCmdBuf))
+                            resolveCmdBuf.close()
+                            resolveEncoder.close()
+                        }
+                        val t4 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
-                    // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
-                    // the Vulkan surface is invalidated before the render loop is cancelled;
-                    // present() then fires the device-lost callback synchronously and throws
-                    // IllegalStateException. Let it propagate — renderLoop() catches and breaks.
-                    surface.present()
-                    val t5 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
+                        // G3: surface.present() maps to vkQueuePresentKHR. On Activity teardown
+                        // the Vulkan surface is invalidated before the render loop is cancelled;
+                        // present() then fires the device-lost callback synchronously and throws
+                        // IllegalStateException. Let it propagate — renderLoop() catches and breaks.
+                        surface.present()
+                        val t5 = if (DEBUG_DRAW_TIMING) System.nanoTime() else 0L
 
-                    if (DEBUG_DRAW_TIMING) {
-                        Log.d(TAG, "drawFrame: acquire=${acquireNanos}ns compute=${t2-postAcquire}ns " +
-                            "render=${t3-t2}ns resolve=${t4-t3}ns present=${t5-t4}ns " +
-                            "total=${t5-acquireStart}ns")
-                    }
+                        if (DEBUG_DRAW_TIMING) {
+                            Log.d(TAG, "drawFrame: acquire=${acquireNanos}ns compute=${t2-postAcquire}ns " +
+                                "render=${t3-t2}ns resolve=${t4-t3}ns present=${t5-t4}ns " +
+                                "total=${t5-acquireStart}ns")
+                        }
 
-                    textureView.close()
-                    surfaceTexture.texture.close()
-
-                    if (surfaceTexture.status == SurfaceGetCurrentTextureStatus.SuccessSuboptimal) {
-                        reconfigureSurface()
+                        if (surfaceTexture.status == SurfaceGetCurrentTextureStatus.SuccessSuboptimal) {
+                            reconfigureSurface()
+                        }
+                    } finally {
+                        textureView.close()
+                        surfaceTexture.texture.close()
                     }
                 }
                 SurfaceGetCurrentTextureStatus.Outdated -> reconfigureSurface()

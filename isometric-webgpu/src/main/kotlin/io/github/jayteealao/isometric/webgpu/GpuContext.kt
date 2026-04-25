@@ -275,19 +275,23 @@ class GpuContext private constructor(
          */
         private fun assertComputeLimits(device: GPUDevice) {
             val limits = device.getLimits()
-            require(limits.maxComputeInvocationsPerWorkgroup >= MIN_COMPUTE_INVOCATIONS) {
-                "Device does not meet the WebGPU minimum maxComputeInvocationsPerWorkgroup " +
+            if (limits.maxComputeInvocationsPerWorkgroup < MIN_COMPUTE_INVOCATIONS) {
+                val msg = "Device does not meet the WebGPU minimum maxComputeInvocationsPerWorkgroup " +
                     "(required >= $MIN_COMPUTE_INVOCATIONS, device reports ${limits.maxComputeInvocationsPerWorkgroup})"
+                Log.e(TAG, msg)
+                require(false) { msg }
             }
             // webgpu-ngon-faces: M5 emit pipeline uses 7 storage buffers per stage; needs 8.
             // Compat-mode OpenGL ES 3.1 adapters cap at 4 and will cause first-dispatch
             // validation failures. Fail loud at init with an actionable message instead.
-            check(limits.maxStorageBuffersPerShaderStage >= MIN_STORAGE_BUFFERS_PER_SHADER_STAGE) {
-                "WebGPU adapter does not support $MIN_STORAGE_BUFFERS_PER_SHADER_STAGE " +
+            if (limits.maxStorageBuffersPerShaderStage < MIN_STORAGE_BUFFERS_PER_SHADER_STAGE) {
+                val msg = "WebGPU adapter does not support $MIN_STORAGE_BUFFERS_PER_SHADER_STAGE " +
                     "storage buffers per shader stage (device reports " +
                     "${limits.maxStorageBuffersPerShaderStage}); required by webgpu-ngon-faces. " +
                     "This typically means an OpenGL ES 3.1 compat-mode adapter was selected. " +
                     "Tier affected: baseline mobile without Vulkan support."
+                Log.e(TAG, msg)
+                check(false) { msg }
             }
         }
 

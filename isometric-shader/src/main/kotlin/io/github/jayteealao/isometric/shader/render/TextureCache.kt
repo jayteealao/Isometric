@@ -27,29 +27,65 @@ internal data class CachedTexture(val bitmap: Bitmap)
  * bitmaps to avoid creating new cache entries on every recomposition.
  *
  * @param maxSize Maximum number of textures to keep in memory.
+ * @param maxBytes Optional maximum total decoded byte size. When non-null, the cache
+ *   evicts LRU entries until both the count and byte constraints are satisfied.
+ *   Defaults to `null` (no byte cap).
  */
-internal class TextureCache(val maxSize: Int = 20) {
+internal class TextureCache(val maxSize: Int = 20, val maxBytes: Long? = null) {
 
     init {
         require(maxSize > 0) { "maxSize must be > 0, was $maxSize" }
     }
 
-    private val cache = object : LinkedHashMap<TextureSource, CachedTexture>(
+    private val cache = LinkedHashMap<TextureSource, CachedTexture>(
         maxSize + 1, 0.75f, /* accessOrder= */ true
-    ) {
-        override fun removeEldestEntry(eldest: Map.Entry<TextureSource, CachedTexture>): Boolean =
-            size > maxSize
-    }
+    )
 
-    fun get(source: TextureSource): CachedTexture? = cache[source]
+    /** Tracks the total decoded byte size of all cached bitmaps. */
+    private var currentBytes: Long = 0L
+
+    /**
+     * Look up [source] in the cache. Returns the cached entry if present and the bitmap
+     * has not been recycled. If the bitmap is recycled, the stale entry is evicted and
+     * `null` is returned so the caller reloads the texture.
+     */
+    fun get(source: TextureSource): CachedTexture? {
+        val entry = cache[source] ?: return null
+        if (entry.bitmap.isRecycled) {
+            // CT-SEC-4: stale recycled bitmap — evict and signal a cache miss so the
+            // caller reloads from the source.
+            cache.remove(source)
+            currentBytes -= entry.bitmap.byteCount.toLong().coerceAtLeast(0L)
+            return null
+        }
+        return entry
+    }
 
     fun put(source: TextureSource, bitmap: Bitmap): CachedTexture {
         val entry = CachedTexture(bitmap)
         cache[source] = entry
+        currentBytes += bitmap.byteCount.toLong()
+        evictIfNeeded()
         return entry
     }
 
-    fun clear() = cache.clear()
+    fun clear() {
+        cache.clear()
+        currentBytes = 0L
+    }
 
     val size: Int get() = cache.size
+
+    /** Evict eldest entries until both count and byte constraints are satisfied. */
+    private fun evictIfNeeded() {
+        val iterator = cache.entries.iterator()
+        while (iterator.hasNext()) {
+            val countExceeded = cache.size > maxSize
+            val bytesExceeded = maxBytes != null && currentBytes > maxBytes
+            if (!countExceeded && !bytesExceeded) break
+            val eldest = iterator.next()
+            currentBytes -= eldest.value.bitmap.byteCount.toLong().coerceAtLeast(0L)
+            iterator.remove()
+        }
+    }
 }

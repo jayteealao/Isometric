@@ -63,9 +63,16 @@ internal class GpuTextureManager(
 
     companion object {
         private const val TAG = "GpuTextureManager"
-    }
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+        /**
+         * ALLOC-1: Shared [Handler] for dispatching [onTextureLoadError] callbacks to the
+         * main thread. Held as a lazy singleton in the companion so all [GpuTextureManager]
+         * instances share one [Handler] rather than creating a new one per instance.
+         * [Handler] creation acquires a lock on the [Looper] message queue, so reducing
+         * construction frequency is measurably beneficial on low-end devices.
+         */
+        private val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
+    }
 
     // ── Core texture components ───────────────────────────────────────────────
 
@@ -212,9 +219,13 @@ internal class GpuTextureManager(
             val bitmap = resolveSourceToBitmap(source)
             if (bitmap == null) {
                 Log.w(TAG, "TextureSource ${source::class.simpleName} not yet supported in WebGPU — skipping")
-                mainHandler.post {
-                    try { onTextureLoadError?.invoke(source) }
-                    catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                if (onTextureLoadError == null) {
+                    Log.w(TAG, "LOW-1: Texture load error dropped for ${source::class.simpleName} (no onTextureLoadError callback configured)")
+                } else {
+                    mainHandler.post {
+                        try { onTextureLoadError.invoke(source) }
+                        catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                    }
                 }
             } else {
                 entries[source] = bitmap
@@ -232,15 +243,20 @@ internal class GpuTextureManager(
 
         if (!atlasManager.rebuild(entries)) {
             Log.w(TAG, "GpuTextureManager: atlas rebuild failed — using fallback bind group")
-            // Bulk-fire: the atlas failure is a GPU capacity constraint affecting all entries,
-            // not an individual load failure. We report every source in the batch so callers
-            // can distinguish partial atlas failures from individual source decode errors.
-            // Each source gets its own Handler.post to match the per-source contract, but
-            // all N messages are enqueued in a single frame — callers should be idempotent.
-            entries.keys.forEach { source ->
+            // PERF-1: Bulk-fire all atlas-failure callbacks in a single mainHandler.post
+            // rather than one post per source. This reduces Handler message queue pressure
+            // when atlas overflow affects many sources simultaneously (e.g. 20+ textures).
+            // The per-source callback contract is preserved — each source still receives
+            // exactly one invocation — but they are all dispatched in one message.
+            val failedSources = entries.keys.toList()
+            if (onTextureLoadError == null) {
+                Log.w(TAG, "LOW-1: Atlas rebuild failure for ${failedSources.size} source(s) dropped (no onTextureLoadError callback configured)")
+            } else {
                 mainHandler.post {
-                    try { onTextureLoadError?.invoke(source) }
-                    catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                    failedSources.forEach { source ->
+                        try { onTextureLoadError.invoke(source) }
+                        catch (t: Throwable) { Log.e(TAG, "onTextureLoadError threw: ${t.message}", t) }
+                    }
                 }
             }
             rebuildBindGroup(textureStore.fallbackTextureView)
@@ -307,6 +323,15 @@ internal class GpuTextureManager(
 
     /**
      * Pack and upload the compact per-face texture index buffer for the emit shader.
+     *
+     * **Ordering invariant:** `queue.writeBuffer` must always be called before
+     * `queue.submit` for the same frame. Dawn guarantees that all `writeBuffer` calls
+     * enqueued prior to a `submit` are visible to GPU commands in that submission. If
+     * `writeBuffer` is called *after* `submit`, the GPU commands dispatched in that
+     * submission may read stale data from the previous frame. All callers in this class
+     * follow the contract: upload (writeBuffer) happens in [uploadTextures], which is
+     * always called from [GpuFullPipeline.upload] before [GpuFullPipeline.dispatch]
+     * encodes any compute passes and before [GpuContext.withGpu] submits them.
      */
     private fun uploadTexIndexBuffer(scene: PreparedScene, faceCount: Int) {
         if (faceCount == 0) return

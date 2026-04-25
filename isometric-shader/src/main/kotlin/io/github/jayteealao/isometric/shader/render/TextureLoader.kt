@@ -6,8 +6,14 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import io.github.jayteealao.isometric.shader.TextureSource
 import java.io.IOException
+import kotlin.math.ceil
+import kotlin.math.log2
+import kotlin.math.sqrt
 
 private const val TAG = "IsometricShader"
+
+/** Maximum decoded bitmap size in bytes (64 MiB). Bitmaps larger than this are downsampled. */
+private const val MAX_DECODED_BYTES = 64L * 1024L * 1024L
 
 /**
  * Loads a [TextureSource] to a decoded [Bitmap].
@@ -62,7 +68,12 @@ private class DefaultTextureLoader(private val context: Context) : TextureLoader
     }
 
     private fun loadResource(resId: Int): Bitmap? = try {
-        BitmapFactory.decodeResource(context.resources, resId)
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeResource(context.resources, resId, opts)
+        val sampleSize = computeSampleSize(opts.outWidth, opts.outHeight, resId.toString())
+            ?: return null
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        BitmapFactory.decodeResource(context.resources, resId, decodeOpts)
     } catch (e: IOException) {
         Log.w(TAG, "Failed to load texture resource: Resource(id=$resId)", e)
         null
@@ -72,12 +83,47 @@ private class DefaultTextureLoader(private val context: Context) : TextureLoader
     }
 
     private fun loadAsset(path: String): Bitmap? = try {
-        context.assets.open(path).use { BitmapFactory.decodeStream(it) }
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.assets.open(path).use { BitmapFactory.decodeStream(it, null, opts) }
+        val sampleSize = computeSampleSize(opts.outWidth, opts.outHeight, "<asset>")
+            ?: return null
+        val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        context.assets.open(path).use { BitmapFactory.decodeStream(it, null, decodeOpts) }
     } catch (e: IOException) {
         Log.w(TAG, "Failed to load texture asset: Asset(path=<redacted>)", e)
         null
     } catch (e: OutOfMemoryError) {
         Log.w(TAG, "OOM loading texture asset: Asset(path=<redacted>)", e)
         null
+    }
+
+    /**
+     * Compute the [BitmapFactory.Options.inSampleSize] needed to keep the decoded bitmap
+     * within [MAX_DECODED_BYTES]. Returns `1` for small images, or a power-of-two >= 2 for
+     * large images. Returns `null` and logs a warning if no finite sample size can fit the
+     * bitmap within the limit (pathological case: e.g. extremely narrow but tall images
+     * at maximum sample size still exceed the limit — callers skip the load).
+     */
+    private fun computeSampleSize(w: Int, h: Int, label: String): Int? {
+        if (w <= 0 || h <= 0) return 1
+        val estimatedBytes = w.toLong() * h.toLong() * 4L
+        if (estimatedBytes <= MAX_DECODED_BYTES) return 1
+        // Compute minimum inSampleSize such that (w/s)*(h/s)*4 <= MAX_DECODED_BYTES.
+        // inSampleSize must be a power of two; use ceil(log2(sqrt(ratio))) then round up.
+        val ratio = estimatedBytes.toDouble() / MAX_DECODED_BYTES.toDouble()
+        val rawSampleSize = ceil(sqrt(ratio)).toInt().let { s ->
+            // Round up to next power of two >= s
+            var p = 1; while (p < s) p = p shl 1; p
+        }
+        // Verify the chosen sample size actually fits
+        val sampledBytes = (w.toLong() / rawSampleSize) * (h.toLong() / rawSampleSize) * 4L
+        if (sampledBytes > MAX_DECODED_BYTES) {
+            Log.w(TAG, "CT-SEC-2: texture $label ($w×$h) exceeds $MAX_DECODED_BYTES bytes " +
+                "even at inSampleSize=$rawSampleSize — skipping load")
+            return null
+        }
+        Log.d(TAG, "CT-SEC-2: texture $label ($w×$h) downsampled with inSampleSize=$rawSampleSize " +
+            "(estimated $estimatedBytes → ~$sampledBytes bytes)")
+        return rawSampleSize
     }
 }
