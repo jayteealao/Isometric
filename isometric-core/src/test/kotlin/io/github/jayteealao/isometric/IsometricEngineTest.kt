@@ -3,6 +3,7 @@
 package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
@@ -328,5 +329,57 @@ class IsometricEngineTest {
         assertFailsWith<IllegalArgumentException> {
             io.github.jayteealao.isometric.shapes.Cylinder(vertices = 25)
         }
+    }
+
+    // H-10: Pyramid BASE path vertex positions and winding order assertion.
+    //
+    // The Pyramid KDoc states "CCW viewed from below" for the base quad. Checking with
+    // the shoelace formula on (x, y) projection: a positive result means CCW when
+    // viewed from ABOVE (+z). The empirical vertex order is (0,0)→(1,0)→(1,1)→(0,1),
+    // which produces a positive signed area (CCW from above, which equals CW from below).
+    // This test pins the ACTUAL winding as implemented (positive signed area = CCW from
+    // above) to catch any future geometry rearrangement. The KDoc label "CCW from below"
+    // appears to be a documentation inaccuracy; the UV generation tests in
+    // UvGeneratorPyramidTest already exercise the canonical base UVs that match this order.
+    //
+    // We verify:
+    //  1. The base path has exactly 4 vertices.
+    //  2. The four corners match the expected positions for a unit Pyramid at origin.
+    //  3. The (x, y) shoelace signed-area is positive (CCW from +z direction).
+    @Test
+    fun `pyramid base path has 4 vertices with correct vertex positions and winding`() {
+        val pyramid = Pyramid(Point.ORIGIN, width = 1.0, depth = 1.0, height = 1.0)
+        // paths[4] is the BASE face per the Pyramid KDoc path-index table.
+        val basePath = pyramid.paths[4]
+        assertEquals(4, basePath.points.size, "Pyramid BASE must have exactly 4 vertices")
+
+        // Verify the four corner positions (order: (0,0), (1,0), (1,1), (0,1) at z=0).
+        val pts = basePath.points
+        assertEquals(0.0, pts[0].x, 1e-9)
+        assertEquals(0.0, pts[0].y, 1e-9)
+        assertEquals(0.0, pts[0].z, 1e-9)
+        assertEquals(1.0, pts[1].x, 1e-9)
+        assertEquals(0.0, pts[1].y, 1e-9)
+        assertEquals(0.0, pts[1].z, 1e-9)
+        assertEquals(1.0, pts[2].x, 1e-9)
+        assertEquals(1.0, pts[2].y, 1e-9)
+        assertEquals(0.0, pts[2].z, 1e-9)
+        assertEquals(0.0, pts[3].x, 1e-9)
+        assertEquals(1.0, pts[3].y, 1e-9)
+        assertEquals(0.0, pts[3].z, 1e-9)
+
+        // Compute the signed area using the shoelace formula on the (x, y) projection.
+        // signedArea2 > 0 → CCW from above (+z direction) — the actual implementation contract.
+        var signedArea2 = 0.0
+        val n = pts.size
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            signedArea2 += pts[i].x * pts[j].y - pts[j].x * pts[i].y
+        }
+        assertTrue(
+            signedArea2 > 0.0,
+            "Pyramid BASE vertex order must be CCW from above (+z): " +
+                "shoelace signedArea2 should be > 0, got $signedArea2"
+        )
     }
 }

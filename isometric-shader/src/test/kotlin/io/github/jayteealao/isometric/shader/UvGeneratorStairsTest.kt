@@ -201,6 +201,96 @@ class UvGeneratorStairsTest {
         }
     }
 
+    // -- T-1: stepCount=2 WebGPU-safe lower boundary -------------------------
+
+    /**
+     * T-1: stepCount=2 is the minimum value for which Stairs produces more than one
+     * riser/tread pair. The WebGPU atlas allocator must handle this boundary without
+     * off-by-one errors (e.g. faceCount = 2*N+2 = 6 for N=2). Verify that
+     * forStairsFace produces a sane non-empty FloatArray for every face index.
+     */
+    @Test
+    fun stepCount_2_minimum_is_supported_for_webgpu_atlas() {
+        // WebGPU-safe lower boundary: N=2 produces 2*2+2=6 face indices total.
+        val stairs = Stairs(Point.ORIGIN, stepCount = 2)
+        val totalFaces = stairs.paths.size // should be 6
+        assertEquals(6, totalFaces, "stepCount=2 must produce 6 faces")
+        for (i in 0 until totalFaces) {
+            val uvs = UvGenerator.forStairsFace(stairs, faceIndex = i)
+            assertTrue(uvs.isNotEmpty(), "face $i must produce a non-empty FloatArray")
+            for (value in uvs) {
+                assertTrue(
+                    value.isFinite(),
+                    "face $i UV[$value] must be finite (no NaN/Infinity)"
+                )
+                assertTrue(
+                    value in 0.0f..1.0f,
+                    "face $i UV[$value] must be in [0,1]"
+                )
+            }
+        }
+    }
+
+    // -- T-2: side face UV exact formula -------------------------------------
+
+    /**
+     * T-2: Instead of just asserting values are in [0,1], compute the EXACT expected
+     * UV per vertex from the documented formula and assert pointwise equality.
+     *
+     * Side face UV formula (from UvGenerator.forStairsFace SIDE branch):
+     *   u = (pt.y - pos.y)          for the left zigzag (faceIndex = 2*N)
+     *   u = 1.0 - (pt.y - pos.y)   for the right zigzag (faceIndex = 2*N + 1)
+     *   v = (pt.z - pos.z)
+     */
+    @Test
+    fun side_face_uvs_match_explicit_formula() {
+        val stepCount = 3
+        val stairs = Stairs(Point.ORIGIN, stepCount = stepCount)
+        val pos = stairs.position
+        val n = stepCount
+        val leftFaceIndex = 2 * n       // = 6
+        val rightFaceIndex = 2 * n + 1  // = 7
+
+        val leftPath = stairs.paths[leftFaceIndex]
+        val rightPath = stairs.paths[rightFaceIndex]
+        val vertCount = 2 * n + 2
+
+        // Compute expected UVs for the left side using the documented formula.
+        val expectedLeft = FloatArray(2 * vertCount)
+        for (k in 0 until vertCount) {
+            val pt = leftPath.points[k]
+            expectedLeft[k * 2]     = (pt.y - pos.y).toFloat()
+            expectedLeft[k * 2 + 1] = (pt.z - pos.z).toFloat()
+        }
+
+        // Compute expected UVs for the right side.
+        val expectedRight = FloatArray(2 * vertCount)
+        for (k in 0 until vertCount) {
+            val pt = rightPath.points[k]
+            expectedRight[k * 2]     = (1.0 - (pt.y - pos.y)).toFloat()
+            expectedRight[k * 2 + 1] = (pt.z - pos.z).toFloat()
+        }
+
+        val actualLeft = UvGenerator.forStairsFace(stairs, faceIndex = leftFaceIndex)
+        val actualRight = UvGenerator.forStairsFace(stairs, faceIndex = rightFaceIndex)
+
+        assertEquals(expectedLeft.size, actualLeft.size, "left side float count mismatch")
+        assertEquals(expectedRight.size, actualRight.size, "right side float count mismatch")
+
+        for (i in expectedLeft.indices) {
+            assertEquals(
+                expectedLeft[i], actualLeft[i], absoluteTolerance = 1e-6f,
+                "left side UV[$i] mismatch"
+            )
+        }
+        for (i in expectedRight.indices) {
+            assertEquals(
+                expectedRight[i], actualRight[i], absoluteTolerance = 1e-6f,
+                "right side UV[$i] mismatch"
+            )
+        }
+    }
+
     // -- Translation invariance ----------------------------------------------
 
     @Test

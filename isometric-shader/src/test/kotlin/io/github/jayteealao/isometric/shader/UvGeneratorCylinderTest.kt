@@ -235,4 +235,60 @@ class UvGeneratorCylinderTest {
         assertEquals(null, mat.bottom)
         assertEquals(null, mat.side)
     }
+
+    // -- D-10: below-minimum vertex count rejected ---------------------------
+
+    /**
+     * D-10: Cylinder with vertices=2 must fail at construction with
+     * IllegalArgumentException — validates the 3..24 guard added in the
+     * WebGPU pipeline-cleanup slice (D-09).
+     */
+    @Test
+    fun `cylinder below minimum vertices is rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            Cylinder(Point.ORIGIN, vertices = 2)
+        }
+    }
+
+    // -- D-11: cap cache serves alternating cap calls ------------------------
+
+    /**
+     * D-11: The cylinder cap cache is an AtomicReference<Triple<Cylinder, FloatArray, FloatArray>>
+     * that eagerly computes BOTH caps on the first cache miss. This means:
+     *  - After the first call for faceIndex=1 (TOP), both bottom and top arrays are cached.
+     *  - A subsequent call for faceIndex=0 (BOTTOM) must return the same cached FloatArray.
+     *  - A second call for faceIndex=1 (TOP) must return the same cached FloatArray as before.
+     *
+     * We assert array identity (===) to confirm the cache is actually serving the same
+     * pre-computed instances rather than recomputing on each call.
+     */
+    @Test
+    fun `cap cache serves alternating cap calls`() {
+        // Use a fresh Cylinder instance separate from the shared test fields to avoid
+        // interference with other test ordering.
+        val cyl = Cylinder(Point.ORIGIN, radius = 1.0, height = 1.0, vertices = 8)
+
+        // First call: TOP (faceIndex=1) — triggers cache miss, computes both caps.
+        val topFirst = UvGenerator.forCylinderFace(cyl, faceIndex = 1)
+
+        // Second call: BOTTOM (faceIndex=0) — must be a cache hit (same instance as
+        // the bottom that was eagerly computed alongside topFirst).
+        val bottomFirst = UvGenerator.forCylinderFace(cyl, faceIndex = 0)
+
+        // Third call: TOP again — must return the same cached array as topFirst.
+        val topSecond = UvGenerator.forCylinderFace(cyl, faceIndex = 1)
+
+        // Fourth call: BOTTOM again — same as bottomFirst.
+        val bottomSecond = UvGenerator.forCylinderFace(cyl, faceIndex = 0)
+
+        assertSame(topFirst, topSecond, "TOP cap array must be identity-cached across calls")
+        assertSame(bottomFirst, bottomSecond, "BOTTOM cap array must be identity-cached across calls")
+
+        // Sanity: TOP and BOTTOM are distinct arrays (not the same array returned for both).
+        assertTrue(topFirst !== bottomFirst, "TOP and BOTTOM cap arrays must be distinct instances")
+
+        // Verify expected sizes: N=8 → 8*2=16 floats per cap.
+        assertEquals(16, topFirst.size, "TOP cap must have 8*2=16 floats for vertices=8")
+        assertEquals(16, bottomFirst.size, "BOTTOM cap must have 8*2=16 floats for vertices=8")
+    }
 }

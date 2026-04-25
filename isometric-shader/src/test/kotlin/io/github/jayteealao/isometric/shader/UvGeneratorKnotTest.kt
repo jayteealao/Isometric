@@ -87,12 +87,104 @@ class UvGeneratorKnotTest {
         }
     }
 
+    // -- U-09: forAllKnotFaces per-element equivalence with forKnotFace ---------
+
+    /**
+     * U-09: Instead of just size-checking the output of forAllKnotFaces, iterate
+     * every face index and assert that allFaces[i] contentEquals forKnotFace(i).
+     * This pins the delegation contract end-to-end.
+     */
+    @Test
+    fun `forAllKnotFaces per element equivalence with forKnotFace`() {
+        val all = UvGenerator.forAllKnotFaces(unitKnot)
+        assertEquals(20, all.size, "forAllKnotFaces must return exactly 20 arrays")
+        for (i in all.indices) {
+            val expected = UvGenerator.forKnotFace(unitKnot, faceIndex = i)
+            val actual = all[i]
+            assertEquals(
+                expected.size, actual.size,
+                "face $i: size mismatch between forAllKnotFaces and forKnotFace"
+            )
+            for (k in expected.indices) {
+                assertEquals(
+                    expected[k], actual[k], absoluteTolerance = 1e-6f,
+                    "face $i: UV[$k] mismatch between forAllKnotFaces and forKnotFace"
+                )
+            }
+        }
+    }
+
     @Test
     fun `forAllKnotFaces returns 20 arrays in path order`() {
         val all = UvGenerator.forAllKnotFaces(unitKnot)
         assertEquals(20, all.size)
         for (i in all.indices) {
             assertEquals(8, all[i].size, "face $i should return 8 floats")
+        }
+    }
+
+    // -- U-11: localFaceIndex 1..5 delegation for each sub-prism ---------------
+
+    /**
+     * U-11: Existing tests only check localFaceIndex=0 (faces 0, 6, 12). Add coverage
+     * for localFaceIndex 1..5 within a single sub-prism (prism[0], faces 1..5).
+     * Each delegation arm `faceIndex % 6` must produce the same UVs as calling
+     * forPrismFace on the corresponding sourcePrism with the local face index.
+     */
+    @Test
+    fun `sub prism 0 local face indices 1 through 5 delegate correctly`() {
+        for (localFaceIndex in 1..5) {
+            val globalFaceIndex = localFaceIndex  // prism[0] occupies global 0..5
+            val actual = UvGenerator.forKnotFace(unitKnot, faceIndex = globalFaceIndex)
+            val expected = UvGenerator.forPrismFace(unitKnot.sourcePrisms[0], faceIndex = localFaceIndex)
+            assertEquals(
+                expected.size, actual.size,
+                "prism[0] localFaceIndex=$localFaceIndex: size mismatch"
+            )
+            for (k in expected.indices) {
+                assertEquals(
+                    expected[k], actual[k], absoluteTolerance = 1e-6f,
+                    "prism[0] localFaceIndex=$localFaceIndex UV[$k] mismatch"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `sub prism 1 local face indices 1 through 5 delegate correctly`() {
+        for (localFaceIndex in 1..5) {
+            val globalFaceIndex = 6 + localFaceIndex  // prism[1] occupies global 6..11
+            val actual = UvGenerator.forKnotFace(unitKnot, faceIndex = globalFaceIndex)
+            val expected = UvGenerator.forPrismFace(unitKnot.sourcePrisms[1], faceIndex = localFaceIndex)
+            assertEquals(
+                expected.size, actual.size,
+                "prism[1] localFaceIndex=$localFaceIndex: size mismatch"
+            )
+            for (k in expected.indices) {
+                assertEquals(
+                    expected[k], actual[k], absoluteTolerance = 1e-6f,
+                    "prism[1] localFaceIndex=$localFaceIndex UV[$k] mismatch"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `sub prism 2 local face indices 1 through 5 delegate correctly`() {
+        for (localFaceIndex in 1..5) {
+            val globalFaceIndex = 12 + localFaceIndex  // prism[2] occupies global 12..17
+            val actual = UvGenerator.forKnotFace(unitKnot, faceIndex = globalFaceIndex)
+            val expected = UvGenerator.forPrismFace(unitKnot.sourcePrisms[2], faceIndex = localFaceIndex)
+            assertEquals(
+                expected.size, actual.size,
+                "prism[2] localFaceIndex=$localFaceIndex: size mismatch"
+            )
+            for (k in expected.indices) {
+                assertEquals(
+                    expected[k], actual[k], absoluteTolerance = 1e-6f,
+                    "prism[2] localFaceIndex=$localFaceIndex UV[$k] mismatch"
+                )
+            }
         }
     }
 
