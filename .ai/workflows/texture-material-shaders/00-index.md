@@ -5,14 +5,14 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-25T18:03:00Z"
-selected-slice: "webgpu-ngon-faces"
+updated-at: "2026-04-25T23:12:32Z"
+selected-slice: "webgpu-pipeline-cleanup"
 current-stage-status: complete
-current-stage: verify
-stage-number: 6
-review-verdict: ""
-review-triage-status: ""
-review-fix-status: ""
+current-stage: implement
+stage-number: 5
+review-verdict: "ship-with-caveats"
+review-triage-status: "complete-all-deferred"
+review-fix-status: "deferred"
 review-fix-applied: ""
 review-fix-verified: ""
 verify-pass: 3
@@ -22,8 +22,21 @@ implement-commit-a-sha: "04afdd9"
 implement-commit-b-sha: "f14a78d"
 implement-commit-c-sha: "77f1968"
 implement-commit-d-sha: "dfb99bc"
-next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders webgpu-ngon-faces"
+implement-pipeline-cleanup-step1-sha: "0ae2cdb"
+implement-pipeline-cleanup-step2-sha: "9aabbfd"
+implement-pipeline-cleanup-step3-sha: "5a01a33"
+implement-pipeline-cleanup-step4-sha: "86e5d80"
+implement-pipeline-cleanup-step5-sha: "67ba5f1"
+implement-pipeline-cleanup-step6-sha: "adeb2ab"
+implement-pipeline-cleanup-step7-sha: "dd8ed69"
+implement-pipeline-cleanup-step8-sha: "7059b66"
+implement-pipeline-cleanup-step9-sha: "3f85983"
+implement-pipeline-cleanup-step11-sha: "0767552"
+implement-pipeline-cleanup-step12-sha: "40ec332"
+implement-pipeline-cleanup-step13-sha: "f1ed25c"
+implement-pipeline-cleanup-step14-sha: "1df8319"
+next-command: wf-verify
+next-invocation: "/wf-verify texture-material-shaders webgpu-pipeline-cleanup"
 branch-strategy: dedicated
 branch: "feat/texture"
 base-branch: "feat/webgpu"
@@ -262,6 +275,21 @@ workflow-files:
   - .ai/workflows/texture-material-shaders/verify-evidence/screenshots-webgpu-ngon-faces-pass3/verify-knot-canvas-gpusort.png
   - .ai/workflows/texture-material-shaders/verify-evidence/screenshots-webgpu-ngon-faces-pass3/verify-knot-canvas-cycle-back.png
   - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/GpuTriangulateEmitPipeline.kt
+  - 07-review-webgpu-ngon-faces.md
+  - 07-review-webgpu-ngon-faces-correctness.md
+  - 07-review-webgpu-ngon-faces-security.md
+  - 07-review-webgpu-ngon-faces-code-simplification.md
+  - 07-review-webgpu-ngon-faces-testing.md
+  - 07-review-webgpu-ngon-faces-maintainability.md
+  - 07-review-webgpu-ngon-faces-reliability.md
+  - 07-review-webgpu-ngon-faces-performance.md
+  - 07-review-webgpu-ngon-faces-architecture.md
+  - 07-review-webgpu-ngon-faces-refactor-safety.md
+  - 07-review-webgpu-ngon-faces-backend-concurrency.md
+  - 07-review-webgpu-ngon-faces-logging.md
+  - 03-slice-webgpu-pipeline-cleanup.md
+  - 04-plan-webgpu-pipeline-cleanup.md
+  - 05-implement-webgpu-pipeline-cleanup.md
 progress:
   intake: complete
   shape: complete
@@ -279,7 +307,8 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: verify-pass-3-complete
-  webgpu-ngon-faces: verify-pass3-pass-all-acs-met
+  webgpu-ngon-faces: review-ship-with-caveats
+  webgpu-pipeline-cleanup: implement-complete
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: review-ship-with-caveats
   uv-generation-knot: review-ship-with-caveats

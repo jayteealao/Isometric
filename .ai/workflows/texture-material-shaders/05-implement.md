@@ -6,18 +6,19 @@ status: in-progress
 stage-number: 5
 created-at: "2026-04-11T22:32:12Z"
 updated-at: "2026-04-22T21:47:18Z"
-slices-implemented: 16
-slices-total: 16
+slices-implemented: 17
+slices-total: 17
 slices-partial: 0
-metric-total-files-changed: 170
-metric-total-lines-added: 7346
-metric-total-lines-removed: 1485
+metric-total-files-changed: 234
+metric-total-lines-added: 10672
+metric-total-lines-removed: 2318
+updated-at: "2026-04-25T23:12:32Z"
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
+next-invocation: "/wf-verify texture-material-shaders webgpu-pipeline-cleanup"
 ---
 
 # Implement Index
@@ -212,6 +213,47 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
   during verify per discovery decision #7).
 - Record: [05-implement-webgpu-ngon-faces.md](05-implement-webgpu-ngon-faces.md)
 
+### `webgpu-pipeline-cleanup` — complete (14-commit omnibus)
+- Files: 64 changed (+3326, -833) across 13 commits.
+- Summary: Closed ~122 of 123 deferred HIGH+MED+LOW review findings from
+  the entire `texture-material-shaders` epic. No new functionality —
+  every change targets existing shipped code. Output is byte-equivalent
+  on all baseline test fixtures (Paparazzi zero-pixel-drift held).
+  Architectural additions (all `internal`): `WgslDiagnostics` (single
+  shader-compile diagnostic helper across 6 pipelines),
+  `IdentityCachedUvProvider<K : Any>` (single-slot atomic UV-array cache),
+  `ShapeUvDescriptor` + `ShapeRegistry` (polymorphic shape-dispatch
+  registry; `UvCoordProviderForShape` collapsed from 6-arm `when` to
+  registry lookup), `SceneDataLayout` (extracted to its own file).
+  Public API additions (additive only — `apiCheck` PASS):
+  `FaceIdentifier.Companion.forShape`, `Stairs.MAX_REASONABLE_STEPS`,
+  `stairsPerFace { }` DSL + `StairsPerFaceMaterialScope`,
+  `TextureCacheConfig.maxBytes` + `MAX_CACHE_SIZE`. Robolectric 4.13
+  added to `isometric-shader` test deps; 3 previously-`@Ignore`'d test
+  classes lit up. Test seams added: `GpuContext.checkComputeLimits`,
+  `TextureCache.putWithSize`, `TextureLoader.decideSampleSize`,
+  `GpuTextureManager.collectTextureSourcesFromMaterial`.
+- Commits: `0ae2cdb` G1 → `9aabbfd` G1 tests → `5a01a33` G6 →
+  `86e5d80` G6 tests → `67ba5f1` G2 → `adeb2ab` G2 tests → `dd8ed69` G3 →
+  `7059b66` G3 tests → `3f85983` G4 → `0767552` G7 → `40ec332` G5 →
+  `f1ed25c` G8 → `1df8319` G9.
+- Deferred: F-03 (WGSL identity early-out — Paparazzi evidence needed),
+  P-1 + U-02 (stairs/knot identity caches — `Pair`-as-key infeasibility
+  with `===` semantics), D-08 (thin abstraction), N-02 (multi-importer
+  rename), D-28 (Maestro pixel-assertion — explicit defer per po-answers),
+  `UvGenerator.clearAllCaches()` from `clearScene` (cross-module
+  `internal` violation; natural eviction holds).
+- Conservative G9: only `UvCoordProviderForShape` migrated to registry.
+  `IsometricMaterial.resolveForFace` and
+  `GpuTextureManager.collectTextureSources` retain exhaustive sealed-class
+  `when (PerFace)` because compile-time exhaustiveness is stronger than
+  `Map<KClass, Descriptor>` lookup. Descriptors have
+  `collectTextureSourcesContribution` ready for future migration.
+- Surfaced finding: Pyramid base winding KDoc says "CCW from below" but
+  shoelace +2.0 means "CCW from above" — test pins actual behavior; doc
+  fix is a future cosmetic commit.
+- Record: [05-implement-webgpu-pipeline-cleanup.md](05-implement-webgpu-pipeline-cleanup.md)
+
 ## Cross-Slice Integration Notes
 - Dependency graph: `core → compose → shader → webgpu`
 - `isometric-compose` has zero shader imports — fully usable standalone
@@ -221,6 +263,6 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 - **After `uv-generation-shared-api` (this slice):** five shape UV slices become purely additive — each adds a new `PerFace.<Shape>.resolve()` implementation, a new `when` branch in `uvCoordProviderForShape()`, and per-shape UV generator logic. No further changes to `IsometricMaterial.kt`, `RenderCommand.kt`, or the WebGPU/Canvas consumer dispatches.
 
 ## Recommended Next Stage
-- **Option A (default):** `/wf-verify texture-material-shaders uv-generation-knot` — confirm AC1–AC5 for the freshly-landed knot slice. 11 new shader unit tests plus passing sibling suites (180 tests green in `:isometric-shader:testDebugUnitTest`) and sibling module test suites give strong automated coverage; Canvas AC1/AC2 and WebGPU AC3 parity still need interactive confirmation. **Consider `/compact` first** — implementation-pass debugging context (CustomShape-fixture discovery, PerFaceSharedApiTest pivot) is noise for verify.
-- **Option B:** `/wf-review texture-material-shaders uv-generation-knot` — skip verify if 11 green tests + `apiCheck` + four-module test suite is sufficient evidence. Review focus: the bag-of-primitives delegation idiom, `sourcePrisms` drift-guard, `quadBboxUvs` non-canonical-winding acceptance, `perFace {}` silent-fallback documentation.
-- **Option C:** All 15 slices implement-complete. Sibling follow-ups that are tracked elsewhere: stairs/octahedron review verdicts (`ship-with-caveats`); `webgpu-ngon-faces` slice (defined but not planned) for lifting the 6-vertex WebGPU face cap that truncates stairs sides at stepCount ≥ 3.
+- **Option A (default):** `/wf-verify texture-material-shaders webgpu-pipeline-cleanup` — multi-pass verify expected (per slice Risk 7). 9 finding-groups likely surface 2–3 verify passes minimum. **Consider `/compact` first** — the per-step debugging context (sub-agent reports, build-fix details) is noise for verification. The H-4 instrumented test (Tint compile validation at `WgslDiagnosticsInstrumentedTest`) is `@Ignore`'d and needs manual lift + emulator run before review can certify shader compilation.
+- **Option B:** `/wf-review texture-material-shaders webgpu-pipeline-cleanup` — skip verify only if you trust the all-green CI signal absolutely. Review focus: `WgslDiagnostics` extraction across 6 pipelines, `IdentityCachedUvProvider` cache semantics, `ShapeRegistry` registry pattern, the cross-module-`internal` deferral, the 6 deferred findings (F-03/P-1/U-02/D-08/N-02/D-28).
+- **Option C:** All 17 slices implement-complete. Epic ready for `/wf-handoff` after verify + review of `webgpu-pipeline-cleanup`.
