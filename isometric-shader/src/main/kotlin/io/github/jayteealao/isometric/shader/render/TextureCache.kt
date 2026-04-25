@@ -9,8 +9,13 @@ import io.github.jayteealao.isometric.shader.TextureSource
  * [android.graphics.BitmapShader] creation is deferred to the draw hook so that
  * the correct [android.graphics.Shader.TileMode] (CLAMP vs REPEAT) can be chosen
  * based on the [io.github.jayteealao.isometric.shader.TextureTransform] at draw time.
+ *
+ * [byteCount] stores the bitmap's allocation size at insertion time so that eviction
+ * and stale-entry removal can deduct the correct byte count without re-calling
+ * [Bitmap.byteCount] (which allows JVM unit tests to exercise the eviction logic
+ * via a stub [Bitmap] without a real Android runtime).
  */
-internal data class CachedTexture(val bitmap: Bitmap)
+internal data class CachedTexture(val bitmap: Bitmap, val byteCount: Long)
 
 /**
  * LRU cache mapping [TextureSource] keys to [CachedTexture] entries.
@@ -55,16 +60,26 @@ internal class TextureCache(val maxSize: Int = 20, val maxBytes: Long? = null) {
             // CT-SEC-4: stale recycled bitmap — evict and signal a cache miss so the
             // caller reloads from the source.
             cache.remove(source)
-            currentBytes -= entry.bitmap.byteCount.toLong().coerceAtLeast(0L)
+            currentBytes -= entry.byteCount.coerceAtLeast(0L)
             return null
         }
         return entry
     }
 
-    fun put(source: TextureSource, bitmap: Bitmap): CachedTexture {
-        val entry = CachedTexture(bitmap)
+    fun put(source: TextureSource, bitmap: Bitmap): CachedTexture =
+        putWithSize(source, bitmap, bitmap.byteCount.toLong())
+
+    /**
+     * Test-only overload that accepts an explicit [byteCount] instead of reading
+     * [Bitmap.byteCount], allowing JVM unit tests to exercise byte-cap eviction without
+     * a real Android [Bitmap].
+     *
+     * Production code must use [put].
+     */
+    internal fun putWithSize(source: TextureSource, bitmap: Bitmap, byteCount: Long): CachedTexture {
+        val entry = CachedTexture(bitmap, byteCount)
         cache[source] = entry
-        currentBytes += bitmap.byteCount.toLong()
+        currentBytes += byteCount
         evictIfNeeded()
         return entry
     }
@@ -76,6 +91,9 @@ internal class TextureCache(val maxSize: Int = 20, val maxBytes: Long? = null) {
 
     val size: Int get() = cache.size
 
+    /** Exposed for tests — total bytes currently tracked across all cached entries. */
+    internal val totalBytes: Long get() = currentBytes
+
     /** Evict eldest entries until both count and byte constraints are satisfied. */
     private fun evictIfNeeded() {
         val iterator = cache.entries.iterator()
@@ -84,7 +102,7 @@ internal class TextureCache(val maxSize: Int = 20, val maxBytes: Long? = null) {
             val bytesExceeded = maxBytes != null && currentBytes > maxBytes
             if (!countExceeded && !bytesExceeded) break
             val eldest = iterator.next()
-            currentBytes -= eldest.value.bitmap.byteCount.toLong().coerceAtLeast(0L)
+            currentBytes -= eldest.value.byteCount.coerceAtLeast(0L)
             iterator.remove()
         }
     }

@@ -97,33 +97,48 @@ private class DefaultTextureLoader(private val context: Context) : TextureLoader
         null
     }
 
-    /**
-     * Compute the [BitmapFactory.Options.inSampleSize] needed to keep the decoded bitmap
-     * within [MAX_DECODED_BYTES]. Returns `1` for small images, or a power-of-two >= 2 for
-     * large images. Returns `null` and logs a warning if no finite sample size can fit the
-     * bitmap within the limit (pathological case: e.g. extremely narrow but tall images
-     * at maximum sample size still exceed the limit — callers skip the load).
-     */
-    private fun computeSampleSize(w: Int, h: Int, label: String): Int? {
-        if (w <= 0 || h <= 0) return 1
-        val estimatedBytes = w.toLong() * h.toLong() * 4L
-        if (estimatedBytes <= MAX_DECODED_BYTES) return 1
-        // Compute minimum inSampleSize such that (w/s)*(h/s)*4 <= MAX_DECODED_BYTES.
-        // inSampleSize must be a power of two; use ceil(log2(sqrt(ratio))) then round up.
-        val ratio = estimatedBytes.toDouble() / MAX_DECODED_BYTES.toDouble()
-        val rawSampleSize = ceil(sqrt(ratio)).toInt().let { s ->
-            // Round up to next power of two >= s
-            var p = 1; while (p < s) p = p shl 1; p
+    private fun computeSampleSize(w: Int, h: Int, label: String): Int? =
+        decideSampleSize(w, h, MAX_DECODED_BYTES).also { result ->
+            when {
+                result == null -> Log.w(TAG, "CT-SEC-2: texture $label ($w×$h) exceeds " +
+                    "$MAX_DECODED_BYTES bytes even at maximum inSampleSize — skipping load")
+                result > 1 -> {
+                    val estimatedBytes = w.toLong() * h.toLong() * 4L
+                    val sampledBytes = (w.toLong() / result) * (h.toLong() / result) * 4L
+                    Log.d(TAG, "CT-SEC-2: texture $label ($w×$h) downsampled with " +
+                        "inSampleSize=$result (estimated $estimatedBytes → ~$sampledBytes bytes)")
+                }
+            }
         }
-        // Verify the chosen sample size actually fits
-        val sampledBytes = (w.toLong() / rawSampleSize) * (h.toLong() / rawSampleSize) * 4L
-        if (sampledBytes > MAX_DECODED_BYTES) {
-            Log.w(TAG, "CT-SEC-2: texture $label ($w×$h) exceeds $MAX_DECODED_BYTES bytes " +
-                "even at inSampleSize=$rawSampleSize — skipping load")
-            return null
-        }
-        Log.d(TAG, "CT-SEC-2: texture $label ($w×$h) downsampled with inSampleSize=$rawSampleSize " +
-            "(estimated $estimatedBytes → ~$sampledBytes bytes)")
-        return rawSampleSize
+}
+
+/**
+ * Compute the [android.graphics.BitmapFactory.Options.inSampleSize] needed to keep a decoded
+ * bitmap within [maxBytes].
+ *
+ * Extracted as a package-internal pure function for JVM-unit testability (CT-SEC-2 / Step 6C).
+ * The caller ([DefaultTextureLoader.computeSampleSize]) wraps this with Android-side logging.
+ *
+ * Returns `1` for images whose unsampled size is already within [maxBytes].
+ * Returns a power-of-two >= 2 when downsampling is needed.
+ * Returns `null` when no power-of-two sample size can bring the image within [maxBytes]
+ * (pathological case — the caller should skip the load).
+ *
+ * @param w Image width in pixels (must be > 0; returns `1` for non-positive values).
+ * @param h Image height in pixels (must be > 0; returns `1` for non-positive values).
+ * @param maxBytes Maximum decoded byte size.
+ */
+internal fun decideSampleSize(w: Int, h: Int, maxBytes: Long): Int? {
+    if (w <= 0 || h <= 0) return 1
+    val estimatedBytes = w.toLong() * h.toLong() * 4L
+    if (estimatedBytes <= maxBytes) return 1
+    // Compute minimum inSampleSize such that (w/s)*(h/s)*4 <= maxBytes.
+    // inSampleSize must be a power of two; use ceil(sqrt(ratio)) then round up to next PoT.
+    val ratio = estimatedBytes.toDouble() / maxBytes.toDouble()
+    val rawSampleSize = ceil(sqrt(ratio)).toInt().let { s ->
+        var p = 1; while (p < s) p = p shl 1; p
     }
+    // Verify the chosen sample size actually fits (guards against integer-division rounding).
+    val sampledBytes = (w.toLong() / rawSampleSize) * (h.toLong() / rawSampleSize) * 4L
+    return if (sampledBytes > maxBytes) null else rawSampleSize
 }

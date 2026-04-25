@@ -188,7 +188,7 @@ internal class TexturedCanvasDrawHook(
             onTextureLoadError?.invoke(source)
             // Do NOT insert into cache on failure — the next frame will retry the load.
             // Return the checkerboard directly for this frame only so the UI doesn't crash.
-            CachedTexture(checkerboard)
+            CachedTexture(checkerboard, checkerboard.byteCount.toLong())
         }
     }
 }

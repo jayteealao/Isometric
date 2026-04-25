@@ -275,23 +275,50 @@ class GpuContext private constructor(
          */
         private fun assertComputeLimits(device: GPUDevice) {
             val limits = device.getLimits()
-            if (limits.maxComputeInvocationsPerWorkgroup < MIN_COMPUTE_INVOCATIONS) {
-                val msg = "Device does not meet the WebGPU minimum maxComputeInvocationsPerWorkgroup " +
-                    "(required >= $MIN_COMPUTE_INVOCATIONS, device reports ${limits.maxComputeInvocationsPerWorkgroup})"
-                Log.e(TAG, msg)
-                require(false) { msg }
+            try {
+                checkComputeLimits(
+                    maxComputeInvocationsPerWorkgroup = limits.maxComputeInvocationsPerWorkgroup,
+                    maxStorageBuffersPerShaderStage = limits.maxStorageBuffersPerShaderStage,
+                )
+            } catch (e: IllegalArgumentException) {
+                Log.e(TAG, e.message ?: "compute limits check failed")
+                throw e
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, e.message ?: "compute limits check failed")
+                throw e
+            }
+        }
+
+        /**
+         * Pure limit-validation logic extracted for JVM-unit testability (M-12).
+         *
+         * Takes raw `Int` values read from `GPUDevice.getLimits()` so the check can be
+         * exercised in a standard JVM test without a real `GPUDevice` or Android runtime.
+         * No Android API calls are made here — logging happens in the [assertComputeLimits]
+         * wrapper so this function remains fully JVM-runnable.
+         *
+         * @throws IllegalArgumentException if [maxComputeInvocationsPerWorkgroup] is below
+         *   the WebGPU-spec minimum of 256.
+         * @throws IllegalStateException if [maxStorageBuffersPerShaderStage] is below the
+         *   8 required by the webgpu-ngon-faces emit pipeline.
+         */
+        internal fun checkComputeLimits(
+            maxComputeInvocationsPerWorkgroup: Int,
+            maxStorageBuffersPerShaderStage: Int,
+        ) {
+            require(maxComputeInvocationsPerWorkgroup >= MIN_COMPUTE_INVOCATIONS) {
+                "Device does not meet the WebGPU minimum maxComputeInvocationsPerWorkgroup " +
+                    "(required >= $MIN_COMPUTE_INVOCATIONS, device reports $maxComputeInvocationsPerWorkgroup)"
             }
             // webgpu-ngon-faces: M5 emit pipeline uses 7 storage buffers per stage; needs 8.
             // Compat-mode OpenGL ES 3.1 adapters cap at 4 and will cause first-dispatch
             // validation failures. Fail loud at init with an actionable message instead.
-            if (limits.maxStorageBuffersPerShaderStage < MIN_STORAGE_BUFFERS_PER_SHADER_STAGE) {
-                val msg = "WebGPU adapter does not support $MIN_STORAGE_BUFFERS_PER_SHADER_STAGE " +
+            check(maxStorageBuffersPerShaderStage >= MIN_STORAGE_BUFFERS_PER_SHADER_STAGE) {
+                "WebGPU adapter does not support $MIN_STORAGE_BUFFERS_PER_SHADER_STAGE " +
                     "storage buffers per shader stage (device reports " +
-                    "${limits.maxStorageBuffersPerShaderStage}); required by webgpu-ngon-faces. " +
+                    "$maxStorageBuffersPerShaderStage); required by webgpu-ngon-faces. " +
                     "This typically means an OpenGL ES 3.1 compat-mode adapter was selected. " +
                     "Tier affected: baseline mobile without Vulkan support."
-                Log.e(TAG, msg)
-                check(false) { msg }
             }
         }
 
