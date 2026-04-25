@@ -180,9 +180,12 @@ internal class TextureAtlasManager(
     private fun computeShelfLayout(sizes: List<Pair<Int, Int>>): ShelfLayout? {
         if (sizes.isEmpty()) return ShelfLayout(0, 0, emptyList())
 
-        // Start with the smallest power-of-two that fits the widest texture
+        // Start with the smallest power-of-two that fits the widest texture.
+        // Note: per-texture padding is added inside tryPack (paddedW = w + paddingPx);
+        // the initial width estimate is based on texture content size only, so that
+        // a small padding value does not spuriously double the required atlas width.
         val maxW = sizes.maxOf { it.first }
-        var atlasW = nextPowerOfTwo(maxOf(maxW + paddingPx, 512).coerceAtMost(maxAtlasSizePx))
+        var atlasW = nextPowerOfTwo(maxOf(maxW, 512).coerceAtMost(maxAtlasSizePx))
 
         // Try packing at this width; if it overflows vertically, double the width
         while (atlasW <= maxAtlasSizePx) {

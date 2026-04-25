@@ -368,7 +368,7 @@ sealed interface IsometricMaterial : MaterialData {
 
             /** Returns the material for [face], falling back to [default] if unassigned. */
             public fun resolve(face: OctahedronFace): MaterialData =
-                byIndex[face] ?: default
+                byIndex.getOrDefault(face, default)
 
             override fun equals(other: Any?): Boolean {
                 if (this === other) return true
@@ -414,7 +414,7 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         // a diagnostic surface is preferred once richer dispatch lands in the shape slices.
         val prismFace = faceType as? PrismFace
         if (prismFace != null) {
-            faceMap[prismFace] ?: default
+            faceMap.getOrDefault(prismFace, default)
         } else {
             android.util.Log.w("IsometricMaterial", "PerFace resolveForFace fallback: faceType=$faceType not in PerFace map, returning default")
             default
@@ -422,7 +422,7 @@ public fun IsometricMaterial.PerFace.resolveForFace(
     }
     is IsometricMaterial.PerFace.Octahedron -> {
         val octahedronFace = faceType as? OctahedronFace
-        if (octahedronFace != null) byIndex[octahedronFace] ?: default else default
+        if (octahedronFace != null) byIndex.getOrDefault(octahedronFace, default) else default
     }
     is IsometricMaterial.PerFace.Pyramid -> {
         val pyramidFace = faceType as? PyramidFace

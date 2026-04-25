@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.shader
 
 import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.Path
+import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.CylinderFace
 import io.github.jayteealao.isometric.shapes.Knot
@@ -312,31 +313,10 @@ internal object UvGenerator {
         val pos = stairs.position
         val n = stairs.stepCount
 
+        val stepI = faceIndex / 2
         return when (face) {
-            StairsFace.RISER -> {
-                val stepI = faceIndex / 2
-                val riserHeight = 1.0 / n
-                val zBot = pos.z + stepI * riserHeight
-                val result = FloatArray(8)
-                for (k in 0..3) {
-                    val pt = path.points[k]
-                    result[k * 2] = (pt.x - pos.x).toFloat()
-                    result[k * 2 + 1] = ((pt.z - zBot) / riserHeight).toFloat()
-                }
-                result
-            }
-            StairsFace.TREAD -> {
-                val stepI = faceIndex / 2
-                val treadDepth = 1.0 / n
-                val yStart = pos.y + stepI * treadDepth
-                val result = FloatArray(8)
-                for (k in 0..3) {
-                    val pt = path.points[k]
-                    result[k * 2] = (pt.x - pos.x).toFloat()
-                    result[k * 2 + 1] = ((pt.y - yStart) / treadDepth).toFloat()
-                }
-                result
-            }
+            StairsFace.RISER -> buildStairsRectUvs(stepI, n, path, pos, isRiser = true)
+            StairsFace.TREAD -> buildStairsRectUvs(stepI, n, path, pos, isRiser = false)
             StairsFace.SIDE -> {
                 val isRightSide = faceIndex == 2 * n + 1
                 val vertCount = 2 * n + 2
@@ -465,6 +445,47 @@ internal object UvGenerator {
             }
             result[i * 2] = u.toFloat()
             result[i * 2 + 1] = v.toFloat()
+        }
+        return result
+    }
+
+    /**
+     * Builds the 8-float UV array for a single RISER or TREAD step quad.
+     *
+     * Both RISER and TREAD faces map the x-axis of the step to `u` and differ only
+     * in which world axis drives `v`:
+     *
+     * - **RISER** (`isRiser = true`): `v` normalises the Z coordinate over the riser
+     *   height (`pt.z - zBot`), where `zBot` is the bottom Z of this riser step.
+     * - **TREAD** (`isRiser = false`): `v` normalises the Y coordinate over the tread
+     *   depth (`pt.y - yStart`), where `yStart` is the front Y of this tread step.
+     *
+     * Step origin is computed as `pos.<axis> + stepI * (1.0 / n)` in both cases.
+     * The step size (1.0 / n) is the normalised step extent for a unit-bounding-box
+     * staircase (width = depth = height = 1.0 regardless of [Stairs.stepCount]).
+     *
+     * @param stepI   0-based step index (`faceIndex / 2`)
+     * @param n       [Stairs.stepCount]
+     * @param path    The 4-vertex face path for this step
+     * @param pos     The stairs' world position
+     * @param isRiser `true` → RISER (Z-axis v); `false` → TREAD (Y-axis v)
+     * @return [FloatArray] of 8 floats `[u0,v0, u1,v1, u2,v2, u3,v3]`
+     */
+    private fun buildStairsRectUvs(
+        stepI: Int,
+        n: Int,
+        path: Path,
+        pos: Point,
+        isRiser: Boolean,
+    ): FloatArray {
+        val stepSize = 1.0 / n
+        val stepOrigin = if (isRiser) pos.z + stepI * stepSize else pos.y + stepI * stepSize
+        val result = FloatArray(8)
+        for (k in 0..3) {
+            val pt = path.points[k]
+            result[k * 2] = (pt.x - pos.x).toFloat()
+            result[k * 2 + 1] = (if (isRiser) (pt.z - stepOrigin) / stepSize
+                                 else         (pt.y - stepOrigin) / stepSize).toFloat()
         }
         return result
     }

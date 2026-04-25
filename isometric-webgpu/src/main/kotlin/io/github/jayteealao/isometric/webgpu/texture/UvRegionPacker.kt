@@ -59,21 +59,23 @@ internal object UvRegionPacker {
      * matrix directly. The atlas region is always written separately, never composed into
      * the user matrix.
      *
-     * @param buf         CPU staging buffer positioned at the start of the 40-byte slot.
-     * @param atlasScaleU Atlas sub-region U scale (width fraction of the atlas).
-     * @param atlasScaleV Atlas sub-region V scale (height fraction of the atlas).
-     * @param atlasOffsetU Atlas sub-region U origin offset.
-     * @param atlasOffsetV Atlas sub-region V origin offset.
-     * @param transform   User-defined [TextureTransform] — written as-is, not composed with atlas.
+     * When [region] is `null` (e.g. the face has no texture assigned), the atlas region
+     * defaults to scale `(1, 1)` and offset `(0, 0)` — a pass-through that maps the full
+     * UV range unchanged.
+     *
+     * @param buf       CPU staging buffer positioned at the start of the 40-byte slot.
+     * @param region    Atlas sub-region for this face. `null` → identity (full atlas range).
+     * @param transform User-defined [TextureTransform] — written as-is, not composed with atlas.
      */
     fun pack(
         buf: ByteBuffer,
-        atlasScaleU: Float,
-        atlasScaleV: Float,
-        atlasOffsetU: Float,
-        atlasOffsetV: Float,
+        region: TextureAtlasManager.AtlasRegion?,
         transform: TextureTransform,
     ) {
+        val atlasScaleU  = region?.uvScale?.get(0)  ?: 1f
+        val atlasScaleV  = region?.uvScale?.get(1)  ?: 1f
+        val atlasOffsetU = region?.uvOffset?.get(0) ?: 0f
+        val atlasOffsetV = region?.uvOffset?.get(1) ?: 0f
         require(atlasScaleU.isFinite() && atlasScaleU > 0f) { "atlasScaleU must be finite and positive, got $atlasScaleU" }
         require(atlasScaleV.isFinite() && atlasScaleV > 0f) { "atlasScaleV must be finite and positive, got $atlasScaleV" }
         require(atlasOffsetU.isFinite()) { "atlasOffsetU must be finite, got $atlasOffsetU" }

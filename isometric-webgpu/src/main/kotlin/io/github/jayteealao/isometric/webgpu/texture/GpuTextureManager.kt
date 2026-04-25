@@ -390,12 +390,9 @@ internal class GpuTextureManager(
             val region = resolveAtlasRegion(effective)
             val transform = resolveTextureTransform(effective)
             UvRegionPacker.pack(
-                buf          = cpu,
-                atlasScaleU  = region?.uvScale?.get(0)  ?: 1f,
-                atlasScaleV  = region?.uvScale?.get(1)  ?: 1f,
-                atlasOffsetU = region?.uvOffset?.get(0) ?: 0f,
-                atlasOffsetV = region?.uvOffset?.get(1) ?: 0f,
-                transform    = transform,
+                buf       = cpu,
+                region    = region,
+                transform = transform,
             )
         }
         cpu.rewind()

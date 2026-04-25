@@ -78,12 +78,12 @@ class GpuTextureManagerUvTransformTest {
     fun `identity writes identity user matrix and separate atlas region`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 0.5f,
-            atlasScaleV  = 0.5f,
-            atlasOffsetU = 0.1f,
-            atlasOffsetV = 0.2f,
-            transform    = TextureTransform.IDENTITY,
+            buf       = buf,
+            region    = TextureAtlasManager.AtlasRegion(
+                uvOffset = floatArrayOf(0.1f, 0.2f),
+                uvScale  = floatArrayOf(0.5f, 0.5f),
+            ),
+            transform = TextureTransform.IDENTITY,
         )
         assertFloats(floatArrayOf(1f, 0f, 0f, 1f, 0f, 0f, 0.5f, 0.5f, 0.1f, 0.2f), readFloats(buf))
     }
@@ -101,12 +101,9 @@ class GpuTextureManagerUvTransformTest {
     fun `tiling 2x3 scales matrix correctly`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.tiling(2f, 3f),
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform.tiling(2f, 3f),
         )
         assertFloats(floatArrayOf(2f, 0f, 0f, 3f, -0.5f, -1.0f, 1f, 1f, 0f, 0f), readFloats(buf))
     }
@@ -126,12 +123,9 @@ class GpuTextureManagerUvTransformTest {
     fun `rotated 90 degrees produces correct matrix`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.rotated(90f),
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform.rotated(90f),
         )
         assertFloats(
             floatArrayOf(0f, 1f, -1f, 0f, 1f, 0f, 1f, 1f, 0f, 0f),
@@ -152,12 +146,9 @@ class GpuTextureManagerUvTransformTest {
     fun `offset shifts translation column`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.offset(0.5f, 0f),
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform.offset(0.5f, 0f),
         )
         assertFloats(floatArrayOf(1f, 0f, 0f, 1f, 0.5f, 0f, 1f, 1f, 0f, 0f), readFloats(buf))
     }
@@ -173,22 +164,16 @@ class GpuTextureManagerUvTransformTest {
     fun `per-face tiling top vs identity side produce distinct matrices`() {
         val topBuf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = topBuf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.tiling(2f, 2f),
+            buf       = topBuf,
+            region    = null,
+            transform = TextureTransform.tiling(2f, 2f),
         )
 
         val sideBuf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = sideBuf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.IDENTITY,
+            buf       = sideBuf,
+            region    = null,
+            transform = TextureTransform.IDENTITY,
         )
 
         val top  = readFloats(topBuf)
@@ -225,12 +210,9 @@ class GpuTextureManagerUvTransformTest {
     fun `mirror scale negates u coefficient`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform(scaleU = -1f, scaleV = 1f),
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform(scaleU = -1f, scaleV = 1f),
         )
         assertFloats(floatArrayOf(-1f, 0f, 0f, 1f, 1f, 0f, 1f, 1f, 0f, 0f), readFloats(buf))
     }
@@ -264,12 +246,9 @@ class GpuTextureManagerUvTransformTest {
     fun `combined tiling rotation offset produces correct matrix`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform(
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform(
                 scaleU          = 2f,
                 scaleV          = 2f,
                 rotationDegrees = 45f,
@@ -313,12 +292,9 @@ class GpuTextureManagerUvTransformTest {
     fun `large tiling 100x produces finite matrix`() {
         val buf = makeBuffer()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 1f,
-            atlasScaleV  = 1f,
-            atlasOffsetU = 0f,
-            atlasOffsetV = 0f,
-            transform    = TextureTransform.tiling(100f, 100f),
+            buf       = buf,
+            region    = null,
+            transform = TextureTransform.tiling(100f, 100f),
         )
         val floats = readFloats(buf)
         // Verify all 6 user-matrix coefficients are finite before asserting exact values
@@ -351,12 +327,12 @@ class GpuTextureManagerUvTransformTest {
             .order(ByteOrder.nativeOrder())
         val before = buf.position()
         UvRegionPacker.pack(
-            buf          = buf,
-            atlasScaleU  = 0.5f,
-            atlasScaleV  = 0.5f,
-            atlasOffsetU = 0.1f,
-            atlasOffsetV = 0.2f,
-            transform    = TextureTransform.IDENTITY,
+            buf       = buf,
+            region    = TextureAtlasManager.AtlasRegion(
+                uvOffset = floatArrayOf(0.1f, 0.2f),
+                uvScale  = floatArrayOf(0.5f, 0.5f),
+            ),
+            transform = TextureTransform.IDENTITY,
         )
         assertEquals(
             SceneDataLayout.UV_REGION_STRIDE,

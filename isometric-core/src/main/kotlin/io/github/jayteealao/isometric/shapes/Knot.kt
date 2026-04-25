@@ -37,25 +37,26 @@ class Knot(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
      * The [Prism] instances themselves are also immutable after construction.
      */
     @ExperimentalIsometricApi
-    val sourcePrisms: List<Prism> = listOf(
-        Prism(Point.ORIGIN, 5.0, 1.0, 1.0),
-        Prism(Point(4.0, 1.0, 0.0), 1.0, 4.0, 1.0),
-        Prism(Point(4.0, 4.0, -2.0), 1.0, 1.0, 3.0),
-    )
+    val sourcePrisms: List<Prism> = listOf(KNOT_PRISM_0, KNOT_PRISM_1, KNOT_PRISM_2)
 
     override fun translate(dx: Double, dy: Double, dz: Double): Knot =
         Knot(position.translate(dx, dy, dz))
 
     companion object {
-        // If you change the Prism constants below, update `sourcePrisms` above to
-        // match — UV generation for Knot relies on the two being in lock-step.
+        // Prism geometry constants — shared between `sourcePrisms` and `createPaths`
+        // so that UV generation (which reads `sourcePrisms`) and path generation stay
+        // in lock-step. Change here; both users update automatically.
+        private val KNOT_PRISM_0 = Prism(Point.ORIGIN,           width = 5.0, depth = 1.0, height = 1.0)
+        private val KNOT_PRISM_1 = Prism(Point(4.0, 1.0, 0.0),  width = 1.0, depth = 4.0, height = 1.0)
+        private val KNOT_PRISM_2 = Prism(Point(4.0, 4.0, -2.0), width = 1.0, depth = 1.0, height = 3.0)
+
         private fun createPaths(position: Point): List<Path> {
             val allPaths = mutableListOf<Path>()
 
             // Add prisms
-            allPaths.addAll(Prism(Point.ORIGIN, 5.0, 1.0, 1.0).paths)
-            allPaths.addAll(Prism(Point(4.0, 1.0, 0.0), 1.0, 4.0, 1.0).paths)
-            allPaths.addAll(Prism(Point(4.0, 4.0, -2.0), 1.0, 1.0, 3.0).paths)
+            allPaths.addAll(KNOT_PRISM_0.paths)
+            allPaths.addAll(KNOT_PRISM_1.paths)
+            allPaths.addAll(KNOT_PRISM_2.paths)
 
             // Add custom paths
             allPaths.add(

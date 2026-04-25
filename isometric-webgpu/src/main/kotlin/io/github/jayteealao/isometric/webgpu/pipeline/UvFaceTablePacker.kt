@@ -34,6 +34,24 @@ internal object UvFaceTablePacker {
     private const val DEFAULT_QUAD_VERTS = 4
 
     /**
+     * Returns `true` when [cmd] carries a well-formed UV array that can be packed
+     * directly into the pool buffer.
+     *
+     * A UV array is considered valid when:
+     * 1. It is non-null.
+     * 2. The face has at least one vertex (`faceVertexCount > 0`).
+     * 3. The array is long enough to hold `2 × faceVertexCount` floats (one `u,v` pair
+     *    per vertex).
+     *
+     * Commands that fail this check fall back to the default quad `(0,0)(1,0)(1,1)(0,1)`.
+     */
+    private fun hasValidUv(cmd: RenderCommand): Boolean {
+        val uv = cmd.uvCoords
+        val vertCount = cmd.faceVertexCount
+        return uv != null && vertCount > 0 && uv.size >= 2 * vertCount
+    }
+
+    /**
      * Pack UV data into the supplied [poolBuffer] and [tableBuffer].
      *
      * Buffers must be pre-sized: pool ≥ [totalEffectiveVertCount] × 8 bytes, table ≥
@@ -65,9 +83,8 @@ internal object UvFaceTablePacker {
             val cmd = commands[i]
             val uv = cmd.uvCoords
             val vertCount = cmd.faceVertexCount
-            val haveValidUv = uv != null && vertCount > 0 && uv.size >= 2 * vertCount
 
-            if (haveValidUv) {
+            if (hasValidUv(cmd)) {
                 tableBuffer.putInt(currentOffset)
                 tableBuffer.putInt(vertCount)
                 for (k in 0 until vertCount) {
@@ -105,10 +122,6 @@ internal object UvFaceTablePacker {
         return total
     }
 
-    private fun effectiveVertCount(cmd: RenderCommand): Int {
-        val uv = cmd.uvCoords
-        val vertCount = cmd.faceVertexCount
-        return if (uv != null && vertCount > 0 && uv.size >= 2 * vertCount) vertCount
-               else DEFAULT_QUAD_VERTS
-    }
+    private fun effectiveVertCount(cmd: RenderCommand): Int =
+        if (hasValidUv(cmd)) cmd.faceVertexCount else DEFAULT_QUAD_VERTS
 }
