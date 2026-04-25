@@ -22,6 +22,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Tab
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -393,6 +394,11 @@ private fun WebGpuGridScene(
 private fun WebGpuTexturedSample() {
     var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu()) }
 
+    // R-21: This sample-app checkerboard is intentionally duplicated from
+    // GpuTextureStore's 1×1-white fallback. The sample uses a visible magenta/black
+    // checkerboard so missing or loading textures are visually obvious during testing;
+    // production rendering uses the white-pixel fallback to avoid distracting visual
+    // artifacts in released builds.
     val checkerboard = remember {
         val size = 16
         val cellSize = 8
@@ -404,6 +410,11 @@ private fun WebGpuTexturedSample() {
             }
         }
         Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+    }
+    // R-20: Recycle the checkerboard bitmap when this composable leaves the composition
+    // so the pixel memory is returned to the system without waiting for GC.
+    DisposableEffect(Unit) {
+        onDispose { checkerboard.recycle() }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {

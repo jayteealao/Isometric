@@ -23,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.compose.runtime.ForEach
 import io.github.jayteealao.isometric.compose.runtime.GestureConfig
 import io.github.jayteealao.isometric.compose.runtime.IsometricScene
+import io.github.jayteealao.isometric.compose.runtime.IsometricScope
 import io.github.jayteealao.isometric.compose.runtime.RenderMode
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.shader.cylinderPerFace
@@ -98,8 +101,35 @@ private enum class ShapeTab(val label: String, val description: String) {
 
 @Composable
 private fun TexturedDemoScreen() {
-    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.Canvas()) }
-    var shapeTab by remember { mutableStateOf(ShapeTab.Prism) }
+    val renderModeSaver = Saver<RenderMode, String>(
+        save = { mode ->
+            when (mode) {
+                is RenderMode.Canvas -> when (mode.compute) {
+                    RenderMode.Canvas.Compute.Cpu -> "Canvas.Cpu"
+                    RenderMode.Canvas.Compute.WebGpu -> "Canvas.WebGpu"
+                }
+                is RenderMode.WebGpu -> "WebGpu"
+                else -> "Canvas.Cpu"
+            }
+        },
+        restore = { s ->
+            when (s) {
+                "Canvas.WebGpu" -> RenderMode.Canvas(compute = RenderMode.Canvas.Compute.WebGpu)
+                "WebGpu" -> RenderMode.WebGpu()
+                else -> RenderMode.Canvas()
+            }
+        },
+    )
+    val shapeTabSaver = Saver<ShapeTab, String>(
+        save = { it.name },
+        restore = { ShapeTab.valueOf(it) },
+    )
+    var renderMode by rememberSaveable(stateSaver = renderModeSaver) {
+        mutableStateOf<RenderMode>(RenderMode.Canvas())
+    }
+    var shapeTab by rememberSaveable(stateSaver = shapeTabSaver) {
+        mutableStateOf(ShapeTab.Prism)
+    }
 
     val tileMaterial = remember {
         prismPerFace {
@@ -269,11 +299,18 @@ private fun TexturedDemoScreen() {
     }
 }
 
+/**
+ * Shared wrapper used by every demo scene in [TexturedDemoScreen].
+ *
+ * Encapsulates the repeated [ProvideTextureRendering] + [IsometricScene] boilerplate so that
+ * individual scene composables only describe their shapes. The [SceneConfig] is fixed to the
+ * demo-appropriate defaults (broad-phase sort enabled, no native canvas, gestures disabled);
+ * only [renderMode] is forwarded from the parent screen.
+ */
 @Composable
-private fun TexturedPrismGridScene(
+private fun TexturedIsometricScene(
     renderMode: RenderMode,
-    tileMaterial: IsometricMaterial,
-    tilingMaterial: IsometricMaterial,
+    content: @Composable IsometricScope.() -> Unit,
 ) {
     ProvideTextureRendering {
         IsometricScene(
@@ -284,26 +321,36 @@ private fun TexturedPrismGridScene(
                 useNativeCanvas = false,
                 gestures = GestureConfig.Disabled,
             ),
-        ) {
-            ForEach((0 until 4).toList()) { col ->
-                ForEach((0 until 4).toList()) { row ->
-                    // Columns 0–1: IDENTITY transform (AC5 baseline)
-                    // Columns 2–3: tiling(2×2 top, 1×2 sides) (AC1 / AC4 exercise)
-                    val material = if (col < 2) tileMaterial else tilingMaterial
-                    Shape(
-                        geometry = Prism(
-                            position = Point(
-                                (col - 1.5) * 1.05,
-                                (row - 1.5) * 1.05,
-                                0.0,
-                            ),
-                            width = 1.0,
-                            depth = 1.0,
-                            height = 1.0,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun TexturedPrismGridScene(
+    renderMode: RenderMode,
+    tileMaterial: IsometricMaterial,
+    tilingMaterial: IsometricMaterial,
+) {
+    TexturedIsometricScene(renderMode = renderMode) {
+        ForEach((0 until 4).toList()) { col ->
+            ForEach((0 until 4).toList()) { row ->
+                // Columns 0–1: IDENTITY transform (AC5 baseline)
+                // Columns 2–3: tiling(2×2 top, 1×2 sides) (AC1 / AC4 exercise)
+                val material = if (col < 2) tileMaterial else tilingMaterial
+                Shape(
+                    geometry = Prism(
+                        position = Point(
+                            (col - 1.5) * 1.05,
+                            (row - 1.5) * 1.05,
+                            0.0,
                         ),
-                        material = material,
-                    )
-                }
+                        width = 1.0,
+                        depth = 1.0,
+                        height = 1.0,
+                    ),
+                    material = material,
+                )
             }
         }
     }
@@ -315,30 +362,20 @@ private fun TexturedOctahedronScene(
     texturedMaterial: IsometricMaterial,
     perFaceMaterial: IsometricMaterial,
 ) {
-    ProvideTextureRendering {
-        IsometricScene(
-            modifier = Modifier.fillMaxSize(),
-            config = SceneConfig(
-                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-                renderMode = renderMode,
-                useNativeCanvas = false,
-                gestures = GestureConfig.Disabled,
-            ),
-        ) {
-            // Two Octahedrons side by side; scale = 3.0 so each fills a substantial
-            // portion of the viewport instead of shrinking down to match the whole-
-            // scene auto-framing of small unit shapes.
-            Shape(
-                geometry = Octahedron(Point(-2.0, 0.0, 0.0)),
-                material = texturedMaterial,
-                scale = 3.0,
-            )
-            Shape(
-                geometry = Octahedron(Point(2.0, 0.0, 0.0)),
-                material = perFaceMaterial,
-                scale = 3.0,
-            )
-        }
+    TexturedIsometricScene(renderMode = renderMode) {
+        // Two Octahedrons side by side; scale = 3.0 so each fills a substantial
+        // portion of the viewport instead of shrinking down to match the whole-
+        // scene auto-framing of small unit shapes.
+        Shape(
+            geometry = Octahedron(Point(-2.0, 0.0, 0.0)),
+            material = texturedMaterial,
+            scale = 3.0,
+        )
+        Shape(
+            geometry = Octahedron(Point(2.0, 0.0, 0.0)),
+            material = perFaceMaterial,
+            scale = 3.0,
+        )
     }
 }
 
@@ -348,27 +385,17 @@ private fun TexturedPyramidScene(
     texturedMaterial: IsometricMaterial,
     perFaceMaterial: IsometricMaterial,
 ) {
-    ProvideTextureRendering {
-        IsometricScene(
-            modifier = Modifier.fillMaxSize(),
-            config = SceneConfig(
-                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-                renderMode = renderMode,
-                useNativeCanvas = false,
-                gestures = GestureConfig.Disabled,
-            ),
-        ) {
-            Shape(
-                geometry = Pyramid(Point(-1.5, 0.0, 0.0)),
-                material = texturedMaterial,
-                scale = 3.0,
-            )
-            Shape(
-                geometry = Pyramid(Point(1.5, 0.0, 0.0)),
-                material = perFaceMaterial,
-                scale = 3.0,
-            )
-        }
+    TexturedIsometricScene(renderMode = renderMode) {
+        Shape(
+            geometry = Pyramid(Point(-1.5, 0.0, 0.0)),
+            material = texturedMaterial,
+            scale = 3.0,
+        )
+        Shape(
+            geometry = Pyramid(Point(1.5, 0.0, 0.0)),
+            material = perFaceMaterial,
+            scale = 3.0,
+        )
     }
 }
 
@@ -378,53 +405,43 @@ private fun TexturedCylinderScene(
     texturedMaterial: IsometricMaterial,
     perFaceMaterial: IsometricMaterial,
 ) {
-    ProvideTextureRendering {
-        IsometricScene(
-            modifier = Modifier.fillMaxSize(),
-            config = SceneConfig(
-                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-                renderMode = renderMode,
-                useNativeCanvas = false,
-                gestures = GestureConfig.Disabled,
+    TexturedIsometricScene(renderMode = renderMode) {
+        // Left: textured barrel at 12 verts. Pre-webgpu-ngon-faces this rendered with a
+        // partial-wedge cap in Full WebGPU because GpuUvCoordsBuffer's 48-byte stride
+        // truncated UV indices 6..N-1 to (0,0).
+        Shape(
+            geometry = Cylinder(
+                position = Point(-2.5, 0.0, 0.0),
+                radius = 0.5,
+                height = 1.5,
+                vertices = 12,
             ),
-        ) {
-            // Left: textured barrel at 12 verts. Pre-webgpu-ngon-faces this rendered with a
-            // partial-wedge cap in Full WebGPU because GpuUvCoordsBuffer's 48-byte stride
-            // truncated UV indices 6..N-1 to (0,0).
-            Shape(
-                geometry = Cylinder(
-                    position = Point(-2.5, 0.0, 0.0),
-                    radius = 0.5,
-                    height = 1.5,
-                    vertices = 12,
-                ),
-                material = texturedMaterial,
-                scale = 2.0,
-            )
-            // Mid: per-face colors at 12 verts exercising resolveForFace dispatch via CylinderFace.
-            Shape(
-                geometry = Cylinder(
-                    position = Point(0.0, 0.0, 0.0),
-                    radius = 0.5,
-                    height = 1.5,
-                    vertices = 12,
-                ),
-                material = perFaceMaterial,
-                scale = 2.0,
-            )
-            // Right: 24-vertex cylinder. Validates AC1 of webgpu-ngon-faces — the cap should
-            // render as a complete brick disk in Full WebGPU, pixel-equivalent to Canvas.
-            Shape(
-                geometry = Cylinder(
-                    position = Point(2.5, 0.0, 0.0),
-                    radius = 0.5,
-                    height = 1.5,
-                    vertices = 24,
-                ),
-                material = texturedMaterial,
-                scale = 2.0,
-            )
-        }
+            material = texturedMaterial,
+            scale = 2.0,
+        )
+        // Mid: per-face colors at 12 verts exercising resolveForFace dispatch via CylinderFace.
+        Shape(
+            geometry = Cylinder(
+                position = Point(0.0, 0.0, 0.0),
+                radius = 0.5,
+                height = 1.5,
+                vertices = 12,
+            ),
+            material = perFaceMaterial,
+            scale = 2.0,
+        )
+        // Right: 24-vertex cylinder. Validates AC1 of webgpu-ngon-faces — the cap should
+        // render as a complete brick disk in Full WebGPU, pixel-equivalent to Canvas.
+        Shape(
+            geometry = Cylinder(
+                position = Point(2.5, 0.0, 0.0),
+                radius = 0.5,
+                height = 1.5,
+                vertices = 24,
+            ),
+            material = texturedMaterial,
+            scale = 2.0,
+        )
     }
 }
 
@@ -434,31 +451,21 @@ private fun TexturedStairsScene(
     texturedMaterial: IsometricMaterial,
     perFaceMaterial: IsometricMaterial,
 ) {
-    ProvideTextureRendering {
-        IsometricScene(
-            modifier = Modifier.fillMaxSize(),
-            config = SceneConfig(
-                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-                renderMode = renderMode,
-                useNativeCanvas = false,
-                gestures = GestureConfig.Disabled,
-            ),
-        ) {
-            // Left: stepCount=5 staircase with grass treads, brick risers, dirt sides.
-            // The 12-vertex zigzag side face validates AC2 of webgpu-ngon-faces — should
-            // render with full UV pattern (no truncation, no I-2 triangulation slash).
-            Shape(
-                geometry = Stairs(Point(-1.5, 0.0, 0.0), stepCount = 5),
-                material = texturedMaterial,
-                scale = 2.0,
-            )
-            // Right: per-face palette exercises StairsFace dispatch.
-            Shape(
-                geometry = Stairs(Point(1.5, 0.0, 0.0), stepCount = 5),
-                material = perFaceMaterial,
-                scale = 2.0,
-            )
-        }
+    TexturedIsometricScene(renderMode = renderMode) {
+        // Left: stepCount=5 staircase with grass treads, brick risers, dirt sides.
+        // The 12-vertex zigzag side face validates AC2 of webgpu-ngon-faces — should
+        // render with full UV pattern (no truncation, no I-2 triangulation slash).
+        Shape(
+            geometry = Stairs(Point(-1.5, 0.0, 0.0), stepCount = 5),
+            material = texturedMaterial,
+            scale = 2.0,
+        )
+        // Right: per-face palette exercises StairsFace dispatch.
+        Shape(
+            geometry = Stairs(Point(1.5, 0.0, 0.0), stepCount = 5),
+            material = perFaceMaterial,
+            scale = 2.0,
+        )
     }
 }
 
@@ -469,29 +476,19 @@ private fun TexturedKnotScene(
     leftMaterial: IsometricMaterial,
     rightMaterial: IsometricMaterial,
 ) {
-    ProvideTextureRendering {
-        IsometricScene(
-            modifier = Modifier.fillMaxSize(),
-            config = SceneConfig(
-                renderOptions = RenderOptions.Default.copy(enableBroadPhaseSort = true),
-                renderMode = renderMode,
-                useNativeCanvas = false,
-                gestures = GestureConfig.Disabled,
-            ),
-        ) {
-            // Left: brick texture across all 20 Knot faces — exercises the full
-            // bag-of-primitives delegation (forPrismFace x18 + quadBboxUvs x2).
-            Shape(
-                geometry = Knot(Point(-1.5, 0.0, 0.0)),
-                material = leftMaterial,
-                scale = 3.0,
-            )
-            // Right: grass texture for visual contrast on the same geometry.
-            Shape(
-                geometry = Knot(Point(1.5, 0.0, 0.0)),
-                material = rightMaterial,
-                scale = 3.0,
-            )
-        }
+    TexturedIsometricScene(renderMode = renderMode) {
+        // Left: brick texture across all 20 Knot faces — exercises the full
+        // bag-of-primitives delegation (forPrismFace x18 + quadBboxUvs x2).
+        Shape(
+            geometry = Knot(Point(-1.5, 0.0, 0.0)),
+            material = leftMaterial,
+            scale = 3.0,
+        )
+        // Right: grass texture for visual contrast on the same geometry.
+        Shape(
+            geometry = Knot(Point(1.5, 0.0, 0.0)),
+            material = rightMaterial,
+            scale = 3.0,
+        )
     }
 }
