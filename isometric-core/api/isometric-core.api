@@ -433,6 +433,11 @@ public final class io/github/jayteealao/isometric/shapes/CylinderFace$Companion 
 }
 
 public abstract interface class io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/FaceIdentifier$Companion;
+}
+
+public final class io/github/jayteealao/isometric/shapes/FaceIdentifier$Companion {
+	public final fun forShape (Lio/github/jayteealao/isometric/Shape;I)Lio/github/jayteealao/isometric/shapes/FaceIdentifier;
 }
 
 public final class io/github/jayteealao/isometric/shapes/Knot : io/github/jayteealao/isometric/Shape {

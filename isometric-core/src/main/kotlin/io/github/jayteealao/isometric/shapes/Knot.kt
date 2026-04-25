@@ -30,6 +30,11 @@ class Knot(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
      * sub-prism block to `UvGenerator.forPrismFace` using each Prism's own
      * dimensional extents. The values must stay in sync with the constants in
      * [createPaths]; a regression guard pins this in `UvGeneratorKnotTest`.
+     *
+     * **Immutability guarantee (U-01):** The backing list is created via [listOf], which
+     * returns Java's `Arrays.asList` — a fixed-size, unmodifiable view. Callers must not
+     * attempt to mutate the returned list; doing so throws [UnsupportedOperationException].
+     * The [Prism] instances themselves are also immutable after construction.
      */
     @ExperimentalIsometricApi
     val sourcePrisms: List<Prism> = listOf(

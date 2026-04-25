@@ -9,6 +9,7 @@ import io.github.jayteealao.isometric.Shape
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.shapes.Cylinder
 import io.github.jayteealao.isometric.shapes.CylinderFace
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.OctahedronFace
 import io.github.jayteealao.isometric.shapes.Prism
@@ -300,13 +301,22 @@ class ShapeNode(
                     // fail the `is <Shape>` check and null out faceType, which in turn
                     // makes `PerFace.resolveForFace(null)` fall back to `default`.
                     // Face identity is structural (path-index order), not transform-dependent.
-                    faceType = when (shape) {
-                        is Prism -> PrismFace.fromPathIndex(index)
-                        is Octahedron -> OctahedronFace.fromPathIndex(index)
-                        is Pyramid -> PyramidFace.fromPathIndex(index)
-                        is Cylinder -> CylinderFace.fromPathIndex(index)
-                        is Stairs -> StairsFace.fromPathIndex(index, (shape as Stairs).stepCount)
-                        else -> null
+                    //
+                    // M-CAST-1: capture `shape` to a local `val` before the smart-cast
+                    // arm for Stairs, eliminating TOCTOU on the mutable `var shape` field.
+                    // Without the capture, the compiler re-reads the field between the
+                    // `is Stairs` check and the `.stepCount` access; another thread could
+                    // write a non-Stairs value in that window, producing a ClassCastException.
+                    faceType = run {
+                        val s = shape  // stable local; `s` is never re-read from the var
+                        when (s) {
+                            is Prism -> PrismFace.fromPathIndex(index)
+                            is Octahedron -> OctahedronFace.fromPathIndex(index)
+                            is Pyramid -> PyramidFace.fromPathIndex(index)
+                            is Cylinder -> CylinderFace.fromPathIndex(index)
+                            is Stairs -> StairsFace.fromPathIndex(index, s.stepCount)
+                            else -> null
+                        }
                     },
                     faceVertexCount = path.points.size,
                 )
@@ -390,18 +400,32 @@ class BatchNode(
 
         val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
-        shapes.forEachIndexed { index, shape ->
+        shapes.forEachIndexed { shapeIndex, shape ->
+            // H-3: the per-face dispatch MUST run on the original (pre-transform) `shape`
+            // value captured from the `shapes` list, NOT on `transformedShape`.
+            // `Shape.rotateZ`/`scale` return the base `Shape` type, so an is-check on
+            // `transformedShape` would always fall to `else -> null`, silently defeating
+            // per-face material resolution for every non-Prism shape in the batch.
+            // Face identity is structural (path-index order) and is invariant under the
+            // isometric transforms applied by `localContext.applyTransformsToShape`.
             val transformedShape = localContext.applyTransformsToShape(shape)
 
-            for (path in transformedShape.paths) {
+            for ((pathIndex, path) in transformedShape.paths.withIndex()) {
                 output.add(
                     RenderCommand(
-                        commandId = "${nodeId}_${index}_${path.hashCode()}",
+                        commandId = "${nodeId}_${shapeIndex}_${path.hashCode()}",
                         points = DoubleArray(0),
                         color = effectiveColor,
                         originalPath = path,
                         originalShape = transformedShape,
                         ownerNodeId = nodeId,
+                        // M-02: emit faceType from the pre-transform shape so per-face
+                        // material dispatch in TexturedCanvasDrawHook and SceneDataPacker
+                        // can resolve the correct slot (e.g. PrismFace.TOP vs FRONT).
+                        // Uses FaceIdentifier.forShape — the canonical single dispatch
+                        // point for all shape families — rather than duplicating the
+                        // when-arms inline here.
+                        faceType = FaceIdentifier.forShape(shape, pathIndex),
                         faceVertexCount = path.points.size,
                     )
                 )

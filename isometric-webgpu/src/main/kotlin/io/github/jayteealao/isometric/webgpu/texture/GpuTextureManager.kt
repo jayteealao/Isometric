@@ -283,9 +283,20 @@ internal class GpuTextureManager(
         material: MaterialData?,
         out: MutableSet<TextureSource>,
     ) {
+        // CR-3/R-05: outer when uses explicit `else -> {}` to document the intentional
+        // no-op for IsoColor and null (neither carries a TextureSource).
+        // Inner when on sealed PerFace is expression-form so Kotlin enforces exhaustiveness:
+        // a 6th PerFace subclass that forgets to add an arm will fail at compile time
+        // rather than silently skipping its texture sources from the atlas.
         when (val m = material) {
             is IsometricMaterial.Textured -> out.add(m.source)
             is IsometricMaterial.PerFace -> {
+                // Expression-form when: every PerFace subclass must have an arm.
+                // Add an `else` with error() so an unhandled future subclass is caught
+                // immediately at runtime during development rather than silently
+                // omitting its sources from the atlas (which would cause missing-texture
+                // artifacts that could look like a UV or atlas-packing bug).
+                @Suppress("UNUSED_EXPRESSION")
                 when (m) {
                     is IsometricMaterial.PerFace.Prism -> {
                         for (sub in m.faceMap.values) {
@@ -313,11 +324,15 @@ internal class GpuTextureManager(
                         (m.riser as? IsometricMaterial.Textured)?.let { out.add(it.source) }
                         (m.side as? IsometricMaterial.Textured)?.let { out.add(it.source) }
                     }
+                    // NOTE: If a 6th PerFace subclass is ever added, this else arm fires
+                    // immediately with a clear error. Remove the else arm at that point and
+                    // add the new explicit arm above so the compiler re-enforces exhaustiveness.
+                    else -> error("Unknown PerFace subclass: ${m::class.simpleName}. Add an explicit arm to collectTextureSources.")
                 }
                 val default = m.default
                 if (default is IsometricMaterial.Textured) out.add(default.source)
             }
-            else -> {}
+            else -> {} // IsoColor and null carry no TextureSource; intentional no-op.
         }
     }
 

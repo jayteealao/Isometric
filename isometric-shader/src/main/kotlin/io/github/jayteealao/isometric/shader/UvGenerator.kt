@@ -11,6 +11,7 @@ import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.shapes.StairsFace
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -188,21 +189,26 @@ internal object UvGenerator {
     fun forAllCylinderFaces(cylinder: Cylinder): List<FloatArray> =
         cylinder.paths.indices.map { forCylinderFace(cylinder, it) }
 
-    @Volatile private var lastCapCylinder: Cylinder? = null
-    @Volatile private var lastBottomCapUvs: FloatArray? = null
-    @Volatile private var lastTopCapUvs: FloatArray? = null
+    // D-01: Replace three @Volatile fields with a single AtomicReference to eliminate
+    // the TOCTOU window where (1) the key is written, (2) another thread reads the key,
+    // (3) the UVs are null-ed, (4) the other thread reads a null UV for a valid key.
+    // AtomicReference<Triple> keeps the key+both-UV-arrays as a single atomic unit.
+    // G8 will migrate this to the shared IdentityCachedUvProvider utility when that
+    // helper lands; for now this is a partial fix that closes the correctness gap.
+    private val cylinderCapCache =
+        AtomicReference<Triple<Cylinder, FloatArray, FloatArray>?>(null)
 
     private fun getOrComputeCapUvs(cylinder: Cylinder, reversed: Boolean): FloatArray {
-        if (lastCapCylinder !== cylinder) {
-            lastCapCylinder = cylinder
-            lastBottomCapUvs = null
-            lastTopCapUvs = null
+        val cached = cylinderCapCache.get()
+        if (cached != null && cached.first === cylinder) {
+            return if (reversed) cached.second else cached.third
         }
-        val cached = if (reversed) lastBottomCapUvs else lastTopCapUvs
-        if (cached != null) return cached
-        val fresh = computeCylinderCapUvs(cylinder.vertices, reversed)
-        if (reversed) lastBottomCapUvs = fresh else lastTopCapUvs = fresh
-        return fresh
+        // Cache miss: compute both caps at once so a subsequent call for the other
+        // cap of the same cylinder is a guaranteed hit.
+        val bottom = computeCylinderCapUvs(cylinder.vertices, reversed = true)
+        val top = computeCylinderCapUvs(cylinder.vertices, reversed = false)
+        cylinderCapCache.set(Triple(cylinder, bottom, top))
+        return if (reversed) bottom else top
     }
 
     private fun computeCylinderCapUvs(n: Int, reversed: Boolean): FloatArray {
@@ -410,11 +416,30 @@ internal object UvGenerator {
     // source path, which may not produce a canonical (0,0)(1,0)(1,1)(0,1)
     // ordering — callers must accept non-canonical winding. Degenerate spans
     // collapse to 0 to avoid division-by-zero.
+    //
+    // U-08: NaN/Infinity guard — return the default quad UVs if any coordinate is
+    // non-finite rather than propagating NaN through the atlas math. Non-finite
+    // coordinates should never appear for valid UvGenerator inputs, but guard here
+    // for belt-and-suspenders safety (render-loop-safe).
+    // U-08 single forward pass: compute min/max in one loop instead of 6 minOf/maxOf
+    // traversals; mathematically identical output, half the iterations.
     private fun quadBboxUvs(path: Path): FloatArray {
         val pts = path.points
-        val minX = pts.minOf { it.x }; val maxX = pts.maxOf { it.x }
-        val minY = pts.minOf { it.y }; val maxY = pts.maxOf { it.y }
-        val minZ = pts.minOf { it.z }; val maxZ = pts.maxOf { it.z }
+
+        // U-08 NaN guard: detect non-finite coordinates before attempting min/max.
+        if (pts.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }) {
+            return floatArrayOf(0f, 0f, 1f, 0f, 1f, 1f, 0f, 1f)
+        }
+
+        // Single forward pass over pts to find all six min/max values.
+        var minX = Double.POSITIVE_INFINITY; var maxX = Double.NEGATIVE_INFINITY
+        var minY = Double.POSITIVE_INFINITY; var maxY = Double.NEGATIVE_INFINITY
+        var minZ = Double.POSITIVE_INFINITY; var maxZ = Double.NEGATIVE_INFINITY
+        for (pt in pts) {
+            if (pt.x < minX) minX = pt.x; if (pt.x > maxX) maxX = pt.x
+            if (pt.y < minY) minY = pt.y; if (pt.y > maxY) maxY = pt.y
+            if (pt.z < minZ) minZ = pt.z; if (pt.z > maxZ) maxZ = pt.z
+        }
 
         val spanX = maxX - minX; val spanY = maxY - minY; val spanZ = maxZ - minZ
 

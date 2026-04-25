@@ -289,6 +289,13 @@ internal object TriangulateEmitShader {
             let uvEntry      = uvFaceTable[key.originalIndex];
             let uvBaseOffset = uvEntry.x;
             let uvCount      = uvEntry.y;
+            // H-1: safeUvCount guards against uvCount==0, which would cause a
+            // division-by-zero in the modulo below. In practice uvCount==0 is
+            // unreachable: UvFaceTablePacker.effectiveVertCount returns at least 4
+            // (the default-quad fallback path). The max(…,1u) costs nothing on the
+            // GPU hot-path and prevents a shader hard-fault if the invariant is ever
+            // violated (e.g. by a future packer change that skips the fallback path).
+            let safeUvCount  = max(uvCount, 1u);
 
             // Precompute NDC + transformed UV per vertex (0..vertexCount-1).
             // Stack arrays are default-zero-initialized; slots beyond vertexCount
@@ -301,7 +308,7 @@ internal object TriangulateEmitShader {
                 // If the face used the default-quad fallback (uvCount == 4 and
                 // vertexCount may be larger), clamp lookup so we always cycle within
                 // the 4 fallback pairs rather than reading past the pool entry.
-                let uvIdx = select(k, k % uvCount, uvCount == 4u && vertexCount > 4u);
+                let uvIdx = select(k, k % safeUvCount, safeUvCount == 4u && vertexCount > 4u);
                 let pair = uvPool[uvBaseOffset + uvIdx];
                 let h = uvRegion.userMatrix * vec3<f32>(pair.x, pair.y, 1.0);
                 uvs[k] = vec2<f32>(h.x, h.y);

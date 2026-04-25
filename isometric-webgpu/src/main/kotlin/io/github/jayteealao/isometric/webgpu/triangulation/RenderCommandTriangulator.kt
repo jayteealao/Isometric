@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.webgpu.triangulation
 
+import android.util.Log
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
@@ -192,7 +193,16 @@ internal class RenderCommandTriangulator {
                     break
                 }
             }
-            if (!earFound) break  // degenerate polygon — bail with what we have
+            if (!earFound) {
+                // M-1: degenerate or self-intersecting polygon — bail with what we have.
+                // Log at WARN so callers can detect geometry authored outside the
+                // UvGenerator contract (e.g. zero-area or self-intersecting paths).
+                Log.w(
+                    "RenderCommandTriangulator",
+                    "Ear-clip aborted: no ear found at guard=$guard, remaining=${remaining.size}",
+                )
+                break
+            }
         }
         if (remaining.size == 3) {
             triangles.add(intArrayOf(remaining[0], remaining[1], remaining[2]))
