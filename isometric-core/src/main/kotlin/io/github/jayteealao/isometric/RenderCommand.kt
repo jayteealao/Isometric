@@ -17,7 +17,10 @@ import io.github.jayteealao.isometric.shapes.FaceIdentifier
  *   double-lighting (the GPU shader applies its own lighting). Defaults to [color] so
  *   existing callers are unaffected.
  * @property originalPath Reference to the original 3D path (for callbacks/hit testing)
- * @property originalShape Reference to the original shape (if this path belongs to one)
+ * @property originalShape Reference to the original shape (if this path belongs to one).
+ *   Despite the name, this stores the POST-transform shape; the field name predates the
+ *   current semantics. Treat as transformedShape — do NOT assume it reflects the shape
+ *   before any position/scale/rotation transforms were applied.
  * @property material Material data for textured rendering. Carries an `IsometricMaterial`
  *   instance from `isometric-shader` opaquely through the core pipeline. Renderers that
  *   depend on `isometric-shader` cast this to `IsometricMaterial`. Null means flat-color only.

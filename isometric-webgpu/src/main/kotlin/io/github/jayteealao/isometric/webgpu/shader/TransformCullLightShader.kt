@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric.webgpu.shader
 
+import io.github.jayteealao.isometric.webgpu.pipeline.SceneDataLayout
+
 /**
  * WGSL compute shader for the fused Transform + Cull + Light pass.
  *
@@ -219,7 +221,7 @@ internal object TransformCullLightShader {
             // atomic, safe on Adreno. Unused slots beyond vc retain zero (default
             // init of array<vec2<f32>,24> on the stack).
             var result: TransformedFace;
-            for (var k: u32 = 0u; k < 24u; k = k + 1u) {
+            for (var k: u32 = 0u; k < ${SceneDataLayout.MAX_FACE_VERTICES}u; k = k + 1u) {
                 result.s[k] = select(vec2<f32>(0.0), screen[k], k < vc);
             }
             result.vertexCount = vc;

@@ -12,7 +12,7 @@ import io.github.jayteealao.isometric.Shape
  * to reposition or resize the staircase.
  *
  * @param position The origin corner of the staircase bounding box (default [Point.ORIGIN])
- * @param stepCount The number of steps (must be at least 1)
+ * @param stepCount The number of steps (must be in `1..[MAX_REASONABLE_STEPS]`)
  */
 class Stairs @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,
@@ -20,12 +20,19 @@ class Stairs @JvmOverloads constructor(
 ) : Shape(createPaths(position, stepCount)) {
     init {
         require(stepCount >= 1) { "Stairs needs at least 1 step, got $stepCount" }
+        require(stepCount <= MAX_REASONABLE_STEPS) {
+            "Stairs stepCount must be at most $MAX_REASONABLE_STEPS; got $stepCount " +
+                "(face count would be ${stepCount * 2 + 2})"
+        }
     }
 
     override fun translate(dx: Double, dy: Double, dz: Double): Stairs =
         Stairs(position.translate(dx, dy, dz), stepCount)
 
     companion object {
+        /** Upper bound on [stepCount] to keep face count well below Int overflow. */
+        const val MAX_REASONABLE_STEPS = 250
+
         private fun createPaths(position: Point, stepCount: Int): List<Path> {
             val paths = mutableListOf<Path>()
             val zigzagPoints = mutableListOf<Point>()

@@ -3,7 +3,7 @@ package io.github.jayteealao.isometric.shapes
 /**
  * Identifies which logical face of a [Cylinder] a path corresponds to.
  *
- * [Cylinder] is modelled as an extruded circle via `Shape.extrude(Circle(...), height)`,
+ * [Cylinder] is constructed via `Cylinder(position, radius, height, vertices)`,
  * which emits the reversed base ring at index 0 and the top ring at index 1.
  * Indices 2..(vertices + 1) are the rectangular side quads that wrap the barrel.
  *

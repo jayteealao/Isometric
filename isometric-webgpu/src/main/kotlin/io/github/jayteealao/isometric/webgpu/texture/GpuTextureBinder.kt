@@ -32,6 +32,13 @@ internal class GpuTextureBinder(
     val bindGroupLayout: GPUBindGroupLayout,
 ) : AutoCloseable {
 
+    /**
+     * Shared sampler for all texture atlas lookups.
+     *
+     * Mipmaps are not generated; texture sampling uses the base level only.
+     * [MipmapFilterMode.Nearest] is set to satisfy the WebGPU sampler descriptor
+     * contract but has no effect since the atlas texture is created without mip levels.
+     */
     val sampler: GPUSampler = ctx.device.createSampler(
         GPUSamplerDescriptor(
             magFilter = FilterMode.Linear,

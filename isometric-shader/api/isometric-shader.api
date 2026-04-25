@@ -1,5 +1,6 @@
 public final class io/github/jayteealao/isometric/shader/CylinderPerFaceMaterialScope {
 	public static final field $stable I
+	public fun <init> ()V
 	public final fun getBottom ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getSide ()Lio/github/jayteealao/isometric/MaterialData;
@@ -57,6 +58,8 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterial$PerFa
 public final class io/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Prism : io/github/jayteealao/isometric/shader/IsometricMaterial$PerFace {
 	public static final field $stable I
 	public static final field Companion Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Prism$Companion;
+	public fun <init> (Ljava/util/Map;Lio/github/jayteealao/isometric/MaterialData;)V
+	public synthetic fun <init> (Ljava/util/Map;Lio/github/jayteealao/isometric/MaterialData;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFaceMap ()Ljava/util/Map;
 	public fun hashCode ()I
@@ -126,6 +129,7 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
 	public static final fun prismPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Prism;
 	public static final fun pyramidPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Pyramid;
 	public static final fun resolveForFace (Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace;Lio/github/jayteealao/isometric/shapes/FaceIdentifier;)Lio/github/jayteealao/isometric/MaterialData;
+	public static final fun stairsPerFace (Lkotlin/jvm/functions/Function1;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$PerFace$Stairs;
 	public static final fun texturedAsset (Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
 	public static synthetic fun texturedAsset$default (Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;ILjava/lang/Object;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
 	public static final fun texturedBitmap (Landroid/graphics/Bitmap;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/shader/TextureTransform;)Lio/github/jayteealao/isometric/shader/IsometricMaterial$Textured;
@@ -136,6 +140,7 @@ public final class io/github/jayteealao/isometric/shader/IsometricMaterialKt {
 
 public final class io/github/jayteealao/isometric/shader/OctahedronPerFaceMaterialScope {
 	public static final field $stable I
+	public fun <init> ()V
 	public final fun allFaces (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun face (Lio/github/jayteealao/isometric/shapes/OctahedronFace;Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
@@ -144,6 +149,7 @@ public final class io/github/jayteealao/isometric/shader/OctahedronPerFaceMateri
 
 public final class io/github/jayteealao/isometric/shader/PrismPerFaceMaterialScope {
 	public static final field $stable I
+	public fun <init> ()V
 	public final fun getBack ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getBottom ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
@@ -164,12 +170,26 @@ public final class io/github/jayteealao/isometric/shader/PrismPerFaceMaterialSco
 
 public final class io/github/jayteealao/isometric/shader/PyramidPerFaceMaterialScope {
 	public static final field $stable I
+	public fun <init> ()V
 	public final fun allLaterals (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun getBase ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun lateral (ILio/github/jayteealao/isometric/MaterialData;)V
 	public final fun setBase (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun setDefault (Lio/github/jayteealao/isometric/MaterialData;)V
+}
+
+public final class io/github/jayteealao/isometric/shader/StairsPerFaceMaterialScope {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun getDefault ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getRiser ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getSide ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun getTread ()Lio/github/jayteealao/isometric/MaterialData;
+	public final fun setDefault (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setRiser (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setSide (Lio/github/jayteealao/isometric/MaterialData;)V
+	public final fun setTread (Lio/github/jayteealao/isometric/MaterialData;)V
 }
 
 public abstract interface class io/github/jayteealao/isometric/shader/TextureSource {

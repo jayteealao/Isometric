@@ -245,7 +245,7 @@ class GroupNode : IsometricNode() {
  *   tint — textured renderers multiply the sampled texture color by this value
  *   (e.g., `textureSample * color` in the GPU fragment shader). The `isometric-shader`
  *   module's overloaded `Shape()` composable derives this color from the material
- *   (e.g., `FlatColor.color` for flat materials, `LocalDefaultColor` for textured).
+ *   (e.g., `material.baseColor()` for non-null materials, `LocalDefaultColor` for textured).
  * @property material Optional material data for textured or per-face rendering. When null,
  *   the renderer uses [color] for flat-color fill. When non-null, the renderer interprets
  *   the material to determine how each face is painted. Set by the `isometric-shader`

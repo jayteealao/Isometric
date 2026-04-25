@@ -3,6 +3,13 @@ package io.github.jayteealao.isometric.webgpu.shader
 internal object IsometricFragmentShader {
     const val ENTRY_POINT = "fragmentMain"
 
+    /**
+     * WGSL source for the isometric fragment shader.
+     *
+     * **String interpolation rule:** Only `const` Kotlin values may be interpolated
+     * into WGSL strings; runtime values would invalidate the shader cache because
+     * the WGSL source is used as the cache key by the WebGPU driver.
+     */
     val WGSL: String = """
         @group(0) @binding(0) var diffuseTexture: texture_2d<f32>;
         @group(0) @binding(1) var diffuseSampler: sampler;

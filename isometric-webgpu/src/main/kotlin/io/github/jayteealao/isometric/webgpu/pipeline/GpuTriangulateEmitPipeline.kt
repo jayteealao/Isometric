@@ -34,7 +34,7 @@ import kotlin.math.ceil
  * Encodes a single sub-pass ([TriangulateEmitShader]) that uses **fixed-stride vertex
  * allocation** — no `atomicAdd` — to avoid the Adreno 750 TDR caused by contended atomics.
  *
- * Each sort entry `i` writes exactly [TriangulateEmitShader.MAX_VERTICES_PER_FACE] = 12
+ * Each sort entry `i` writes exactly [TriangulateEmitShader.MAX_VERTICES_PER_FACE] = 66
  * vertex slots at `i × 12`. Visible faces fill `triCount × 3` slots with real triangles
  * and pad the remaining slots with degenerate (zero-area) vertices. Sentinels write all
  * 12 slots as degenerate.

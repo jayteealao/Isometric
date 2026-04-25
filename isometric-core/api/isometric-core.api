@@ -565,6 +565,7 @@ public final class io/github/jayteealao/isometric/shapes/PyramidFace$Lateral : i
 
 public final class io/github/jayteealao/isometric/shapes/Stairs : io/github/jayteealao/isometric/Shape {
 	public static final field Companion Lio/github/jayteealao/isometric/shapes/Stairs$Companion;
+	public static final field MAX_REASONABLE_STEPS I
 	public fun <init> (I)V
 	public fun <init> (Lio/github/jayteealao/isometric/Point;I)V
 	public synthetic fun <init> (Lio/github/jayteealao/isometric/Point;IILkotlin/jvm/internal/DefaultConstructorMarker;)V

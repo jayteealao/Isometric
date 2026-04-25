@@ -257,18 +257,11 @@ internal class GpuTextureManager(
      * Recursively collect [TextureSource] references from a material, expanding
      * [IsometricMaterial.PerFace] into its constituent sub-materials.
      *
-     * **Per-slot textures on the `Stairs` `PerFace` variant are not yet collected into
-     * the atlas.** Stairs ships as an empty dispatch stub: constructing one with
-     * per-slot [IsometricMaterial.Textured] entries is legal, but those textures never
-     * make it into the atlas and the faces render with the material's
-     * [IsometricMaterial.PerFace.default] at runtime. The corresponding
-     * `uv-generation-stairs` slice will enable per-slot collection. `Prism`, `Octahedron`,
-     * `Pyramid`, and `Cylinder` are already wired.
-     *
-     * To avoid silently dropping textures, this function emits a single Log.w warning
-     * the first time Stairs is seen carrying at least one `Textured` slot, listing
-     * the slot sources. Callers that need textured Stairs rendering should wait for
-     * the `uv-generation-stairs` slice.
+     * All five [IsometricMaterial.PerFace] variants are fully wired: `Prism`,
+     * `Octahedron`, `Pyramid`, `Cylinder`, and `Stairs` each contribute their
+     * per-slot texture sources to the atlas. Missing slots (null) are silently
+     * skipped; [IsometricMaterial.PerFace.default] is also collected when it is
+     * a [IsometricMaterial.Textured].
      */
     private fun collectTextureSources(
         material: MaterialData?,

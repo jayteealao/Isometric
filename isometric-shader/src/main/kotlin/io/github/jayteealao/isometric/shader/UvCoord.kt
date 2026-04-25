@@ -56,7 +56,15 @@ data class TextureTransform(
     }
 
     companion object {
-        /** No transform — identity. */
+        /**
+         * The identity texture transform — scale 1×1, no rotation, no offset.
+         *
+         * Named `IDENTITY` after the mathematical identity element: composing any
+         * transform with [IDENTITY] leaves it unchanged. The all-defaults constructor
+         * is equivalent but less expressive at the call site; the named constant makes
+         * the intent explicit when a no-op transform is required (e.g. as a default
+         * parameter value or a reset sentinel).
+         */
         val IDENTITY = TextureTransform()
 
         /**

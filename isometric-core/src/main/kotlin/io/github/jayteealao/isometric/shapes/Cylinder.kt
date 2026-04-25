@@ -31,6 +31,9 @@ import kotlin.math.sin
  * @param height The extent along the z-axis (must be positive, default 1.0)
  * @param vertices The number of sides used to approximate the circle (must be in 3..24,
  *   default 20). Higher values produce a smoother cylinder but generate more polygons.
+ *   The vertex range was tightened from a permissive `Int.MAX_VALUE` to `3..24` in the
+ *   WebGPU pipeline-cleanup slice; values outside this range now throw
+ *   `IllegalArgumentException` at construction.
  */
 class Cylinder @JvmOverloads constructor(
     val position: Point = Point.ORIGIN,

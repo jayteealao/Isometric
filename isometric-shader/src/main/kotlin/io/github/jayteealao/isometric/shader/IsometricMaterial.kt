@@ -65,10 +65,9 @@ sealed interface IsometricMaterial : MaterialData {
      * [default] invariant — a `PerFace` material cannot itself be a `PerFace` — is
      * enforced in the base [init] block and applies to every subclass.
      *
-     * Each wired-up shape has its own per-face DSL: [prismPerFace] for [Prism],
+     * Each shape has its own per-face DSL: [prismPerFace] for [Prism],
      * [pyramidPerFace] for [Pyramid], [octahedronPerFace] for [Octahedron],
-     * [cylinderPerFace] for [Cylinder]. Stubbed shapes (Stairs) construct the matching
-     * subclass directly until their `uv-generation-<shape>` slices ship a DSL.
+     * [cylinderPerFace] for [Cylinder], and [stairsPerFace] for [Stairs].
      *
      * ### Validation via `require()` rather than a compile-time builder
      *
@@ -119,7 +118,7 @@ sealed interface IsometricMaterial : MaterialData {
          * @property faceMap Map from [PrismFace] role to material for that face
          * @property default Material used for faces not present in [faceMap].
          */
-        public class Prism internal constructor(
+        public class Prism @PublishedApi internal constructor(
             faceMap: Map<PrismFace, MaterialData>,
             default: MaterialData = UNASSIGNED_FACE_DEFAULT,
         ) : PerFace(default) {
@@ -198,6 +197,11 @@ sealed interface IsometricMaterial : MaterialData {
          *     default = IsoColor.GRAY
          * }
          * ```
+         *
+         * **`v=0` inconsistency:** Cylinder side faces place `v=0` at the top ring,
+         * which is the opposite of [Prism] side faces where `v=0` is at the bottom;
+         * Cylinder caps and side faces also interpret `v=0` differently from Prism
+         * top/bottom faces due to their planar disk vs. planar quad UV projections.
          *
          * @property top Material for the top cap (path index 1)
          * @property bottom Material for the bottom cap (path index 0)
@@ -586,6 +590,28 @@ fun cylinderPerFace(
 ): IsometricMaterial.PerFace.Cylinder =
     CylinderPerFaceMaterialScope().apply(block).build()
 
+/**
+ * Creates an [IsometricMaterial.PerFace.Stairs] via a builder with named face slots.
+ *
+ * Stairs has three named face groups: [StairsPerFaceMaterialScope.tread] (horizontal step
+ * surfaces), [StairsPerFaceMaterialScope.riser] (vertical step surfaces), and
+ * [StairsPerFaceMaterialScope.side] (the two zigzag side walls). All faces of each logical
+ * group share the same material — the number of steps does not affect the material API.
+ *
+ * ```kotlin
+ * Shape(Stairs(origin, stepCount = 4), material = stairsPerFace {
+ *     tread = texturedResource(R.drawable.stone)
+ *     riser = texturedResource(R.drawable.brick)
+ *     side  = texturedResource(R.drawable.wood)
+ *     default = IsoColor.GRAY
+ * })
+ * ```
+ */
+fun stairsPerFace(
+    block: StairsPerFaceMaterialScope.() -> Unit,
+): IsometricMaterial.PerFace.Stairs =
+    StairsPerFaceMaterialScope().apply(block).build()
+
 // -- Builder classes ----------------------------------------------------------
 
 /** DSL marker that prevents nesting per-face scope calls inadvertently. */
@@ -593,7 +619,7 @@ fun cylinderPerFace(
 annotation class IsometricMaterialDsl
 
 @IsometricMaterialDsl
-class PrismPerFaceMaterialScope internal constructor() {
+class PrismPerFaceMaterialScope @PublishedApi internal constructor() {
     var top: MaterialData? = null
     var bottom: MaterialData? = null
     var front: MaterialData? = null
@@ -625,7 +651,7 @@ class PrismPerFaceMaterialScope internal constructor() {
 }
 
 @IsometricMaterialDsl
-class PyramidPerFaceMaterialScope internal constructor() {
+class PyramidPerFaceMaterialScope @PublishedApi internal constructor() {
     /** Material for the rectangular base quad (path index 4). */
     var base: MaterialData? = null
 
@@ -641,6 +667,9 @@ class PyramidPerFaceMaterialScope internal constructor() {
      *   (enforced by [PyramidFace.Lateral]'s init block).
      */
     fun lateral(index: Int, material: MaterialData) {
+        require(index in 0..3) {
+            "Pyramid lateral index out of range: $index (expected 0..3 for the 4 lateral faces)"
+        }
         lateralMap[PyramidFace.Lateral(index)] = material
     }
 
@@ -658,7 +687,7 @@ class PyramidPerFaceMaterialScope internal constructor() {
 }
 
 @IsometricMaterialDsl
-class OctahedronPerFaceMaterialScope internal constructor() {
+class OctahedronPerFaceMaterialScope @PublishedApi internal constructor() {
     /** Fallback for any face not explicitly assigned via [face] or [allFaces]. */
     var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
 
@@ -682,7 +711,30 @@ class OctahedronPerFaceMaterialScope internal constructor() {
 }
 
 @IsometricMaterialDsl
-class CylinderPerFaceMaterialScope internal constructor() {
+class StairsPerFaceMaterialScope @PublishedApi internal constructor() {
+    /** Material for every tread face (horizontal step surfaces). */
+    var tread: MaterialData? = null
+
+    /** Material for every riser face (vertical step surfaces). */
+    var riser: MaterialData? = null
+
+    /** Material for the two zigzag side walls. */
+    var side: MaterialData? = null
+
+    /** Fallback for any slot left null. */
+    var default: MaterialData = IsometricMaterial.PerFace.UNASSIGNED_FACE_DEFAULT
+
+    internal fun build(): IsometricMaterial.PerFace.Stairs =
+        IsometricMaterial.PerFace.Stairs(
+            tread = tread,
+            riser = riser,
+            side = side,
+            default = default,
+        )
+}
+
+@IsometricMaterialDsl
+class CylinderPerFaceMaterialScope @PublishedApi internal constructor() {
     /** Material for the top cap (path index 1). */
     var top: MaterialData? = null
 

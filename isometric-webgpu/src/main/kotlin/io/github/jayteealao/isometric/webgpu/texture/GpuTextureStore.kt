@@ -22,6 +22,9 @@ import java.nio.ByteOrder
  * when an untextured face samples it. Provides [uploadBitmap] to upload Android
  * [Bitmap] data as `RGBA8Unorm` GPU textures — matching Android's
  * `Bitmap.copyPixelsToBuffer()` output which writes pixels as R,G,B,A bytes.
+ *
+ * **Mipmap note:** Mipmaps are not generated; texture sampling uses the base level only.
+ * All textures are created with `mipLevelCount = 1` (the WebGPU default).
  */
 internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 

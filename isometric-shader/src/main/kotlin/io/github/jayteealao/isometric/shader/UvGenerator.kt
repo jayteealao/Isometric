@@ -3,6 +3,7 @@ package io.github.jayteealao.isometric.shader
 import io.github.jayteealao.isometric.ExperimentalIsometricApi
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.CylinderFace
 import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
 import io.github.jayteealao.isometric.shapes.Prism
@@ -15,14 +16,26 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Generates per-vertex UV coordinates for [Prism] faces. Internal implementation detail.
+ * Generates per-vertex UV coordinates for shape faces. Internal implementation detail.
  *
  * UV coordinates are computed in 3D space (before isometric projection). Affine
  * mapping in screen space is correct for orthographic projection — no foreshortening
  * correction is required.
  *
- * Output is a [FloatArray] of 8 floats: `[u0,v0, u1,v1, u2,v2, u3,v3]` matching the
- * vertex order of [Prism.paths] at the given face index.
+ * Output is a [FloatArray] of `2 × faceVertexCount` floats in `[u0,v0, u1,v1, ...]`
+ * order matching the vertex order of the shape's [io.github.jayteealao.isometric.Path.points]
+ * at the given face index.
+ *
+ * ## Face-index ordering rationale
+ *
+ * Each `for<Shape>Face(shape, faceIndex)` function accepts a 0-based path index into
+ * `shape.paths`, which is the same ordering used by the isometric scene projector when
+ * it emits [io.github.jayteealao.isometric.RenderCommand] instances. Maintaining a
+ * single canonical face-index ordering (path list order) avoids N-way translation
+ * tables between UV generation, material resolution, and GPU packing. Consumers that
+ * need to identify a face semantically (e.g. "top cap") use the corresponding
+ * `FaceIdentifier` subtype (e.g. [CylinderFace.fromPathIndex]) rather than relying on
+ * raw indices, which keeps semantic and positional concerns separated.
  */
 internal object UvGenerator {
 
@@ -371,16 +384,15 @@ internal object UvGenerator {
         require(faceIndex in knot.paths.indices) {
             "faceIndex $faceIndex out of bounds for Knot with ${knot.paths.size} faces (valid range: 0 until ${knot.paths.size})"
         }
+        val prismFaceCount = knot.sourcePrisms.size * PrismFace.entries.size  // 3 * 6 = 18
         return when (faceIndex) {
-            in 0..17 -> {
-                val prismIndex = faceIndex / 6
-                val localFaceIndex = faceIndex % 6
+            in 0 until prismFaceCount -> {
+                val prismIndex = faceIndex / PrismFace.entries.size
+                val localFaceIndex = faceIndex % PrismFace.entries.size
                 forPrismFace(knot.sourcePrisms[prismIndex], localFaceIndex)
             }
-            18, 19 -> quadBboxUvs(knot.paths[faceIndex])
-            else -> throw IllegalArgumentException(
-                "Knot has exactly 20 faces (indices 0..19); got $faceIndex"
-            )
+            prismFaceCount, prismFaceCount + 1 -> quadBboxUvs(knot.paths[faceIndex])
+            else -> error("unreachable: faceIndex=$faceIndex already validated to be in knot.paths.indices (${knot.paths.size} faces)")
         }
     }
 
