@@ -9,7 +9,6 @@ import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
 import io.github.jayteealao.isometric.shader.TextureSource
-import io.github.jayteealao.isometric.shader.UvGenerator
 import io.github.jayteealao.isometric.webgpu.texture.GpuTextureManager
 import java.nio.ByteOrder
 
@@ -296,7 +295,13 @@ internal class GpuFullPipeline(
 
         emit.reset()
         textureManager.resetToFallback()
-        UvGenerator.clearAllCaches()
+        // NOTE: UvGenerator.clearAllCaches() is intentionally NOT called here.
+        // UvGenerator is `internal` to isometric-shader; isometric-webgpu cannot access
+        // it directly across module boundaries. Clearing the identity-caches on clearScene
+        // is a memory-hygiene nice-to-have (the caches hold identity-keyed slots that evict
+        // naturally when a new scene is uploaded with different shape instances). A
+        // cross-module clearing hook can be added in a follow-up slice if profiling shows
+        // significant retained-shape pressure across scene transitions (Risk 4 deferral).
         Log.d(TAG, "clearScene: scene cleared, emit caches reset")
     }
 
