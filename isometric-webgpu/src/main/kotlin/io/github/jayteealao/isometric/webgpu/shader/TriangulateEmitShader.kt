@@ -20,10 +20,10 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  *    `triCount = vc−2` triangles into the slot, and fill the remaining
  *    `MAX_VERTICES_PER_FACE − emitted×3` vertex positions with degenerates.
  * 4. **Ear-clipping** (post `webgpu-ngon-faces` I-02 fix): classic O(n²) algorithm
- *    over a doubly-linked list of active vertices (`nextIdx`/`prevIdx`). Each
+ *    over a doubly-linked list of activeCount vertices (`nextIdx`/`prevIdx`). Each
  *    iteration finds an "ear" — a vertex whose triangle (prev, current, next) is
  *    convex w.r.t. the polygon's signed-area-derived winding AND empty of other
- *    active vertices — emits it, and unlinks the ear vertex. Convex polygons hit
+ *    activeCount vertices — emits it, and unlinks the ear vertex. Convex polygons hit
  *    an ear at the first vertex every iteration (O(n) inner emptiness check) and
  *    so degrade gracefully to fan performance; only non-convex faces (Stairs
  *    zigzag at stepCount ≥ 3) pay the full O(n²) cost.
@@ -66,7 +66,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * ## Ear-clip emit (post `webgpu-ngon-faces` I-02 fix)
  *
  * The emit path runs ear-clipping over up to 24 vertices, producing up to 22
- * triangles per face. Per iteration: scan up to `active` vertices for an ear,
+ * triangles per face. Per iteration: scan up to `activeCount` vertices for an ear,
  * emit `(prev, ear, next)` in the polygon's natural winding, and remove the ear
  * vertex from the linked list. Slots after `emitted * 3` are filled with
  * degenerates. The pre-fix fan-from-`s[0]` approach was a special case that
@@ -307,89 +307,85 @@ internal object TriangulateEmitShader {
                 uvs[k] = vec2<f32>(h.x, h.y);
             }
 
-            // ── Ear-clip triangulation (non-convex-safe) ──────────────────────
+            // ── Ear-clip triangulation (non-convex-safe, for-loop form) ───────
             // Replaces the prior fan-from-s[0] which was correct only for convex
             // polygons. Stairs zigzag side faces (stepCount >= 3) are non-convex
             // and need a triangulation that respects the polygon silhouette.
             //
-            // Classic O(n²) ear-clipping over a doubly-linked list of active
-            // vertices (`nextIdx`/`prevIdx`). Each iteration scans for an "ear" —
-            // a vertex whose triangle (prev, current, next) is convex w.r.t. the
-            // polygon's winding AND contains no other active vertex — then emits
-            // the triangle and removes the ear vertex from the list. Convex
-            // polygons (cylinder caps, knot quads, prism quads) find an ear at
-            // the first vertex every iteration, so they pay only the O(n) inner
-            // emptiness check; only non-convex faces incur the full O(n²) cost.
+            // Classic ear-clipping over a doubly-linked list of activeCount vertices
+            // (`nextIdx`/`prevIdx`). Bounded `for` loops in all three positions
+            // (outer / scan / point-in-triangle) so Tint emits structured SPIR-V
+            // control flow with no ambiguity. Convex polygons (cylinder caps,
+            // knot quads, prism quads) find an ear at the first scan position
+            // every iteration, so they pay only the O(n) inner emptiness check;
+            // only non-convex faces incur the full O(n²) cost. Worst-case bound:
+            // 24 outer × 24 scan × 24 inner = 13824 ops per face.
             let triCount = vertexCount - 2u;
 
             // Polygon signed area determines NDC-space winding. The y-flip in the
             // projection above can invert per-face winding, so we don't hardcode
             // CCW/CW; we test convexity against this face's actual orientation.
             var signedArea2: f32 = 0.0;
-            for (var k: u32 = 0u; k < vertexCount; k = k + 1u) {
-                let kNext = select(k + 1u, 0u, k + 1u == vertexCount);
-                let pa = ndc[k];
-                let pb = ndc[kNext];
+            for (var sk: u32 = 0u; sk < vertexCount; sk = sk + 1u) {
+                let skNext = select(sk + 1u, 0u, sk + 1u == vertexCount);
+                let pa = ndc[sk];
+                let pb = ndc[skNext];
                 signedArea2 = signedArea2 + (pa.x * pb.y - pb.x * pa.y);
             }
             let desiredSign: f32 = select(-1.0, 1.0, signedArea2 > 0.0);
 
-            // Initialize circular doubly-linked list of active vertices.
+            // Initialize circular doubly-linked list of activeCount vertices.
             var nextIdx: array<u32, 24>;
             var prevIdx: array<u32, 24>;
-            for (var k: u32 = 0u; k < vertexCount; k = k + 1u) {
-                nextIdx[k] = select(k + 1u, 0u, k + 1u == vertexCount);
-                prevIdx[k] = select(k - 1u, vertexCount - 1u, k == 0u);
+            for (var ik: u32 = 0u; ik < vertexCount; ik = ik + 1u) {
+                nextIdx[ik] = select(ik + 1u, 0u, ik + 1u == vertexCount);
+                prevIdx[ik] = select(ik - 1u, vertexCount - 1u, ik == 0u);
             }
 
             var emitted: u32 = 0u;
             var current: u32 = 0u;
-            var active: u32 = vertexCount;
+            var activeCount: u32 = vertexCount;
+            var done: bool = false;
 
-            // Outer loop: emit one triangle per iteration until we have triCount.
-            loop {
-                if (emitted >= triCount) { break; }
-                if (active < 3u) { break; }
+            // Outer for-loop: at most triCount = vertexCount-2 ears to emit.
+            for (var emitIter: u32 = 0u; emitIter < triCount; emitIter = emitIter + 1u) {
+                if (done) { break; }
 
-                // Scan up to `active` vertices to find an ear starting at `current`.
-                var foundEar = false;
+                // Scan up to `activeCount` vertices to find an ear starting at `current`.
+                var foundEar: bool = false;
                 var earIdx: u32 = 0u;
                 var scanIdx: u32 = current;
-                var scanCount: u32 = 0u;
-                loop {
-                    if (scanCount >= active) { break; }
 
-                    let p = prevIdx[scanIdx];
-                    let n = nextIdx[scanIdx];
-                    let A = ndc[p];
+                for (var scanCount: u32 = 0u; scanCount < vertexCount; scanCount = scanCount + 1u) {
+                    if (scanCount >= activeCount) { break; }
+
+                    let pIdx0 = prevIdx[scanIdx];
+                    let nIdx0 = nextIdx[scanIdx];
+                    let A = ndc[pIdx0];
                     let B = ndc[scanIdx];
-                    let C = ndc[n];
+                    let C = ndc[nIdx0];
 
                     // Convex test in the polygon's winding (sign of (B-A) × (C-A)).
                     let cross = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
-                    var isEar = (cross * desiredSign) > 0.0;
+                    var isEar: bool = (cross * desiredSign) > 0.0;
 
-                    // Emptiness test: no other active vertex must lie inside the
-                    // candidate triangle (A, B, C). Walk the linked list from
-                    // `nextIdx[n]` until we reach `p`, exclusive.
+                    // Emptiness test: no other activeCount vertex inside (A, B, C).
+                    // Walk the linked list from nextIdx[nIdx0] until we reach pIdx0.
                     if (isEar) {
-                        var k = nextIdx[n];
-                        var pitGuard: u32 = 0u;
-                        loop {
-                            if (k == p) { break; }
-                            if (pitGuard >= 24u) { break; }
-                            pitGuard = pitGuard + 1u;
-                            let P = ndc[k];
+                        var pitIdx: u32 = nextIdx[nIdx0];
+                        for (var pitStep: u32 = 0u; pitStep < vertexCount; pitStep = pitStep + 1u) {
+                            if (pitIdx == pIdx0) { break; }
+                            let P = ndc[pitIdx];
                             let s1 = (P.x - B.x) * (A.y - B.y) - (A.x - B.x) * (P.y - B.y);
                             let s2 = (P.x - C.x) * (B.y - C.y) - (B.x - C.x) * (P.y - C.y);
                             let s3 = (P.x - A.x) * (C.y - A.y) - (C.x - A.x) * (P.y - A.y);
-                            let hasNeg = (s1 < 0.0) || (s2 < 0.0) || (s3 < 0.0);
-                            let hasPos = (s1 > 0.0) || (s2 > 0.0) || (s3 > 0.0);
+                            let hasNeg: bool = (s1 < 0.0) || (s2 < 0.0) || (s3 < 0.0);
+                            let hasPos: bool = (s1 > 0.0) || (s2 > 0.0) || (s3 > 0.0);
                             if (!(hasNeg && hasPos)) {
                                 isEar = false;
                                 break;
                             }
-                            k = nextIdx[k];
+                            pitIdx = nextIdx[pitIdx];
                         }
                     }
 
@@ -400,35 +396,37 @@ internal object TriangulateEmitShader {
                     }
 
                     scanIdx = nextIdx[scanIdx];
-                    scanCount = scanCount + 1u;
                 }
 
-                if (!foundEar) { break; }
+                if (!foundEar) {
+                    done = true;
+                    continue;
+                }
 
-                let p = prevIdx[earIdx];
-                let n = nextIdx[earIdx];
+                let pIdx = prevIdx[earIdx];
+                let nIdx = nextIdx[earIdx];
 
-                // Emit triangle (p, earIdx, n) in the polygon's natural winding.
+                // Emit triangle (pIdx, earIdx, nIdx) in the polygon's natural winding.
                 let outBase = (base + emitted * 3u) * 14u;
-                let n0 = ndc[p];      let u0 = uvs[p];
-                let n1 = ndc[earIdx]; let u1 = uvs[earIdx];
-                let n2 = ndc[n];      let u2 = uvs[n];
-                writeVertex(outBase + 0u  * 14u, n0.x, n0.y, r, g, b, a, u0.x, u0.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex(outBase + 1u  * 14u, n1.x, n1.y, r, g, b, a, u1.x, u1.y, asU, asV, aoU, aoV, texIdx);
-                writeVertex(outBase + 2u  * 14u, n2.x, n2.y, r, g, b, a, u2.x, u2.y, asU, asV, aoU, aoV, texIdx);
+                let pNdc = ndc[pIdx];   let pUv = uvs[pIdx];
+                let eNdc = ndc[earIdx]; let eUv = uvs[earIdx];
+                let nNdc = ndc[nIdx];   let nUv = uvs[nIdx];
+                writeVertex(outBase + 0u  * 14u, pNdc.x, pNdc.y, r, g, b, a, pUv.x, pUv.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex(outBase + 1u  * 14u, eNdc.x, eNdc.y, r, g, b, a, eUv.x, eUv.y, asU, asV, aoU, aoV, texIdx);
+                writeVertex(outBase + 2u  * 14u, nNdc.x, nNdc.y, r, g, b, a, nUv.x, nUv.y, asU, asV, aoU, aoV, texIdx);
                 emitted = emitted + 1u;
 
-                // Remove `earIdx` from the active list and advance to its successor.
-                nextIdx[p] = n;
-                prevIdx[n] = p;
-                active = active - 1u;
-                current = n;
+                // Remove `earIdx` from the activeCount list and advance to its successor.
+                nextIdx[pIdx] = nIdx;
+                prevIdx[nIdx] = pIdx;
+                activeCount = activeCount - 1u;
+                current = nIdx;
             }
 
             // Fill remaining slots (from emitted*3u onwards) with degenerates.
-            // Using `emitted` rather than `triCount` keeps the buffer clean even
-            // if the safety guards aborted early on a degenerate/self-intersecting
-            // polygon (should not happen for UvGenerator outputs).
+            // Using `emitted` rather than `triCount` keeps the buffer clean if
+            // ear-search bailed early on a degenerate/self-intersecting polygon
+            // (should not happen for UvGenerator outputs).
             let firstDegen = emitted * 3u;
             for (var j = firstDegen; j < ${MAX_VERTICES_PER_FACE}u; j = j + 1u) {
                 writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);

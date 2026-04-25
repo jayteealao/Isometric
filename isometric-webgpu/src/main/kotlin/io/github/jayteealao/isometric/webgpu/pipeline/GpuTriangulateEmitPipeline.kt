@@ -191,6 +191,26 @@ internal class GpuTriangulateEmitPipeline(
             )
         )
 
+        // TEMP DIAGNOSTIC (I-04 bisect): surface Tint compile messages to logcat.
+        // The androidx.webgpu wrapper's exception throws away the Tint diagnostic
+        // text; getCompilationInfo() is the only way to see it.
+        try {
+            val info = emitShaderModule!!.getCompilationInfo()
+            if (info.messages.isEmpty()) {
+                android.util.Log.d(TAG, "TINT: shader compiled with zero messages")
+            } else {
+                for ((i, msg) in info.messages.withIndex()) {
+                    android.util.Log.e(
+                        TAG,
+                        "TINT[$i] type=${msg.type} line=${msg.lineNum}:${msg.linePos} " +
+                            "off=${msg.offset} len=${msg.length}: ${msg.message}"
+                    )
+                }
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "TINT: getCompilationInfo() threw", t)
+        }
+
         // Storage-buffer slot usage (WebGPU limit: maxStorageBuffersPerShaderStage = 8):
         //   binding 0 — transformed    (ReadOnlyStorage)
         //   binding 1 — sortedKeys     (ReadOnlyStorage)

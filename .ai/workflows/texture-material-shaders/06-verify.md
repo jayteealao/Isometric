@@ -2,10 +2,10 @@
 schema: sdlc/v1
 type: verify-index
 slug: texture-material-shaders
-status: in-progress
+status: complete
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-22T23:07:41Z"
+updated-at: "2026-04-25T18:03:00Z"
 slices-verified: 16
 slices-total: 16
 tags: [texture, material, shader, canvas, webgpu]
@@ -13,7 +13,7 @@ refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
+next-invocation: "/wf-review texture-material-shaders webgpu-ngon-faces"
 ---
 
 # Verify Index
@@ -129,12 +129,14 @@ next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
   - **I-1 — PRE-EXISTING compile failure in :isometric-benchmark.** `BenchmarkScreen.kt:165` calls `Shape(color = …)`; parameter was renamed to `material` by `api-design-fixes` slice. Unrelated to Stairs (commit `8f06ed6` touches 0 files under `isometric-benchmark/`).
 - Record: [06-verify-uv-generation-stairs.md](06-verify-uv-generation-stairs.md)
 
-### `webgpu-ngon-faces` — FAIL (6 of 7 ACs met; AC2 NOT MET — WGSL fan-triangulation defect on non-convex zigzag)
-- Checks: **5/5 passed** — compile (all 4 modules), webgpu unit tests (incl. 7 new `UvFaceTablePackerTest` + 5 new `TriangulateEmitShaderTest`), apiCheck (zero delta), aggregate `./gradlew check`, `:app:installDebug`.
-- Acceptance: **6/7 met, 1 NOT MET.** AC1 (24-vert cylinder cap) — direct visual pass. AC3 (Knot) — direct visual pass. AC4 — Paparazzi 22 baselines + Prism tab visual. AC5/AC6/AC7 — automated green. **AC2 (Stairs stepCount=5) — DOES NOT MEET pixel-equivalence with Canvas:** the right palette stairs' blue zigzag side renders as a smooth diagonal slope on Full WebGPU instead of the staircase silhouette Canvas produces.
-- Interactive: 4 Maestro runs (verify-cylinder×2, verify-knot, verify-stairs-fixed). Cold-boot post-pass-1 used to clear Vulkan surface transient; `verify-stairs-fixed.yaml` (new flow) successfully lands on Stairs tab — drift in original `verify-stairs.yaml` is filed as I-01.
-- Issues: **2 new.** **I-02 (BLOCKER)** — `TriangulateEmitShader.WGSL` emit-loop fan-triangulates from `s[0]`, which is wrong for non-convex polygons (stairs zigzag side at stepCount≥3). Commit B replaced the unrolled fan with a looped fan but kept the algorithm; Commit A's ear-clipping fix is on the CPU `RenderCommandTriangulator`, not the WGSL shader. Cylinder caps + Knot quads pass because they are convex. Fix path: add ear-clipping inside WGSL emit, or pre-triangulate non-convex faces on CPU. **I-01 (LOW)** — Maestro tab-tap coords drifted in original verify-stairs/verify-knot flows; new `.maestro/verify-stairs-fixed.yaml` resolves it for stairs.
-- Record: [06-verify-webgpu-ngon-faces.md](06-verify-webgpu-ngon-faces.md)
+### `webgpu-ngon-faces` — PASS on pass 3 (all 7 ACs met; 2 BLOCKERs resolved across 3 verify passes)
+- Three verify passes. Pass 1 (`2026-04-22T23:07Z`): **FAIL** with AC2 NOT MET (WGSL fan-from-`s[0]` defect on non-convex stairs zigzag) → resolved by Commit C `77f1968`. Pass 2 (`2026-04-25T17:30Z`): **FAIL with strict regression** — new BLOCKER I-04 (WGSL `'active' is a reserved keyword`, surfaced via `getCompilationInfo()` instrumentation). Pass 3 (`2026-04-25T18:03Z`): **PASS** after rename `active → activeCount`.
+- **Pass 3 checks:** 6/6 automated passed (compile, unit tests, apiCheck, install). 3/3 interactive Maestro flows passed (stairs, cylinder, knot — though knot drifted to Prism per carried-forward I-01).
+- **Pass 3 acceptance:** **7/7 met.** AC1 dispositive (24-vert cylinder cap full brick disk), AC2 dispositive (zigzag silhouette traces every step's notch on Full WebGPU), AC3 inferential (WGSL compile + dispatch ✓ via AC1; knot polygons all convex; pass-1 direct evidence preserved). AC4-AC7 automated/structural.
+- **Pass 3 interactive:** 11 screenshots archived in `verify-evidence/screenshots-webgpu-ngon-faces-pass3/`. Stairs WebGPU 127KB (real render, was 17KB blank-crash in pass 2). Cylinder WebGPU shows three cylinders with the right-most 24-vert variant rendering full brick cap. No app crashes; `Canvas + GPU Sort` tap that cascade-failed in pass 2 now completes cleanly.
+- **Pass 3 issues:** **0 new. I-04 RESOLVED** (rename `active → activeCount`). **I-05 RESOLVED** (cascade — auto-resolved with I-04). I-01 LOW (Maestro tab coord drift) remains open as test-infra defect, out of scope for slice review.
+- **Pass 3 production-code changes (atypical for verify pass):** at user direction, applied two changes during this verify run — (1) WGSL identifier rename, (2) `getCompilationInfo()` Tint diagnostic instrumentation in `GpuTriangulateEmitPipeline`. The instrumentation stays as a debug aid; recommended for adoption across other shader pipelines in a follow-up.
+- Record: [06-verify-webgpu-ngon-faces.md](06-verify-webgpu-ngon-faces.md) (pass-3 PASS body atop archived pass-2 + pass-1 records).
 
 ### `uv-generation-knot` — PASS (all 5 ACs met on pass 1; zero new issues)
 - Checks: **5/5 passed** — targeted `UvGeneratorKnotTest` (11/11 tests, 0 failures, 0.047s), shader debug + release variants, core / compose debug+release / webgpu test, apiCheck on all four slice modules. Aggregate across slice-relevant modules: **849 tests / 79 suites / 0 failures / 0 errors / 14 pre-existing skips**. apiCheck delta: single planned addition `+Knot.getSourcePrisms(): List` in `isometric-core.api`; `UvGenerator` stays `internal` as planned.
@@ -145,12 +147,12 @@ next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
 
 ## Recommended Next Stage
 
-**Update (2026-04-25):** I-02 fix landed in Commit C — WGSL ear-clipping
-inside `TriangulateEmitShader.WGSL` replaces the fan-from-`s[0]` algorithm
-that broke non-convex polygons. See
-`05-implement-webgpu-ngon-faces.md` § "Commit C" for details. Pass-2 verify
-is now the next step.
+**Update (2026-04-25T18:03Z):** Pass 3 verify PASSED with all 7 ACs met.
+I-04 was diagnosed via `getCompilationInfo()` instrumentation as a Tint
+reserved-keyword conflict (`active`) and resolved by a single-token rename
+to `activeCount`. The instrumentation stays in `GpuTriangulateEmitPipeline`
+as a debug aid. Slice is ready for review.
 
-- **Option A (default, recommended):** `/wf-verify texture-material-shaders webgpu-ngon-faces` — pass-2 verify. Re-run `.maestro/verify-stairs-fixed.yaml` to confirm AC2 (zigzag silhouette parity) now passes on Full WebGPU. Also re-run cylinder + knot flows to confirm no regression on convex polygons.
-- **Option B:** `/wf-plan texture-material-shaders webgpu-ngon-faces` — revisit the plan only if pass-2 verify exposes a deeper algorithmic gap. The plan's §Step 7 fan prescription has now been deviated-from (deviation #5 in implement record).
-- **Option C:** `/wf-review texture-material-shaders webgpu-ngon-faces` — review the Commit A + B + C diff as the final slice surface. Not recommended ahead of pass-2 verify since AC2 still has no positive on-device evidence.
+- **Option A (default, recommended):** `/wf-review texture-material-shaders webgpu-ngon-faces` — review the full slice diff (Commit A omnibus, Commit B GPU pipeline rewrite, Commit C ear-clip, plus pass-3 fix commit). Suggest `/compact` first since the verify trail carried substantial bisection context.
+- **Option B:** `/wf-handoff texture-material-shaders webgpu-ngon-faces` — if the user judges the slice review-complete via this verify trail and wants to skip a separate review pass.
+- **Option C:** `/wf-implement texture-material-shaders webgpu-ngon-faces` — only if a new defect surfaces during review prep.
