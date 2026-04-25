@@ -253,11 +253,12 @@ class UvGeneratorCylinderTest {
     // -- D-11: cap cache serves alternating cap calls ------------------------
 
     /**
-     * D-11: The cylinder cap cache is an AtomicReference<Triple<Cylinder, FloatArray, FloatArray>>
-     * that eagerly computes BOTH caps on the first cache miss. This means:
-     *  - After the first call for faceIndex=1 (TOP), both bottom and top arrays are cached.
-     *  - A subsequent call for faceIndex=0 (BOTTOM) must return the same cached FloatArray.
-     *  - A second call for faceIndex=1 (TOP) must return the same cached FloatArray as before.
+     * D-11: The cylinder cap cache uses two separate IdentityCachedUvProvider<Cylinder>
+     * instances (one for top, one for bottom). Each provider lazily computes its cap on
+     * the first miss and caches the result by Cylinder identity (===). This means:
+     *  - After the first call for faceIndex=1 (TOP), the top array is cached.
+     *  - After the first call for faceIndex=0 (BOTTOM), the bottom array is cached.
+     *  - Subsequent calls for the same Cylinder and face return the same cached FloatArray.
      *
      * We assert array identity (===) to confirm the cache is actually serving the same
      * pre-computed instances rather than recomputing on each call.

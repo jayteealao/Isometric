@@ -9,6 +9,7 @@ import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
 import io.github.jayteealao.isometric.shader.TextureSource
+import io.github.jayteealao.isometric.shader.UvGenerator
 import io.github.jayteealao.isometric.webgpu.texture.GpuTextureManager
 import java.nio.ByteOrder
 
@@ -295,6 +296,7 @@ internal class GpuFullPipeline(
 
         emit.reset()
         textureManager.resetToFallback()
+        UvGenerator.clearAllCaches()
         Log.d(TAG, "clearScene: scene cleared, emit caches reset")
     }
 

@@ -12,7 +12,7 @@ import io.github.jayteealao.isometric.shapes.PrismFace
 import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.shapes.StairsFace
-import java.util.concurrent.atomic.AtomicReference
+import io.github.jayteealao.isometric.shader.internal.IdentityCachedUvProvider
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -190,26 +190,23 @@ internal object UvGenerator {
     fun forAllCylinderFaces(cylinder: Cylinder): List<FloatArray> =
         cylinder.paths.indices.map { forCylinderFace(cylinder, it) }
 
-    // D-01: Replace three @Volatile fields with a single AtomicReference to eliminate
-    // the TOCTOU window where (1) the key is written, (2) another thread reads the key,
-    // (3) the UVs are null-ed, (4) the other thread reads a null UV for a valid key.
-    // AtomicReference<Triple> keeps the key+both-UV-arrays as a single atomic unit.
-    // G8 will migrate this to the shared IdentityCachedUvProvider utility when that
-    // helper lands; for now this is a partial fix that closes the correctness gap.
-    private val cylinderCapCache =
-        AtomicReference<Triple<Cylinder, FloatArray, FloatArray>?>(null)
+    // G8: Migrate from AtomicReference<Triple<Cylinder, FloatArray, FloatArray>> to
+    // two separate IdentityCachedUvProvider instances (one per cap). Each provider
+    // stores a single (key, array) pair behind an AtomicReference, giving the same
+    // TOCTOU protection as the prior Triple approach but with simpler, reusable code.
+    // On a cap-miss for one provider, the OTHER cap is NOT eagerly computed here;
+    // instead, the two providers each lazily compute their own array on first access.
+    // The D-11 test semantics (identity-caching per Cylinder, distinct arrays for top
+    // and bottom) are preserved: each provider caches its own FloatArray independently.
+    private val cylinderTopCache = IdentityCachedUvProvider<Cylinder>()
+    private val cylinderBottomCache = IdentityCachedUvProvider<Cylinder>()
 
     private fun getOrComputeCapUvs(cylinder: Cylinder, reversed: Boolean): FloatArray {
-        val cached = cylinderCapCache.get()
-        if (cached != null && cached.first === cylinder) {
-            return if (reversed) cached.second else cached.third
+        return if (reversed) {
+            cylinderBottomCache.compute(cylinder) { computeCylinderCapUvs(it.vertices, reversed = true) }
+        } else {
+            cylinderTopCache.compute(cylinder) { computeCylinderCapUvs(it.vertices, reversed = false) }
         }
-        // Cache miss: compute both caps at once so a subsequent call for the other
-        // cap of the same cylinder is a guaranteed hit.
-        val bottom = computeCylinderCapUvs(cylinder.vertices, reversed = true)
-        val top = computeCylinderCapUvs(cylinder.vertices, reversed = false)
-        cylinderCapCache.set(Triple(cylinder, bottom, top))
-        return if (reversed) bottom else top
     }
 
     private fun computeCylinderCapUvs(n: Int, reversed: Boolean): FloatArray {
@@ -242,23 +239,15 @@ internal object UvGenerator {
         0.5f, 0.0f,   // v[2] apex
     )
 
-    // Single-slot identity cache for the base-face UVs. Pyramid is immutable after
-    // construction, so `computePyramidBaseUvs` is referentially transparent per
-    // Pyramid instance; the last-computed result is reused until a different Pyramid
-    // arrives. Per-scene renders typically touch one or a few Pyramid instances per
-    // frame, so hit rate is high. Not thread-safe, but UvGenerator is only called
-    // from the UI / render thread in `ShapeNode.renderTo`.
-    @Volatile private var lastBasePyramid: Pyramid? = null
-    @Volatile private var lastBaseUvs: FloatArray? = null
+    // G8: Migrate from two @Volatile fields to IdentityCachedUvProvider<Pyramid>.
+    // The prior @Volatile pair had a TOCTOU window between the key read and value
+    // read; IdentityCachedUvProvider stores a single (key, array) Pair behind an
+    // AtomicReference, closing that window. Semantics (identity-keyed, single-slot)
+    // and output (byte-identical FloatArray) are unchanged.
+    private val pyramidBaseCache = IdentityCachedUvProvider<Pyramid>()
 
-    private fun getOrComputeBaseUvs(pyramid: Pyramid): FloatArray {
-        val cached = lastBaseUvs
-        if (lastBasePyramid === pyramid && cached != null) return cached
-        val fresh = computePyramidBaseUvs(pyramid)
-        lastBasePyramid = pyramid
-        lastBaseUvs = fresh
-        return fresh
-    }
+    private fun getOrComputeBaseUvs(pyramid: Pyramid): FloatArray =
+        pyramidBaseCache.compute(pyramid) { computePyramidBaseUvs(it) }
 
     private fun computePyramidBaseUvs(pyramid: Pyramid): FloatArray {
         val ox = pyramid.position.x
@@ -423,28 +412,41 @@ internal object UvGenerator {
 
         val spanX = maxX - minX; val spanY = maxY - minY; val spanZ = maxZ - minZ
 
+        // U-04: hoist the axis-selection `when` out of the per-vertex loop so it
+        // executes once per face rather than once per vertex. Also replace the
+        // per-iteration `Pair(u, v)` allocation with two plain local vars.
         val result = FloatArray(8)
-        for (i in 0..3) {
-            val pt = pts[i]
-            val (u, v) = when {
-                spanZ <= spanX && spanZ <= spanY ->
-                    Pair(
-                        if (spanX > 0.0) (pt.x - minX) / spanX else 0.0,
-                        if (spanY > 0.0) (pt.y - minY) / spanY else 0.0,
-                    )
-                spanY <= spanX ->
-                    Pair(
-                        if (spanX > 0.0) (pt.x - minX) / spanX else 0.0,
-                        if (spanZ > 0.0) (pt.z - minZ) / spanZ else 0.0,
-                    )
-                else ->
-                    Pair(
-                        if (spanY > 0.0) (pt.y - minY) / spanY else 0.0,
-                        if (spanZ > 0.0) (pt.z - minZ) / spanZ else 0.0,
-                    )
+        when {
+            spanZ <= spanX && spanZ <= spanY -> {
+                // Project onto XY plane (Z is smallest span).
+                val invX = if (spanX > 0.0) 1.0 / spanX else 0.0
+                val invY = if (spanY > 0.0) 1.0 / spanY else 0.0
+                for (i in 0..3) {
+                    val pt = pts[i]
+                    result[i * 2]     = ((pt.x - minX) * invX).toFloat()
+                    result[i * 2 + 1] = ((pt.y - minY) * invY).toFloat()
+                }
             }
-            result[i * 2] = u.toFloat()
-            result[i * 2 + 1] = v.toFloat()
+            spanY <= spanX -> {
+                // Project onto XZ plane (Y is smallest span).
+                val invX = if (spanX > 0.0) 1.0 / spanX else 0.0
+                val invZ = if (spanZ > 0.0) 1.0 / spanZ else 0.0
+                for (i in 0..3) {
+                    val pt = pts[i]
+                    result[i * 2]     = ((pt.x - minX) * invX).toFloat()
+                    result[i * 2 + 1] = ((pt.z - minZ) * invZ).toFloat()
+                }
+            }
+            else -> {
+                // Project onto YZ plane (X is smallest span).
+                val invY = if (spanY > 0.0) 1.0 / spanY else 0.0
+                val invZ = if (spanZ > 0.0) 1.0 / spanZ else 0.0
+                for (i in 0..3) {
+                    val pt = pts[i]
+                    result[i * 2]     = ((pt.y - minY) * invY).toFloat()
+                    result[i * 2 + 1] = ((pt.z - minZ) * invZ).toFloat()
+                }
+            }
         }
         return result
     }
@@ -488,6 +490,21 @@ internal object UvGenerator {
                                  else         (pt.y - stepOrigin) / stepSize).toFloat()
         }
         return result
+    }
+
+    /**
+     * Clears all identity-cached UV arrays held by this generator.
+     *
+     * Intended to be called from [GpuFullPipeline.clearScene] to release references
+     * to shape instances that may otherwise be retained across scene transitions,
+     * preventing GC of stale scene objects.
+     *
+     * Thread-safe: each provider uses an AtomicReference internally.
+     */
+    fun clearAllCaches() {
+        cylinderTopCache.clear()
+        cylinderBottomCache.clear()
+        pyramidBaseCache.clear()
     }
 
     private fun computeUvs(prism: Prism, face: PrismFace, path: Path): FloatArray {
