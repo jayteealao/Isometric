@@ -1,0 +1,39 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Stairs render-mode capture (3 modes, post-cold-boot)"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Tab row after webgpu-ngon-faces: Prism | Octahedron | Pyramid | Cylinder | Stairs | Knot.
+# Strategy: dump UI hierarchy to find Stairs tab bounds reliably, then tap it by text.
+# Use adb-style tab text matching with id selector if Maestro accepts; fall back to swipe + coord.
+# Long swipe to scroll well past the visible row.
+- swipe:
+    start: "95%,4%"
+    end: "5%,4%"
+    duration: 800
+- waitForAnimationToEnd
+# After this swipe, tab order from left should be roughly: Pyramid | Cylinder | Stairs | Knot.
+# Stairs is 3rd visible — around 55% horizontal.
+- tapOn:
+    point: "55%,3%"
+- waitForAnimationToEnd
+
+# Canvas mode (default after launch)
+- takeScreenshot: screenshots/stairs-fixed-canvas
+
+# Full WebGPU mode
+- tapOn: "Full WebGPU"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/stairs-fixed-webgpu
+
+# Hybrid Canvas + GPU Sort
+- tapOn: "Canvas + GPU Sort"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/stairs-fixed-canvas-gpusort

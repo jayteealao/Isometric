@@ -100,23 +100,56 @@ class TriangulateEmitShaderTest {
     }
 
     /**
-     * Triangle emit is now a dynamic loop over `triCount = vertexCount - 2`, not a
-     * chain of unrolled `if (triCount >= Nu)` blocks. The presence of the loop and
-     * the absence of the unrolled markers anchor that change.
+     * Triangle emit is now ear-clip triangulation, not a fan-from-`s[0]` loop.
+     * Anchors:
+     * - Active-set linked list arrays (`nextIdx`, `prevIdx`) declared as
+     *   `array<u32, 24>` on stack.
+     * - Per-face winding detection via signed area (so the convex test isn't
+     *   hardcoded to a specific NDC orientation).
+     * - The legacy fan loop signature (`for (var t: u32 = 0u; t < triCount`)
+     *   must be absent; that pattern was the I-02 BLOCKER for non-convex faces.
+     *
+     * Earlier unrolled markers (pre-Commit B) must remain absent.
      */
     @Test
-    fun `triangle emit uses dynamic loop over triCount`() {
+    fun `triangle emit uses ear-clipping not fan-from-s0`() {
         val wgsl = TriangulateEmitShader.WGSL
 
-        val triLoop = Regex(
-            """for\s*\(\s*var\s+t\s*:\s*u32\s*=\s*0u\s*;\s*t\s*<\s*triCount"""
-        )
+        // Active-set linked list — required for ear-clipping.
+        val nextIdxDecl = Regex("""nextIdx\s*:\s*array<u32\s*,\s*24>""")
         assertNotNull(
-            triLoop.find(wgsl),
-            "Triangle emit must loop `for (var t: u32 = 0u; t < triCount ...)`"
+            nextIdxDecl.find(wgsl),
+            "Ear-clipping requires `nextIdx: array<u32, 24>` on-stack linked list"
+        )
+        val prevIdxDecl = Regex("""prevIdx\s*:\s*array<u32\s*,\s*24>""")
+        assertNotNull(
+            prevIdxDecl.find(wgsl),
+            "Ear-clipping requires `prevIdx: array<u32, 24>` on-stack linked list"
         )
 
-        // Legacy unrolled markers gone.
+        // Per-face winding detection via signed area — must not hardcode CCW/CW.
+        val signedAreaDecl = Regex("""var\s+signedArea2\s*:\s*f32""")
+        assertNotNull(
+            signedAreaDecl.find(wgsl),
+            "Convex test must derive sign from per-face polygon signed area"
+        )
+        val desiredSignDecl = Regex("""let\s+desiredSign\s*:\s*f32""")
+        assertNotNull(
+            desiredSignDecl.find(wgsl),
+            "`desiredSign` constant must encode this face's winding for the ear test"
+        )
+
+        // Legacy fan loop must be gone — that was the I-02 BLOCKER.
+        val legacyFanLoop = Regex(
+            """for\s*\(\s*var\s+t\s*:\s*u32\s*=\s*0u\s*;\s*t\s*<\s*triCount"""
+        )
+        assertFalse(
+            legacyFanLoop.containsMatchIn(wgsl),
+            "Fan-from-s[0] loop `for (var t: u32 = 0u; t < triCount ...)` must be " +
+                "removed — it broke non-convex polygons (I-02)"
+        )
+
+        // Pre-Commit-B unrolled markers stay gone.
         assertFalse(
             wgsl.contains("Triangle 3: (s0, s4, s5)"),
             "Unrolled 'Triangle 3' comment must be removed"

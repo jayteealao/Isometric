@@ -6,7 +6,7 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * WGSL compute shader for the M5 triangulate-and-emit pass.
  *
  * Reads the M4 sorted [SortKey] array (back-to-front order) and for each visible
- * face fan-triangulates the projected screen-space polygon into a flat `array<u32>`
+ * face triangulates the projected screen-space polygon into a flat `array<u32>`
  * vertex buffer consumed by the render pass. One GPU thread per sorted entry.
  *
  * ## Algorithm
@@ -14,15 +14,24 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * 1. Each thread reads `sortedKeys[i]`. Threads are assigned a **fixed stride** slot
  *    in the vertex buffer: `base = i * MAX_VERTICES_PER_FACE`.
  * 2. Sentinel entries (`originalIndex == 0xFFFFFFFF`) and culled faces write
- *    [MAX_VERTICES_PER_FACE] = 12 degenerate (zero-area) vertices so the render pass
+ *    [MAX_VERTICES_PER_FACE] degenerate (zero-area) vertices so the render pass
  *    draws the full `paddedCount × MAX_VERTICES_PER_FACE` vertex range without gaps.
- * 3. Visible entries fetch `transformed[originalIndex]`, fan-triangulate `triCount = vc−2`
- *    triangles into the slot, and fill the remaining `12 − triCount×3` vertex positions
- *    with degenerate vertices.
- * 4. Fan triangulation: pivot = `s0`; triangles = `(s0, s_{t+1}, s_{t+2})` for
- *    `t` in `0..triCount-1`.
+ * 3. Visible entries fetch `transformed[originalIndex]`, ear-clip-triangulate up to
+ *    `triCount = vc−2` triangles into the slot, and fill the remaining
+ *    `MAX_VERTICES_PER_FACE − emitted×3` vertex positions with degenerates.
+ * 4. **Ear-clipping** (post `webgpu-ngon-faces` I-02 fix): classic O(n²) algorithm
+ *    over a doubly-linked list of active vertices (`nextIdx`/`prevIdx`). Each
+ *    iteration finds an "ear" — a vertex whose triangle (prev, current, next) is
+ *    convex w.r.t. the polygon's signed-area-derived winding AND empty of other
+ *    active vertices — emits it, and unlinks the ear vertex. Convex polygons hit
+ *    an ear at the first vertex every iteration (O(n) inner emptiness check) and
+ *    so degrade gracefully to fan performance; only non-convex faces (Stairs
+ *    zigzag at stepCount ≥ 3) pay the full O(n²) cost.
  * 5. Screen-space to NDC: `ndcX = (sx / viewportWidth) * 2 - 1`,
  *    `ndcY = 1 - (sy / viewportHeight) * 2`. Matches [RenderCommandTriangulator] exactly.
+ *    The y-flip can invert per-face winding in NDC, so the convex test uses a
+ *    `desiredSign` derived from the per-face polygon signed area rather than a
+ *    hardcoded CCW/CW assumption.
  *
  * ## UV coordinates (variable-stride offset+length indirection)
  *
@@ -54,13 +63,15 @@ import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangul
  * Degenerate triangles (three vertices at the same position) produce no visible pixels
  * and are discarded by the rasterizer at negligible cost.
  *
- * ## Loop-based emit (post `webgpu-ngon-faces`)
+ * ## Ear-clip emit (post `webgpu-ngon-faces` I-02 fix)
  *
- * The emit path now loops over `triCount = vertexCount - 2` triangles, up to 22
- * (for a 24-vertex face). Each triangle writes `(s[0], s[t+1], s[t+2])` using dynamic
- * indexing into the `TransformedFace.s` array and the UV pool. Dynamic indexing into
- * struct arrays is well-supported on Dawn/Vulkan; unused slot writes are bounded by
- * `triCount`, and slots after `triCount * 3` are filled with degenerates as before.
+ * The emit path runs ear-clipping over up to 24 vertices, producing up to 22
+ * triangles per face. Per iteration: scan up to `active` vertices for an ear,
+ * emit `(prev, ear, next)` in the polygon's natural winding, and remove the ear
+ * vertex from the linked list. Slots after `emitted * 3` are filled with
+ * degenerates. The pre-fix fan-from-`s[0]` approach was a special case that
+ * silently broke on non-convex polygons (Stairs zigzag side at stepCount ≥ 3,
+ * which produced a smooth diagonal slope instead of the stepped silhouette).
  *
  * ## Vertex buffer layout
  *
@@ -116,8 +127,9 @@ internal object TriangulateEmitShader {
     /**
      * Maximum triangles producible from a single face.
      *
-     * Post `webgpu-ngon-faces`: a 24-vertex face produces a triangle fan of
-     * `vertexCount - 2 = 22` triangles. Used to size the output vertex buffer.
+     * Post `webgpu-ngon-faces`: a 24-vertex face produces at most
+     * `vertexCount - 2 = 22` triangles via ear-clipping. Used to size the output
+     * vertex buffer.
      */
     const val MAX_TRIANGLES_PER_FACE = 22
 
@@ -295,26 +307,129 @@ internal object TriangulateEmitShader {
                 uvs[k] = vec2<f32>(h.x, h.y);
             }
 
-            // ── Triangle-fan emit (loop over triCount = vertexCount - 2) ──────
-            // Triangle t writes (vertex 0, vertex t+1, vertex t+2) — a classic fan
-            // from vertex 0 valid for convex polygons. Non-convex face emission is
-            // handled by the CPU triangulator on the Canvas path; GPU faces come
-            // from UvGenerator outputs that are all convex (cylinder caps,
-            // pyramid/octahedron tris, knot quads, stairs zigzag — zigzag is the
-            // non-convex case, routed via ear-clipping on CPU).
+            // ── Ear-clip triangulation (non-convex-safe) ──────────────────────
+            // Replaces the prior fan-from-s[0] which was correct only for convex
+            // polygons. Stairs zigzag side faces (stepCount >= 3) are non-convex
+            // and need a triangulation that respects the polygon silhouette.
+            //
+            // Classic O(n²) ear-clipping over a doubly-linked list of active
+            // vertices (`nextIdx`/`prevIdx`). Each iteration scans for an "ear" —
+            // a vertex whose triangle (prev, current, next) is convex w.r.t. the
+            // polygon's winding AND contains no other active vertex — then emits
+            // the triangle and removes the ear vertex from the list. Convex
+            // polygons (cylinder caps, knot quads, prism quads) find an ear at
+            // the first vertex every iteration, so they pay only the O(n) inner
+            // emptiness check; only non-convex faces incur the full O(n²) cost.
             let triCount = vertexCount - 2u;
-            for (var t: u32 = 0u; t < triCount; t = t + 1u) {
-                let outBase = (base + t * 3u) * 14u;
-                let n0 = ndc[0];        let u0 = uvs[0];
-                let n1 = ndc[t + 1u];   let u1 = uvs[t + 1u];
-                let n2 = ndc[t + 2u];   let u2 = uvs[t + 2u];
+
+            // Polygon signed area determines NDC-space winding. The y-flip in the
+            // projection above can invert per-face winding, so we don't hardcode
+            // CCW/CW; we test convexity against this face's actual orientation.
+            var signedArea2: f32 = 0.0;
+            for (var k: u32 = 0u; k < vertexCount; k = k + 1u) {
+                let kNext = select(k + 1u, 0u, k + 1u == vertexCount);
+                let pa = ndc[k];
+                let pb = ndc[kNext];
+                signedArea2 = signedArea2 + (pa.x * pb.y - pb.x * pa.y);
+            }
+            let desiredSign: f32 = select(-1.0, 1.0, signedArea2 > 0.0);
+
+            // Initialize circular doubly-linked list of active vertices.
+            var nextIdx: array<u32, 24>;
+            var prevIdx: array<u32, 24>;
+            for (var k: u32 = 0u; k < vertexCount; k = k + 1u) {
+                nextIdx[k] = select(k + 1u, 0u, k + 1u == vertexCount);
+                prevIdx[k] = select(k - 1u, vertexCount - 1u, k == 0u);
+            }
+
+            var emitted: u32 = 0u;
+            var current: u32 = 0u;
+            var active: u32 = vertexCount;
+
+            // Outer loop: emit one triangle per iteration until we have triCount.
+            loop {
+                if (emitted >= triCount) { break; }
+                if (active < 3u) { break; }
+
+                // Scan up to `active` vertices to find an ear starting at `current`.
+                var foundEar = false;
+                var earIdx: u32 = 0u;
+                var scanIdx: u32 = current;
+                var scanCount: u32 = 0u;
+                loop {
+                    if (scanCount >= active) { break; }
+
+                    let p = prevIdx[scanIdx];
+                    let n = nextIdx[scanIdx];
+                    let A = ndc[p];
+                    let B = ndc[scanIdx];
+                    let C = ndc[n];
+
+                    // Convex test in the polygon's winding (sign of (B-A) × (C-A)).
+                    let cross = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x);
+                    var isEar = (cross * desiredSign) > 0.0;
+
+                    // Emptiness test: no other active vertex must lie inside the
+                    // candidate triangle (A, B, C). Walk the linked list from
+                    // `nextIdx[n]` until we reach `p`, exclusive.
+                    if (isEar) {
+                        var k = nextIdx[n];
+                        var pitGuard: u32 = 0u;
+                        loop {
+                            if (k == p) { break; }
+                            if (pitGuard >= 24u) { break; }
+                            pitGuard = pitGuard + 1u;
+                            let P = ndc[k];
+                            let s1 = (P.x - B.x) * (A.y - B.y) - (A.x - B.x) * (P.y - B.y);
+                            let s2 = (P.x - C.x) * (B.y - C.y) - (B.x - C.x) * (P.y - C.y);
+                            let s3 = (P.x - A.x) * (C.y - A.y) - (C.x - A.x) * (P.y - A.y);
+                            let hasNeg = (s1 < 0.0) || (s2 < 0.0) || (s3 < 0.0);
+                            let hasPos = (s1 > 0.0) || (s2 > 0.0) || (s3 > 0.0);
+                            if (!(hasNeg && hasPos)) {
+                                isEar = false;
+                                break;
+                            }
+                            k = nextIdx[k];
+                        }
+                    }
+
+                    if (isEar) {
+                        foundEar = true;
+                        earIdx = scanIdx;
+                        break;
+                    }
+
+                    scanIdx = nextIdx[scanIdx];
+                    scanCount = scanCount + 1u;
+                }
+
+                if (!foundEar) { break; }
+
+                let p = prevIdx[earIdx];
+                let n = nextIdx[earIdx];
+
+                // Emit triangle (p, earIdx, n) in the polygon's natural winding.
+                let outBase = (base + emitted * 3u) * 14u;
+                let n0 = ndc[p];      let u0 = uvs[p];
+                let n1 = ndc[earIdx]; let u1 = uvs[earIdx];
+                let n2 = ndc[n];      let u2 = uvs[n];
                 writeVertex(outBase + 0u  * 14u, n0.x, n0.y, r, g, b, a, u0.x, u0.y, asU, asV, aoU, aoV, texIdx);
                 writeVertex(outBase + 1u  * 14u, n1.x, n1.y, r, g, b, a, u1.x, u1.y, asU, asV, aoU, aoV, texIdx);
                 writeVertex(outBase + 2u  * 14u, n2.x, n2.y, r, g, b, a, u2.x, u2.y, asU, asV, aoU, aoV, texIdx);
+                emitted = emitted + 1u;
+
+                // Remove `earIdx` from the active list and advance to its successor.
+                nextIdx[p] = n;
+                prevIdx[n] = p;
+                active = active - 1u;
+                current = n;
             }
 
-            // Fill remaining degenerate slots (from triCount*3 to MAX_VERTICES_PER_FACE-1)
-            let firstDegen = triCount * 3u;
+            // Fill remaining slots (from emitted*3u onwards) with degenerates.
+            // Using `emitted` rather than `triCount` keeps the buffer clean even
+            // if the safety guards aborted early on a degenerate/self-intersecting
+            // polygon (should not happen for UvGenerator outputs).
+            let firstDegen = emitted * 3u;
             for (var j = firstDegen; j < ${MAX_VERTICES_PER_FACE}u; j = j + 1u) {
                 writeVertex((base + j) * 14u, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0xFFFFFFFFu);
             }

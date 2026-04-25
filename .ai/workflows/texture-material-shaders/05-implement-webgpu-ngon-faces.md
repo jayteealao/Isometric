@@ -6,16 +6,17 @@ slice-slug: webgpu-ngon-faces
 status: complete
 stage-number: 5
 created-at: "2026-04-22T21:18:56Z"
-updated-at: "2026-04-22T21:47:18Z"
-metric-files-changed: 18
-metric-lines-added: 1050
-metric-lines-removed: 210
-metric-deviations-from-plan: 3
+updated-at: "2026-04-25T16:07:49Z"
+metric-files-changed: 20
+metric-lines-added: 1170
+metric-lines-removed: 240
+metric-deviations-from-plan: 4
 metric-review-fixes-applied: 0
 commit-sha-a: "04afdd9"
 commit-sha-b: "f14a78d"
-implementation-mode: two-commit
-tags: [webgpu, uv, ngon, omnibus, ear-clipping, gpu-pipeline-rewrite]
+commit-sha-c: ""
+implementation-mode: three-commit
+tags: [webgpu, uv, ngon, omnibus, ear-clipping, gpu-pipeline-rewrite, i02-fix]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
@@ -32,8 +33,11 @@ next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 
 # Implement: webgpu-ngon-faces
 
-This slice landed across **two commits** rather than the plan's specified single atomic
-commit (deviation #1). Both commits together deliver the plan in full.
+This slice landed across **three commits** rather than the plan's specified single
+atomic commit (deviation #1, extended). Commit A + Commit B delivered the planned
+scope; **Commit C is a verify-fail follow-up fix** for I-02 (WGSL fan-from-`s[0]`
+defect on non-convex polygons), shipped after Pass 1 verify revealed the fan emit
+algorithm needed replacement on the GPU path.
 
 ## Commit A (`04afdd9`, +530/-33, 7 files) — omnibus prep
 
@@ -269,18 +273,166 @@ Supplementary check during implement:
   as a valid constructor call. `Constants.LIMIT_U32_UNDEFINED` is the "not
   requested" sentinel for all other fields — default values left alone.
 
+## Commit C (this pass, `<sha-pending>`) — WGSL ear-clip triangulation for I-02
+
+Pass-1 verify (record `06-verify-webgpu-ngon-faces.md`) ran the new
+`.maestro/verify-stairs-fixed.yaml` flow and captured AC2 as **NOT MET**: the
+right palette stairs' blue zigzag side rendered as a smooth diagonal slope on
+Full WebGPU instead of the staircase silhouette. Root cause was traced to the
+post-Commit-B WGSL emit loop:
+
+```wgsl
+// Commit B (failing): fan from vertex 0
+let triCount = vertexCount - 2u;
+for (var t: u32 = 0u; t < triCount; t = t + 1u) {
+    writeVertex(..., s[0], s[t+1], s[t+2], ...)
+}
+```
+
+A triangle fan rooted at `s[0]` is the correct triangulation only for **convex**
+polygons. The Stairs zigzag side polygon is non-convex (it traces the staircase
+notches), so fan triangles cut across the polygon body and produce the diagonal
+slash artifact. Commit A's `RenderCommandTriangulator` ear-clipping fix lives on
+the CPU path only and does not reach the WGSL emit shader.
+
+This pass replaces the WGSL fan with **classic O(n²) ear-clipping**, the same
+algorithm Commit A uses on the CPU side. Three approaches were considered (per
+`06-verify-webgpu-ngon-faces.md` I-02 recommendations):
+
+| Approach | Verdict | Reason |
+|---|---|---|
+| **A. In-shader ear-clip** | **Chosen** | Polygon vertices already on stack in `s: array<vec2<f32>, 24>`; ~70 lines of WGSL; no bind-group / packer changes; symmetric with Commit A's CPU path. |
+| B. CPU pre-triangulate | Rejected | Would inflate `RenderCommand` count and require new GPU pipeline plumbing for what is fundamentally a triangulation algorithm choice. |
+| C. CPU convex-decomposition | Rejected | Same downsides as B with extra bookkeeping; no advantage over ear-clipping. |
+
+### Summary of changes (Commit C)
+
+1. **`TriangulateEmitShader.kt` WGSL emit rewrite (core change).** Replaced the
+   fan-from-`s[0]` loop with an ear-clipping algorithm:
+   - Polygon signed area computed first to derive `desiredSign: f32` (the
+     y-flip in the projection step can invert per-face NDC winding, so we
+     don't hardcode CCW vs CW).
+   - Doubly-linked list `nextIdx`/`prevIdx` (`array<u32, 24>` on stack) of
+     active vertices initialized as a circular list.
+   - Outer `loop`: scan up to `active` vertices for an "ear" — a vertex whose
+     triangle (prev, current, next) is convex w.r.t. `desiredSign` AND empty
+     of all other active vertices.
+   - Inner emptiness check: walk the linked list `nextIdx[n] → prevIdx[p]`
+     and run a same-side point-in-triangle test on each remaining vertex. A
+     `pitGuard >= 24u` safety counter defends against hypothetical linked-list
+     corruption.
+   - Emit `(prev, ear, next)` in the polygon's natural winding, unlink the
+     ear vertex, advance `current` to the ear's successor.
+   - Bookkeeping: changed degenerate-fill base from `triCount * 3u` to
+     `emitted * 3u` so any safety abort still leaves a clean output buffer
+     (output slots `emitted*3..MAX_VERTICES_PER_FACE-1` become degenerate).
+
+2. **KDoc updated** at the file header (Algorithm step 4 reworded from "Fan
+   triangulation: pivot = `s0`" to ear-clipping description with winding
+   handling), at the "Loop-based emit" section (now "Ear-clip emit"), and at
+   the `MAX_TRIANGLES_PER_FACE` constant ("triangle fan" → "ear-clipping").
+
+3. **`TriangulateEmitShaderTest.kt`** — replaced the
+   `triangle emit uses dynamic loop over triCount` test with
+   `triangle emit uses ear-clipping not fan-from-s0`. New presence anchors:
+   `nextIdx: array<u32, 24>`, `prevIdx: array<u32, 24>`, `signedArea2: f32`,
+   `desiredSign: f32`. New absence anchor: legacy fan-loop signature `for (var
+   t: u32 = 0u; t < triCount`. Pre-Commit-B unrolled-marker absence checks
+   preserved as defensive tripwires.
+
+### Files changed (Commit C)
+
+| File | +/− | Action |
+|------|-----|--------|
+| `isometric-webgpu/.../shader/TriangulateEmitShader.kt` | +110 / −24 | Ear-clip algorithm + KDoc |
+| `isometric-webgpu/.../test/.../TriangulateEmitShaderTest.kt` | +50 / −15 | Updated structural anchors |
+| `.ai/workflows/texture-material-shaders/05-implement-webgpu-ngon-faces.md` | +90 / −15 | This Commit C section + frontmatter bumps |
+| `.ai/workflows/texture-material-shaders/00-index.md` | +5 / −5 | Stage status + commit-sha-c |
+| `.ai/workflows/texture-material-shaders/06-verify.md` | +3 / −2 | Verify-fix-applied marker |
+
+### Notes on design choices (Commit C)
+
+- **Why O(n²) ear-clipping over a faster algorithm.** Polynomial-time
+  alternatives (Seidel triangulation O(n log n) expected, Chazelle O(n) worst-
+  case) are dramatically more code and have less robust numeric behavior on
+  near-degenerate polygons. The ear-clipping cost is bounded above by 24² = 576
+  inner ops per face, which on Adreno 750 / Mali compiles to scratchpad-resident
+  loops well under any frame-budget threshold. Symmetry with Commit A's CPU
+  ear-clipping is also worth preserving — both paths fail in the same way on
+  the same pathological inputs.
+
+- **Convex fast-path emerges naturally from the algorithm.** A convex polygon's
+  vertex 0 is always an ear (the inner emptiness check passes immediately),
+  so the outer scan exits in O(1) per ear and the algorithm degrades to fan
+  performance for convex inputs. Cylinder caps, knot quads, prism quads,
+  pyramid/octahedron triangles all hit this fast path — no perf regression on
+  the polygons that worked under Commit B.
+
+- **Per-face winding detection rather than hardcoded.** The projection step
+  flips Y (`ndcY = 1.0 - sy/h * 2.0`), so a screen-space CCW polygon becomes
+  CW in NDC. Rather than assume one direction and special-case the other,
+  the per-face `signedArea2` makes the convex test orientation-agnostic. This
+  also makes the algorithm robust if a future change reorders Y mapping or
+  adds a 3D rotation step that flips winding for some faces.
+
+- **`pitGuard >= 24u` belt-and-suspenders.** For a valid simple polygon the
+  inner walk must reach `p` within `active - 3` steps (the ear's prev and next
+  are excluded from the walk). The hard cap at 24 is paranoia against a
+  hypothetical linked-list corruption — practically unreachable with the
+  current packer code, but cheap to keep.
+
+- **No new bind-groups, packer, or constants.** The fix lives entirely inside
+  the `triangulateEmit` entry function. `MAX_VERTICES_PER_FACE = 66`,
+  `MAX_TRIANGLES_PER_FACE = 22`, all bind-group bindings, struct strides, and
+  the upstream M3 `TransformedFace` data shape are unchanged. This is the
+  minimum-diff fix for I-02.
+
+### Deviations from plan (extends prior list)
+
+5. **WGSL emit algorithm: ear-clipping, not fan.** Plan §Step 7 explicitly
+   prescribed `for i in 1..vertexCount-1: emit (0, i, i+1)`. Commit B
+   implemented this faithfully. Pass-1 verify exposed it as wrong for
+   non-convex polygons, so Commit C deviates from the plan and adopts ear-
+   clipping. This deviation is the direct result of an acceptance-criterion
+   failure (AC2), not an in-flight design judgment call.
+
+### Anything deferred (Commit C)
+
+- **On-device WGSL compile + Maestro re-run for AC2** — handled by the next
+  `/wf-verify` pass. Kotlin tests verify the shader's static text shape only.
+- **Performance micro-benchmark of ear-clipping cost on Adreno** — plan
+  Risk #6 left this out as LOW severity. Still LOW post-fix; ear-clipping's
+  worst case is bounded at 576 inner ops/face and convex faces stay on the
+  fast path.
+
+### Known risks / caveats (Commit C)
+
+- **AC2 verification still pending** — same as before, but now expected to
+  pass. The fix targets exactly the failure mode reported in pass-1 verify.
+  `verify-stairs-fixed.yaml` Maestro flow already exists and is the recommended
+  re-verify path.
+- **Ear-clipping is sensitive to numerical degeneracies.** If a polygon has
+  three nearly-collinear vertices, the convex test cross product can be ~0
+  and either branch of `cross * desiredSign > 0.0` may trigger non-deterministically.
+  This is theoretical for current shape inputs — UvGenerator outputs have
+  generous angle margins. If a future shape introduces near-collinear face
+  vertices, an epsilon comparison may be needed.
+- **`apiCheck` zero-diff** — confirmed; all changes are inside an `internal
+  object`'s WGSL string and a test class.
+
 ## Recommended Next Stage
 
 - **Option A (default, recommended):** `/wf-verify texture-material-shaders webgpu-ngon-faces`
-  — install the debug APK, run all three Maestro flows (cylinder, stairs, knot),
-  capture Full WebGPU screenshots at the new 24-vert / stepCount=5 / knot fixtures
-  and compare with Canvas. This proves AC1/AC2/AC3. **`/compact` first is
-  recommended** — implementation-side context (byte-layout math, WGSL rewrites,
-  struct alignment debugging) is noise for verification. The PreCompact hook
-  preserves workflow state.
-- **Option B:** `/wf-review texture-material-shaders webgpu-ngon-faces` — skip
-  verify and go straight to review. Only appropriate if you intend to defer AC1-3
-  proof to a separate verify pass and just want architectural/correctness review
-  of the Commit B diff first.
-- **Option C:** `/wf-implement texture-material-shaders reviews` — only if verify
-  surfaces shader defects that need fixing before merge.
+  — re-run the same `.maestro/verify-stairs-fixed.yaml` flow that surfaced
+  the I-02 BLOCKER. Capture Canvas vs Full WebGPU screenshots and compare
+  the right palette stairs' blue zigzag side. Pass criterion: WebGPU shows
+  the staircase silhouette (matches Canvas) instead of the diagonal slope.
+  Should also re-run cylinder + knot flows to confirm no regression on
+  convex polygons. **`/compact` first is recommended** — Commit C
+  implementation context (WGSL algorithm details, point-in-triangle math)
+  is noise for verification.
+- **Option B:** `/wf-review texture-material-shaders webgpu-ngon-faces` —
+  review all three commits (A + B + C) together as the final slice diff.
+  Appropriate only if AC2 re-verification is deferred.
+- **Option C:** `/wf-implement texture-material-shaders reviews` — only if
+  re-verify surfaces a new defect.

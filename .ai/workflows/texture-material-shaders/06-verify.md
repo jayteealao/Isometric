@@ -5,15 +5,15 @@ slug: texture-material-shaders
 status: in-progress
 stage-number: 6
 created-at: "2026-04-11T23:44:32Z"
-updated-at: "2026-04-20T22:08:29Z"
-slices-verified: 15
-slices-total: 15
+updated-at: "2026-04-22T23:07:41Z"
+slices-verified: 16
+slices-total: 16
 tags: [texture, material, shader, canvas, webgpu]
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
 next-command: wf-review
-next-invocation: "/wf-review texture-material-shaders uv-generation-knot"
+next-invocation: "/wf-implement texture-material-shaders webgpu-ngon-faces"
 ---
 
 # Verify Index
@@ -129,6 +129,13 @@ next-invocation: "/wf-review texture-material-shaders uv-generation-knot"
   - **I-1 — PRE-EXISTING compile failure in :isometric-benchmark.** `BenchmarkScreen.kt:165` calls `Shape(color = …)`; parameter was renamed to `material` by `api-design-fixes` slice. Unrelated to Stairs (commit `8f06ed6` touches 0 files under `isometric-benchmark/`).
 - Record: [06-verify-uv-generation-stairs.md](06-verify-uv-generation-stairs.md)
 
+### `webgpu-ngon-faces` — FAIL (6 of 7 ACs met; AC2 NOT MET — WGSL fan-triangulation defect on non-convex zigzag)
+- Checks: **5/5 passed** — compile (all 4 modules), webgpu unit tests (incl. 7 new `UvFaceTablePackerTest` + 5 new `TriangulateEmitShaderTest`), apiCheck (zero delta), aggregate `./gradlew check`, `:app:installDebug`.
+- Acceptance: **6/7 met, 1 NOT MET.** AC1 (24-vert cylinder cap) — direct visual pass. AC3 (Knot) — direct visual pass. AC4 — Paparazzi 22 baselines + Prism tab visual. AC5/AC6/AC7 — automated green. **AC2 (Stairs stepCount=5) — DOES NOT MEET pixel-equivalence with Canvas:** the right palette stairs' blue zigzag side renders as a smooth diagonal slope on Full WebGPU instead of the staircase silhouette Canvas produces.
+- Interactive: 4 Maestro runs (verify-cylinder×2, verify-knot, verify-stairs-fixed). Cold-boot post-pass-1 used to clear Vulkan surface transient; `verify-stairs-fixed.yaml` (new flow) successfully lands on Stairs tab — drift in original `verify-stairs.yaml` is filed as I-01.
+- Issues: **2 new.** **I-02 (BLOCKER)** — `TriangulateEmitShader.WGSL` emit-loop fan-triangulates from `s[0]`, which is wrong for non-convex polygons (stairs zigzag side at stepCount≥3). Commit B replaced the unrolled fan with a looped fan but kept the algorithm; Commit A's ear-clipping fix is on the CPU `RenderCommandTriangulator`, not the WGSL shader. Cylinder caps + Knot quads pass because they are convex. Fix path: add ear-clipping inside WGSL emit, or pre-triangulate non-convex faces on CPU. **I-01 (LOW)** — Maestro tab-tap coords drifted in original verify-stairs/verify-knot flows; new `.maestro/verify-stairs-fixed.yaml` resolves it for stairs.
+- Record: [06-verify-webgpu-ngon-faces.md](06-verify-webgpu-ngon-faces.md)
+
 ### `uv-generation-knot` — PASS (all 5 ACs met on pass 1; zero new issues)
 - Checks: **5/5 passed** — targeted `UvGeneratorKnotTest` (11/11 tests, 0 failures, 0.047s), shader debug + release variants, core / compose debug+release / webgpu test, apiCheck on all four slice modules. Aggregate across slice-relevant modules: **849 tests / 79 suites / 0 failures / 0 errors / 14 pre-existing skips**. apiCheck delta: single planned addition `+Knot.getSourcePrisms(): List` in `isometric-core.api`; `UvGenerator` stays `internal` as planned.
 - Acceptance: 5/5 met. AC1 (texture renders on Knot, Canvas), AC2 (no UV discontinuity), AC3 (WebGPU parity — pixel-equivalent to Canvas across all four backends), AC4 (11 tests cover all 4 distinct mesh regions: sub-prism 0/1/2 + custom quads 18/19), AC5 (zero regression across 849 sibling tests, Paparazzi golden images regenerated cleanly).
@@ -137,7 +144,13 @@ next-invocation: "/wf-review texture-material-shaders uv-generation-knot"
 - Record: [06-verify-uv-generation-knot.md](06-verify-uv-generation-knot.md)
 
 ## Recommended Next Stage
-- **Option A (recommended):** `/wf-review texture-material-shaders uv-generation-knot` — latest slice is fully green; code review is the natural next gate. Consider `/compact` first to drop tab-coordinate-discovery and APK-rebuild debugging context from this verify.
-- **Option B:** `/wf-handoff texture-material-shaders uv-generation-knot` — skip review only if already externally pair-reviewed against sibling cylinder / pyramid / stairs slices. Formal review is cheap; recommend Option A instead.
-- **Option C:** `/wf-plan texture-material-shaders uv-generation-knot` — **not applicable**. Plan rev 0 is sound and fully implemented; verify surfaced no plan-level gaps.
-- **Option D (orthogonal cleanup):** a one-line hotfix slice to repair `:isometric-benchmark/BenchmarkScreen.kt:165` (Shape `color`→`material`) so that `./gradlew check` / `build` aggregates unblock. Not required for this slice's review gate; same rationale as in stairs verify.
+
+**Update (2026-04-25):** I-02 fix landed in Commit C — WGSL ear-clipping
+inside `TriangulateEmitShader.WGSL` replaces the fan-from-`s[0]` algorithm
+that broke non-convex polygons. See
+`05-implement-webgpu-ngon-faces.md` § "Commit C" for details. Pass-2 verify
+is now the next step.
+
+- **Option A (default, recommended):** `/wf-verify texture-material-shaders webgpu-ngon-faces` — pass-2 verify. Re-run `.maestro/verify-stairs-fixed.yaml` to confirm AC2 (zigzag silhouette parity) now passes on Full WebGPU. Also re-run cylinder + knot flows to confirm no regression on convex polygons.
+- **Option B:** `/wf-plan texture-material-shaders webgpu-ngon-faces` — revisit the plan only if pass-2 verify exposes a deeper algorithmic gap. The plan's §Step 7 fan prescription has now been deviated-from (deviation #5 in implement record).
+- **Option C:** `/wf-review texture-material-shaders webgpu-ngon-faces` — review the Commit A + B + C diff as the final slice surface. Not recommended ahead of pass-2 verify since AC2 still has no positive on-device evidence.

@@ -5,21 +5,22 @@ slug: texture-material-shaders
 title: "Implement textures, materials, and shaders across Canvas and WebGPU"
 status: active
 created-at: "2026-04-11T22:00:00Z"
-updated-at: "2026-04-22T21:47:18Z"
+updated-at: "2026-04-25T16:07:49Z"
 selected-slice: "webgpu-ngon-faces"
 current-stage-status: complete
 current-stage: implement
 stage-number: 5
-review-verdict: ship-with-caveats
-review-triage-status: triaged
-review-fix-status: all-deferred
+review-verdict: ""
+review-triage-status: ""
+review-fix-status: ""
 review-fix-applied: ""
 review-fix-verified: ""
 verify-pass: 1
-verify-result: pass
+verify-result: fail
 verify-fix-applied: ""
 implement-commit-a-sha: "04afdd9"
 implement-commit-b-sha: "f14a78d"
+implement-commit-c-sha: ""
 next-command: wf-verify
 next-invocation: "/wf-verify texture-material-shaders webgpu-ngon-faces"
 branch-strategy: dedicated
@@ -206,6 +207,13 @@ workflow-files:
   - 03-slice-webgpu-ngon-faces.md
   - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/UvFaceTablePacker.kt
   - isometric-webgpu/src/test/kotlin/io/github/jayteealao/isometric/webgpu/pipeline/UvFaceTablePackerTest.kt
+  - 06-verify-webgpu-ngon-faces.md
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-cylinder-canvas.png
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-cylinder-webgpu.png
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-stairs-canvas.png
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-stairs-webgpu.png
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-knot-canvas.png
+  - verify-evidence/screenshots-webgpu-ngon-faces/verify-knot-webgpu.png
   - 00-sync.md
   - 90-findings-explain.md
   - 90-resume.md
@@ -236,6 +244,9 @@ workflow-files:
   - app/src/main/kotlin/io/github/jayteealao/isometric/sample/TexturedDemoActivity.kt
   - .maestro/verify-stairs.yaml
   - .maestro/verify-knot.yaml
+  - isometric-webgpu/src/main/kotlin/io/github/jayteealao/isometric/webgpu/shader/TriangulateEmitShader.kt
+  - isometric-webgpu/src/test/kotlin/io/github/jayteealao/isometric/webgpu/shader/TriangulateEmitShaderTest.kt
+  - .maestro/verify-stairs-fixed.yaml
 progress:
   intake: complete
   shape: complete
@@ -253,7 +264,7 @@ progress:
   webgpu-texture-error-callback: complete
   uv-generation-shared-api: verify-complete
   uv-generation-cylinder: verify-pass-3-complete
-  webgpu-ngon-faces: implement-complete
+  webgpu-ngon-faces: implement-i02-fix-complete-pending-reverify
   uv-generation-pyramid: verify-pass-3-complete
   uv-generation-stairs: review-ship-with-caveats
   uv-generation-knot: review-ship-with-caveats
