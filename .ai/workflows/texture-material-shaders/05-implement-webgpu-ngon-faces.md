@@ -14,7 +14,7 @@ metric-deviations-from-plan: 4
 metric-review-fixes-applied: 0
 commit-sha-a: "04afdd9"
 commit-sha-b: "f14a78d"
-commit-sha-c: ""
+commit-sha-c: "77f1968"
 implementation-mode: three-commit
 tags: [webgpu, uv, ngon, omnibus, ear-clipping, gpu-pipeline-rewrite, i02-fix]
 refs:
@@ -273,7 +273,7 @@ Supplementary check during implement:
   as a valid constructor call. `Constants.LIMIT_U32_UNDEFINED` is the "not
   requested" sentinel for all other fields — default values left alone.
 
-## Commit C (this pass, `<sha-pending>`) — WGSL ear-clip triangulation for I-02
+## Commit C (this pass, `77f1968`) — WGSL ear-clip triangulation for I-02
 
 Pass-1 verify (record `06-verify-webgpu-ngon-faces.md`) ran the new
 `.maestro/verify-stairs-fixed.yaml` flow and captured AC2 as **NOT MET**: the
