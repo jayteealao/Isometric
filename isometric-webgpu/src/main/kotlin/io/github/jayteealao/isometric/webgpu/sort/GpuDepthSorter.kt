@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.webgpu.sort
 
+import android.util.Log
 import androidx.webgpu.BufferBindingType
 import androidx.webgpu.BufferUsage
 import androidx.webgpu.GPUBindGroup
@@ -21,6 +22,7 @@ import androidx.webgpu.GPURequestCallback
 import androidx.webgpu.MapMode
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.diagnostics.WgslDiagnostics
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.ceil
@@ -375,6 +377,7 @@ class GpuDepthSorter(
                     shaderSourceWGSL = GPUShaderSourceWGSL(code = GPUBitonicSortShader.WGSL)
                 )
             )
+            WgslDiagnostics.logCompilation(shaderModule!!, TAG)
         }
 
         val layout = ctx.device.createBindGroupLayout(
@@ -419,6 +422,7 @@ class GpuDepthSorter(
     }
 
     companion object {
+        private const val TAG = "GpuDepthSorter"
         private const val SORT_KEY_BYTES = 16
         private const val ORIGINAL_INDEX_OFFSET = 4
 

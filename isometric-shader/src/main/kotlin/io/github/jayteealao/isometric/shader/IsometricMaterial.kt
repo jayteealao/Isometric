@@ -409,7 +409,12 @@ public fun IsometricMaterial.PerFace.resolveForFace(
         // (e.g. CylinderFace on a Prism command) fall back to default rather than crashing —
         // a diagnostic surface is preferred once richer dispatch lands in the shape slices.
         val prismFace = faceType as? PrismFace
-        if (prismFace != null) faceMap[prismFace] ?: default else default
+        if (prismFace != null) {
+            faceMap[prismFace] ?: default
+        } else {
+            android.util.Log.w("IsometricMaterial", "PerFace resolveForFace fallback: faceType=$faceType not in PerFace map, returning default")
+            default
+        }
     }
     is IsometricMaterial.PerFace.Octahedron -> {
         val octahedronFace = faceType as? OctahedronFace

@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
+import android.util.Log
 import androidx.webgpu.CullMode
 import androidx.webgpu.GPUBindGroupLayout
 import androidx.webgpu.GPUColorTargetState
@@ -19,6 +20,7 @@ import androidx.webgpu.TextureFormat
 import androidx.webgpu.VertexFormat
 import androidx.webgpu.VertexStepMode
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.diagnostics.WgslDiagnostics
 import io.github.jayteealao.isometric.webgpu.shader.IsometricFragmentShader
 import io.github.jayteealao.isometric.webgpu.shader.IsometricVertexShader
 import io.github.jayteealao.isometric.webgpu.triangulation.RenderCommandTriangulator
@@ -68,6 +70,10 @@ internal class GpuRenderPipeline(
     @TextureFormat private val surfaceFormat: Int,
 ) : AutoCloseable {
 
+    companion object {
+        private const val TAG = "GpuRenderPipeline"
+    }
+
     private val device: GPUDevice get() = ctx.device
 
     var pipeline: GPURenderPipeline? = null
@@ -113,12 +119,14 @@ internal class GpuRenderPipeline(
                 shaderSourceWGSL = GPUShaderSourceWGSL(IsometricVertexShader.WGSL),
             )
         )
+        WgslDiagnostics.logCompilation(vertexModule!!, TAG)
         fragmentModule = device.createShaderModule(
             GPUShaderModuleDescriptor(
                 label = "IsometricFragmentShader",
                 shaderSourceWGSL = GPUShaderSourceWGSL(IsometricFragmentShader.WGSL),
             )
         )
+        WgslDiagnostics.logCompilation(fragmentModule!!, TAG)
 
         val vertexState = GPUVertexState(
             module = vertexModule!!,

@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
+import android.util.Log
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.RenderCommand
@@ -286,7 +287,10 @@ internal object SceneDataPacker {
         return when (val sub = perFace.resolveForFace(cmd.faceType)) {
             is IsoColor -> sub
             is IsometricMaterial.Textured -> sub.tint
-            else -> cmd.baseColor
+            else -> {
+                Log.w("SceneDataPacker", "Unknown MaterialData fallback for face ${cmd.faceType ?: "?"}: ${sub?.javaClass?.simpleName ?: "null"}")
+                cmd.baseColor
+            }
         }
     }
 

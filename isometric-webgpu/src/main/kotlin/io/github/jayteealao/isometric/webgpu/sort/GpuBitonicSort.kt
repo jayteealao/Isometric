@@ -21,6 +21,7 @@ import androidx.webgpu.GPUShaderModuleDescriptor
 import androidx.webgpu.GPUShaderSourceWGSL
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.diagnostics.WgslDiagnostics
 import kotlin.math.ceil
 
 /**
@@ -140,6 +141,7 @@ internal class GpuBitonicSort(
                 shaderSourceWGSL = GPUShaderSourceWGSL(code = GPUBitonicSortShader.WGSL)
             )
         )
+        WgslDiagnostics.logCompilation(shaderModule!!, TAG)
 
         val bgl = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(

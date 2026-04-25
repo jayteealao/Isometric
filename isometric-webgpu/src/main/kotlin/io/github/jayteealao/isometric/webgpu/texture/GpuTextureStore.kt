@@ -17,10 +17,11 @@ import java.nio.ByteOrder
 /**
  * Manages GPU texture creation and pixel upload for the WebGPU render pipeline.
  *
- * Creates a 2×2 magenta/black checkerboard fallback texture on init (used when no
- * texture is loaded). Provides [uploadBitmap] to upload Android [Bitmap] data as
- * `RGBA8Unorm` GPU textures — matching Android's `Bitmap.copyPixelsToBuffer()`
- * output which writes pixels as R,G,B,A bytes.
+ * Creates a 1×1 white fallback texture on init (used when no texture is loaded).
+ * White is neutral for all multiply/blend operations — it produces no color artifact
+ * when an untextured face samples it. Provides [uploadBitmap] to upload Android
+ * [Bitmap] data as `RGBA8Unorm` GPU textures — matching Android's
+ * `Bitmap.copyPixelsToBuffer()` output which writes pixels as R,G,B,A bytes.
  */
 internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
@@ -31,7 +32,7 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
     private val ownedTextures = mutableListOf<GPUTexture>()
 
-    /** 2×2 checkerboard fallback GPU texture (magenta/black pattern). */
+    /** 1×1 white fallback GPU texture. */
     val fallbackTexture: GPUTexture
 
     /** View of [fallbackTexture] for bind group creation. */
@@ -39,24 +40,17 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
 
     init {
         ctx.assertGpuThread()
-        // 2×2 RGBA8Unorm checkerboard: magenta, black, black, magenta
-        val pixels = ByteBuffer.allocateDirect(2 * 2 * 4).order(ByteOrder.nativeOrder())
-        // pixel (0,0): magenta — RGBA = (255, 0, 255, 255)
-        pixels.put(0xFF.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte())
-        // pixel (1,0): black — RGBA = (0, 0, 0, 255)
-        pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte())
-        // pixel (0,1): black
-        pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte())
-        // pixel (1,1): magenta
-        pixels.put(0xFF.toByte()); pixels.put(0x00.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte())
+        // 1×1 RGBA8Unorm white pixel — neutral for all multiply/blend operations.
+        val pixels = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder())
+        pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte())
         pixels.rewind()
 
-        fallbackTexture = createTexture(2, 2)
+        fallbackTexture = createTexture(1, 1)
         ctx.queue.writeTexture(
             GPUTexelCopyTextureInfo(texture = fallbackTexture),
             pixels,
-            GPUExtent3D(width = 2, height = 2),
-            GPUTexelCopyBufferLayout(bytesPerRow = 2 * 4, rowsPerImage = 2),
+            GPUExtent3D(width = 1, height = 1),
+            GPUTexelCopyBufferLayout(bytesPerRow = 1 * 4, rowsPerImage = 1),
         )
         fallbackTextureView = fallbackTexture.createView()
         ownedTextures += fallbackTexture

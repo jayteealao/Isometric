@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Shader
+import android.util.Log
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.compose.runtime.MaterialDrawHook
@@ -14,6 +15,9 @@ import io.github.jayteealao.isometric.shader.IsometricMaterial
 import io.github.jayteealao.isometric.shader.resolveForFace
 import io.github.jayteealao.isometric.shader.TextureSource
 import io.github.jayteealao.isometric.shader.TextureTransform
+
+/** Cache key for [TexturedCanvasDrawHook]'s BitmapShader cache. */
+internal data class TextureShaderKey(val bitmap: Bitmap, val tileMode: Shader.TileMode)
 
 /**
  * [MaterialDrawHook] implementation that draws textured faces using `BitmapShader` +
@@ -49,16 +53,16 @@ internal class TexturedCanvasDrawHook(
     private val checkerboard: Bitmap by lazy { createCheckerboardBitmap() }
 
     /**
-     * Per-[Shader.TileMode] BitmapShader cache. Keyed by `(Bitmap, tileU, tileV)`.
+     * Per-[Shader.TileMode] BitmapShader cache. Keyed by [TextureShaderKey] `(bitmap, tileMode)`.
      * Using the [Bitmap] instance (rather than [TextureSource]) as the first key component
      * ensures a cache miss whenever [TextureCache] evicts and reloads a texture — the new
      * [Bitmap] instance will not match the old key, so a fresh [BitmapShader] is created
      * from the new bitmap instead of returning a shader backed by a recycled/evicted bitmap.
-     * Both tile modes are included in the key so that asymmetric tiling (tileU != tileV)
-     * never collides with a uniformly-tiled shader.
+     * `tileMode` is uniform for both U and V axes (both are always assigned the same value
+     * at the call site), so a single field is sufficient.
      */
-    private val shaderCache = object : LinkedHashMap<Triple<Bitmap, Shader.TileMode, Shader.TileMode>, BitmapShader>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: Map.Entry<Triple<Bitmap, Shader.TileMode, Shader.TileMode>, BitmapShader>): Boolean {
+    private val shaderCache = object : LinkedHashMap<TextureShaderKey, BitmapShader>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<TextureShaderKey, BitmapShader>): Boolean {
             return size > cache.maxSize * 2
         }
     }
@@ -108,7 +112,10 @@ internal class TexturedCanvasDrawHook(
                     // flat-color path. The default path paints command.color (which equals
                     // material.baseColor() — the PerFace.default's baseColor), so this only
                     // renders the fallback for per-face materials that aren't Textured or IsoColor.
-                    else -> false
+                    else -> {
+                        Log.w("TexturedCanvasDrawHook", "Unsupported MaterialData type for face ${command.faceType}: ${sub?.javaClass?.simpleName}")
+                        false
+                    }
                 }
             }
         }
@@ -142,18 +149,19 @@ internal class TexturedCanvasDrawHook(
         // Require 2*faceVertexCount to match GpuUvCoordsBuffer's invariant so pyramid /
         // octahedron commands that ship exact-size UV arrays don't pass with a truncated buffer.
         val minUvSize = maxOf(6, 2 * command.faceVertexCount)
-        if (uvCoords == null || uvCoords.size < minUvSize) return false
+        if (uvCoords == null || uvCoords.size < minUvSize) {
+            Log.w("TexturedCanvasDrawHook", "Textured material missing or short uvCoords (size=${uvCoords?.size}, required=$minUvSize) for ${command.faceVertexCount}-vertex face")
+            return false
+        }
 
         val cached = resolveToCache(material.source)
         val texW = cached.bitmap.width
         val texH = cached.bitmap.height
 
         val tileMode = if (material.transform != TextureTransform.IDENTITY) Shader.TileMode.REPEAT else Shader.TileMode.CLAMP
-        val tileU = tileMode
-        val tileV = tileMode
-        val shaderKey = Triple(cached.bitmap, tileU, tileV)
+        val shaderKey = TextureShaderKey(cached.bitmap, tileMode)
         val shader = shaderCache.getOrPut(shaderKey) {
-            BitmapShader(cached.bitmap, tileU, tileV)
+            BitmapShader(cached.bitmap, tileMode, tileMode)
         }
 
         computeAffineMatrix(uvCoords, command.points, texW, texH, material.transform, affineMatrix, transformMatrix, transformMatrixInv, matrixSrc, matrixDst)
