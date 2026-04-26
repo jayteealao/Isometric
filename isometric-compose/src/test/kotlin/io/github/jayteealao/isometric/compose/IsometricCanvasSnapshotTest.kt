@@ -12,6 +12,7 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
+import io.github.jayteealao.isometric.compose.scenes.WS10NodeIdScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import org.junit.Rule
@@ -297,6 +298,21 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(680.dp, 440.dp)) {
                 IsometricScene {
                     Shape(geometry = Stairs(Point(1.0, 1.0, 1.0), 10), color = LIGHT_GREEN)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun nodeIdSharedEdge() {
+        // Snapshot of the WS10 NodeIdSample geometry that surfaced the
+        // depth-sort shared-edge overpaint bug. Pre-fix, factory's orange
+        // top face painted over hq's blue right wall; post-fix, the
+        // adjacency renders cleanly.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    WS10NodeIdScene()
                 }
             }
         }
