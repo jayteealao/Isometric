@@ -101,7 +101,18 @@ open class Path(
     }
 
     /**
-     * Count how many vertices of this path are on the same side of pathA's plane as the observer
+     * Returns 1 if any vertex of this path is on the same side of pathA's plane as the
+     * observer (within a 1e-6 epsilon to absorb floating-point noise), 0 otherwise.
+     *
+     * Used by [closerThan] which subtracts both directions to produce a signed comparator.
+     *
+     * Permissive ("any vertex" rather than "majority") is required for shared-edge cases:
+     * for adjacent prism faces, only a fraction of the four vertices may sit on the
+     * observer side of the other plane. The previous implementation collapsed mixed cases
+     * via integer division — `(result + result0) / points.size` — which truncated 2/4 to 0
+     * and reported a spurious tie that DepthSorter could not resolve. The back-to-front
+     * pre-sort then became the sole arbiter and let a farther face paint over a closer one.
+     * See workflow `depth-sort-shared-edge-overpaint` for the full diagnosis.
      */
     private fun countCloserThan(pathA: Path, observer: Point): Int {
         // The plane containing pathA is defined by the three points A, B, C
@@ -118,25 +129,19 @@ open class Path(
         val observerPosition = Vector.dotProduct(n, OU) - d
 
         var result = 0
-        var result0 = 0
 
         for (point in points) {
             val OP = Vector.fromTwoPoints(Point.ORIGIN, point)
             val pPosition = Vector.dotProduct(n, OP) - d
 
-            // Careful with rounding approximations
-            if (observerPosition * pPosition >= 0.000000001) {
+            // Epsilon widened from 1e-9 to 1e-6 to absorb floating-point noise for the
+            // project's typical 0..100 coordinate range; a vertex within 1e-6 of pathA's
+            // plane is treated as coplanar (neither closer nor farther).
+            if (observerPosition * pPosition >= 0.000001) {
                 result++
-            }
-            if (observerPosition * pPosition >= -0.000000001 && observerPosition * pPosition < 0.000000001) {
-                result0++
             }
         }
 
-        return if (result == 0) {
-            0
-        } else {
-            (result + result0) / points.size
-        }
+        return if (result > 0) 1 else 0
     }
 }

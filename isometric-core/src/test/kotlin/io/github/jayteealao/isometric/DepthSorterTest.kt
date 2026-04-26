@@ -158,6 +158,97 @@ class DepthSorterTest {
     }
 
     @Test
+    fun `WS10 NodeIdSample four buildings render in correct front-to-back order`() {
+        // Reproduces the WS10 NodeIdSample geometry that surfaced the
+        // shared-edge overpaint bug: four buildings of varying heights placed
+        // along the X axis. The bug manifested as factory's top face painting
+        // over hq's right wall at their adjacent screen-space boundary.
+        //
+        // After the countCloserThan fix, DepthSorter must add an edge between
+        // hq_right and factory_top such that factory_top is drawn first
+        // (lower index in the command list) and hq_right is drawn after
+        // (higher index, on top).
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 1.0, 0.1), 1.5, 1.5, 3.0), IsoColor.BLUE)    // hq
+        engine.add(Prism(Point(2.0, 1.0, 0.1), 1.5, 1.5, 2.0), IsoColor.ORANGE)  // factory
+        engine.add(Prism(Point(4.0, 1.0, 0.1), 1.5, 1.5, 1.5), IsoColor.GREEN)   // warehouse
+        engine.add(Prism(Point(6.0, 1.0, 0.1), 1.5, 1.5, 4.0), IsoColor.PURPLE)  // tower
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Identify hq's right wall: all four vertices at x≈1.5 (the right edge
+        // of the hq building at x=[0,1.5]).
+        val hqRightIndex = scene.commands.indexOfFirst { cmd ->
+            cmd.originalPath.points.all { kotlin.math.abs(it.x - 1.5) < 1e-9 } &&
+                cmd.originalPath.points.any { it.z > 3.0 }
+        }
+        // Identify factory's top: all four vertices at z≈2.1, with x in [2.0, 3.5].
+        val factoryTopIndex = scene.commands.indexOfFirst { cmd ->
+            cmd.originalPath.points.all { kotlin.math.abs(it.z - 2.1) < 1e-9 } &&
+                cmd.originalPath.points.all { it.x in 2.0..3.5 }
+        }
+
+        assertTrue(hqRightIndex >= 0, "hq's right wall must appear in scene commands")
+        assertTrue(factoryTopIndex >= 0, "factory's top must appear in scene commands")
+        assertTrue(
+            factoryTopIndex < hqRightIndex,
+            "factory_top (index $factoryTopIndex) must be drawn before hq_right " +
+                "(index $hqRightIndex) so the closer face paints on top"
+        )
+    }
+
+    @Test
+    fun `closerThan is antisymmetric for representative non-coplanar pairs`() {
+        // closerThan must satisfy a + b = 0 when computed in both directions.
+        // Without antisymmetry the topological sort can produce inconsistent
+        // orderings depending on iteration direction.
+        val observer = Point(-10.0, -10.0, 20.0)
+        val pairs: List<Pair<Path, Path>> = listOf(
+            // hq_right vs factory_top (the diagnosed case)
+            Path(
+                Point(1.5, 1.0, 0.1), Point(1.5, 2.5, 0.1),
+                Point(1.5, 2.5, 3.1), Point(1.5, 1.0, 3.1)
+            ) to Path(
+                Point(2.0, 1.0, 2.1), Point(3.5, 1.0, 2.1),
+                Point(3.5, 2.5, 2.1), Point(2.0, 2.5, 2.1)
+            ),
+            // X-adjacent different-heights generic pair
+            Path(
+                Point(1.0, 0.0, 0.0), Point(1.0, 1.0, 0.0),
+                Point(1.0, 1.0, 3.0), Point(1.0, 0.0, 3.0)
+            ) to Path(
+                Point(2.0, 0.0, 1.0), Point(3.0, 0.0, 1.0),
+                Point(3.0, 1.0, 1.0), Point(2.0, 1.0, 1.0)
+            ),
+            // Y-adjacent different-heights generic pair
+            Path(
+                Point(0.0, 1.0, 0.0), Point(0.0, 1.0, 3.0),
+                Point(1.0, 1.0, 3.0), Point(1.0, 1.0, 0.0)
+            ) to Path(
+                Point(0.0, 2.0, 1.0), Point(1.0, 2.0, 1.0),
+                Point(1.0, 3.0, 1.0), Point(0.0, 3.0, 1.0)
+            ),
+            // Top vs vertical side at equal heights
+            Path(
+                Point(0.0, 0.0, 2.0), Point(1.0, 0.0, 2.0),
+                Point(1.0, 1.0, 2.0), Point(0.0, 1.0, 2.0)
+            ) to Path(
+                Point(2.0, 0.0, 0.0), Point(2.0, 0.0, 2.0),
+                Point(2.0, 1.0, 2.0), Point(2.0, 1.0, 0.0)
+            )
+        )
+        pairs.forEachIndexed { idx, (a, b) ->
+            val ab = a.closerThan(b, observer)
+            val ba = b.closerThan(a, observer)
+            assertEquals(
+                0,
+                ab + ba,
+                "closerThan must be antisymmetric for pair $idx: a.closerThan(b)=$ab, b.closerThan(a)=$ba"
+            )
+        }
+    }
+
+    @Test
     fun `kahn algorithm preserves existing broad phase sparse test`() {
         // Same scenario as IsometricEngineTest broad phase sparse test —
         // verifies the new Kahn's sort doesn't break existing behavior
