@@ -44,6 +44,9 @@ The core module has unit tests covering all fundamental types:
 | `TileGridConfigTest` | Default values, `tileSize` validation, elevation lambda storage, `equals`/`hashCode` (elevation excluded), `toString` |
 | `TileCoordinateExtensionsTest` | `Point.toTileCoordinate` with positive/negative/boundary coords, floor-not-truncation, `screenToTile` round-trip |
 | `StackAxisTest` | All three enum values, `unitPoint()` unit vectors, one-non-zero-component invariant |
+| `RenderCommandTest` | `RenderCommand` construction, `faceType` and `faceVertexCount` propagation, equality contract for nullable `uvCoords` |
+| `PrismFaceTest` | `PrismFace.fromPathIndex` mapping for all six faces, round-trip via `pathIndex`, ordinal stability |
+| `ShapeFaceEnumTest` | Shape ↔ face-enum parity for `CylinderFace`, `PyramidFace`, `StairsFace`, `OctahedronFace` (path-index mapping, vertex count, fromPathIndex bounds) |
 
 Pre-WS9 test files are located under:
 
@@ -63,6 +66,7 @@ The compose module also has instrumented tests that run on a device or emulator:
 |------------|--------|
 | `TileGridTest` | Per-tile content invocation, bounds enforcement, `onTileClick` wiring, elevation function inputs |
 | `StackTest` | Item count, axis directions, gap validation, negative gap, nested stacks |
+| `IsometricRendererNativeCanvasTest` | Native canvas backend smoke test for `IsometricRenderer`; verifies hardware-accelerated draw path is reachable on-device |
 
 ```bash
 ./gradlew :isometric-compose:connectedAndroidTest
