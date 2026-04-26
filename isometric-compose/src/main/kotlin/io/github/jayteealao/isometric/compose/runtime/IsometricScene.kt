@@ -268,23 +268,21 @@ fun IsometricScene(
         }
     }
 
-    // Keep fresh references for the pointer-input coroutine, which is keyed on
-    // gesturesActive and would otherwise capture stale values.
+    // Keep fresh references for the pointer-input coroutine, which is keyed
+    // on Unit (never restarts) and would otherwise capture stale values.
     val currentRenderContext by rememberUpdatedState(renderContext)
     val currentCanvasWidth by rememberUpdatedState(canvasWidth)
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
 
-    // Render to canvas with gesture handling.
-    // Pointer input is installed when gestures are explicitly enabled OR when a
-    // CameraState is provided (for default drag-to-pan behavior).
-    val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
+    // Pointer input is always installed so per-node onClick / onLongClick
+    // callbacks fire even when no scene-level GestureConfig is supplied.
+    // Downstream hit-test and dispatch are no-ops when nothing is registered.
     Canvas(
         modifier = modifier
             .then(
-                if (gesturesActive) {
-                    Modifier.pointerInput(gesturesActive) {
+                Modifier.pointerInput(Unit) {
                         // Capture coroutine scope for long-press detection.
                         // pointerInput's lambda is a suspend PointerInputScope.() -> Unit,
                         // so we wrap with coroutineScope to get a scope for launching.
@@ -435,9 +433,6 @@ fun IsometricScene(
                         }
                         } // coroutineScope
                     }
-                } else {
-                    Modifier
-                }
             )
     ) {
         // Read sceneVersion to subscribe to node tree changes.
