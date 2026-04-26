@@ -78,7 +78,13 @@ internal class TextureCache(val maxSize: Int = 20, val maxBytes: Long? = null) {
      */
     internal fun putWithSize(source: TextureSource, bitmap: Bitmap, byteCount: Long): CachedTexture {
         val entry = CachedTexture(bitmap, byteCount)
-        cache[source] = entry
+        // Account for any pre-existing entry's bytes before overwriting so currentBytes
+        // stays consistent with what's actually in the map. Without this, putting the
+        // same key twice leaks the first entry's bytes into the running total.
+        val previous = cache.put(source, entry)
+        if (previous != null) {
+            currentBytes -= previous.byteCount.coerceAtLeast(0L)
+        }
         currentBytes += byteCount
         evictIfNeeded()
         return entry

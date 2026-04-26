@@ -77,12 +77,18 @@ class Pyramid @JvmOverloads constructor(
             paths.add(face2)
             paths.add(face2.rotateZ(center, PI))
 
-            /* Rectangular base quad (CCW viewed from below). */
+            /*
+             * Rectangular base quad — wound CCW viewed from below (−z) so that the
+             * outward normal points downward. The lighting code computes
+             * `edge1 = v0 − v1` × `edge2 = v1 − v2`; with vertices in this order the
+             * cross product yields a −z normal, matching the pyramid's bottom face
+             * being shadowed under the default light direction.
+             */
             val base = Path(
                 position,
-                Point(position.x + width, position.y, position.z),
-                Point(position.x + width, position.y + depth, position.z),
                 Point(position.x, position.y + depth, position.z),
+                Point(position.x + width, position.y + depth, position.z),
+                Point(position.x + width, position.y, position.z),
             )
             paths.add(base)
 

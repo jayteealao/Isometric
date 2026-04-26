@@ -125,7 +125,13 @@ internal class RenderCommandTriangulator {
         }
 
         buffer.flip()
-        return PackedVertices(buffer = buffer, vertexCount = vertexCount)
+        // Derive vertex count from bytes actually written. countVertices(scene) pre-computes
+        // (n−2)*3 per face assuming every face triangulates cleanly, but earClipTriangulate
+        // bails on degenerate / self-intersecting input (Log.w'd) and emits fewer triangles.
+        // Using the pre-computed count would cause downstream draw(vertexCount) calls to
+        // read past the actual buffer contents.
+        val emittedVertexCount = buffer.limit() / BYTES_PER_VERTEX
+        return PackedVertices(buffer = buffer, vertexCount = emittedVertexCount)
     }
 
     /**

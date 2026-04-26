@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.shader.internal
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -38,9 +39,11 @@ class IdentityCachedUvProviderTest {
         val second = provider.compute(key, builder)
 
         assertSame("Same key (===) must return the cached array reference", first, second)
-        assert(callCount.get() == 1) {
-            "Builder must be invoked exactly once on cache hit, but was invoked ${callCount.get()} time(s)"
-        }
+        assertEquals(
+            "Builder must be invoked exactly once on cache hit",
+            1,
+            callCount.get(),
+        )
     }
 
     // ── cache miss ────────────────────────────────────────────────────────────
@@ -58,8 +61,8 @@ class IdentityCachedUvProviderTest {
         val key2 = StringBuilder("key").toString()
 
         // Sanity: the two keys are equal by value but distinct instances
-        assert(key1 == key2) { "Precondition: keys must be value-equal" }
-        assert(key1 !== key2) { "Precondition: keys must be distinct instances" }
+        assertEquals("Precondition: keys must be value-equal", key1, key2)
+        assertNotSame("Precondition: keys must be distinct instances", key1, key2)
 
         val builder: (String) -> FloatArray = { _ ->
             callCount.incrementAndGet()
@@ -70,9 +73,11 @@ class IdentityCachedUvProviderTest {
         val second = provider.compute(key2, builder)
 
         assertNotSame("Different key instances must produce a new array reference", first, second)
-        assert(callCount.get() == 2) {
-            "Builder must be invoked twice for two distinct key instances, but was invoked ${callCount.get()} time(s)"
-        }
+        assertEquals(
+            "Builder must be invoked twice for two distinct key instances",
+            2,
+            callCount.get(),
+        )
     }
 
     // ── concurrent reads ──────────────────────────────────────────────────────
@@ -126,12 +131,17 @@ class IdentityCachedUvProviderTest {
             for (i in 0 until callsPerThread) {
                 val arr = results[t][i]
                 assertNotNull("Thread $t call $i returned null", arr)
-                assert(arr.size == 1) {
-                    "Thread $t call $i returned array of unexpected size ${arr.size}"
-                }
-                assert(arr[0] == expectedValue) {
-                    "Thread $t call $i returned torn value ${arr[0]}, expected $expectedValue"
-                }
+                assertEquals(
+                    "Thread $t call $i returned array of unexpected size",
+                    1,
+                    arr.size,
+                )
+                assertEquals(
+                    "Thread $t call $i returned torn value",
+                    expectedValue,
+                    arr[0],
+                    0f,
+                )
             }
         }
     }
@@ -154,15 +164,17 @@ class IdentityCachedUvProviderTest {
 
         // Warm the cache
         val first = provider.compute(key, builder)
-        assert(callCount.get() == 1) { "Builder must be invoked once before clear()" }
+        assertEquals("Builder must be invoked once before clear()", 1, callCount.get())
 
         // Clear and re-request
         provider.clear()
         val second = provider.compute(key, builder)
 
-        assert(callCount.get() == 2) {
-            "Builder must be invoked again after clear(), but call count is ${callCount.get()}"
-        }
+        assertEquals(
+            "Builder must be invoked again after clear()",
+            2,
+            callCount.get(),
+        )
         assertNotSame("Array after clear() must be a new instance", first, second)
         assertArrayEquals(
             "Both arrays must have the same length",
