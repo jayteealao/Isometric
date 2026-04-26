@@ -74,6 +74,19 @@ fun add(
 )
 ```
 
+### FaceIdentifier.forShape
+
+```kotlin
+FaceIdentifier.forShape(shape: Shape, faceIndex: Int): FaceIdentifier?
+```
+
+Bridges a `Shape` and a face index to the right `FaceIdentifier` variant
+(`PrismFace`, `CylinderFace`, `PyramidFace`, `StairsFace`, `OctahedronFace`).
+Returns `null` for shapes that do not have a per-face dispatch (e.g., `Knot`).
+
+Used internally to wire per-face materials to the correct face on each shape;
+exposed publicly for custom dispatchers and tests.
+
 ### clear
 
 Removes all items from the scene graph.
