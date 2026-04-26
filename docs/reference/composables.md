@@ -28,6 +28,23 @@ Entry point composable. Two overloads:
 | scaleOrigin | Point? | null | Center of scale |
 | visible | Boolean | true | Visibility toggle |
 
+### Shape (textured overload)
+
+`isometric-shader` adds a `material` parameter for bitmap textures and per-face
+materials. Requires `ProvideTextureRendering` somewhere up the composition tree.
+See the [Textured Materials guide](../guides/textured-materials.md).
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| geometry | Shape | — | Required. The 3D shape geometry |
+| material | MaterialData | LocalDefaultColor | `IsoColor` for flat color, or an `IsometricMaterial` (`Textured`, `PerFace.Prism`, `PerFace.Cylinder`, etc.) for bitmap rendering |
+| position | Point | Point(0,0,0) | Additional position offset |
+| rotation | Double | 0.0 | Rotation angle in radians |
+| scale | Double | 1.0 | Uniform scale factor |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle |
+
 ### Group
 
 | Param | Type | Default | Description |
@@ -64,6 +81,64 @@ Name collision with `kotlin.io.path.Path` — use an import alias:
 ```kotlin
 import io.github.jayteealao.isometric.Path as IsoPath
 ```
+
+### Path (textured overload)
+
+`isometric-shader` adds a `material` parameter to `Path` matching the
+[Shape textured overload](#shape-textured-overload). Same caveats — requires
+`ProvideTextureRendering` in the composition.
+
+### ProvideTextureRendering
+
+Installs the texture rendering hook, LRU `TextureCache`, and optional error
+callback. Wrap the part of your composition that uses textured materials.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| config | TextureCacheConfig | TextureCacheConfig() | Cache size / byte limit |
+| loader | TextureLoader | defaultTextureLoader() | Decoder for `TextureSource` → `Bitmap` |
+| onTextureLoadError | ((TextureSource) -> Unit)? | null | Fired on the main thread for decode and atlas-rebuild failures |
+| content | @Composable () -> Unit | — | Composition that may use textured materials |
+
+```kotlin
+ProvideTextureRendering(
+    config = TextureCacheConfig(maxSize = 32, maxBytes = 16L * 1024 * 1024),
+    onTextureLoadError = { src -> Log.w("MyApp", "Texture failed: $src") }
+) {
+    IsometricScene { /* ... */ }
+}
+```
+
+### Texture material factories
+
+These helper functions construct `Textured` materials. They are not composables
+— call them anywhere a `MaterialData` is expected.
+
+| Factory | Source | Description |
+|---|---|---|
+| `texturedResource(resId, tint?, transform?)` | Drawable resource | Validates `resId != 0`. Recommended for app-bundled textures. |
+| `texturedAsset(path, tint?, transform?)` | Asset file | Path is rejected if it contains `..`, leading `/`, or null bytes. |
+| `texturedBitmap(bitmap, tint?, transform?)` | In-memory bitmap | For procedural or runtime-decoded sources. |
+
+### Per-face material DSLs
+
+Each shape that supports per-face materials has its own scope DSL:
+
+| DSL | Slots | Returns |
+|---|---|---|
+| `prismPerFace { top; sides; bottom; default }` | 4 named slots | `PerFace.Prism` |
+| `cylinderPerFace { side; topCap; bottomCap; default }` | 3 named slots + default | `PerFace.Cylinder` |
+| `pyramidPerFace { sides; base; default }` | 2 named slots + default | `PerFace.Pyramid` |
+| `stairsPerFace { riser; tread; sides; default }` | 3 named slots + default | `PerFace.Stairs` |
+| `octahedronPerFace { ... }` | per-triangle slots | `PerFace.Octahedron` |
+
+Faces with no DSL entry fall through to `default`, then to flat color.
+
+### LocalTextureErrorCallback
+
+`CompositionLocal<((TextureSource) -> Unit)?>` providing the texture-load error
+callback to renderers. Set via `ProvideTextureRendering(onTextureLoadError = ...)`
+rather than reading directly.
 
 ### Batch
 
