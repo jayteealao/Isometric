@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.github.jayteealao"
-version = "1.2.0-SNAPSHOT"
+version = "1.2.0-alpha.01"
 
 android {
     namespace = "io.github.jayteealao.isometric.view"
