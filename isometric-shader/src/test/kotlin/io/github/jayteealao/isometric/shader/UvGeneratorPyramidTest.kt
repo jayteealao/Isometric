@@ -93,12 +93,15 @@ class UvGeneratorPyramidTest {
 
     @Test
     fun `base face returns canonical quad UVs for unit pyramid`() {
+        // Base quad vertex order is (0,0)→(0,d)→(w,d)→(w,0), wound CCW from below
+        // so the outward normal points −z (the correct lighting orientation for a
+        // pyramid's bottom face). Per-vertex UVs follow that same order.
         val uvs = UvGenerator.forPyramidFace(unitPyramid, faceIndex = 4)
         assertEquals(8, uvs.size)
         assertUvAt(uvs, 0, 0.0f, 0.0f)
-        assertUvAt(uvs, 1, 1.0f, 0.0f)
+        assertUvAt(uvs, 1, 0.0f, 1.0f)
         assertUvAt(uvs, 2, 1.0f, 1.0f)
-        assertUvAt(uvs, 3, 0.0f, 1.0f)
+        assertUvAt(uvs, 3, 1.0f, 0.0f)
     }
 
     @Test
@@ -114,15 +117,16 @@ class UvGeneratorPyramidTest {
     @Test
     fun `non-unit pyramid normalizes base UVs by width and depth`() {
         // Width=3, depth=2 → base corners span (0..3, 0..2) in local units. After
-        // normalization the UVs should still be the canonical (0,0)-(1,0)-(1,1)-(0,1)
-        // regardless of absolute extents, proving the /width, /depth division is applied.
+        // normalization the UVs should still be the canonical (0,0)-(0,1)-(1,1)-(1,0)
+        // regardless of absolute extents, proving the /width, /depth division is
+        // applied. Order matches the base quad's CCW-from-below winding.
         val stretched = Pyramid(Point.ORIGIN, width = 3.0, depth = 2.0, height = 4.0)
         val uvs = UvGenerator.forPyramidFace(stretched, faceIndex = 4)
         assertEquals(8, uvs.size)
         assertUvAt(uvs, 0, 0.0f, 0.0f)
-        assertUvAt(uvs, 1, 1.0f, 0.0f)
+        assertUvAt(uvs, 1, 0.0f, 1.0f)
         assertUvAt(uvs, 2, 1.0f, 1.0f)
-        assertUvAt(uvs, 3, 0.0f, 1.0f)
+        assertUvAt(uvs, 3, 1.0f, 0.0f)
     }
 
     @Test
