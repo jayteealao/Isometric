@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
+
 /**
  * Abstraction over the isometric projection pipeline.
  *
@@ -34,7 +36,11 @@ interface SceneProjector {
         color: IsoColor,
         originalShape: Shape? = null,
         id: String? = null,
-        ownerNodeId: String? = null
+        ownerNodeId: String? = null,
+        material: MaterialData? = null,
+        uvCoords: FloatArray? = null,
+        faceType: FaceIdentifier? = null,
+        faceVertexCount: Int = 4,
     )
 
     /**

@@ -6,8 +6,35 @@ import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
 import io.github.jayteealao.isometric.Shape
+import io.github.jayteealao.isometric.MaterialData
+import io.github.jayteealao.isometric.shapes.Cylinder
+import io.github.jayteealao.isometric.shapes.CylinderFace
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
+import io.github.jayteealao.isometric.shapes.Octahedron
+import io.github.jayteealao.isometric.shapes.OctahedronFace
+import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.PrismFace
+import io.github.jayteealao.isometric.shapes.Pyramid
+import io.github.jayteealao.isometric.shapes.PyramidFace
+import io.github.jayteealao.isometric.shapes.Stairs
+import io.github.jayteealao.isometric.shapes.StairsFace
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
+
+/**
+ * Provides per-face UV coordinates for textured rendering.
+ *
+ * Implementations receive the original (pre-transform) [Shape] and a 0-based face index,
+ * and return a packed `FloatArray` of `[u0,v0, u1,v1, ...]` or null if no UVs apply.
+ *
+ * This is a `fun interface` so it can be constructed from a lambda:
+ * ```kotlin
+ * UvCoordProvider { shape, faceIndex -> floatArrayOf(0f, 0f, 1f, 0f, 1f, 1f, 0f, 1f) }
+ * ```
+ */
+fun interface UvCoordProvider {
+    fun provide(shape: Shape, faceIndex: Int): FloatArray?
+}
 
 /**
  * Base node for the isometric scene graph.
@@ -212,11 +239,30 @@ class GroupNode : IsometricNode() {
 }
 
 /**
- * Node representing a 3D shape
+ * Node representing a 3D shape.
+ *
+ * @property color Base color for this shape. When [material] is null, this is the fill
+ *   color (flat-color rendering). When [material] is non-null, this serves as the base
+ *   tint — textured renderers multiply the sampled texture color by this value
+ *   (e.g., `textureSample * color` in the GPU fragment shader). The `isometric-shader`
+ *   module's overloaded `Shape()` composable derives this color from the material
+ *   (e.g., `material.baseColor()` for non-null materials, `LocalDefaultColor` for textured).
+ * @property material Optional material data for textured or per-face rendering. When null,
+ *   the renderer uses [color] for flat-color fill. When non-null, the renderer interprets
+ *   the material to determine how each face is painted. Set by the `isometric-shader`
+ *   module's composable overloads — not typically set directly.
  */
 class ShapeNode(
     var shape: Shape,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: MaterialData? = null,
+    /**
+     * Optional UV coordinate provider. When set, called for each face during
+     * [renderTo] with the original (pre-transform) shape and the 0-based face index.
+     *
+     * Set by the `isometric-shader` module's composable overloads — not typically set directly.
+     */
+    var uvProvider: UvCoordProvider? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -238,7 +284,7 @@ class ShapeNode(
         val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
         // Convert shape to render commands — adds directly to accumulator
-        for (path in transformedShape.paths) {
+        for ((index, path) in transformedShape.paths.withIndex()) {
             output.add(
                 RenderCommand(
                     commandId = "${nodeId}_${path.hashCode()}",
@@ -246,7 +292,33 @@ class ShapeNode(
                     color = effectiveColor,
                     originalPath = path,
                     originalShape = transformedShape,
-                    ownerNodeId = nodeId
+                    ownerNodeId = nodeId,
+                    material = material,
+                    uvCoords = uvProvider?.provide(shape, index),
+                    // Dispatch on the pre-transform `shape` field, not `transformedShape`.
+                    // `Shape.rotateZ` / `Shape.scale` return the base `Shape` type and
+                    // cannot be overridden, so a transformed Pyramid/Octahedron would
+                    // fail the `is <Shape>` check and null out faceType, which in turn
+                    // makes `PerFace.resolveForFace(null)` fall back to `default`.
+                    // Face identity is structural (path-index order), not transform-dependent.
+                    //
+                    // M-CAST-1: capture `shape` to a local `val` before the smart-cast
+                    // arm for Stairs, eliminating TOCTOU on the mutable `var shape` field.
+                    // Without the capture, the compiler re-reads the field between the
+                    // `is Stairs` check and the `.stepCount` access; another thread could
+                    // write a non-Stairs value in that window, producing a ClassCastException.
+                    faceType = run {
+                        val s = shape  // stable local; `s` is never re-read from the var
+                        when (s) {
+                            is Prism -> PrismFace.fromPathIndex(index)
+                            is Octahedron -> OctahedronFace.fromPathIndex(index)
+                            is Pyramid -> PyramidFace.fromPathIndex(index)
+                            is Cylinder -> CylinderFace.fromPathIndex(index)
+                            is Stairs -> StairsFace.fromPathIndex(index, s.stepCount)
+                            else -> null
+                        }
+                    },
+                    faceVertexCount = path.points.size,
                 )
             )
         }
@@ -255,11 +327,15 @@ class ShapeNode(
 }
 
 /**
- * Node representing a raw 2D path
+ * Node representing a raw 2D path.
+ *
+ * @property color Base color / tint. See [ShapeNode] for the color/material contract.
+ * @property material Optional material data. See [ShapeNode] for the color/material contract.
  */
 class PathNode(
     var path: Path,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: MaterialData? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -287,7 +363,9 @@ class PathNode(
                 color = effectiveColor,
                 originalPath = transformedPath,
                 originalShape = null,
-                ownerNodeId = nodeId
+                ownerNodeId = nodeId,
+                material = material,
+                faceVertexCount = transformedPath.points.size,
             )
         )
     }
@@ -300,7 +378,8 @@ class PathNode(
  */
 class BatchNode(
     var shapes: List<Shape>,
-    var color: IsoColor
+    var color: IsoColor,
+    var material: MaterialData? = null,
 ) : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
@@ -321,18 +400,33 @@ class BatchNode(
 
         val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
 
-        shapes.forEachIndexed { index, shape ->
+        shapes.forEachIndexed { shapeIndex, shape ->
+            // H-3: the per-face dispatch MUST run on the original (pre-transform) `shape`
+            // value captured from the `shapes` list, NOT on `transformedShape`.
+            // `Shape.rotateZ`/`scale` return the base `Shape` type, so an is-check on
+            // `transformedShape` would always fall to `else -> null`, silently defeating
+            // per-face material resolution for every non-Prism shape in the batch.
+            // Face identity is structural (path-index order) and is invariant under the
+            // isometric transforms applied by `localContext.applyTransformsToShape`.
             val transformedShape = localContext.applyTransformsToShape(shape)
 
-            for (path in transformedShape.paths) {
+            for ((pathIndex, path) in transformedShape.paths.withIndex()) {
                 output.add(
                     RenderCommand(
-                        commandId = "${nodeId}_${index}_${path.hashCode()}",
+                        commandId = "${nodeId}_${shapeIndex}_${path.hashCode()}",
                         points = DoubleArray(0),
                         color = effectiveColor,
                         originalPath = path,
                         originalShape = transformedShape,
-                        ownerNodeId = nodeId
+                        ownerNodeId = nodeId,
+                        // M-02: emit faceType from the pre-transform shape so per-face
+                        // material dispatch in TexturedCanvasDrawHook and SceneDataPacker
+                        // can resolve the correct slot (e.g. PrismFace.TOP vs FRONT).
+                        // Uses FaceIdentifier.forShape — the canonical single dispatch
+                        // point for all shape families — rather than duplicating the
+                        // when-arms inline here.
+                        faceType = FaceIdentifier.forShape(shape, pathIndex),
+                        faceVertexCount = path.points.size,
                     )
                 )
             }
@@ -381,7 +475,11 @@ class CustomRenderNode(
                         color = cmd.color.withAlpha(alpha),
                         originalPath = cmd.originalPath,
                         originalShape = cmd.originalShape,
-                        ownerNodeId = cmd.ownerNodeId
+                        ownerNodeId = cmd.ownerNodeId,
+                        material = cmd.material,
+                        uvCoords = cmd.uvCoords,
+                        faceType = cmd.faceType,
+                        faceVertexCount = cmd.faceVertexCount,
                     )
                 )
             }

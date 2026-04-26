@@ -1,0 +1,50 @@
+appId: io.github.jayteealao.isometric.sample
+name: "uv-generation-knot verification"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate to Textured Materials demo from the chooser.
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Knot is the 6th (last) tab — Prism, Octahedron, Pyramid, Cylinder, Stairs,
+# Knot. After webgpu-ngon-faces it is a PERMANENT tab in TexturedDemoActivity.
+# Sits off-screen to the right; we (a) swipe the tab row left strongly to
+# bring Knot fully into view, then (b) tap by coordinate. Maestro text-match
+# on ScrollableTabRow Tab does not route reliably to the Tab onClick on this
+# emulator (same bug verify-cylinder.yaml + verify-stairs.yaml document).
+# Use a stronger swipe than stairs (more tabs to scroll past).
+- swipe:
+    start: "97%,4%"
+    end: "3%,4%"
+    duration: 1500
+- waitForAnimationToEnd
+# Knot is now rightmost — tap near right edge.
+- tapOn:
+    point: "90%,3%"
+- waitForAnimationToEnd
+
+# Canvas mode — AC1 (texture renders on every Knot face),
+# AC2 (no gross UV discontinuity between adjacent faces).
+- takeScreenshot: screenshots/verify-knot-canvas
+
+# Full WebGPU mode — AC3 parity. Caveat: triangulation of any non-convex
+# face (none in Knot, but custom quads at indices 18-19 may flag the same
+# convex-fan limitation surfaced by I-2 in stairs verify).
+- tapOn: "Full WebGPU"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-knot-webgpu
+
+# Hybrid Canvas + GPU-sort path.
+- tapOn: "Canvas + GPU Sort"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-knot-canvas-gpusort
+
+# Cycle back to Canvas to confirm no state corruption after toggling backends.
+- tapOn: "Canvas"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-knot-canvas-cycle-back

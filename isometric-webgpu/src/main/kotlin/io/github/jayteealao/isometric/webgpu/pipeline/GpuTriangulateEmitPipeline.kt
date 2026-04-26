@@ -23,6 +23,7 @@ import androidx.webgpu.GPUShaderModuleDescriptor
 import androidx.webgpu.GPUShaderSourceWGSL
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.diagnostics.WgslDiagnostics
 import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import java.nio.ByteOrder
 import kotlin.math.ceil
@@ -33,7 +34,7 @@ import kotlin.math.ceil
  * Encodes a single sub-pass ([TriangulateEmitShader]) that uses **fixed-stride vertex
  * allocation** — no `atomicAdd` — to avoid the Adreno 750 TDR caused by contended atomics.
  *
- * Each sort entry `i` writes exactly [TriangulateEmitShader.MAX_VERTICES_PER_FACE] = 12
+ * Each sort entry `i` writes exactly [TriangulateEmitShader.MAX_VERTICES_PER_FACE] = 66
  * vertex slots at `i × 12`. Visible faces fill `triCount × 3` slots with real triangles
  * and pad the remaining slots with degenerate (zero-area) vertices. Sentinels write all
  * 12 slots as degenerate.
@@ -137,6 +138,10 @@ internal class GpuTriangulateEmitPipeline(
     private var lastViewportHeight: Int = 0
     private var lastTransformedBuffer: GPUBuffer? = null
     private var lastSortedKeysBuffer: GPUBuffer? = null
+    private var lastTexIndexBuffer: GPUBuffer? = null
+    private var lastUvRegionBuffer: GPUBuffer? = null
+    private var lastUvPoolBuffer: GPUBuffer? = null
+    private var lastUvTableBuffer: GPUBuffer? = null
 
     // ── Exposed buffers ───────────────────────────────────────────────────────
 
@@ -187,6 +192,20 @@ internal class GpuTriangulateEmitPipeline(
             )
         )
 
+        WgslDiagnostics.logCompilation(emitShaderModule!!, TAG)
+
+        // Storage-buffer slot usage (WebGPU limit: maxStorageBuffersPerShaderStage = 8):
+        //   binding 0 — transformed    (ReadOnlyStorage)
+        //   binding 1 — sortedKeys     (ReadOnlyStorage)
+        //   binding 2 — vertices       (Storage, read_write)
+        //   binding 4 — sceneTexIndices (ReadOnlyStorage)
+        //   binding 5 — sceneUvRegions  (ReadOnlyStorage)
+        //   binding 6 — uvPool          (ReadOnlyStorage, array<vec2<f32>>)
+        //   binding 7 — uvFaceTable     (ReadOnlyStorage, array<vec2<u32>>)
+        // Total: 7 of 8 storage-buffer slots used; 1 slot remains.
+        // Binding 3 is a Uniform buffer and does not count against this limit.
+        // GpuContext requests maxStorageBuffersPerShaderStage >= 8 explicitly and
+        // fails loud at init if the adapter cannot provide it.
         val bgl = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(
                 entries = arrayOf(
@@ -213,6 +232,30 @@ internal class GpuTriangulateEmitPipeline(
                         binding = 3,
                         visibility = ShaderStage.Compute,
                         buffer = GPUBufferBindingLayout(type = BufferBindingType.Uniform),
+                    ),
+                    // binding 4 — compact per-face texture index array (read-only)
+                    GPUBindGroupLayoutEntry(
+                        binding = 4,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
+                    ),
+                    // binding 5 — compact per-face UV region array (read-only)
+                    GPUBindGroupLayoutEntry(
+                        binding = 5,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
+                    ),
+                    // binding 6 — flat UV pool (array<vec2<f32>>, variable stride)
+                    GPUBindGroupLayoutEntry(
+                        binding = 6,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
+                    ),
+                    // binding 7 — per-face UV offset+count table (array<vec2<u32>>)
+                    GPUBindGroupLayoutEntry(
+                        binding = 7,
+                        visibility = ShaderStage.Compute,
+                        buffer = GPUBufferBindingLayout(type = BufferBindingType.ReadOnlyStorage),
                     ),
                 )
             )
@@ -253,6 +296,13 @@ internal class GpuTriangulateEmitPipeline(
      * @param viewportHeight    Current surface height in pixels.
      * @param transformedBuffer M3 [GpuTransformPipeline.transformedBuffer].
      * @param sortedKeysBuffer  M4 [GpuBitonicSort.resultBuffer].
+     * @param texIndexBuffer    Compact per-face texture index buffer (binding 4).
+     * @param uvRegionBuffer   Compact per-face UV region buffer (binding 5). Each entry
+     *                         is 10 floats: user transform + atlas region.
+     * @param uvPoolBuffer     Flat UV pool buffer (binding 6). `array<vec2<f32>>` packed
+     *                         in scene order; total length = `sumOf { faceVertexCount }`.
+     * @param uvTableBuffer    Per-face UV offset+count table (binding 7). `array<vec2<u32>>`
+     *                         with entry `i` = `(offsetPairs, vertCount)` for `commands[i]`.
      */
     fun ensureBuffers(
         paddedCount: Int,
@@ -260,6 +310,10 @@ internal class GpuTriangulateEmitPipeline(
         viewportHeight: Int,
         transformedBuffer: GPUBuffer,
         sortedKeysBuffer: GPUBuffer,
+        texIndexBuffer: GPUBuffer,
+        uvRegionBuffer: GPUBuffer,
+        uvPoolBuffer: GPUBuffer,
+        uvTableBuffer: GPUBuffer,
     ) {
         require(paddedCount > 0) { "paddedCount must be > 0, got $paddedCount" }
 
@@ -267,7 +321,11 @@ internal class GpuTriangulateEmitPipeline(
             viewportWidth            == lastViewportWidth &&
             viewportHeight           == lastViewportHeight &&
             transformedBuffer        === lastTransformedBuffer &&
-            sortedKeysBuffer         === lastSortedKeysBuffer
+            sortedKeysBuffer         === lastSortedKeysBuffer &&
+            texIndexBuffer           === lastTexIndexBuffer &&
+            uvRegionBuffer           === lastUvRegionBuffer &&
+            uvPoolBuffer             === lastUvPoolBuffer &&
+            uvTableBuffer            === lastUvTableBuffer
         if (same) return
 
         // Release stale bind group before rebuilding.
@@ -334,6 +392,10 @@ internal class GpuTriangulateEmitPipeline(
                     GPUBindGroupEntry(binding = 1, buffer = sortedKeysBuffer),
                     GPUBindGroupEntry(binding = 2, buffer = vertexBuf!!),
                     GPUBindGroupEntry(binding = 3, buffer = paramsBuffer!!),
+                    GPUBindGroupEntry(binding = 4, buffer = texIndexBuffer),
+                    GPUBindGroupEntry(binding = 5, buffer = uvRegionBuffer),
+                    GPUBindGroupEntry(binding = 6, buffer = uvPoolBuffer),
+                    GPUBindGroupEntry(binding = 7, buffer = uvTableBuffer),
                 )
             )
         )
@@ -343,6 +405,10 @@ internal class GpuTriangulateEmitPipeline(
         lastViewportHeight    = viewportHeight
         lastTransformedBuffer = transformedBuffer
         lastSortedKeysBuffer  = sortedKeysBuffer
+        lastTexIndexBuffer    = texIndexBuffer
+        lastUvRegionBuffer    = uvRegionBuffer
+        lastUvPoolBuffer      = uvPoolBuffer
+        lastUvTableBuffer     = uvTableBuffer
 
         Log.d(
             TAG,
@@ -394,6 +460,26 @@ internal class GpuTriangulateEmitPipeline(
         emitPass.close()   // release JNI wrapper immediately (GPU_OBJECT_LIFETIME.md)
     }
 
+    // ── Scene lifecycle ───────────────────────────────────────────────────────
+
+    /**
+     * Reset change-detection caches so that the next [ensureBuffers] call sees a clean
+     * state. Call this whenever the scene is cleared (e.g. from [GpuFullPipeline.clearScene])
+     * so that stale buffer references do not prevent bind-group rebuilds after the next
+     * non-empty upload.
+     */
+    internal fun reset() {
+        lastPaddedCount       = 0
+        lastViewportWidth     = 0
+        lastViewportHeight    = 0
+        lastTransformedBuffer = null
+        lastSortedKeysBuffer  = null
+        lastTexIndexBuffer    = null
+        lastUvRegionBuffer    = null
+        lastUvPoolBuffer      = null
+        lastUvTableBuffer     = null
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun close() {
@@ -426,5 +512,9 @@ internal class GpuTriangulateEmitPipeline(
         lastViewportHeight    = 0
         lastTransformedBuffer = null
         lastSortedKeysBuffer  = null
+        lastTexIndexBuffer    = null
+        lastUvRegionBuffer    = null
+        lastUvPoolBuffer      = null
+        lastUvTableBuffer     = null
     }
 }

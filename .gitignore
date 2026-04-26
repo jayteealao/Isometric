@@ -46,3 +46,13 @@ compare_benchmarks.py
 compare_gc.py
 webgpu_screen.png
 build-logic/.kotlin/**/*
+.kotlin/
+.ai/**/*
+app/src/main/assets/textures/ground_color.jpg
+app/src/main/assets/textures/paving_color.jpg
+
+# Local Claude Code plugin symlinks (developer machine only)
+plugins/
+
+# Paparazzi local snapshot output (regenerated per-run; not version-controlled)
+isometric-compose/src/test/snapshots/

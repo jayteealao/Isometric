@@ -24,6 +24,7 @@ Isometric is a Kotlin library for rendering interactive isometric (2.5D) scenes 
 - **Camera control** — pan and zoom with `CameraState`
 - **6 built-in shapes** — Prism, Pyramid, Cylinder, Octahedron, Stairs, Knot
 - **Custom shapes** — extrude paths or implement `CustomNode` for full control
+- **Textured materials** — bitmap textures and per-face materials on every shape, with parity between Canvas and WebGPU render paths
 
 ## Quick Start
 
@@ -62,6 +63,7 @@ See the [Quick Start guide](site/src/content/docs/getting-started/quickstart.mdx
 - [**Camera**](site/src/content/docs/guides/camera.mdx) — Pan and zoom with `CameraState`
 - [**Theming & Colors**](site/src/content/docs/guides/theming.mdx) — `IsoColor`, palettes, lighting, stroke styles
 - [**Custom Shapes**](site/src/content/docs/guides/custom-shapes.mdx) — `Path`, `Shape.extrude`, and `CustomNode`
+- [**Textured Materials**](site/src/content/docs/guides/textured-materials.mdx) — Bitmap textures, per-face materials, and `TextureTransform`
 - [**Performance**](site/src/content/docs/guides/performance.mdx) — Caching, native canvas, spatial indexing
 - [**Compose Interop**](site/src/content/docs/guides/compose-interop.mdx) — Layout, state sharing, Material theming, navigation
 - [**Advanced Configuration**](site/src/content/docs/guides/advanced-config.mdx) — Lifecycle hooks, custom engines, escape hatches

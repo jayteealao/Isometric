@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import android.os.Bundle
 import android.util.Log
@@ -22,6 +22,7 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Tab
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +46,10 @@ import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.webgpu.WebGpuComputeBackend
 import io.github.jayteealao.isometric.webgpu.WebGpuProviderImpl
+import io.github.jayteealao.isometric.shader.Shape as MaterialShape
+import io.github.jayteealao.isometric.shader.render.ProvideTextureRendering
+import io.github.jayteealao.isometric.shader.texturedBitmap
+import android.graphics.Bitmap
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
@@ -97,6 +102,11 @@ private fun WebGpuSamplesScreen() {
                 onClick = { selectedTab = 2 },
                 text = { Text("Dense Grid") }
             )
+            Tab(
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 },
+                text = { Text("Textured") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -104,6 +114,7 @@ private fun WebGpuSamplesScreen() {
                 0 -> AnimatedTowersBackendSample()
                 1 -> WebGpuSmokeSample()
                 2 -> WebGpuDenseGridSample()
+                3 -> WebGpuTexturedSample()
             }
         }
     }
@@ -300,29 +311,6 @@ private fun AnimatedTowersBackendSample() {
 }
 
 @Composable
-private fun TogglePill(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Card(
-        backgroundColor = if (selected) MaterialTheme.colors.primary.copy(alpha = 0.18f) else Color.Transparent,
-        elevation = 0.dp,
-        modifier = Modifier
-            .padding(top = 2.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            color = if (selected) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface,
-            style = MaterialTheme.typography.body2,
-        )
-    }
-}
-
-@Composable
 private fun AnimatedTowersScene(
     phase: Double,
     renderMode: RenderMode,
@@ -381,7 +369,7 @@ private fun WebGpuGridScene(
                         depth = 1.0,
                         height = baseHeight
                     ),
-                    color = IsoColor(
+                    material = IsoColor(
                         clampRgb(60.0 + x * 14.0),
                         clampRgb(80.0 + y * 16.0),
                         clampRgb(220.0 - y * 9.0)
@@ -395,8 +383,96 @@ private fun WebGpuGridScene(
                         depth = 0.68,
                         height = 0.22
                     ),
-                    color = IsoColor(245.0, 245.0, 255.0)
+                    material = IsoColor(245.0, 245.0, 255.0)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WebGpuTexturedSample() {
+    var renderMode by remember { mutableStateOf<RenderMode>(RenderMode.WebGpu()) }
+
+    // R-21: This sample-app checkerboard is intentionally duplicated from
+    // GpuTextureStore's 1×1-white fallback. The sample uses a visible magenta/black
+    // checkerboard so missing or loading textures are visually obvious during testing;
+    // production rendering uses the white-pixel fallback to avoid distracting visual
+    // artifacts in released builds.
+    val checkerboard = remember {
+        val size = 16
+        val cellSize = 8
+        val pixels = IntArray(size * size)
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                val isMagenta = ((x / cellSize) + (y / cellSize)) % 2 == 0
+                pixels[y * size + x] = if (isMagenta) 0xFFFF00FF.toInt() else 0xFF000000.toInt()
+            }
+        }
+        Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
+    }
+    // R-20: Recycle the checkerboard bitmap when this composable leaves the composition
+    // so the pixel memory is returned to the system without waiting for GC.
+    DisposableEffect(Unit) {
+        onDispose { checkerboard.recycle() }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            elevation = 2.dp
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = "Textured Prisms", style = MaterialTheme.typography.subtitle1)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Render mode", style = MaterialTheme.typography.caption)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TogglePill(
+                        label = "Canvas",
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.Cpu,
+                        onClick = { renderMode = RenderMode.Canvas() }
+                    )
+                    TogglePill(
+                        label = "Canvas + GPU Sort",
+                        selected = renderMode is RenderMode.Canvas && (renderMode as RenderMode.Canvas).compute == RenderMode.Canvas.Compute.WebGpu,
+                        onClick = { renderMode = RenderMode.Canvas(compute = RenderMode.Canvas.Compute.WebGpu) }
+                    )
+                    TogglePill(
+                        label = "Full WebGPU",
+                        selected = renderMode is RenderMode.WebGpu,
+                        onClick = { renderMode = RenderMode.WebGpu() }
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            ProvideTextureRendering {
+                IsometricScene(
+                    modifier = Modifier.fillMaxSize(),
+                    config = SceneConfig(
+                        renderMode = renderMode,
+                        gestures = GestureConfig.Disabled,
+                    )
+                ) {
+                    // Textured prism (checkerboard)
+                    MaterialShape(
+                        geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                        material = texturedBitmap(checkerboard),
+                    )
+                    // Flat-color prism (backward compat — should stay blue)
+                    Shape(
+                        geometry = Prism(position = Point(2.0, 0.0, 0.0)),
+                        material = IsoColor(33.0, 150.0, 243.0),
+                    )
+                    // Another textured prism (cache reuse)
+                    MaterialShape(
+                        geometry = Prism(position = Point(4.0, 0.0, 0.0)),
+                        material = texturedBitmap(checkerboard),
+                    )
+                }
             }
         }
     }

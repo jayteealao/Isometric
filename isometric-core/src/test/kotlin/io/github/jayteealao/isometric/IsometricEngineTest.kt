@@ -3,6 +3,7 @@
 package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.shapes.Knot
 import io.github.jayteealao.isometric.shapes.Octahedron
@@ -296,9 +297,91 @@ class IsometricEngineTest {
     @Test
     fun `shapes support zero arg defaults where intended`() {
         assertEquals(6, Prism().paths.size)
-        assertEquals(4, io.github.jayteealao.isometric.shapes.Pyramid().paths.size)
+        assertEquals(5, io.github.jayteealao.isometric.shapes.Pyramid().paths.size)
         assertTrue(io.github.jayteealao.isometric.shapes.Cylinder().paths.isNotEmpty())
         assertEquals(8, Octahedron().paths.size)
         assertTrue(Knot().paths.isNotEmpty())
+    }
+
+    @Test
+    fun `cylinder path layout has expected counts for N=6`() {
+        val cyl = io.github.jayteealao.isometric.shapes.Cylinder(vertices = 6)
+        assertEquals(8, cyl.paths.size)
+        assertEquals(6, cyl.paths[0].points.size)
+        assertEquals(6, cyl.paths[1].points.size)
+        assertEquals(4, cyl.paths[2].points.size)
+        assertEquals(4, cyl.paths[7].points.size)
+    }
+
+    @Test
+    fun `cylinder seam duplicates point at angle zero for distinct UV slots`() {
+        val cyl = io.github.jayteealao.isometric.shapes.Cylinder(vertices = 6)
+        val quad0 = cyl.paths[2].points
+        val quadLast = cyl.paths[7].points
+        assertEquals(quad0[1].x, quadLast[2].x, 1e-10)
+        assertEquals(quad0[1].y, quadLast[2].y, 1e-10)
+        assertEquals(quad0[1].z, quadLast[2].z, 1e-10)
+        assertTrue(quad0[1] !== quadLast[2], "seam vertex must be identity-distinct")
+    }
+
+    @Test
+    fun `cylinder rejects vertices above 24 at construction`() {
+        assertFailsWith<IllegalArgumentException> {
+            io.github.jayteealao.isometric.shapes.Cylinder(vertices = 25)
+        }
+    }
+
+    // H-10: Pyramid BASE path vertex positions and winding order assertion.
+    //
+    // The Pyramid base quad is wound CCW viewed from BELOW (−z) so its outward
+    // normal points downward — matching the bottom face of a pyramid sitting on
+    // the ground plane. The lighting code computes `edge1 = v0 − v1` ×
+    // `edge2 = v1 − v2`; with this winding the cross product yields a −z normal
+    // and the base face is correctly shadowed under the default light direction.
+    //
+    // The empirical vertex order is (0,0)→(0,1)→(1,1)→(1,0). On the (x, y)
+    // projection this produces a NEGATIVE shoelace signed area (CCW from below
+    // ≡ CW from above), which is the correct contract.
+    //
+    // We verify:
+    //  1. The base path has exactly 4 vertices.
+    //  2. The four corners match the expected positions for a unit Pyramid at origin.
+    //  3. The (x, y) shoelace signed-area is negative (CCW from −z direction).
+    @Test
+    fun `pyramid base path has 4 vertices with correct vertex positions and winding`() {
+        val pyramid = Pyramid(Point.ORIGIN, width = 1.0, depth = 1.0, height = 1.0)
+        // paths[4] is the BASE face per the Pyramid KDoc path-index table.
+        val basePath = pyramid.paths[4]
+        assertEquals(4, basePath.points.size, "Pyramid BASE must have exactly 4 vertices")
+
+        // Verify the four corner positions (order: (0,0), (0,1), (1,1), (1,0) at z=0).
+        val pts = basePath.points
+        assertEquals(0.0, pts[0].x, 1e-9)
+        assertEquals(0.0, pts[0].y, 1e-9)
+        assertEquals(0.0, pts[0].z, 1e-9)
+        assertEquals(0.0, pts[1].x, 1e-9)
+        assertEquals(1.0, pts[1].y, 1e-9)
+        assertEquals(0.0, pts[1].z, 1e-9)
+        assertEquals(1.0, pts[2].x, 1e-9)
+        assertEquals(1.0, pts[2].y, 1e-9)
+        assertEquals(0.0, pts[2].z, 1e-9)
+        assertEquals(1.0, pts[3].x, 1e-9)
+        assertEquals(0.0, pts[3].y, 1e-9)
+        assertEquals(0.0, pts[3].z, 1e-9)
+
+        // Compute the signed area using the shoelace formula on the (x, y) projection.
+        // signedArea2 < 0 → CCW from below (−z direction) → outward normal points −z,
+        // which is what we want for the pyramid's bottom face.
+        var signedArea2 = 0.0
+        val n = pts.size
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            signedArea2 += pts[i].x * pts[j].y - pts[j].x * pts[i].y
+        }
+        assertTrue(
+            signedArea2 < 0.0,
+            "Pyramid BASE vertex order must be CCW from below (−z) so its outward normal " +
+                "points downward: shoelace signedArea2 should be < 0, got $signedArea2"
+        )
     }
 }

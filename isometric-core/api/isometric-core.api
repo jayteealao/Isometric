@@ -19,7 +19,7 @@ public final class io/github/jayteealao/isometric/IntersectionUtils {
 	public final fun isPointInPoly ([DDD)Z
 }
 
-public final class io/github/jayteealao/isometric/IsoColor {
+public final class io/github/jayteealao/isometric/IsoColor : io/github/jayteealao/isometric/MaterialData {
 	public static final field BLACK Lio/github/jayteealao/isometric/IsoColor;
 	public static final field BLUE Lio/github/jayteealao/isometric/IsoColor;
 	public static final field BROWN Lio/github/jayteealao/isometric/IsoColor;
@@ -40,6 +40,7 @@ public final class io/github/jayteealao/isometric/IsoColor {
 	public fun <init> (III)V
 	public fun <init> (IIII)V
 	public synthetic fun <init> (IIIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun component1 ()D
 	public final fun component2 ()D
 	public final fun component3 ()D
@@ -76,7 +77,7 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 	public fun <init> (DDD)V
 	public fun <init> (DDDLio/github/jayteealao/isometric/IsoColor;)V
 	public synthetic fun <init> (DDDLio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;)V
+	public fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/FaceIdentifier;I)V
 	public fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public fun clear ()V
 	public fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
@@ -94,6 +95,14 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 }
 
 public final class io/github/jayteealao/isometric/IsometricEngine$Companion {
+}
+
+public abstract interface class io/github/jayteealao/isometric/MaterialData {
+	public abstract fun baseColor ()Lio/github/jayteealao/isometric/IsoColor;
+}
+
+public final class io/github/jayteealao/isometric/MaterialData$DefaultImpls {
+	public static fun baseColor (Lio/github/jayteealao/isometric/MaterialData;)Lio/github/jayteealao/isometric/IsoColor;
 }
 
 public class io/github/jayteealao/isometric/Path {
@@ -177,7 +186,8 @@ public final class io/github/jayteealao/isometric/Point2D$Companion {
 }
 
 public final class io/github/jayteealao/isometric/PreparedScene {
-	public fun <init> (Ljava/util/List;IILio/github/jayteealao/isometric/ProjectionParams;Lio/github/jayteealao/isometric/Vector;)V
+	public fun <init> (Ljava/util/List;IILio/github/jayteealao/isometric/ProjectionParams;Lio/github/jayteealao/isometric/Vector;ZZ)V
+	public synthetic fun <init> (Ljava/util/List;IILio/github/jayteealao/isometric/ProjectionParams;Lio/github/jayteealao/isometric/Vector;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCommands ()Ljava/util/List;
 	public final fun getHeight ()I
@@ -185,6 +195,8 @@ public final class io/github/jayteealao/isometric/PreparedScene {
 	public final fun getProjectionParams ()Lio/github/jayteealao/isometric/ProjectionParams;
 	public final fun getWidth ()I
 	public fun hashCode ()I
+	public final fun isGpuSorted ()Z
+	public final fun isProjected ()Z
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -212,17 +224,21 @@ public final class io/github/jayteealao/isometric/ProjectionParams {
 }
 
 public final class io/github/jayteealao/isometric/RenderCommand {
-	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;)V
-	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/FaceIdentifier;I)V
+	public synthetic fun <init> (Ljava/lang/String;[DLio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/FaceIdentifier;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBaseColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getCommandId ()Ljava/lang/String;
+	public final fun getFaceType ()Lio/github/jayteealao/isometric/shapes/FaceIdentifier;
+	public final fun getFaceVertexCount ()I
+	public final fun getMaterial ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getOriginalPath ()Lio/github/jayteealao/isometric/Path;
 	public final fun getOriginalShape ()Lio/github/jayteealao/isometric/Shape;
 	public final fun getOwnerNodeId ()Ljava/lang/String;
 	public final fun getPointCount ()I
 	public final fun getPoints ()[D
+	public final fun getUvCoords ()[F
 	public fun hashCode ()I
 	public final fun pointX (I)D
 	public final fun pointY (I)D
@@ -259,7 +275,7 @@ public final class io/github/jayteealao/isometric/RenderOptions$Companion {
 
 public abstract interface class io/github/jayteealao/isometric/SceneProjector {
 	public static final field Companion Lio/github/jayteealao/isometric/SceneProjector$Companion;
-	public abstract fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/FaceIdentifier;I)V
 	public abstract fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public abstract fun clear ()V
 	public abstract fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
@@ -273,7 +289,7 @@ public final class io/github/jayteealao/isometric/SceneProjector$Companion {
 }
 
 public final class io/github/jayteealao/isometric/SceneProjector$DefaultImpls {
-	public static synthetic fun add$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun add$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;Lio/github/jayteealao/isometric/MaterialData;[FLio/github/jayteealao/isometric/shapes/FaceIdentifier;IILjava/lang/Object;)V
 	public static synthetic fun findItemAt$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;DILjava/lang/Object;)Lio/github/jayteealao/isometric/RenderCommand;
 	public static fun getProjectionVersion (Lio/github/jayteealao/isometric/SceneProjector;)J
 	public static synthetic fun projectScene$default (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;ILjava/lang/Object;)Lio/github/jayteealao/isometric/PreparedScene;
@@ -402,12 +418,35 @@ public final class io/github/jayteealao/isometric/shapes/Cylinder : io/github/ja
 	public fun translate (DDD)Lio/github/jayteealao/isometric/shapes/Cylinder;
 }
 
+public final class io/github/jayteealao/isometric/shapes/CylinderFace : java/lang/Enum, io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field BOTTOM Lio/github/jayteealao/isometric/shapes/CylinderFace;
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/CylinderFace$Companion;
+	public static final field SIDE Lio/github/jayteealao/isometric/shapes/CylinderFace;
+	public static final field TOP Lio/github/jayteealao/isometric/shapes/CylinderFace;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/shapes/CylinderFace;
+	public static fun values ()[Lio/github/jayteealao/isometric/shapes/CylinderFace;
+}
+
+public final class io/github/jayteealao/isometric/shapes/CylinderFace$Companion {
+	public final fun fromPathIndex (I)Lio/github/jayteealao/isometric/shapes/CylinderFace;
+}
+
+public abstract interface class io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/FaceIdentifier$Companion;
+}
+
+public final class io/github/jayteealao/isometric/shapes/FaceIdentifier$Companion {
+	public final fun forShape (Lio/github/jayteealao/isometric/Shape;I)Lio/github/jayteealao/isometric/shapes/FaceIdentifier;
+}
+
 public final class io/github/jayteealao/isometric/shapes/Knot : io/github/jayteealao/isometric/Shape {
 	public static final field Companion Lio/github/jayteealao/isometric/shapes/Knot$Companion;
 	public fun <init> ()V
 	public fun <init> (Lio/github/jayteealao/isometric/Point;)V
 	public synthetic fun <init> (Lio/github/jayteealao/isometric/Point;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getPosition ()Lio/github/jayteealao/isometric/Point;
+	public final fun getSourcePrisms ()Ljava/util/List;
 	public synthetic fun translate (DDD)Lio/github/jayteealao/isometric/Shape;
 	public fun translate (DDD)Lio/github/jayteealao/isometric/shapes/Knot;
 }
@@ -426,6 +465,25 @@ public final class io/github/jayteealao/isometric/shapes/Octahedron : io/github/
 }
 
 public final class io/github/jayteealao/isometric/shapes/Octahedron$Companion {
+}
+
+public final class io/github/jayteealao/isometric/shapes/OctahedronFace : java/lang/Enum, io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/OctahedronFace$Companion;
+	public static final field LOWER_0 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field LOWER_1 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field LOWER_2 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field LOWER_3 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field UPPER_0 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field UPPER_1 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field UPPER_2 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static final field UPPER_3 Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+	public static fun values ()[Lio/github/jayteealao/isometric/shapes/OctahedronFace;
+}
+
+public final class io/github/jayteealao/isometric/shapes/OctahedronFace$Companion {
+	public final fun fromPathIndex (I)Lio/github/jayteealao/isometric/shapes/OctahedronFace;
 }
 
 public final class io/github/jayteealao/isometric/shapes/Prism : io/github/jayteealao/isometric/Shape {
@@ -447,6 +505,23 @@ public final class io/github/jayteealao/isometric/shapes/Prism : io/github/jayte
 public final class io/github/jayteealao/isometric/shapes/Prism$Companion {
 }
 
+public final class io/github/jayteealao/isometric/shapes/PrismFace : java/lang/Enum, io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field BACK Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field BOTTOM Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/PrismFace$Companion;
+	public static final field FRONT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field LEFT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field RIGHT Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static final field TOP Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/shapes/PrismFace;
+	public static fun values ()[Lio/github/jayteealao/isometric/shapes/PrismFace;
+}
+
+public final class io/github/jayteealao/isometric/shapes/PrismFace$Companion {
+	public final fun fromPathIndex (I)Lio/github/jayteealao/isometric/shapes/PrismFace;
+}
+
 public final class io/github/jayteealao/isometric/shapes/Pyramid : io/github/jayteealao/isometric/Shape {
 	public static final field Companion Lio/github/jayteealao/isometric/shapes/Pyramid$Companion;
 	public fun <init> ()V
@@ -466,8 +541,36 @@ public final class io/github/jayteealao/isometric/shapes/Pyramid : io/github/jay
 public final class io/github/jayteealao/isometric/shapes/Pyramid$Companion {
 }
 
+public abstract class io/github/jayteealao/isometric/shapes/PyramidFace : io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/PyramidFace$Companion;
+}
+
+public final class io/github/jayteealao/isometric/shapes/PyramidFace$BASE : io/github/jayteealao/isometric/shapes/PyramidFace {
+	public static final field INSTANCE Lio/github/jayteealao/isometric/shapes/PyramidFace$BASE;
+}
+
+public final class io/github/jayteealao/isometric/shapes/PyramidFace$Companion {
+	public final fun fromPathIndex (I)Lio/github/jayteealao/isometric/shapes/PyramidFace;
+	public final fun getLATERAL_0 ()Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+	public final fun getLATERAL_1 ()Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+	public final fun getLATERAL_2 ()Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+	public final fun getLATERAL_3 ()Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+}
+
+public final class io/github/jayteealao/isometric/shapes/PyramidFace$Lateral : io/github/jayteealao/isometric/shapes/PyramidFace {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;IILjava/lang/Object;)Lio/github/jayteealao/isometric/shapes/PyramidFace$Lateral;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/jayteealao/isometric/shapes/Stairs : io/github/jayteealao/isometric/Shape {
 	public static final field Companion Lio/github/jayteealao/isometric/shapes/Stairs$Companion;
+	public static final field MAX_REASONABLE_STEPS I
 	public fun <init> (I)V
 	public fun <init> (Lio/github/jayteealao/isometric/Point;I)V
 	public synthetic fun <init> (Lio/github/jayteealao/isometric/Point;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -478,5 +581,19 @@ public final class io/github/jayteealao/isometric/shapes/Stairs : io/github/jayt
 }
 
 public final class io/github/jayteealao/isometric/shapes/Stairs$Companion {
+}
+
+public final class io/github/jayteealao/isometric/shapes/StairsFace : java/lang/Enum, io/github/jayteealao/isometric/shapes/FaceIdentifier {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/StairsFace$Companion;
+	public static final field RISER Lio/github/jayteealao/isometric/shapes/StairsFace;
+	public static final field SIDE Lio/github/jayteealao/isometric/shapes/StairsFace;
+	public static final field TREAD Lio/github/jayteealao/isometric/shapes/StairsFace;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/jayteealao/isometric/shapes/StairsFace;
+	public static fun values ()[Lio/github/jayteealao/isometric/shapes/StairsFace;
+}
+
+public final class io/github/jayteealao/isometric/shapes/StairsFace$Companion {
+	public final fun fromPathIndex (II)Lio/github/jayteealao/isometric/shapes/StairsFace;
 }
 

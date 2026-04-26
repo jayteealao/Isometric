@@ -1,0 +1,48 @@
+appId: io.github.jayteealao.isometric.sample
+name: "Textured WebGPU — UV transform + atlas tiling fix verification"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate to Textured Materials demo from the chooser
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+
+# Verify the info card is visible (confirms navigation succeeded)
+# After the tiling fix the card reads:
+# "Left 2 cols: IDENTITY — Right 2 cols: tiling(2×2 top, 1×2 sides)"
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Screenshot 1: Canvas (CPU) baseline
+# Expected: 4×4 prism grid. Left 2 cols: IDENTITY green tops / brown sides.
+# Right 2 cols: tiling(2×2) green tops / tiling(1×2) brown sides.
+# Canvas uses BitmapShader so both should look correct.
+- takeScreenshot: screenshots/tiling_fix_canvas_baseline
+
+# Switch to Full WebGPU render mode to exercise the UvRegion / fract() path
+- tapOn: "Full WebGPU"
+# Capture immediately (before animation ends) to detect blank-on-transition
+- takeScreenshot: screenshots/transition_canvas_to_webgpu
+- waitForAnimationToEnd
+
+# Screenshot 2: WebGPU mode with tiling fix (settled)
+# Expected: right 2 cols should match Canvas — green tops (NOT black).
+# Before the fix: right 2 cols had black/wrong-color tops (UV wrapped to atlas origin).
+# After the fix: fract() wraps within the atlas sub-region correctly.
+- takeScreenshot: screenshots/tiling_fix_webgpu
+
+# Switch to Canvas + GPU Sort to verify the hybrid path
+- tapOn: "Canvas + GPU Sort"
+# Capture immediately to detect blank-on-transition
+- takeScreenshot: screenshots/transition_webgpu_to_canvas_gpu_sort
+- waitForAnimationToEnd
+
+# Screenshot 3: Hybrid canvas+GPU sort mode (settled)
+- takeScreenshot: screenshots/tiling_fix_canvas_gpu_sort
+
+# Cycle back to Canvas to confirm no state corruption after toggling
+- tapOn: "Canvas"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/tiling_fix_canvas_cycle_back

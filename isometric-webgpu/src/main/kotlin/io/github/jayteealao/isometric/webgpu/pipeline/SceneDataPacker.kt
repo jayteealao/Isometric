@@ -1,53 +1,14 @@
 package io.github.jayteealao.isometric.webgpu.pipeline
 
+import android.util.Log
+import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.RenderCommand
+import io.github.jayteealao.isometric.shader.IsometricMaterial
+import io.github.jayteealao.isometric.shader.resolveForFace
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
-
-/**
- * Layout constants for the `FaceData` and `TransformedFace` GPU storage buffer structs.
- *
- * These values must match the WGSL struct definitions in `transform_cull_light.wgsl` exactly.
- * Any change here requires a matching change to the shader.
- *
- * ## FaceData memory layout (144 bytes per face)
- *
- * ```
- *  offset  size  field
- *    0      12   v0.xyz  (vec3<f32>)
- *   12       4   _p0     (f32 padding — vec4 alignment)
- *   16      12   v1.xyz
- *   28       4   _p1
- *   32      12   v2.xyz
- *   44       4   _p2
- *   48      12   v3.xyz
- *   60       4   _p3
- *   64      12   v4.xyz
- *   76       4   _p4
- *   80      12   v5.xyz
- *   92       4   vertexCount (u32 — packed into v5's padding slot)
- *   96      16   baseColor   (vec4<f32>, RGBA in [0,1])
- *  112      12   normal      (vec3<f32>)
- *  124       4   textureIndex (u32; NO_TEXTURE = 0xFFFFFFFF)
- *  128       4   faceIndex   (u32)
- *  132      12   _padding    (vec3<u32>)
- * 144  →   144   (already aligned for storage-buffer layout)
- * ```
- */
-internal object SceneDataLayout {
-    /** Bytes per FaceData struct in the GPU scene-data storage buffer. */
-    const val FACE_DATA_BYTES = 144
-
-    /** Bytes per TransformedFace struct in the GPU intermediate buffer. */
-    const val TRANSFORMED_FACE_BYTES = 96
-
-    /**
-     * Sentinel value for [FaceData.textureIndex] when no texture is bound.
-     * Equals `0xFFFFFFFF` as an unsigned 32-bit integer, stored as a signed Kotlin [Int].
-     */
-    const val NO_TEXTURE: Int = -1 // 0xFFFFFFFF interpreted as u32 in WGSL
-}
 
 /**
  * Packs a list of [RenderCommand] objects into a flat [ByteBuffer] matching the GPU's
@@ -95,11 +56,13 @@ internal object SceneDataPacker {
 
         for ((index, cmd) in commands.withIndex()) {
             val pts3d = cmd.originalPath.points
-            val n = pts3d.size.coerceAtMost(6)
+            // Post webgpu-ngon-faces: supports up to MAX_FACE_VERTICES (=24) per face.
+            // `RenderCommand.init` enforces faceVertexCount in 3..24 — this matches.
+            val n = pts3d.size.coerceAtMost(SceneDataLayout.MAX_FACE_VERTICES)
 
-            // v0–v5: vec3<f32> each, padded to 16 bytes (vec4 alignment).
-            // v5's padding slot is repurposed for vertexCount.
-            for (i in 0 until 6) {
+            // v: array<vec3<f32>, 24> — each element is 16-byte aligned (xyz + 4-byte pad).
+            // Total block size: 24 × 16 = 384 bytes.
+            for (i in 0 until SceneDataLayout.MAX_FACE_VERTICES) {
                 if (i < n) {
                     val pt = pts3d[i]
                     buffer.putFloat(pt.x.toFloat())
@@ -110,19 +73,25 @@ internal object SceneDataPacker {
                     buffer.putFloat(0f)
                     buffer.putFloat(0f)
                 }
-                if (i < 5) {
-                    buffer.putFloat(0f)    // _p0…_p4 — alignment padding
-                } else {
-                    buffer.putInt(n)       // vertexCount packed into v5's padding slot
-                }
+                buffer.putFloat(0f)    // vec3 padding to 16-byte stride
             }
 
+            // vertexCount (u32) + 3 × u32 pad — aligns the next vec4 (baseColor) to 400.
+            buffer.putInt(n)
+            buffer.putInt(0)
+            buffer.putInt(0)
+            buffer.putInt(0)
+
             // baseColor: vec4<f32> RGBA in [0, 1] — use raw material color (pre-lighting)
-            // so the GPU M3 shader applies lighting exactly once.
-            buffer.putFloat(cmd.baseColor.r.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.g.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.b.toFloat() / 255f)
-            buffer.putFloat(cmd.baseColor.a.toFloat() / 255f)
+            // so the GPU M3 shader applies lighting exactly once. For PerFace materials
+            // that resolve to a per-face IsoColor, use that color instead of the command's
+            // default-carrying baseColor — otherwise every face renders as the PerFace
+            // default (typically mid-gray), erasing distinct per-face colors.
+            val effectiveColor = resolveEffectiveColor(cmd)
+            buffer.putFloat(effectiveColor.r.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.g.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.b.toFloat() / 255f)
+            buffer.putFloat(effectiveColor.a.toFloat() / 255f)
 
             // normal: vec3<f32> — cross product of first two edge vectors, inlined to
             // avoid Triple<Float,Float,Float> allocation per face.
@@ -145,13 +114,13 @@ internal object SceneDataPacker {
             buffer.putFloat(ny)
             buffer.putFloat(nz)
 
-            // textureIndex: u32 — NO_TEXTURE sentinel for now (Phase 3 texture work: M9+)
-            buffer.putInt(SceneDataLayout.NO_TEXTURE)
+            // textureIndex: u32 — resolved from cmd.material
+            buffer.putInt(resolveTextureIndex(cmd))
 
             // faceIndex: u32 — original command list index (used in sort + emit passes)
             buffer.putInt(index)
 
-            // _padding: 12 bytes to bring the struct to 128-byte alignment
+            // _padding: 12 bytes to reach 448 (16-byte aligned struct size)
             buffer.putInt(0)
             buffer.putInt(0)
             buffer.putInt(0)
@@ -171,6 +140,67 @@ internal object SceneDataPacker {
      * @return A rewound direct [ByteBuffer] of size `commands.size × FACE_DATA_BYTES`.
      *   Returns an empty (zero-capacity) buffer if [commands] is empty.
      */
+    /**
+     * Pack a compact `u32` array of texture indices for the M5 emit shader's
+     * `sceneTexIndices` binding. One `u32` per command (4 bytes each).
+     *
+     * Only the first [faceCount] entries of [commands] are packed, so writes never
+     * exceed the GPU buffer that was sized for exactly [faceCount] entries.
+     *
+     * Buffer size must be `≥ faceCount × 4`.
+     */
+    fun packTexIndicesInto(commands: List<RenderCommand>, buffer: ByteBuffer, faceCount: Int = commands.size) {
+        buffer.rewind()
+        buffer.limit(faceCount * 4)
+        for (i in 0 until faceCount) {
+            buffer.putInt(resolveTextureIndex(commands[i]))
+        }
+        buffer.rewind()
+    }
+
+    /**
+     * Resolve the GPU texture index for a render command's material.
+     *
+     * Commands with `IsometricMaterial.Textured` material get index 0 (atlas texture).
+     * `PerFace` resolves using the command's [RenderCommand.faceType] to find the
+     * per-face sub-material, falling back to the PerFace default.
+     * All others get [SceneDataLayout.NO_TEXTURE].
+     */
+    private fun resolveTextureIndex(cmd: RenderCommand): Int {
+        val effective = when (val m = cmd.material) {
+            is IsometricMaterial.PerFace -> m.resolveForFace(cmd.faceType)
+            else -> m
+        }
+        return when (effective) {
+            is IsometricMaterial.Textured -> 0
+            else -> SceneDataLayout.NO_TEXTURE
+        }
+    }
+
+    /**
+     * Resolve the per-face effective color for vertex packing.
+     *
+     * For `PerFace` materials whose [faceType][RenderCommand.faceType] resolves to a
+     * per-face [IsoColor], returns that color so distinct face colors survive the
+     * GPU vertex buffer. For `PerFace` that resolves to a [IsometricMaterial.Textured],
+     * returns the `tint` (so the fragment shader's `sample * tint` multiplication
+     * behaves as the user intends per-face).
+     *
+     * For all other cases (flat materials, unresolved per-face), returns
+     * [RenderCommand.baseColor] so the pre-existing flat-material path is unchanged.
+     */
+    private fun resolveEffectiveColor(cmd: RenderCommand): IsoColor {
+        val perFace = cmd.material as? IsometricMaterial.PerFace ?: return cmd.baseColor
+        return when (val sub = perFace.resolveForFace(cmd.faceType)) {
+            is IsoColor -> sub
+            is IsometricMaterial.Textured -> sub.tint
+            else -> {
+                Log.w("SceneDataPacker", "Unknown MaterialData fallback for face ${cmd.faceType ?: "?"}: ${sub?.javaClass?.simpleName ?: "null"}")
+                cmd.baseColor
+            }
+        }
+    }
+
     fun pack(commands: List<RenderCommand>): ByteBuffer {
         if (commands.isEmpty()) {
             return ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())

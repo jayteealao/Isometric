@@ -91,7 +91,7 @@ class IsometricRendererNativeCanvasTest {
             ) {
                 Shape(
                     geometry = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
-                    color = IsoColor.BLUE,
+                    material = IsoColor.BLUE,
                     position = Point.ORIGIN
                 )
             }

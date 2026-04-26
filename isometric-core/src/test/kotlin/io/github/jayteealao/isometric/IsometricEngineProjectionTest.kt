@@ -270,7 +270,7 @@ class IsometricEngineProjectionTest {
     fun `SceneProjector default projectionVersion is zero`() {
         val projector = object : SceneProjector {
             override fun add(shape: Shape, color: IsoColor) {}
-            override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?) {}
+            override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?, material: MaterialData?, uvCoords: FloatArray?, faceType: io.github.jayteealao.isometric.shapes.FaceIdentifier?, faceVertexCount: Int) {}
             override fun clear() {}
             override fun projectScene(width: Int, height: Int, renderOptions: RenderOptions, lightDirection: Vector): PreparedScene =
                 PreparedScene(emptyList(), width, height,
@@ -278,6 +278,54 @@ class IsometricEngineProjectionTest {
             override fun findItemAt(preparedScene: PreparedScene, x: Double, y: Double, order: HitOrder, touchRadius: Double): RenderCommand? = null
         }
         assertEquals(0L, projector.projectionVersion)
+    }
+
+    // --- TEST-03: faceVertexCount round-trip ---
+
+    /**
+     * TEST-03: Project a scene with mixed shapes (Prism, Cylinder, Pyramid, Stairs,
+     * Octahedron). For each emitted RenderCommand assert that
+     *   cmd.faceVertexCount == cmd.points.size / 2
+     * i.e. faceVertexCount matches the actual number of projected 2D vertices.
+     * This catches regressions where faceVertexCount is hardcoded to 4 for non-quad
+     * faces such as Pyramid laterals (3 vertices) or Cylinder caps (N vertices).
+     */
+    @Test
+    fun `faceVertexCount round trips through render command for mixed scene`() {
+        val engine = IsometricEngine()
+        // Add shapes with varying per-face vertex counts:
+        // Prism:     all faces = 4 vertices
+        // Pyramid:   laterals = 3 vertices, base = 4 vertices
+        // Cylinder:  caps = 6 vertices (N=6), sides = 4 vertices
+        // Octahedron: all faces = 3 vertices
+        // Stairs:    risers/treads = 4 vertices, sides = 2*N+2 vertices
+        engine.add(io.github.jayteealao.isometric.shapes.Prism(Point.ORIGIN), IsoColor.BLUE)
+        engine.add(io.github.jayteealao.isometric.shapes.Pyramid(Point(2.0, 0.0, 0.0)), IsoColor.RED)
+        engine.add(
+            io.github.jayteealao.isometric.shapes.Cylinder(
+                Point(4.0, 0.0, 0.0), vertices = 6
+            ),
+            IsoColor.GREEN,
+        )
+        engine.add(io.github.jayteealao.isometric.shapes.Octahedron(Point(0.0, 2.0, 0.0)), IsoColor.BLUE)
+        engine.add(
+            io.github.jayteealao.isometric.shapes.Stairs(Point(2.0, 2.0, 0.0), stepCount = 3),
+            IsoColor.RED,
+        )
+
+        // Use NoCulling so every face is emitted regardless of visibility.
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+        assertTrue(scene.commands.isNotEmpty(), "scene must have commands")
+
+        for (cmd in scene.commands) {
+            val expectedVertexCount = cmd.points.size / 2
+            assertEquals(
+                expectedVertexCount,
+                cmd.faceVertexCount,
+                "RenderCommand '${cmd.commandId}': faceVertexCount (${cmd.faceVertexCount}) " +
+                    "must equal points.size/2 ($expectedVertexCount)"
+            )
+        }
     }
 
     // --- screenToWorld edge cases ---

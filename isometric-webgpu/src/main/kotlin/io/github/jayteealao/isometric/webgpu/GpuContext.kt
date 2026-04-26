@@ -13,6 +13,7 @@ import androidx.webgpu.GPUSurface
 import androidx.webgpu.PowerPreference
 import androidx.webgpu.DeviceLostCallback
 import androidx.webgpu.FeatureName
+import androidx.webgpu.GPULimits
 import androidx.webgpu.UncapturedErrorCallback
 import androidx.webgpu.helper.initLibrary
 import java.util.concurrent.Executor
@@ -75,6 +76,17 @@ class GpuContext private constructor(
         private const val POLLING_DELAY_MS = 100L
         private const val GPU_THREAD_NAME = "WebGPU-Thread"
         private const val MIN_COMPUTE_INVOCATIONS = 256
+
+        /**
+         * Minimum storage buffers required per shader stage.
+         *
+         * The M5 triangulate-emit pipeline uses 7 storage-buffer bindings (see
+         * [io.github.jayteealao.isometric.webgpu.pipeline.GpuTriangulateEmitPipeline]).
+         * 8 is the WebGPU core-profile default, but compat-mode adapters (OpenGL ES 3.1
+         * baseline) may report 4 — such devices cannot run the `webgpu-ngon-faces`
+         * pipeline and are rejected at init.
+         */
+        private const val MIN_STORAGE_BUFFERS_PER_SHADER_STAGE = 8
 
         /**
          * Initialize the GPU context for compute-only use (Phase 1 path).
@@ -263,9 +275,50 @@ class GpuContext private constructor(
          */
         private fun assertComputeLimits(device: GPUDevice) {
             val limits = device.getLimits()
-            require(limits.maxComputeInvocationsPerWorkgroup >= MIN_COMPUTE_INVOCATIONS) {
+            try {
+                checkComputeLimits(
+                    maxComputeInvocationsPerWorkgroup = limits.maxComputeInvocationsPerWorkgroup,
+                    maxStorageBuffersPerShaderStage = limits.maxStorageBuffersPerShaderStage,
+                )
+            } catch (e: IllegalArgumentException) {
+                Log.e(TAG, e.message ?: "compute limits check failed")
+                throw e
+            } catch (e: IllegalStateException) {
+                Log.e(TAG, e.message ?: "compute limits check failed")
+                throw e
+            }
+        }
+
+        /**
+         * Pure limit-validation logic extracted for JVM-unit testability (M-12).
+         *
+         * Takes raw `Int` values read from `GPUDevice.getLimits()` so the check can be
+         * exercised in a standard JVM test without a real `GPUDevice` or Android runtime.
+         * No Android API calls are made here — logging happens in the [assertComputeLimits]
+         * wrapper so this function remains fully JVM-runnable.
+         *
+         * @throws IllegalArgumentException if [maxComputeInvocationsPerWorkgroup] is below
+         *   the WebGPU-spec minimum of 256.
+         * @throws IllegalStateException if [maxStorageBuffersPerShaderStage] is below the
+         *   8 required by the webgpu-ngon-faces emit pipeline.
+         */
+        internal fun checkComputeLimits(
+            maxComputeInvocationsPerWorkgroup: Int,
+            maxStorageBuffersPerShaderStage: Int,
+        ) {
+            require(maxComputeInvocationsPerWorkgroup >= MIN_COMPUTE_INVOCATIONS) {
                 "Device does not meet the WebGPU minimum maxComputeInvocationsPerWorkgroup " +
-                    "(required >= $MIN_COMPUTE_INVOCATIONS, device reports ${limits.maxComputeInvocationsPerWorkgroup})"
+                    "(required >= $MIN_COMPUTE_INVOCATIONS, device reports $maxComputeInvocationsPerWorkgroup)"
+            }
+            // webgpu-ngon-faces: M5 emit pipeline uses 7 storage buffers per stage; needs 8.
+            // Compat-mode OpenGL ES 3.1 adapters cap at 4 and will cause first-dispatch
+            // validation failures. Fail loud at init with an actionable message instead.
+            check(maxStorageBuffersPerShaderStage >= MIN_STORAGE_BUFFERS_PER_SHADER_STAGE) {
+                "WebGPU adapter does not support $MIN_STORAGE_BUFFERS_PER_SHADER_STAGE " +
+                    "storage buffers per shader stage (device reports " +
+                    "$maxStorageBuffersPerShaderStage); required by webgpu-ngon-faces. " +
+                    "This typically means an OpenGL ES 3.1 compat-mode adapter was selected. " +
+                    "Tier affected: baseline mobile without Vulkan support."
             }
         }
 
@@ -283,6 +336,13 @@ class GpuContext private constructor(
             deviceLostCallbackExecutor = Executor(Runnable::run),
             uncapturedErrorCallbackExecutor = Executor(Runnable::run),
             requiredFeatures = if (enableTimestamps) intArrayOf(FeatureName.TimestampQuery) else intArrayOf(),
+            // webgpu-ngon-faces: request 8 storage buffers per compute stage explicitly.
+            // Core-profile default is 8; compat-mode adapters may only offer 4. Requesting
+            // here moves the failure from first-dispatch silent wrong-results into init-
+            // time `requestDevice` rejection — see assertRequiredLimits below.
+            requiredLimits = GPULimits(
+                maxStorageBuffersPerShaderStage = MIN_STORAGE_BUFFERS_PER_SHADER_STAGE,
+            ),
             deviceLostCallback = DeviceLostCallback { _, reason, message ->
                 lastFailure.compareAndSet(
                     null,

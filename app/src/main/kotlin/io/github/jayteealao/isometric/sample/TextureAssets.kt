@@ -1,0 +1,113 @@
+package io.github.jayteealao.isometric.sample
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import kotlin.random.Random
+
+/**
+ * Procedurally generated texture bitmaps for the textured-demo sample.
+ * Both are 64x64 ARGB_8888 — generated once and cached via [lazy].
+ */
+internal object TextureAssets {
+
+    val grassTop: Bitmap by lazy { buildGrassTop() }
+    val dirtSide: Bitmap by lazy { buildDirtSide() }
+    val brick: Bitmap by lazy { buildBrick() }
+
+    private const val SIZE = 64
+
+    private fun buildGrassTop(): Bitmap {
+        val bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = Paint()
+
+        // Base fill — medium green
+        canvas.drawColor(0xFF6AA84F.toInt())
+
+        // Lighter highlight stripe across the top third
+        paint.color = 0xFF93C47D.toInt()
+        canvas.drawRect(0f, 0f, SIZE.toFloat(), SIZE / 3f, paint)
+
+        // Noise layer — darker green dots to simulate grass blades
+        paint.color = 0xFF3D8512.toInt()
+        val rng = Random(42) // deterministic for reproducibility
+        repeat(80) {
+            val x = rng.nextFloat() * SIZE
+            val y = rng.nextFloat() * SIZE
+            canvas.drawCircle(x, y, 1.5f, paint)
+        }
+
+        return bmp
+    }
+
+    private fun buildDirtSide(): Bitmap {
+        val bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = Paint()
+
+        // Base fill — mid-brown
+        canvas.drawColor(0xFFA2713D.toInt())
+
+        // Horizontal band variation every 8px
+        val lighter = 0xFFB4824B.toInt()
+        val darker = 0xFF8C6032.toInt()
+        for (row in 0 until SIZE step 8) {
+            paint.color = if ((row / 8) % 2 == 0) lighter else darker
+            canvas.drawRect(0f, row.toFloat(), SIZE.toFloat(), (row + 8).toFloat(), paint)
+        }
+
+        // Small random dark flecks for gravel texture
+        paint.color = 0xFF654321.toInt()
+        val rng = Random(99)
+        repeat(60) {
+            val x = rng.nextFloat() * SIZE
+            val y = rng.nextFloat() * SIZE
+            canvas.drawCircle(x, y, 1f, paint)
+        }
+
+        return bmp
+    }
+
+    private fun buildBrick(): Bitmap {
+        val bmp = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = Paint()
+
+        // Mortar background — light gray
+        canvas.drawColor(0xFFDCDCDC.toInt())
+
+        // Brick body — warm red
+        val brickColor = 0xFFB34A2E.toInt()
+        val brickHighlight = 0xFFCC5A3A.toInt()
+        val brickRowHeight = 16
+        val brickWidth = 32
+        val mortar = 2f
+
+        paint.color = brickColor
+        for (row in 0 until SIZE step brickRowHeight) {
+            val offset = if ((row / brickRowHeight) % 2 == 0) 0 else brickWidth / 2
+            for (colStart in -brickWidth until SIZE + brickWidth step brickWidth) {
+                val x0 = colStart + offset + mortar
+                val x1 = x0 + brickWidth - 2 * mortar
+                val y0 = row + mortar
+                val y1 = y0 + brickRowHeight - 2 * mortar
+                canvas.drawRect(x0, y0, x1, y1, paint)
+            }
+        }
+
+        // Highlight band along the top of each brick for subtle relief
+        paint.color = brickHighlight
+        for (row in 0 until SIZE step brickRowHeight) {
+            val offset = if ((row / brickRowHeight) % 2 == 0) 0 else brickWidth / 2
+            for (colStart in -brickWidth until SIZE + brickWidth step brickWidth) {
+                val x0 = colStart + offset + mortar
+                val x1 = x0 + brickWidth - 2 * mortar
+                val y0 = row + mortar
+                canvas.drawRect(x0, y0, x1, y0 + 2f, paint)
+            }
+        }
+
+        return bmp
+    }
+}

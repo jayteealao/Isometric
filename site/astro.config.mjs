@@ -36,6 +36,7 @@ export default defineConfig({
 						{ label: 'Theming & Colors', slug: 'guides/theming' },
 						{ label: 'Camera & Viewport', slug: 'guides/camera' },
 						{ label: 'Custom Shapes', slug: 'guides/custom-shapes' },
+						{ label: 'Textured Materials', slug: 'guides/textured-materials' },
 						{ label: 'Performance', slug: 'guides/performance' },
 						{ label: 'Compose Interop', slug: 'guides/compose-interop' },
 						{ label: 'Advanced Config', slug: 'guides/advanced-config' },

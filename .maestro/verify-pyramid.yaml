@@ -1,0 +1,39 @@
+appId: io.github.jayteealao.isometric.sample
+name: "uv-generation-pyramid verification"
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+
+# Navigate to Textured Materials demo from the chooser.
+- tapOn: "Textured Materials"
+- waitForAnimationToEnd
+- assertVisible: "Textured Materials"
+- assertVisible: "Full WebGPU"
+
+# Pyramid tab is the 3rd (scrollable) tab — Prism, Octahedron, Pyramid.
+# Tap the Pyramid tab by explicit point — Maestro's text-match on the
+# ScrollableTabRow Tab does not route to the Tab onClick on this device.
+# Coordinates derived from `uiautomator dump` tab bounds on 1080x2400 screen:
+# "Pyramid" text bounds [716,41][869,84]; y≈100 clears any status-bar overlap.
+- tapOn:
+    point: "73%,4%"
+- waitForAnimationToEnd
+
+# Canvas mode — AC1 (lateral textures), AC2 (base texture), AC3 (per-face colors).
+- takeScreenshot: screenshots/verify-pyramid-canvas
+
+# Full WebGPU mode — AC1/AC2/AC3 parity + I-02 mixed-vertex-count stress.
+- tapOn: "Full WebGPU"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-pyramid-webgpu
+
+# Hybrid path just for completeness (Canvas draw with GPU sort).
+- tapOn: "Canvas + GPU Sort"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-pyramid-canvas-gpusort
+
+# Cycle back to Canvas to confirm no state corruption after toggling backends.
+- tapOn: "Canvas"
+- waitForAnimationToEnd
+- takeScreenshot: screenshots/verify-pyramid-canvas-cycle-back

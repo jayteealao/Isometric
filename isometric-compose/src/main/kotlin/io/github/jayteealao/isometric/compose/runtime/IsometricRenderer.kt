@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.SceneProjector
 import io.github.jayteealao.isometric.SortingComputeBackend
@@ -77,6 +79,13 @@ class IsometricRenderer(
      */
     var forceRebuild: Boolean = false
 
+    /**
+     * Optional hook for material-aware rendering (textured fills).
+     * Set via [IsometricScene]'s DisposableEffect from [LocalMaterialDrawHook].
+     * Null in production when no texture rendering module is loaded (zero overhead).
+     */
+    var materialDrawHook: MaterialDrawHook? = null
+
     // Closed flag — once true, the renderer must not be used
     private var closed = false
 
@@ -94,6 +103,13 @@ class IsometricRenderer(
      * and refilling existing Path objects via [fillComposePath] instead of allocating new ones.
      */
     private val pathPool = ArrayList<androidx.compose.ui.graphics.Path>()
+
+    /**
+     * Pool of reusable native [android.graphics.Path] objects for the textured draw path.
+     * Only used in [renderPreparedScene] when the [MaterialDrawHook] is active.
+     * Mirrors the Compose [pathPool] to avoid per-frame native path allocation.
+     */
+    private val nativePathPool = ArrayList<android.graphics.Path>()
 
     internal val currentPreparedScene: PreparedScene? get() = cache.currentPreparedScene
 
@@ -182,7 +198,7 @@ class IsometricRenderer(
 
         cache.currentPreparedScene?.let { scene ->
             with(nativeRenderer) {
-                renderNative(scene, strokeStyle, onRenderError)
+                renderNative(scene, strokeStyle, onRenderError, materialDrawHook)
             }
         }
 
@@ -226,6 +242,7 @@ class IsometricRenderer(
         cache.clearCache()
         hitTestResolver.clearIndices()
         pathPool.clear()
+        nativePathPool.clear()
     }
 
     /**
@@ -259,6 +276,13 @@ class IsometricRenderer(
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return
         if (forceRebuild) clearCache()
+        // If the cached scene is not GPU-sorted (either a Full WebGPU GPU-only scene or a
+        // CPU-sync fallback scene), force a rebuild so that rebuildAsync runs and the
+        // Canvas+GPU Sort path uses proper GPU depth ordering.
+        // • isProjected==false: Full WebGPU scene (no CPU projection, no GPU sort)
+        // • isProjected==true, isGpuSorted==false: CPU-sync fallback (no GPU sort)
+        // • isProjected==true, isGpuSorted==true: already correct, no action needed
+        if (cache.currentPreparedScene?.isGpuSorted != true) clearCache()
 
         if (cache.needsUpdate(rootNode, context, width, height)) {
             benchmarkHooks?.onCacheMiss()
@@ -379,7 +403,7 @@ class IsometricRenderer(
 
         benchmarkHooks?.onDrawStart()
         with(nativeRenderer) {
-            renderNative(scene, strokeStyle, onRenderError)
+            renderNative(scene, strokeStyle, onRenderError, materialDrawHook)
         }
         benchmarkHooks?.onDrawEnd()
     }
@@ -399,6 +423,8 @@ class IsometricRenderer(
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return null
         if (forceRebuild) clearCache()
+        // GPU-only scenes cannot be drawn on a Canvas — force rebuild if one is cached.
+        if (cache.currentPreparedScene?.isProjected == false) clearCache()
         if (cache.needsUpdate(rootNode, context, width, height)) {
             benchmarkHooks?.onCacheMiss()
             benchmarkHooks?.onPrepareStart()
@@ -446,11 +472,20 @@ class IsometricRenderer(
     ) {
         val commands = scene.commands
 
-        // Grow the path pool to match the command count. Paths are never
+        // Grow the path pools to match the command count. Paths are never
         // removed — only new slots are added when the scene grows. This
         // eliminates ~280 Path() allocations per frame after the first.
         while (pathPool.size < commands.size) {
             pathPool.add(androidx.compose.ui.graphics.Path())
+        }
+
+        val hook = materialDrawHook
+
+        // Grow native path pool only when a hook is active (textured rendering).
+        if (hook != null) {
+            while (nativePathPool.size < commands.size) {
+                nativePathPool.add(android.graphics.Path())
+            }
         }
 
         for (i in commands.indices) {
@@ -458,18 +493,45 @@ class IsometricRenderer(
             try {
                 val path = pathPool[i]
                 command.fillComposePath(path)
-                val color = command.color.toComposeColor()
 
-                when (strokeStyle) {
-                    is StrokeStyle.FillOnly -> {
-                        drawPath(path, color, style = Fill)
+                // Try material hook for textured rendering via native canvas bridge.
+                // Skipped in stroke-only mode: textured fills would silently override the
+                // user's stroke-only intent. Uses pooled native paths to avoid per-frame
+                // allocation.
+                val materialHandled = command.material != null
+                    && hook != null
+                    && strokeStyle !is StrokeStyle.Stroke
+                    && run {
+                        var handled = false
+                        drawIntoCanvas { canvas ->
+                            val nativePath = nativePathPool[i]
+                            command.fillNativePath(nativePath)
+                            handled = hook.draw(canvas.nativeCanvas, command, nativePath)
+                        }
+                        handled
                     }
-                    is StrokeStyle.Stroke -> {
-                        drawPath(path, strokeComposeColor!!, style = strokeDrawStyle!!)
+
+                if (materialHandled) {
+                    // Hook drew the fill — apply stroke if needed
+                    when (strokeStyle) {
+                        is StrokeStyle.Stroke, is StrokeStyle.FillAndStroke -> {
+                            drawPath(path, strokeComposeColor!!, style = strokeDrawStyle!!)
+                        }
+                        is StrokeStyle.FillOnly -> { /* no stroke */ }
                     }
-                    is StrokeStyle.FillAndStroke -> {
-                        drawPath(path, color, style = Fill)
-                        drawPath(path, strokeComposeColor!!, style = strokeDrawStyle!!)
+                } else {
+                    val color = command.color.toComposeColor()
+                    when (strokeStyle) {
+                        is StrokeStyle.FillOnly -> {
+                            drawPath(path, color, style = Fill)
+                        }
+                        is StrokeStyle.Stroke -> {
+                            drawPath(path, strokeComposeColor!!, style = strokeDrawStyle!!)
+                        }
+                        is StrokeStyle.FillAndStroke -> {
+                            drawPath(path, color, style = Fill)
+                            drawPath(path, strokeComposeColor!!, style = strokeDrawStyle!!)
+                        }
                     }
                 }
             } catch (e: Exception) {

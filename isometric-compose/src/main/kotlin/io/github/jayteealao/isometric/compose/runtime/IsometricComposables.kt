@@ -5,6 +5,7 @@ import androidx.compose.runtime.ComposeNode
 import androidx.compose.runtime.ComposableTarget
 import androidx.compose.runtime.ReusableComposeNode
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.MaterialData
 import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
@@ -30,8 +31,12 @@ annotation class IsometricComposable
  * ```
  *
  * @param geometry The 3D [io.github.jayteealao.isometric.Shape] to render (e.g., [io.github.jayteealao.isometric.shapes.Prism])
- * @param color The color of the shape (defaults to [LocalDefaultColor])
- * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
+ * @param material The material of the shape. Pass an [IsoColor] for flat-color rendering
+ *   (defaults to [LocalDefaultColor]). Pass an `IsometricMaterial` (from `isometric-shader`)
+ *   for textured or per-face materials.
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque).
+ *   Applied to the shape's overall opacity. For textured materials, `alpha` scales the
+ *   composite opacity; tint alpha is controlled via the material's `tint` property.
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
@@ -50,7 +55,7 @@ annotation class IsometricComposable
 @Composable
 fun IsometricScope.Shape(
     geometry: Shape,
-    color: IsoColor = LocalDefaultColor.current,
+    material: MaterialData = LocalDefaultColor.current,
     alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
@@ -63,11 +68,13 @@ fun IsometricScope.Shape(
     testTag: String? = null,
     nodeId: String? = null
 ) {
+    val color = material.baseColor()
     ReusableComposeNode<ShapeNode, IsometricApplier>(
-        factory = { ShapeNode(geometry, color) },
+        factory = { ShapeNode(geometry, color).also { it.material = material } },
         update = {
             set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(material) { this.material = it; markDirty() }
             set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {

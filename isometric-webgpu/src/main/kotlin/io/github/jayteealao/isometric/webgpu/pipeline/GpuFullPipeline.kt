@@ -8,6 +8,8 @@ import io.github.jayteealao.isometric.webgpu.GpuContext
 import io.github.jayteealao.isometric.webgpu.shader.TriangulateEmitShader
 import io.github.jayteealao.isometric.webgpu.sort.BitonicSortNetwork
 import io.github.jayteealao.isometric.webgpu.sort.GpuBitonicSort
+import io.github.jayteealao.isometric.shader.TextureSource
+import io.github.jayteealao.isometric.webgpu.texture.GpuTextureManager
 import java.nio.ByteOrder
 
 /**
@@ -20,6 +22,7 @@ import java.nio.ByteOrder
  * - [GpuBitonicSort]           — M4b:   GPU-only bitonic depth sort
  * - [GpuSortKeyPacker]         — M4a:   pack sort keys from transformed faces
  * - [GpuTriangulateEmitPipeline] — M5:  triangulate + emit + write indirect args
+ * - [GpuTextureManager]        — texture atlas, bind group, tex-index and UV region buffers
  *
  * ## Per-frame call sequence
  *
@@ -31,6 +34,7 @@ import java.nio.ByteOrder
  * val encoder = device.createCommandEncoder()
  * fullPipeline.dispatch(encoder)              // encodes M3 → M4 → M5 compute passes
  * // ... begin render pass ...
+ * pass.setBindGroup(0, fullPipeline.textureBindGroup)
  * pass.setVertexBuffer(0, fullPipeline.vertexBuffer)
  * pass.drawIndirect(fullPipeline.indirectArgsBuffer, 0L)
  * // ... end render pass ...
@@ -53,6 +57,7 @@ import java.nio.ByteOrder
  */
 internal class GpuFullPipeline(
     private val ctx: GpuContext,
+    private val onTextureLoadError: ((TextureSource) -> Unit)? = null,
 ) : AutoCloseable {
 
     companion object {
@@ -82,6 +87,14 @@ internal class GpuFullPipeline(
     private val sort       = GpuBitonicSort(ctx)
     private val packer     = GpuSortKeyPacker(ctx)
     private val emit       = GpuTriangulateEmitPipeline(ctx)
+
+    // ── Texture manager ───────────────────────────────────────────────────────
+
+    private val textureManager = GpuTextureManager(ctx, onTextureLoadError)
+
+    // ── Per-vertex UV coords (geometry concern, separate from atlas) ──────────
+
+    private val uvCoordsBuffer = GpuUvCoordsBuffer(ctx)
 
     // ── Reusable indirect-args staging buffer ─────────────────────────────────
 
@@ -136,17 +149,29 @@ internal class GpuFullPipeline(
      */
     val indirectArgsBuffer: GPUBuffer get() = emit.indirectArgsBuffer
 
+    /**
+     * The texture bind group to set on the render pass at `@group(0)`.
+     * Delegated to [GpuTextureManager].
+     */
+    val textureBindGroup get() = textureManager.textureBindGroup
+
     // ── Pipeline init ─────────────────────────────────────────────────────────
 
     /**
-     * Compile all compute pipelines if not already done.
+     * Compile all compute pipelines and wire the texture bind group layout.
      *
-     * Calls [ensurePipeline]/[ensurePipelines] on all four compute stages.
+     * Calls [GpuRenderPipeline.ensurePipeline] to guarantee the render pipeline
+     * and its auto-derived bind group layout are available, then transfers layout
+     * ownership to [GpuTextureManager] (created here on first call).
+     *
      * Safe to call multiple times — each sub-pipeline is a no-op on subsequent calls.
      *
      * Must be called from the GPU thread (`ctx.withGpu { ... }`).
      */
-    suspend fun ensurePipelines() {
+    suspend fun ensurePipelines(renderPipeline: GpuRenderPipeline) {
+        ctx.assertGpuThread()
+        renderPipeline.ensurePipeline()
+        textureManager.ensurePipelines(renderPipeline)
         transform.ensurePipeline()
         sort.ensurePipeline()
         packer.ensurePipeline()
@@ -192,9 +217,12 @@ internal class GpuFullPipeline(
             faceCount      = faceCount,
         )
 
+        // ── Texture upload (atlas + tex-index + UV region) ───────────────────
+        textureManager.uploadTextures(scene, faceCount)
+        // ── Per-vertex UV coords (geometry concern, separate from atlas) ─────
+        uvCoordsBuffer.upload(scene, faceCount)
+
         // paddedCount must be a power of two for the bitonic sort network to be correct.
-        // nextPowerOfTwo(faceCount) ≤ capacity (since capacity is always a power-of-two
-        // multiple of INITIAL_CAPACITY_FACES and capacity ≥ faceCount by construction).
         val paddedCount = BitonicSortNetwork.nextPowerOfTwo(faceCount)
         lastPaddedCount = paddedCount
         val capacity    = sceneData.capacity
@@ -214,18 +242,30 @@ internal class GpuFullPipeline(
             transformedBuffer   = transform.transformedBuffer,
             sortKeyOutputBuffer = sort.primaryBuffer,
         )
+        val texIndexBuf  = textureManager.texIndexGpuBuffer
+        val uvRegionBuf  = textureManager.uvRegionGpuBuffer
+        val uvPoolBuf    = uvCoordsBuffer.poolBuffer
+        val uvTableBuf   = uvCoordsBuffer.tableBuffer
+        if (texIndexBuf == null || uvRegionBuf == null || uvPoolBuf == null || uvTableBuf == null) {
+            // Buffers must be non-null when faceCount > 0 — this indicates a bug in
+            // uploadTextures() or uvCoordsBuffer.upload(). Skip emit setup and clear defensively.
+            Log.e(TAG, "upload: GPU buffer unexpectedly null after uploadTextures (faceCount=$faceCount); clearing scene")
+            clearScene()
+            return
+        }
         emit.ensureBuffers(
             paddedCount       = paddedCount,
             viewportWidth     = viewportWidth,
             viewportHeight    = viewportHeight,
             transformedBuffer = transform.transformedBuffer,
             sortedKeysBuffer  = sort.resultBuffer,
+            texIndexBuffer    = texIndexBuf,
+            uvRegionBuffer    = uvRegionBuf,
+            uvPoolBuffer      = uvPoolBuf,
+            uvTableBuffer     = uvTableBuf,
         )
 
         // Write indirectArgs: { vertexCount, instanceCount=1, firstVertex=0, firstInstance=0 }.
-        // With fixed-stride M5, the vertex count is always paddedCount × MAX_VERTICES_PER_FACE.
-        // queue.writeBuffer is ordered before the next queue.submit so the render pass sees
-        // the correct value even though the compute submit comes after this call.
         val totalVertexCount = paddedCount * TriangulateEmitShader.MAX_VERTICES_PER_FACE
         indirectArgsStagingBuf.rewind()
         indirectArgsStagingBuf.putInt(totalVertexCount)
@@ -239,9 +279,8 @@ internal class GpuFullPipeline(
     /**
      * Reset draw-visible state so subsequent render passes cannot draw stale geometry.
      *
-     * This is used when the scene becomes empty/null. We do not need to clear every backing
-     * GPU buffer; clearing indirect args and resetting the cached counts is sufficient to make
-     * both the compute dispatch and the render draw path inert.
+     * Used when the scene becomes empty/null. Clears indirect args, resets cached counts,
+     * and reverts to the fallback texture bind group.
      */
     fun clearScene() {
         lastFaceCount = 0
@@ -253,6 +292,17 @@ internal class GpuFullPipeline(
         indirectArgsStagingBuf.putInt(0)
         indirectArgsStagingBuf.rewind()
         ctx.queue.writeBuffer(emit.indirectArgsBuffer, 0L, indirectArgsStagingBuf)
+
+        emit.reset()
+        textureManager.resetToFallback()
+        // NOTE: UvGenerator.clearAllCaches() is intentionally NOT called here.
+        // UvGenerator is `internal` to isometric-shader; isometric-webgpu cannot access
+        // it directly across module boundaries. Clearing the identity-caches on clearScene
+        // is a memory-hygiene nice-to-have (the caches hold identity-keyed slots that evict
+        // naturally when a new scene is uploaded with different shape instances). A
+        // cross-module clearing hook can be added in a follow-up slice if profiling shows
+        // significant retained-shape pressure across scene transitions (Risk 4 deferral).
+        Log.d(TAG, "clearScene: scene cleared, emit caches reset")
     }
 
     // ── Per-frame dispatch ────────────────────────────────────────────────────
@@ -315,7 +365,6 @@ internal class GpuFullPipeline(
         val faceCount = lastFaceCount
         require(faceCount > 0) { "No faces to dispatch — call upload with a non-empty scene first" }
 
-
         var submitIndex = 0
         fun submitStage(label: String, block: (GPUCommandEncoder) -> Unit) {
             val idx = ++submitIndex
@@ -341,7 +390,11 @@ internal class GpuFullPipeline(
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun close() {
-        // Close in reverse-dependency order: consumers before producers.
+        // Close texture manager (atlas, bind group, tex-index, UV region)
+        textureManager.close()
+        uvCoordsBuffer.close()
+
+        // Close compute sub-pipelines in reverse-dependency order.
         emit.close()
         packer.close()
         sort.close()

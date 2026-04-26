@@ -61,6 +61,11 @@ class MainActivity : ComponentActivity() {
                     description = "Per-node interaction: onClick, onLongClick, alpha transparency, stable nodeId, testTag",
                     onClick = { onSelect(Intent(this@MainActivity, InteractionSamplesActivity::class.java)) }
                 )
+                SampleCard(
+                    title = "Textured Materials",
+                    description = "Per-face BitmapShader (grass top, dirt sides) in Canvas and WebGPU modes",
+                    onClick = { onSelect(Intent(this@MainActivity, TexturedDemoActivity::class.java)) }
+                )
             }
         }
     }

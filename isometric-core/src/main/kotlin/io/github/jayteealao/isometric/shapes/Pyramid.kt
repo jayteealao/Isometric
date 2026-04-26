@@ -11,6 +11,27 @@ import kotlin.math.PI
  * The base is defined by [position], [width], and [depth], and the apex is centered
  * above the base at the given [height].
  *
+ * ## Path index layout
+ *
+ * `paths` has **five** entries — four triangular lateral faces followed by the base quad.
+ *
+ * | Index | Face | Vertices |
+ * |-------|------|----------|
+ * | 0 | `PyramidFace.LATERAL_0` (along +x) | 3 |
+ * | 1 | `PyramidFace.LATERAL_1` (along −x) | 3 |
+ * | 2 | `PyramidFace.LATERAL_2` (along +y) | 3 |
+ * | 3 | `PyramidFace.LATERAL_3` (along −y) | 3 |
+ * | 4 | `PyramidFace.BASE` (CCW viewed from below) | 4 |
+ *
+ * Pyramid is currently the only built-in shape with mixed vertex counts per face —
+ * downstream render code that depends on `faceVertexCount` must use
+ * `path.points.size` rather than assuming a uniform 4.
+ *
+ * > **Compat note (2026-04-18):** the base quad at index 4 was added by the
+ * > `uv-generation-pyramid` slice; before then `paths.size == 4`. Downstream
+ * > iteration that hard-coded `4` must recompute from `paths.size` or the new
+ * > path will be dropped.
+ *
  * @param position The minimum-corner origin point of the base (default [Point.ORIGIN])
  * @param width The extent of the base along the x-axis (must be positive, default 1.0)
  * @param depth The extent of the base along the y-axis (must be positive, default 1.0)
@@ -55,6 +76,21 @@ class Pyramid @JvmOverloads constructor(
             )
             paths.add(face2)
             paths.add(face2.rotateZ(center, PI))
+
+            /*
+             * Rectangular base quad — wound CCW viewed from below (−z) so that the
+             * outward normal points downward. The lighting code computes
+             * `edge1 = v0 − v1` × `edge2 = v1 − v2`; with vertices in this order the
+             * cross product yields a −z normal, matching the pyramid's bottom face
+             * being shadowed under the default light direction.
+             */
+            val base = Path(
+                position,
+                Point(position.x, position.y + depth, position.z),
+                Point(position.x + width, position.y + depth, position.z),
+                Point(position.x + width, position.y, position.z),
+            )
+            paths.add(base)
 
             return paths
         }

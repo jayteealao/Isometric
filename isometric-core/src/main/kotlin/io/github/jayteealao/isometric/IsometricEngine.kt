@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.FaceIdentifier
 import kotlin.math.PI
 
 /**
@@ -179,8 +180,12 @@ class IsometricEngine @JvmOverloads constructor(
         color: IsoColor,
         originalShape: Shape?,
         id: String?,
-        ownerNodeId: String?
-    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId)
+        ownerNodeId: String?,
+        material: MaterialData?,
+        uvCoords: FloatArray?,
+        faceType: FaceIdentifier?,
+        faceVertexCount: Int,
+    ) = sceneGraph.add(path, color, originalShape, id, ownerNodeId, material, uvCoords, faceType, faceVertexCount)
 
     /**
      * Removes all items from the scene graph.
@@ -231,6 +236,13 @@ class IsometricEngine @JvmOverloads constructor(
                 originalShape = transformedItem.item.originalShape,
                 ownerNodeId = transformedItem.item.ownerNodeId,
                 baseColor = transformedItem.item.baseColor,
+                material = transformedItem.item.material,
+                // Defensive copy: PreparedScene must own its UVs because the source
+                // FloatArray on TransformedSceneItem is mutable and may be reused on
+                // the next projection pass.
+                uvCoords = transformedItem.item.uvCoords?.copyOf(),
+                faceType = transformedItem.item.faceType,
+                faceVertexCount = transformedItem.item.faceVertexCount,
             )
         }
 
@@ -343,11 +355,15 @@ class IsometricEngine @JvmOverloads constructor(
                     originalShape = transformedItem.item.originalShape,
                     ownerNodeId = transformedItem.item.ownerNodeId,
                     baseColor = transformedItem.item.baseColor,
+                    material = transformedItem.item.material,
+                    uvCoords = transformedItem.item.uvCoords,
+                    faceType = transformedItem.item.faceType,
+                    faceVertexCount = transformedItem.item.faceVertexCount,
                 )
             )
         }
 
-        return PreparedScene(commands, width, height, projectionParams, lightDirection)
+        return PreparedScene(commands, width, height, projectionParams, lightDirection, isGpuSorted = true)
     }
 
     private fun projectAndCull(

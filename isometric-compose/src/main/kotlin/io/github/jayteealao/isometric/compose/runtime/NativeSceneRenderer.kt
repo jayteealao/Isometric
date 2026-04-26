@@ -35,13 +35,19 @@ internal class NativeSceneRenderer {
      * @param scene The projected and sorted scene to render
      * @param strokeStyle How to stroke/fill each polygon
      * @param onRenderError Optional callback for per-command render errors
+     * @param materialDrawHook Optional hook for material-aware rendering (textured fills).
+     *   When non-null and a command carries [RenderCommand.material], the hook is called
+     *   first. If it returns `true`, the fill was drawn by the hook; stroke is still applied
+     *   by this renderer. If `false` or null, the default flat-color fill is used.
      */
     fun DrawScope.renderNative(
         scene: PreparedScene,
         strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
-        onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null
+        onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null,
+        materialDrawHook: MaterialDrawHook? = null,
     ) {
         drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
             val strokeAndroidColor = when (strokeStyle) {
                 is StrokeStyle.FillOnly -> null
                 is StrokeStyle.Stroke -> strokeStyle.color.toAndroidColor()
@@ -57,22 +63,40 @@ internal class NativeSceneRenderer {
                 try {
                     val nativePath = command.toNativePath()
 
-                    when (strokeStyle) {
-                        is StrokeStyle.FillOnly -> {
-                            fillPaint.color = command.color.toAndroidColor()
-                            canvas.nativeCanvas.drawPath(nativePath, fillPaint)
+                    // Try material hook first for textured rendering
+                    val materialHandled = command.material != null
+                        && materialDrawHook != null
+                        && materialDrawHook.draw(nativeCanvas, command, nativePath)
+
+                    if (materialHandled) {
+                        // Hook drew the fill — still apply stroke if needed
+                        when (strokeStyle) {
+                            is StrokeStyle.Stroke, is StrokeStyle.FillAndStroke -> {
+                                strokePaint.strokeWidth = strokeWidth!!
+                                strokePaint.color = strokeAndroidColor!!
+                                nativeCanvas.drawPath(nativePath, strokePaint)
+                            }
+                            is StrokeStyle.FillOnly -> { /* no stroke */ }
                         }
-                        is StrokeStyle.Stroke -> {
-                            strokePaint.strokeWidth = strokeWidth!!
-                            strokePaint.color = strokeAndroidColor!!
-                            canvas.nativeCanvas.drawPath(nativePath, strokePaint)
-                        }
-                        is StrokeStyle.FillAndStroke -> {
-                            fillPaint.color = command.color.toAndroidColor()
-                            canvas.nativeCanvas.drawPath(nativePath, fillPaint)
-                            strokePaint.strokeWidth = strokeWidth!!
-                            strokePaint.color = strokeAndroidColor!!
-                            canvas.nativeCanvas.drawPath(nativePath, strokePaint)
+                    } else {
+                        // Default flat-color path (unchanged)
+                        when (strokeStyle) {
+                            is StrokeStyle.FillOnly -> {
+                                fillPaint.color = command.color.toAndroidColor()
+                                nativeCanvas.drawPath(nativePath, fillPaint)
+                            }
+                            is StrokeStyle.Stroke -> {
+                                strokePaint.strokeWidth = strokeWidth!!
+                                strokePaint.color = strokeAndroidColor!!
+                                nativeCanvas.drawPath(nativePath, strokePaint)
+                            }
+                            is StrokeStyle.FillAndStroke -> {
+                                fillPaint.color = command.color.toAndroidColor()
+                                nativeCanvas.drawPath(nativePath, fillPaint)
+                                strokePaint.strokeWidth = strokeWidth!!
+                                strokePaint.color = strokeAndroidColor!!
+                                nativeCanvas.drawPath(nativePath, strokePaint)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -88,18 +112,29 @@ internal class NativeSceneRenderer {
  * TODO(KMP): Move to androidMain source set.
  */
 internal fun RenderCommand.toNativePath(): android.graphics.Path {
-    return android.graphics.Path().apply {
-        val pts = points
-        if (pts.isEmpty()) return@apply
+    return android.graphics.Path().apply { fillNativePathImpl(this) }
+}
 
-        moveTo(pts[0].toFloat(), pts[1].toFloat())
-        var i = 2
-        while (i < pts.size) {
-            lineTo(pts[i].toFloat(), pts[i + 1].toFloat())
-            i += 2
-        }
-        close()
+/**
+ * Fill an existing [android.graphics.Path] from this command's [points],
+ * reusing the path object to avoid per-frame allocation.
+ */
+internal fun RenderCommand.fillNativePath(target: android.graphics.Path) {
+    target.reset()
+    fillNativePathImpl(target)
+}
+
+private fun RenderCommand.fillNativePathImpl(target: android.graphics.Path) {
+    val pts = points
+    if (pts.isEmpty()) return
+
+    target.moveTo(pts[0].toFloat(), pts[1].toFloat())
+    var i = 2
+    while (i < pts.size) {
+        target.lineTo(pts[i].toFloat(), pts[i + 1].toFloat())
+        i += 2
     }
+    target.close()
 }
 
 /**

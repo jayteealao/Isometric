@@ -1,4 +1,4 @@
-package io.github.jayteealao.isometric.sample
+﻿package io.github.jayteealao.isometric.sample
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -37,7 +37,7 @@ import kotlin.math.sin
 fun IsometricScope.SimpleShapeHighLevel() {
     Shape(
         geometry = Prism(position = Point(0.0, 0.0, 0.0)),
-        color = IsoColor(255.0, 0.0, 0.0)
+        material = IsoColor(255.0, 0.0, 0.0)
     )
 }
 
@@ -80,7 +80,7 @@ fun IsometricScope.AnimatedShapeHighLevel() {
 
     Shape(
         geometry = Prism(position = Point(0.0, 0.0, 0.0)),
-        color = IsoColor(255.0, 0.0, 0.0),
+        material = IsoColor(255.0, 0.0, 0.0),
         rotation = rotation  // Automatically triggers update
     )
 }
@@ -270,14 +270,14 @@ fun MixedLevelExample() {
         // HIGH-LEVEL: Easy to use for standard shapes
         Shape(
             geometry = Prism(position = Point(-3.0, 0.0, 0.0)),
-            color = IsoColor(255.0, 0.0, 0.0)
+            material = IsoColor(255.0, 0.0, 0.0)
         )
 
         // HIGH-LEVEL: Groups work great for hierarchies
         Group(rotation = angle) {
             Shape(
                 geometry = Pyramid(position = Point(0.0, 0.0, 0.0)),
-                color = IsoColor(0.0, 255.0, 0.0)
+                material = IsoColor(0.0, 255.0, 0.0)
             )
         }
 

@@ -23,6 +23,7 @@ import androidx.webgpu.GPUShaderModuleDescriptor
 import androidx.webgpu.GPUShaderSourceWGSL
 import androidx.webgpu.ShaderStage
 import io.github.jayteealao.isometric.webgpu.GpuContext
+import io.github.jayteealao.isometric.webgpu.diagnostics.WgslDiagnostics
 import io.github.jayteealao.isometric.webgpu.shader.PackSortKeysShader
 import java.nio.ByteOrder
 import kotlin.math.ceil
@@ -124,6 +125,7 @@ internal class GpuSortKeyPacker(
                 shaderSourceWGSL = GPUShaderSourceWGSL(code = PackSortKeysShader.WGSL)
             )
         )
+        WgslDiagnostics.logCompilation(shaderModule!!, TAG)
 
         val bgl = ctx.device.createBindGroupLayout(
             GPUBindGroupLayoutDescriptor(

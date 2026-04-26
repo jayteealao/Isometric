@@ -18,6 +18,9 @@ dependencies {
     // Access to GroupNode, RenderCommand, PreparedScene, SceneProjector, etc.
     api(project(":isometric-compose"))
 
+    // Material types (IsometricMaterial, TextureSource) for GPU texture resolution
+    implementation(project(":isometric-shader"))
+
     // Vendored WebGPU — pinned to alpha04
     implementation("androidx.webgpu:webgpu:1.0.0-alpha04")
 
@@ -36,4 +39,5 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation(libs.compose.ui.test.junit4)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

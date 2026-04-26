@@ -113,7 +113,11 @@ internal class SceneCache(
                     color = command.color,
                     originalShape = command.originalShape,
                     id = command.commandId,
-                    ownerNodeId = command.ownerNodeId
+                    ownerNodeId = command.ownerNodeId,
+                    material = command.material,
+                    uvCoords = command.uvCoords,
+                    faceType = command.faceType,
+                    faceVertexCount = command.faceVertexCount,
                 )
             }
 
@@ -180,7 +184,11 @@ internal class SceneCache(
                     color = command.color,
                     originalShape = command.originalShape,
                     id = command.commandId,
-                    ownerNodeId = command.ownerNodeId
+                    ownerNodeId = command.ownerNodeId,
+                    material = command.material,
+                    uvCoords = command.uvCoords,
+                    faceType = command.faceType,
+                    faceVertexCount = command.faceVertexCount,
                 )
             }
 
@@ -257,6 +265,7 @@ internal class SceneCache(
                 height = height,
                 projectionParams = concreteEngine.projectionParams,
                 lightDirection = context.lightDirection,
+                isProjected = false,
             )
 
             currentPreparedScene = scene

@@ -24,7 +24,7 @@ data class IsoColor @JvmOverloads constructor(
     val g: Double,
     val b: Double,
     val a: Double = 255.0
-) {
+) : MaterialData {
     @JvmOverloads
     constructor(r: Int, g: Int, b: Int, a: Int = 255) : this(
         r.toDouble(),
@@ -32,6 +32,8 @@ data class IsoColor @JvmOverloads constructor(
         b.toDouble(),
         a.toDouble()
     )
+
+    override fun baseColor(): IsoColor = this
 
     private val hsl: Triple<Double, Double, Double> by lazy(LazyThreadSafetyMode.NONE) { computeHsl() }
 

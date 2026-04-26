@@ -160,6 +160,7 @@ fun IsometricScene(
     // Wire benchmark hooks from CompositionLocal — read during composition,
     // then bridged into the imperative renderer via DisposableEffect.
     val currentBenchmarkHooks = LocalBenchmarkHooks.current
+    val currentMaterialDrawHook = LocalMaterialDrawHook.current
     val currentOnRenderError by rememberUpdatedState(config.onRenderError)
 
     // Effect 1: Wire dirty notification and renderer config.
@@ -167,15 +168,17 @@ fun IsometricScene(
     // Callback keys use rememberUpdatedState to avoid churn from inline lambdas.
     // onDispose clears the callback and hooks to prevent stale references when
     // the composable leaves the tree or dependencies are recreated.
-    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, config.forceRebuild) {
+    DisposableEffect(rootNode, renderer, currentBenchmarkHooks, currentMaterialDrawHook, config.forceRebuild) {
         rootNode.onDirty = { sceneVersion++ }
         renderer.benchmarkHooks = currentBenchmarkHooks
+        renderer.materialDrawHook = currentMaterialDrawHook
         renderer.forceRebuild = config.forceRebuild
         renderer.onRenderError = { id, error -> currentOnRenderError?.invoke(id, error) }
 
         onDispose {
             rootNode.onDirty = null
             renderer.benchmarkHooks = null
+            renderer.materialDrawHook = null
             renderer.onRenderError = null
         }
     }
@@ -628,12 +631,26 @@ fun IsometricScene(
                 // GPU compute path: read scene directly from renderer cache.
                 // NOT from Compose state — avoids snapshot retention of old scenes.
                 val scene = renderer.currentPreparedScene
-                if (scene != null) {
+                if (scene != null && scene.isProjected) {
+                    // Happy path: GPU-sort scene is ready — use it.
                     with(renderer) {
                         if (config.useNativeCanvas) {
                             renderNativeFromScene(scene, config.strokeStyle)
                         } else {
                             renderFromScene(scene, config.strokeStyle)
+                        }
+                    }
+                } else {
+                    // Fallback: scene is null or is a GPU-only (unprojected) scene from Full
+                    // WebGPU mode. Render synchronously so the first frame after a mode switch
+                    // is never blank. ensurePreparedScene inside render() detects isProjected==false
+                    // and clears the cache, then runs a CPU rebuild for immediate display.
+                    // prepareAsync (LaunchedEffect) will later force a GPU-sort rebuild.
+                    with(renderer) {
+                        if (config.useNativeCanvas) {
+                            renderNative(rootNode, renderContext, config.strokeStyle)
+                        } else {
+                            render(rootNode, renderContext, config.strokeStyle)
                         }
                     }
                 }

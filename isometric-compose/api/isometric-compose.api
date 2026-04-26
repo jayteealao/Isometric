@@ -35,11 +35,14 @@ public final class io/github/jayteealao/isometric/compose/runtime/AdvancedSceneC
 
 public final class io/github/jayteealao/isometric/compose/runtime/BatchNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {
 	public static final field $stable I
-	public fun <init> (Ljava/util/List;Lio/github/jayteealao/isometric/IsoColor;)V
+	public fun <init> (Ljava/util/List;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;)V
+	public synthetic fun <init> (Ljava/util/List;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getMaterial ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getShapes ()Ljava/util/List;
 	public fun renderTo (Ljava/util/List;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;)V
 	public final fun setColor (Lio/github/jayteealao/isometric/IsoColor;)V
+	public final fun setMaterial (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun setShapes (Ljava/util/List;)V
 }
 
@@ -161,7 +164,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricCompo
 	public static final fun Group (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLio/github/jayteealao/isometric/RenderOptions;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;III)V
 	public static final fun If (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;ZLkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
 	public static final fun Path (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
-	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
+	public static final fun Shape (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/MaterialData;FLio/github/jayteealao/isometric/Point;DDLio/github/jayteealao/isometric/Point;Lio/github/jayteealao/isometric/Point;ZLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Ljava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;III)V
 }
 
 public abstract class io/github/jayteealao/isometric/compose/runtime/IsometricNode {
@@ -218,6 +221,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricRende
 	public fun close ()V
 	public final fun getBenchmarkHooks ()Lio/github/jayteealao/isometric/compose/runtime/RenderBenchmarkHooks;
 	public final fun getForceRebuild ()Z
+	public final fun getMaterialDrawHook ()Lio/github/jayteealao/isometric/compose/runtime/MaterialDrawHook;
 	public final fun getOnRenderError ()Lkotlin/jvm/functions/Function2;
 	public final fun hitTest (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;DDLio/github/jayteealao/isometric/compose/runtime/RenderContext;II)Lio/github/jayteealao/isometric/compose/runtime/IsometricNode;
 	public final fun prepareAsync (Lio/github/jayteealao/isometric/compose/runtime/GroupNode;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;IILio/github/jayteealao/isometric/SortingComputeBackend;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -235,6 +239,7 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricRende
 	public static synthetic fun renderNativeFromScene$default (Lio/github/jayteealao/isometric/compose/runtime/IsometricRenderer;Landroidx/compose/ui/graphics/drawscope/DrawScope;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;ILjava/lang/Object;)V
 	public final fun setBenchmarkHooks (Lio/github/jayteealao/isometric/compose/runtime/RenderBenchmarkHooks;)V
 	public final fun setForceRebuild (Z)V
+	public final fun setMaterialDrawHook (Lio/github/jayteealao/isometric/compose/runtime/MaterialDrawHook;)V
 	public final fun setOnRenderError (Lkotlin/jvm/functions/Function2;)V
 }
 
@@ -249,13 +254,24 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricScene
 public abstract interface class io/github/jayteealao/isometric/compose/runtime/IsometricScope {
 }
 
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/MaterialDrawHook {
+	public abstract fun draw (Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/RenderCommand;Landroid/graphics/Path;)Z
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/MaterialDrawHookKt {
+	public static final fun getLocalMaterialDrawHook ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
 public final class io/github/jayteealao/isometric/compose/runtime/PathNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {
 	public static final field $stable I
-	public fun <init> (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;)V
+	public fun <init> (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getMaterial ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getPath ()Lio/github/jayteealao/isometric/Path;
 	public fun renderTo (Ljava/util/List;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;)V
 	public final fun setColor (Lio/github/jayteealao/isometric/IsoColor;)V
+	public final fun setMaterial (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun setPath (Lio/github/jayteealao/isometric/Path;)V
 }
 
@@ -385,12 +401,17 @@ public class io/github/jayteealao/isometric/compose/runtime/SceneConfig {
 
 public final class io/github/jayteealao/isometric/compose/runtime/ShapeNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {
 	public static final field $stable I
-	public fun <init> (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
+	public fun <init> (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;Lio/github/jayteealao/isometric/compose/runtime/UvCoordProvider;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/MaterialData;Lio/github/jayteealao/isometric/compose/runtime/UvCoordProvider;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getMaterial ()Lio/github/jayteealao/isometric/MaterialData;
 	public final fun getShape ()Lio/github/jayteealao/isometric/Shape;
+	public final fun getUvProvider ()Lio/github/jayteealao/isometric/compose/runtime/UvCoordProvider;
 	public fun renderTo (Ljava/util/List;Lio/github/jayteealao/isometric/compose/runtime/RenderContext;)V
 	public final fun setColor (Lio/github/jayteealao/isometric/IsoColor;)V
+	public final fun setMaterial (Lio/github/jayteealao/isometric/MaterialData;)V
 	public final fun setShape (Lio/github/jayteealao/isometric/Shape;)V
+	public final fun setUvProvider (Lio/github/jayteealao/isometric/compose/runtime/UvCoordProvider;)V
 }
 
 public final class io/github/jayteealao/isometric/compose/runtime/StackKt {
@@ -465,6 +486,10 @@ public final class io/github/jayteealao/isometric/compose/runtime/TapEvent {
 
 public final class io/github/jayteealao/isometric/compose/runtime/TileGridKt {
 	public static final fun TileGrid (Lio/github/jayteealao/isometric/compose/runtime/IsometricScope;IILio/github/jayteealao/isometric/TileGridConfig;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;Landroidx/compose/runtime/Composer;II)V
+}
+
+public abstract interface class io/github/jayteealao/isometric/compose/runtime/UvCoordProvider {
+	public abstract fun provide (Lio/github/jayteealao/isometric/Shape;I)[F
 }
 
 public abstract interface class io/github/jayteealao/isometric/compose/runtime/WebGpuProvider {
