@@ -495,9 +495,12 @@ class IsometricRenderer(
                 command.fillComposePath(path)
 
                 // Try material hook for textured rendering via native canvas bridge.
-                // Uses pooled native paths to avoid per-frame allocation.
+                // Skipped in stroke-only mode: textured fills would silently override the
+                // user's stroke-only intent. Uses pooled native paths to avoid per-frame
+                // allocation.
                 val materialHandled = command.material != null
                     && hook != null
+                    && strokeStyle !is StrokeStyle.Stroke
                     && run {
                         var handled = false
                         drawIntoCanvas { canvas ->

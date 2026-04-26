@@ -237,7 +237,10 @@ class IsometricEngine @JvmOverloads constructor(
                 ownerNodeId = transformedItem.item.ownerNodeId,
                 baseColor = transformedItem.item.baseColor,
                 material = transformedItem.item.material,
-                uvCoords = transformedItem.item.uvCoords,
+                // Defensive copy: PreparedScene must own its UVs because the source
+                // FloatArray on TransformedSceneItem is mutable and may be reused on
+                // the next projection pass.
+                uvCoords = transformedItem.item.uvCoords?.copyOf(),
                 faceType = transformedItem.item.faceType,
                 faceVertexCount = transformedItem.item.faceVertexCount,
             )

@@ -12,7 +12,6 @@ import androidx.webgpu.TextureFormat
 import androidx.webgpu.TextureUsage
 import io.github.jayteealao.isometric.webgpu.GpuContext
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /**
  * Manages GPU texture creation and pixel upload for the WebGPU render pipeline.
@@ -44,7 +43,8 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
     init {
         ctx.assertGpuThread()
         // 1×1 RGBA8Unorm white pixel — neutral for all multiply/blend operations.
-        val pixels = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder())
+        // Byte order is irrelevant: only single-byte put(Byte) calls follow.
+        val pixels = ByteBuffer.allocateDirect(4)
         pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte()); pixels.put(0xFF.toByte())
         pixels.rewind()
 
@@ -81,7 +81,9 @@ internal class GpuTextureStore(private val ctx: GpuContext) : AutoCloseable {
         require(byteCount <= Int.MAX_VALUE) {
             "Bitmap byte count $byteCount exceeds Int.MAX_VALUE"
         }
-        val pixels = ByteBuffer.allocateDirect(byteCount.toInt()).order(ByteOrder.nativeOrder())
+        // Byte order is irrelevant: copyPixelsToBuffer writes bytes individually
+        // in R,G,B,A order matching RGBA8Unorm.
+        val pixels = ByteBuffer.allocateDirect(byteCount.toInt())
         bitmap.copyPixelsToBuffer(pixels)
         pixels.rewind()
 

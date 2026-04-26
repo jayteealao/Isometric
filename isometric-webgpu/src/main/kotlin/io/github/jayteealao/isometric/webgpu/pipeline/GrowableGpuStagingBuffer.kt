@@ -58,12 +58,14 @@ internal class GrowableGpuStagingBuffer(
     }
 
     /**
-     * Close the underlying GPU buffer and reset capacity to zero.
-     * The CPU buffer is left for GC; [ByteBuffer.allocateDirect] memory is freed by the JVM.
+     * Close the underlying GPU buffer and release the CPU staging buffer reference.
+     * Direct [ByteBuffer] off-heap memory is reclaimed once the GC visits the buffer;
+     * dropping the strong reference here is what enables that.
      */
     fun close() {
         gpuBuffer?.close()
         gpuBuffer = null
+        cpuBuffer = null
         capacity = 0
     }
 }

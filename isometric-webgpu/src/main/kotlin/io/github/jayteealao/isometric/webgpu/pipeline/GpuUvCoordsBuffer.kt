@@ -60,6 +60,7 @@ internal class GpuUvCoordsBuffer(
         private set
 
     fun upload(scene: PreparedScene, faceCount: Int) {
+        require(faceCount >= 0) { "faceCount must be non-negative, got $faceCount" }
         if (faceCount == 0) {
             totalUvPairs = 0
             return
