@@ -1,0 +1,9 @@
+appId: io.github.jayteealao.isometric.sample
+---
+- launchApp:
+    clearState: true
+- tapOn: "Interaction API"
+- waitForAnimationToEnd
+- tapOn: "Alpha"
+- waitForAnimationToEnd
+- takeScreenshot: ".ai/workflows/depth-sort-shared-edge-overpaint/verify-evidence/maestro-alpha-default"

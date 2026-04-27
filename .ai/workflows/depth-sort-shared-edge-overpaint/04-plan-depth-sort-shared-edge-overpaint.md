@@ -6,11 +6,13 @@ slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 4
 created-at: "2026-04-26T19:33:07Z"
-updated-at: "2026-04-26T19:33:07Z"
-metric-files-to-touch: 5
-metric-step-count: 9
+updated-at: "2026-04-27T22:32:06Z"
+metric-files-to-touch: 9
+metric-step-count: 14
 has-blockers: false
-revision-count: 0
+revision-count: 1
+amends: 02-shape-amend-1.md
+applies-amendment: 1
 tags:
   - rendering
   - depth-sort
@@ -18,21 +20,36 @@ tags:
   - isometric-core
   - bug
   - numerical-robustness
+  - 3x3-grid
+  - screen-overlap-gate
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
   slice-def: 02-shape.md
+  shape-amendment: 02-shape-amend-1.md
+  diagnostic: 07-review-grid-regression-diagnostic.md
   siblings: []
   implement: 05-implement-depth-sort-shared-edge-overpaint.md
-next-command: wf-verify
-next-invocation: "/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
+next-command: wf-implement
+next-invocation: "/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 ---
 
 # Plan: depth-sort shared-edge overpaint
 
 ## Current State
 
-**Path.kt last modified:** `c4a62a5 build: prepare release v1.0.0`. The `closerThan`/`countCloserThan` functions have not been touched since the v1.0.0 release commit. The bug is genuinely 2+ years old and was only exposed by the WS10 NodeIdSample geometry (commit `e4aa792`).
+**Amendment-1 update**: Path.kt was modified by `3e811aa fix(depth-sort): permissive countCloserThan threshold + 1e-6 epsilon`. That change is the WS10 fix and remains correct in isolation. The amendment-1 work focuses on a SECOND bug class — over-aggressive topological edges in 3×3 grid layouts — that only became visible on emulator after `3e811aa` shipped. Per the diagnostic in `07-review-grid-regression-diagnostic.md`, the mechanism is: permissive `result > 0` produces "winning votes" in `closerThan` for prism face pairs whose 2D iso-projected polygons don't actually overlap, and `IntersectionUtils.hasIntersection` accepts boundary-touching AABBs as overlapping (line 99-103 of `IntersectionUtils.kt`), so the gate that should reject these pairs lets them through. Topological sort then pushes corner-cube vertical faces to output positions 0–2 where they get painted over.
+
+**`IntersectionUtils.hasIntersection` current behaviour** (read at amendment time):
+- AABB rejection (lines 84–103) accepts `A.maxX == B.minX` as overlap (`<=` checks). Permissive about boundary touch.
+- SAT edge-crossing test (lines 137–151) uses strict `< -1e-9` so edges that just touch don't count as crossing. Correct.
+- `isPointInPoly` containment fallback (lines 154–166) uses ray-casting; boundary points have asymmetric inclusion behaviour. Mostly correct but boundary-only contact CAN return true via the AABB+isPointInPoly path.
+
+The plan needs a tighter gate: when two prism face polygons are separated by a non-zero gap or share only a boundary edge in iso-projected screen space, the gate must return false even if `hasIntersection` returns true. Concretely: add an interior-overlap check that requires non-trivial intersection area (or equivalently, at least one polygon vertex strictly INSIDE the other, OR at least one edge crossing strictly interior to both polygons).
+
+**Pre-amendment tests**: 183 isometric-core tests green at commit `3e811aa`. PathTest (10 cases including the WS10 closerThan unit), DepthSorterTest (8 cases including the WS10 NodeIdSample integration test and the antisymmetry invariant), IntersectionUtilsTest (3 cases — disjoint, overlapping, contains). All retained as-is; the amendment ADDS new tests rather than modifying existing ones.
+
+**Path.kt last modified:** `c4a62a5 build: prepare release v1.0.0`, then `3e811aa fix(depth-sort): permissive countCloserThan threshold + 1e-6 epsilon`. The `closerThan`/`countCloserThan` functions are now in their post-`3e811aa` state and remain UNCHANGED by this amendment.
 
 **Exact bug arithmetic** (verified by sub-agent 1 against the live source):
 
@@ -75,7 +92,13 @@ For the diagnosed face pair (factory-top vs hq-right at the WS10 NodeIdSample's 
 - **`@Test fun \`backtick test name\`()` + `kotlin.test.assertEquals/assertTrue`** pattern from `PathTest.kt` and `DepthSorterTest.kt` — *reuse as-is* for new core unit tests.
 - **`Building` data class semantics** from `InteractionSamplesActivity.NodeIdSample` (`hq` h=3.0 / `factory` h=2.0 / `warehouse` h=1.5 / `tower` h=4.0 at `Point(i*2.0, 1.0, 0.1)`) — *extract into shared utility then use*. New file in `isometric-compose/src/test/kotlin/.../scenes/` will host the factory; both the new snapshot test and any future regression tests can call it.
 
-No reuse candidate exists for the `closerThan` math itself. The fix is local to `Path.kt`.
+No reuse candidate exists for the `closerThan` math itself. The original-scope fix is local to `Path.kt`.
+
+**Amendment-1 reuse opportunities:**
+- **`IntersectionUtils.hasIntersection`** at `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt:71-169` — *reuse with modification*. Existing SAT-based polygon overlap test that combines AABB rejection (lines 84–103), edge-crossing detection (lines 137–151), and point-in-polygon containment fallback (lines 154–166). The amendment requires either tightening this function's behaviour for boundary-only contact OR adding a sibling helper `hasInteriorIntersection` that returns false for the same boundary cases. Recommend ADDING a sibling helper to preserve the existing function's contract for any other (non-DepthSorter) callers — even if today it has only one caller.
+- **`IntersectionUtils.isPointInPoly`** at `IntersectionUtils.kt:48-60` — *reuse as-is*. Ray-casting containment test; useful inside the new `hasInteriorIntersection` for "is at least one vertex strictly INSIDE the other polygon" check.
+- **`WS10NodeIdScene`** at `isometric-compose/src/test/kotlin/.../scenes/WS10NodeIdScene.kt` — *reuse as-is*. Already extracted; the amendment-1 work adds three sibling factories (`OnClickRowScene`, `LongPressGridScene`, `AlphaSampleScene`) following the same pattern.
+- **`DepthSorterTest`** existing pattern — *reuse as-is*. AC-9's 3×3 grid integration test follows the same `IsometricEngine().add(...).projectScene(800, 600, RenderOptions.NoCulling)` recipe used by the existing `WS10 NodeIdSample` integration test.
 
 ## Likely Files / Areas to Touch
 
@@ -87,11 +110,39 @@ No reuse candidate exists for the `closerThan` math itself. The fix is local to 
 6. **`isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricCanvasSnapshotTest.kt`** — append one new `@Test fun nodeIdSharedEdge()` calling `paparazzi.snapshot { ... }` with `Box(800.dp, 600.dp)` + `IsometricScene { WS10NodeIdScene() }`. **Net diff: ~10 lines new**.
 7. **`isometric-compose/src/test/snapshots/images/io.github.jayteealao.isometric.compose_IsometricCanvasSnapshotTest_nodeIdSharedEdge.png`** *(NEW)* — new file. Generated by `recordPaparazzi`, committed to git so CI's `verifyPaparazzi` can compare against it. **Net diff: 1 binary file**.
 
-**Total: 5 source files (3 modified, 2 new) + 1 binary snapshot baseline.** Comfortably under the medium-appetite ceiling.
+**Total: 5 source files (3 modified, 2 new) + 1 binary snapshot baseline.** Original-scope estimate; superseded by amendment-1 below.
+
+**Amendment-1 file additions:**
+
+8. **`isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt`** — add a NEW public function `hasInteriorIntersection(pointsA, pointsB): Boolean` that reuses the existing AABB and SAT logic but rejects boundary-only contact (no overlapping interior area). Existing `hasIntersection` UNCHANGED so other callers retain their semantics. **Net diff: ~30 lines added**.
+
+9. **`isometric-core/src/main/kotlin/io/github/jayteealao/isometric/DepthSorter.kt`** — modify `checkDepthDependency` (lines 124-149) to use `hasInteriorIntersection` instead of `hasIntersection` as the gate for adding topological edges. Single-line behavioural change. **Net diff: ~3 lines (1 modified line + 2-3 line comment update)**.
+
+10. **`isometric-core/src/test/kotlin/io/github/jayteealao/isometric/IntersectionUtilsTest.kt`** — extend with cases for AC-10 + EC-9, EC-10: (a) two polygons sharing exactly one edge → `hasInteriorIntersection` returns false, `hasIntersection` keeps returning true (regression marker). (b) two polygons sharing exactly one vertex → false. (c) bounding-boxes overlap but interiors disjoint (e.g., one inside the other's BBox in a non-overlapping zone) → false. (d) interior overlap → true. **Net diff: ~50 lines new**.
+
+11. **`isometric-core/src/test/kotlin/io/github/jayteealao/isometric/DepthSorterTest.kt`** — extend with AC-9: `3x3 grid corner cube vertical faces are not at output positions 0-2`. Build the scene with 9 unit prisms at `Point(col*1.8, row*1.8, 0.1)` for col,row ∈ {0,1,2}, run DepthSorter, identify back-right cube's front (y=3.6 plane) and left (x=3.6 plane) faces by vertex geometry, assert `commandIndex >= 3`. **Net diff: ~40 lines new**.
+
+12. **`isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/OnClickRowScene.kt`** *(NEW)* — reusable factory replicating the OnClickSample geometry (5 prisms in a row, optionally one elevated to height=2 + IsoColor.YELLOW). **Net diff: ~25 lines new**.
+
+13. **`isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/LongPressGridScene.kt`** *(NEW)* — reusable factory replicating the LongPressSample 3×3 grid geometry. **Net diff: ~25 lines new**.
+
+14. **`isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/AlphaSampleScene.kt`** *(NEW)* — reusable factory replicating the AlphaSample mixed geometry (pyramid + cylinder + prisms). **Net diff: ~30 lines new**.
+
+15. **`isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricCanvasSnapshotTest.kt`** — REPLACE the single `nodeIdSharedEdge` test (added at original scope, step 8) with FOUR new tests: `nodeIdRowScene` (renamed from nodeIdSharedEdge with its WS10NodeIdScene factory), `onClickRowScene`, `longPressGridScene`, `alphaSampleScene`. **Net diff: ~30 lines (replace 10 lines with 40)**.
+
+16. **Four Paparazzi snapshot baselines** *(NEW)* under `isometric-compose/src/test/snapshots/images/` for each of the four AC-11 tests. Generated by `recordPaparazzi` on Linux CI; committed to git. **Net diff: 4 binary files**.
+
+**Amendment-1 total: 9 source/test files (3 modified, 6 new) + 4 binary snapshot baselines.** Plus the original-scope work which is mostly already committed in `3e811aa`. The original `nodeIdSharedEdge` snapshot is REPLACED by `nodeIdRowScene` (new name reflecting its use as the row-layout regression test rather than the original "shared edge" framing). Remains within medium-appetite ceiling.
 
 ## Proposed Change Strategy
 
-Strict red-green TDD per Round 2:
+**Amendment-1 strategy (overlays on the original strategy below):**
+
+The amendment work is purely additive on top of `3e811aa`. The existing red-green TDD steps 1–9 are CONSIDERED COMPLETE (committed in `3e811aa`). Amendment-1 work is steps A1–A6 below, executed as a second atomic commit `fix(depth-sort): screen-overlap gate for 3x3 grid edge-cases`.
+
+Original-scope strategy (already executed) follows for context:
+
+
 
 1. **Red**: write the failing `closerThan` shared-edge unit test in `PathTest.kt`. Run; confirm it fails with the diagnosed `0` return value.
 2. **Green**: edit `countCloserThan` in `Path.kt`: replace `(result + result0) / points.size` with `if (result > 0) 1 else 0`, and widen epsilon. Re-run the failing test; confirm it passes.
@@ -103,6 +154,151 @@ Strict red-green TDD per Round 2:
 The KDoc update on `countCloserThan` is included in step 2's diff.
 
 ## Step-by-Step Plan
+
+**Amendment-1 steps (NEW — execute these in this order):**
+
+A1. **Pre-flight (amendment)**: confirm `isometric-core/.../Path.kt` and `isometric-core/.../DepthSorter.kt` are at commit `3e811aa` state (both files match `git show HEAD:<path>`). Confirm 183 isometric-core tests green. The diagnostic logging from yesterday's session must be REVERTED already (verified: working tree clean for both files).
+
+A2. **Red — failing AC-9 test**: in `DepthSorterTest.kt`, add:
+    ```kotlin
+    @Test
+    fun `WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)
+        for (i in 0 until 9) {
+            val row = i / 3; val col = i % 3
+            engine.add(
+                Prism(Point(col * 1.8, row * 1.8, 0.1), 1.2, 1.2, 1.0),
+                IsoColor((col + 1) * 80.0, (row + 1) * 80.0, 150.0)
+            )
+        }
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Identify back-right cube's vertical faces by vertex geometry
+        val backRightFront = scene.commands.indexOfFirst { cmd ->
+            cmd.path.points.all { it.y in 3.59..3.61 } &&
+                cmd.path.points.any { it.x in 3.59..3.61 } &&
+                cmd.path.points.any { it.x in 4.79..4.81 }
+        }
+        val backRightLeft = scene.commands.indexOfFirst { cmd ->
+            cmd.path.points.all { it.x in 3.59..3.61 } &&
+                cmd.path.points.any { it.y in 3.59..3.61 } &&
+                cmd.path.points.any { it.y in 4.79..4.81 }
+        }
+
+        assertTrue(backRightFront >= 3, "back-right cube's front face must not be at output positions 0-2; was at $backRightFront")
+        assertTrue(backRightLeft >= 3, "back-right cube's left face must not be at output positions 0-2; was at $backRightLeft")
+    }
+    ```
+    Run; confirm it FAILS (current `3e811aa` state has back-right vertical faces at positions 0–2 per the diagnostic).
+
+A3. **Red — failing AC-10 test**: in `IntersectionUtilsTest.kt`, add:
+    ```kotlin
+    @Test
+    fun `hasInteriorIntersection returns false for polygons sharing only an edge`() {
+        val polyA = listOf(Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0), Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0))
+        val polyB = listOf(Point(1.0, 0.0, 0.0), Point(2.0, 0.0, 0.0), Point(2.0, 1.0, 0.0), Point(1.0, 1.0, 0.0))
+        assertFalse(IntersectionUtils.hasInteriorIntersection(polyA, polyB))
+        assertTrue(IntersectionUtils.hasIntersection(polyA, polyB), "old hasIntersection still returns true for shared-edge case (regression marker)")
+    }
+
+    @Test
+    fun `hasInteriorIntersection returns false for polygons sharing only a vertex`() { /* analogous */ }
+
+    @Test
+    fun `hasInteriorIntersection returns true for genuine interior overlap`() { /* analogous, returns true */ }
+    ```
+    Run; confirm: (a) the new tests fail because `hasInteriorIntersection` doesn't exist yet; (b) the regression-marker assertion would FAIL too if we used the old function.
+
+A4. **Green — implement `hasInteriorIntersection`**: in `IntersectionUtils.kt`, add:
+    ```kotlin
+    /**
+     * Tests whether two convex polygons have a non-trivial interior overlap area.
+     *
+     * Stricter than [hasIntersection]: returns false when polygons share only an
+     * edge or vertex (boundary touch with zero interior overlap). Used by
+     * [DepthSorter.checkDepthDependency] to gate topological-edge insertion —
+     * boundary-touch pairs do not need a draw-order edge because they don't
+     * actually overpaint each other.
+     */
+    fun hasInteriorIntersection(pointsA: List<Point>, pointsB: List<Point>): Boolean {
+        if (!hasIntersection(pointsA, pointsB)) return false
+
+        // hasIntersection passed; now require at least one of:
+        //   (1) a strictly-interior point of one polygon inside the other, OR
+        //   (2) a strictly-interior edge crossing (already strict in hasIntersection's SAT path)
+        // For boundary-only contact, hasIntersection's containment-fallback returns true
+        // via isPointInPoly returning true for a vertex on the boundary, but no STRICT
+        // crossing exists. We re-check that explicitly here.
+
+        // ... implementation: invoke a strict-interior test (SAT with strict <0 thresholds
+        // and isPointInPoly with ε exclusion of boundary) ...
+    }
+    ```
+    Implement the strict-interior logic. Run AC-10 tests; confirm green.
+
+A5. **Green — wire the gate**: in `DepthSorter.kt:133-136`, change:
+    ```kotlin
+    if (IntersectionUtils.hasIntersection(  // OLD
+    ```
+    to:
+    ```kotlin
+    if (IntersectionUtils.hasInteriorIntersection(  // NEW
+    ```
+    Update the surrounding comment to mention the gate's new strictness. Run AC-9 test from step A2; confirm green. Run the full `:isometric-core:test` suite; confirm 183 pre-existing tests + AC-9 + 3 AC-10 cases all green.
+
+A6. **Replace Paparazzi snapshot test (AC-11)**: in `IsometricCanvasSnapshotTest.kt`, REMOVE the single `nodeIdSharedEdge()` test added at original-scope step 8. ADD four new tests:
+    - `nodeIdRowScene()` — uses the existing `WS10NodeIdScene` factory.
+    - `onClickRowScene()` — uses new `OnClickRowScene` factory (with one shape selected/elevated to test the height-change case).
+    - `longPressGridScene()` — uses new `LongPressGridScene` factory (default state, no long-press; this is where the regression manifests).
+    - `alphaSampleScene()` — uses new `AlphaSampleScene` factory.
+
+    Create the three new scene factories under `isometric-compose/src/test/kotlin/.../scenes/`. Run `recordPaparazzi` on Linux CI (or accept the Windows blank-render gap and wait for CI). Commit four new baseline PNGs.
+
+A7. **Maestro flow snapshots**: the existing maestro flows at `.ai/workflows/depth-sort-shared-edge-overpaint/maestro/{01-onclick.yaml, 02-longpress.yaml, 03-alpha.yaml}` produced screenshots in `verify-evidence/`. After the fix lands, re-run them and compare against the post-fix expected behaviour. Capture into `verify-evidence/post-fix/` for the verify stage.
+
+A8. **Atomic commit**: `fix(depth-sort): screen-overlap gate for 3x3 grid edge-cases`. Stage:
+    - `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt`
+    - `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/DepthSorter.kt`
+    - `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/IntersectionUtilsTest.kt`
+    - `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/DepthSorterTest.kt`
+    - `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/OnClickRowScene.kt`
+    - `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/LongPressGridScene.kt`
+    - `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/AlphaSampleScene.kt`
+    - `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricCanvasSnapshotTest.kt`
+    - 4 baseline PNGs under `isometric-compose/src/test/snapshots/images/`
+
+    Commit message:
+    ```
+    fix(depth-sort): screen-overlap gate for 3x3 grid edge-cases
+
+    The permissive `result > 0` threshold landed in 3e811aa correctly resolves
+    the WS10 NodeIdSample shared-edge case, but its asymmetric "winning votes"
+    in countCloserThan fire even for face pairs whose 2D iso-projected polygons
+    don't actually overlap. In 3x3 grid layouts (LongPressSample, AlphaSample),
+    multiple such spurious votes accumulate as topological edges in
+    DepthSorter.checkDepthDependency, pushing corner cubes' vertical faces to
+    output positions 0-2 where they get painted over by faces drawn afterward.
+    Visible regression: the back-right cube of the 3x3 grid renders with only
+    its top face visible.
+
+    Add IntersectionUtils.hasInteriorIntersection — stricter than hasIntersection;
+    rejects boundary-only contact (shared edges, shared vertices, no interior
+    overlap area). Wire DepthSorter.checkDepthDependency to gate topological-edge
+    insertion on this stricter test. The closerThan algorithm itself is unchanged;
+    only the gate that decides which closerThan results matter changes.
+
+    Adds AC-9 (3x3 grid integration test asserting corner cubes' vertical faces
+    are not at output positions 0-2), AC-10 (hasInteriorIntersection unit cases
+    for boundary-only contact), AC-11 (four scene-factory Paparazzi snapshots
+    replacing the single nodeIdSharedEdge baseline).
+
+    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+    ```
+
+---
+
+**Original-scope steps (already executed in commit `3e811aa`)**:
 
 1. **Pre-flight**: confirm current branch is `feat/ws10-interaction-props`; confirm `git status` shows only the build-logic CC fix as uncommitted modification (no other surprises). Run `:isometric-core:test` once to confirm 172 tests pass on the pre-fix baseline.
 
@@ -299,18 +495,22 @@ The KDoc update on `countCloserThan` is included in step 2's diff.
 
 ## Test / Verification Plan
 
-### Automated checks
+### Automated checks (post-amendment-1 expected state)
 
 - **Lint/typecheck**: `./gradlew :isometric-core:assemble :isometric-compose:assemble` — confirms compile-clean.
-- **Unit tests**: `./gradlew :isometric-core:test` should run 172 (pre-existing) + ~10–12 (new) = ~182–184 tests, all green. Specifically:
-  - `PathTest.closerThan returns nonzero for hq-right vs factory-top shared-edge case` (AC-1)
-  - `PathTest.closerThan returns 0 for genuinely coplanar non-overlapping faces` (AC-2)
-  - `PathTest.<5 parameterised shared-edge cases>` (AC-3)
-  - `DepthSorterTest.WS10 NodeIdSample four buildings render in correct front-to-back order` (AC-4)
-  - `DepthSorterTest.closerThan is antisymmetric for representative non-coplanar pairs` (AC-7)
-  - `IntersectionUtilsTest.<3 baseline cases>` (AC for the new file's coverage of adjacent / overlap / disjoint).
-- **Snapshot verification**: `./gradlew :isometric-compose:verifyPaparazzi` — must pass for the new `nodeIdSharedEdge` test against the committed baseline PNG.
-- **Regression**: existing `DepthSorterTest` cases (`coplanar adjacent prisms`, `3x3 grid face count`, `cycle fallback`, broad-phase parity) must remain green.
+- **Unit tests**: `./gradlew :isometric-core:test` should run **187 tests** (183 from pre-amendment-1 baseline + 1 AC-9 + 3 AC-10 cases), all green:
+  - **From original scope (already passing in `3e811aa`):** PathTest AC-1, AC-2, AC-3 cases, DepthSorterTest AC-4 (WS10 NodeIdSample), AC-7 (antisymmetry), IntersectionUtilsTest 3 baseline cases.
+  - **New (amendment-1):**
+    - `DepthSorterTest.WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first` (AC-9).
+    - `IntersectionUtilsTest.hasInteriorIntersection returns false for polygons sharing only an edge` (AC-10 case 1 + EC-10).
+    - `IntersectionUtilsTest.hasInteriorIntersection returns false for polygons sharing only a vertex` (AC-10 case 2).
+    - `IntersectionUtilsTest.hasInteriorIntersection returns true for genuine interior overlap` (AC-10 case 3).
+- **Snapshot verification**: `./gradlew :isometric-compose:verifyPaparazzi` — must pass for FOUR baselines:
+  - `IsometricCanvasSnapshotTest_nodeIdRowScene.png` (replaces `nodeIdSharedEdge.png`).
+  - `IsometricCanvasSnapshotTest_onClickRowScene.png` (NEW, AC-11).
+  - `IsometricCanvasSnapshotTest_longPressGridScene.png` (NEW, AC-11 — primary regression marker).
+  - `IsometricCanvasSnapshotTest_alphaSampleScene.png` (NEW, AC-11).
+- **Regression**: existing `DepthSorterTest` cases (`coplanar adjacent prisms`, `coplanar tile grid` broad-phase parity, `cycle fallback`, `kahn algorithm preserves existing broad phase sparse test`) must remain green. The new gate's stricter behaviour MUST NOT break the coplanar-tile-grid case (which relies on edges being added for tile-grid face pairs that DO have interior overlap in screen projection).
 
 ### Interactive verification (human-in-the-loop)
 
@@ -361,8 +561,26 @@ Inherited from shape's freshness pass. No additional searches required for plan 
 
 ## Revision History
 
-*(none yet — initial plan)*
+### Revision 1 — 2026-04-27T22:32:06Z — Directed Fix (apply amendment-1)
+
+- **Mode:** Directed Fix (`/wf-plan depth-sort-shared-edge-overpaint amend-1`).
+- **Source:** `02-shape-amend-1.md` and `07-review-grid-regression-diagnostic.md`.
+- **What changed:**
+  - Frontmatter: `metric-files-to-touch` 5 → 9, `metric-step-count` 9 → 14 (original 9 + amendment-1 A1–A8 with A6/A7 sometimes counted as one step block), `revision-count` 0 → 1, added `amends`, `applies-amendment`, `tags` for grid + screen-overlap-gate, `next-invocation` from wf-verify to wf-implement (since amendment-1 work is unimplemented).
+  - `## Current State`: noted that Path.kt is already at `3e811aa` post-fix state and the amendment-1 work focuses on a SECOND bug class (over-aggressive edges in 3×3 grids). Added a deep read of `IntersectionUtils.hasIntersection` showing the AABB-rejection step accepts boundary-touching boxes, which is the proximate cause of the over-aggressive gate.
+  - `## Reuse Opportunities`: added `IntersectionUtils.hasIntersection` (reuse with modification — recommend ADD a sibling `hasInteriorIntersection` rather than modifying the existing function), `IntersectionUtils.isPointInPoly` (reuse as-is in the new helper), `WS10NodeIdScene` (reuse as-is, plus add three sibling factories), `DepthSorterTest` integration test pattern.
+  - `## Likely Files / Areas to Touch`: added 9 new file additions (steps A1–A8 above, listing the new IntersectionUtils sibling helper, the DepthSorter gate change, three new scene factories, expanded snapshot test file, and four new baselines).
+  - `## Proposed Change Strategy`: layered amendment-1 strategy on top of the original (which is now committed in `3e811aa`).
+  - `## Step-by-Step Plan`: prepended steps A1–A8 for amendment-1 work; original steps 1–9 retained for context but marked as "already executed in `3e811aa`".
+  - `## Test / Verification Plan`: total test count changed from ~182–184 to 187 (183 pre-amendment + 4 new from AC-9 and AC-10). Replaced the single `nodeIdSharedEdge` snapshot with FOUR new scene-factory snapshots covering the regressed samples (LongPress, Alpha, OnClick) plus the original WS10 case (renamed).
+- **Why:** The original `02-shape.md` was scoped to row-layout shared-edge cases. The diagnostic in `07-review-grid-regression-diagnostic.md` revealed a second bug class (3×3 grid corner cubes lose vertical faces because of accumulated over-aggressive topological edges). Amendment-1 expanded the shape to cover both bug classes; the plan needed to grow the file list, step sequence, test inventory, and snapshot baseline set accordingly.
+- **What is preserved unchanged from revision 0:** all original-scope steps (1–9) and their committed result (`3e811aa`); `Path.kt`'s permissive `result > 0` predicate; the 1e-6 epsilon; AC-1 through AC-8 verification logic; the `WS10NodeIdScene` factory; the `IntersectionUtilsTest` baseline case set.
+- **What is invalidated:** the single `nodeIdSharedEdge` snapshot test (REPLACED by `nodeIdRowScene`, equivalent geometry, renamed for clarity); the implicit assumption that the WS10 fix was the complete bug class.
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — plan is execution-ready. Strict red-green order locked in. Compact recommended before invoking implement.
+- **Option A (default, post-amendment-1):** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — execute amendment-1 steps A1–A8 (add `IntersectionUtils.hasInteriorIntersection`, wire it in `DepthSorter.checkDepthDependency`, add AC-9 + AC-10 tests, replace the single Paparazzi snapshot with four scene-factory snapshots). All original-scope work is already in `3e811aa`. The directed-fix revision history above documents exactly what the implementer is to add. **Compact recommended before invoking implement** — the back-and-forth from the prior failed reviews-mode attempt and the diagnostic investigation is noise; the plan now stands alone.
+
+- **Option B:** `/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — only if the user wants to re-verify the existing `3e811aa` state without the amendment-1 work. Not recommended; the verify stage already ran (06-verify-*) and produced result `partial` with the LongPress regression unverified — that's exactly what amendment-1 addresses.
+
+- **Option C:** `/wf-amend depth-sort-shared-edge-overpaint from-review` — only if amendment-1's strategy itself proves wrong during implement. Not currently triggered.

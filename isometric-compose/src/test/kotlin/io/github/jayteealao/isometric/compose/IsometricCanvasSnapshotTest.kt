@@ -12,6 +12,9 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
+import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
+import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
+import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
 import io.github.jayteealao.isometric.compose.scenes.WS10NodeIdScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
@@ -303,16 +306,68 @@ class IsometricCanvasSnapshotTest {
         }
     }
 
+    // ----------------------------------------------------------------------
+    // depth-sort regression baselines (workflow `depth-sort-shared-edge-overpaint`).
+    //
+    // These snapshots replace the single `nodeIdSharedEdge` baseline with
+    // four scene-specific captures covering both bug classes:
+    //
+    //   1. Row-layout shared-edge case (WS10 NodeIdSample). The original-scope
+    //      fix in commit 3e811aa addressed this; pinned here for regression.
+    //   2. Row-layout with height change (OnClickSample with one shape selected).
+    //   3. 3x3 grid layout (LongPressSample default state). The amendment-1
+    //      fix added IntersectionUtils.hasInteriorIntersection to gate edge
+    //      insertion in DepthSorter; this snapshot is the primary regression
+    //      marker for the over-aggressive-edge case.
+    //   4. Mixed-geometry alpha sample (AlphaSample). Same regression class
+    //      as (3), different geometry mix.
+    // ----------------------------------------------------------------------
+
     @Test
-    fun nodeIdSharedEdge() {
-        // Snapshot of the WS10 NodeIdSample geometry that surfaced the
-        // depth-sort shared-edge overpaint bug. Pre-fix, factory's orange
-        // top face painted over hq's blue right wall; post-fix, the
-        // adjacency renders cleanly.
+    fun nodeIdRowScene() {
+        // 4 buildings in a row at varying heights — the WS10 NodeIdSample case.
         paparazzi.snapshot {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
                     WS10NodeIdScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun onClickRowScene() {
+        // 5 unit cubes in a row with the 4th selected (height=2, yellow).
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    OnClickRowScene(selectedIndex = 3)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun longPressGridScene() {
+        // 3x3 grid default state — primary regression marker for amendment-1.
+        // Pre-fix: back-right cube renders with only its top face visible.
+        // Post-fix: all cubes render with all expected faces.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    LongPressGridScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun alphaSampleScene() {
+        // Mixed geometry: prism + cylinder + pyramid + 3 small prisms in a row.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    AlphaSampleScene()
                 }
             }
         }

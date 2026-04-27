@@ -6,13 +6,18 @@ slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 5
 created-at: "2026-04-26T20:12:32Z"
-updated-at: "2026-04-26T20:12:32Z"
+updated-at: "2026-04-27T22:32:06Z"
 metric-files-changed: 6
 metric-lines-added: 353
 metric-lines-removed: 12
 metric-deviations-from-plan: 2
 metric-review-fixes-applied: 0
-commit-sha: ""
+commit-sha: "3e811aa"
+amend-1-files-changed: 8
+amend-1-lines-added: 466
+amend-1-lines-removed: 7
+amend-1-deviations-from-plan: 1
+amend-1-commit-sha: ""
 tags:
   - rendering
   - depth-sort
@@ -153,16 +158,202 @@ Inherited from plan + shape stages. No additional searches required. The fix
 was a localised behavioural change to a single private method; no external
 APIs or libraries were involved.
 
-## Recommended Next Stage
+## Recommended Next Stage (original-scope, superseded by amend-1 below)
 
 - **Option A (default):** `/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
   — implementation touches testable behaviour (Path math, DepthSorter ordering)
   and adds a Paparazzi snapshot that requires baseline generation. Local Windows
   verification is unreliable; CI on Linux is the source of truth.
-  **Compact strongly recommended before /wf-verify** — implementation reasoning
-  (vertex-by-vertex sign tracing, plan drift detection, scope receiver renames)
-  is noise for verification. The PreCompact hook will preserve workflow state.
+
+---
+
+# Round 2: Amendment-1 Implementation
+
+## Summary of Changes (Round 2)
+
+Applied the directed fix specified by `04-plan-depth-sort-shared-edge-overpaint.md`
+revision 1 (which itself applies `02-shape-amend-1.md`). The work adds a strict
+2D screen-overlap gate to `DepthSorter.checkDepthDependency` to address the
+3×3 grid corner-cube regression diagnosed in
+`07-review-grid-regression-diagnostic.md`. The original-scope `Path.kt`
+permissive-threshold fix from commit `3e811aa` is preserved unchanged — it
+remains correct in isolation; only the gate around `closerThan` is tightened.
+
+## Files Changed (Round 2)
+
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt` —
+  Added `hasInteriorIntersection(pointsA, pointsB): Boolean` (~131 lines new).
+  Reuses the existing AABB rejection + strict SAT edge-crossing test, and
+  adds a strict-inside fallback that combines `isPointInPoly` +
+  `isPointCloseToPoly` with `EDGE_BAND = 1e-6` to reject boundary points.
+  Existing `hasIntersection` left UNCHANGED to preserve its lenient contract
+  for any non-DepthSorter callers.
+
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/DepthSorter.kt` —
+  Single behavioural change at `checkDepthDependency` line 133: replaced the
+  `hasIntersection` call with `hasInteriorIntersection`. Updated the
+  surrounding comment block from "Check if 2D projections intersect" to a
+  longer rationale that explains why the strict gate is needed
+  (over-aggressive edges in 3×3 grid layouts push corner cubes' vertical
+  faces to extreme topological-order positions). +14 / -2 lines.
+
+- `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/IntersectionUtilsTest.kt` —
+  Added 5 new test cases for `hasInteriorIntersection`: shared-edge → false,
+  shared-vertex → false, interior-overlap → true, disjoint → false, strict-
+  containment → true. Includes a regression-marker assertion that
+  `hasIntersection` STILL returns true for the shared-edge case — pinning the
+  intentional divergence between the two functions. ~101 lines new.
+
+- `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/DepthSorterTest.kt` —
+  Added the AC-9 integration test `WS10 LongPress 3x3 grid back-right cube
+  vertical faces are not drawn first`. Builds the full LongPressSample
+  geometry (9 unit prisms in a 3×3 grid, 1.2×1.2×1.0 each, plus the
+  ground platform), runs `DepthSorter`, identifies the back-right cube's
+  front (y=3.6) and left (x=3.6) faces by vertex geometry, asserts both
+  output indices are ≥ 3. ~68 lines new.
+
+- `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/OnClickRowScene.kt` *(NEW)* —
+  Reusable factory replicating `InteractionSamplesActivity.OnClickSample`:
+  5 unit prisms in a row at `Point(i * 1.5, 0.0, 0.1)`, with optional
+  `selectedIndex` parameter that bumps that shape's height from 1.0 to 2.0
+  and color to `IsoColor.YELLOW`. ~42 lines.
+
+- `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/LongPressGridScene.kt` *(NEW)* —
+  Reusable factory replicating `InteractionSamplesActivity.LongPressSample`:
+  3×3 grid of unit prisms, default static state (no shape locked). This
+  is the canonical regression case for amendment-1. ~38 lines.
+
+- `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/AlphaSampleScene.kt` *(NEW)* —
+  Reusable factory replicating `InteractionSamplesActivity.AlphaSample`:
+  prism + cylinder + pyramid + 3 small prisms in a row. Alpha values
+  intentionally NOT applied — the regression manifests in the depth sort,
+  not the alpha render pass. ~42 lines.
+
+- `isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricCanvasSnapshotTest.kt` —
+  REPLACED the single `nodeIdSharedEdge()` test from Round 1 with FOUR
+  scene-factory tests: `nodeIdRowScene` (uses existing `WS10NodeIdScene`),
+  `onClickRowScene` (with `selectedIndex = 3` to test the height-change
+  case), `longPressGridScene` (primary regression marker), `alphaSampleScene`.
+  Each renders inside a 800.dp × 600.dp Box. +65 / -10 lines.
+
+- 4 baseline PNGs under `isometric-compose/src/test/snapshots/images/` —
+  DEFERRED to Linux CI per the `06-verify-*.md` blank-render finding.
+  Baselines must be regenerated on a Linux build server before commit.
+
+## Shared Files (also touched by sibling slices)
+
+None — single-slice workflow.
+
+## Notes on Design Choices (Round 2)
+
+- **Add a sibling `hasInteriorIntersection` rather than tightening
+  `hasIntersection`.** The amendment offered both options. I chose the
+  additive approach because: (a) `hasIntersection` is `public` on the
+  `IntersectionUtils` object — modifying it silently changes behaviour for
+  any current or future caller; (b) the semantic difference between
+  "any contact" and "interior overlap" is meaningful and might genuinely
+  be wanted by some caller; (c) the diff is strictly additive and trivially
+  reversible if needed. The new helper reuses every code path of
+  `hasIntersection` for the AABB and SAT steps; only the point-in-polygon
+  fallback is tightened.
+
+- **`EDGE_BAND = 1e-6` constant** for the boundary-distance test. Matches
+  the per-distance epsilon already used in `Path.countCloserThan` line 137
+  comments ("1e-6 to absorb floating-point noise"). Keeping the same band
+  width across both functions makes the numerical-stability story uniform.
+
+- **`isPointCloseToPoly(..., EDGE_BAND)` for boundary rejection** rather
+  than computing distance-to-segment directly. The existing
+  `isPointCloseToPoly` does exactly that work and was easier to reuse than
+  reimplement.
+
+- **Scene factories are 1:1 with the live samples' geometry, not their
+  alpha values.** The regression is in the depth sort, which doesn't see
+  alpha. The factories produce the same 30-something faces with the same
+  positions; the snapshot test asserts the rendered pixels post-fix.
+  Alpha values from the live `AlphaSample` are intentionally not applied.
+
+- **Snapshot test name `nodeIdRowScene` (vs original `nodeIdSharedEdge`).**
+  The old name framed the test around the bug being fixed. The new name
+  describes what the scene IS (a row layout with shared edges). The
+  scene factory `WS10NodeIdScene` survives unchanged as the source.
+
+## Deviations from Plan (Round 2)
+
+1. **Plan's AC-9 test used `cmd.path.points`, actual field is `cmd.originalPath.points`.**
+   Trivial substitution. The plan was inferred from the existing WS10
+   integration test — same pattern, same field name. The plan's snippet had
+   a transcription error caught at edit time. No behaviour change.
+
+## Anything Deferred (Round 2)
+
+- **Four Paparazzi baseline PNGs** — Cannot be reliably recorded on the
+  current Windows + JDK17 environment per `06-verify-*.md`. Deferred to
+  Linux CI's `recordPaparazzi` invocation. The snapshot test source is
+  committed; the baselines must be regenerated on Linux before they can
+  pass `verifyPaparazzi`. Implementation note: do not commit the locally-
+  produced blank PNGs that may exist under
+  `isometric-compose/src/test/snapshots/images/` from yesterday's
+  diagnostic session — explicitly remove or `.gitignore`-skip them
+  before staging the commit.
+
+- **Local test run** — Skipped for the same Windows-toolchain reason that
+  affected the original-scope verify stage. The full test suite will run
+  on Linux CI when the PR opens. Spot-check at the source level: the
+  AC-9 test references `Prism`, `Point`, `IsoColor`, `IsometricEngine`,
+  `RenderOptions.NoCulling` — all imports already in `DepthSorterTest.kt`
+  (existing tests use the same APIs).
+
+## Known Risks / Caveats (Round 2)
+
+- **The `coplanar tile grid` `DepthSorterTest` case is the canary** for
+  the gate-tightening change. The tile grid relies on `closerThan` edges
+  being added for face pairs that DO have interior overlap in screen
+  projection. If `hasInteriorIntersection`'s strict-inside check is *too*
+  strict (e.g., rejects a vertex that's marginally inside another polygon
+  due to floating-point noise), the tile-grid test would fail with
+  "expected face count and no duplicates". The 1e-6 EDGE_BAND was chosen
+  to match the rest of the codebase's epsilon convention; if the canary
+  fires, widen the band or relax the strict-inside check.
+
+- **Strict-inside via `isPointCloseToPoly`** uses `Point.distanceToSegment`
+  which is O(N) per point. For an N-vertex polygon, the strict-inside
+  check is now O(N²) for the worst case (each polygon vertex checked
+  against the other polygon's N edges). Acceptable for prism faces (N=4)
+  but worth noting if larger polygons enter the depth sort in future.
+
+- **Scene factory geometry must stay synchronised** with the live samples
+  in `InteractionSamplesActivity.kt`. If a sample's positions or
+  dimensions change, the corresponding factory must be updated to match,
+  or the snapshot baseline becomes stale. Each factory's KDoc explicitly
+  says "If the sample changes, update here to match." This is unavoidable
+  duplication: the app module can't be imported by the compose-test
+  module (wrong direction), so the geometry is replicated.
+
+- **Build-logic Windows CC fix** in `build-logic/build.gradle.kts` is
+  still uncommitted. Per the original plan's handoff section, it can
+  ride as a separate `chore(build-logic):` commit at handoff time.
+
+## Freshness Research (Round 2)
+
+No new external research. The amendment-1 algorithm is local geometric
+work — no library version checks needed. The diagnostic in
+`07-review-grid-regression-diagnostic.md` plus the existing shape's
+freshness pass remain authoritative.
+
+## Recommended Next Stage
+
+- **Option A (default):** `/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
+  — Round 2 adds testable behaviour (the `hasInteriorIntersection` helper,
+  the screen-overlap gate, AC-9 + AC-10 + AC-11 tests) and a snapshot
+  baseline gap that requires Linux CI to close. **Compact strongly
+  recommended before /wf-verify** — Round 2's implementation work
+  (algorithm decisions, deviations, sibling-helper rationale) is noise
+  for verification.
+
 - **Option B:** `/wf-review depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
-  — only if verification is deferred to CI and reviewers want to read the diff
-  first. Less recommended because the Paparazzi baseline gap is best closed
-  during verify.
+  — skip verify and have reviewers read the Round 2 diff first. Less
+  recommended because AC-9 / AC-10 are unit/integration tests that should
+  pass before review starts; an unverified diff produces noisier review
+  findings. CI's automated verify catches both, so going to review without
+  verify is technically safe but less efficient.

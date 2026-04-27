@@ -273,4 +273,72 @@ class DepthSorterTest {
             broadPhase.commands.map { it.commandId }
         )
     }
+
+    @Test
+    fun `WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first`() {
+        // Reproduces the LongPressSample 3x3 grid geometry that surfaced the
+        // over-aggressive-edge regression after the original 3e811aa fix.
+        //
+        // The permissive countCloserThan threshold legitimately fires "winning
+        // votes" for face pairs whose 2D iso-projected polygons don't actually
+        // overlap (e.g., back-right cube's front face vs middle-right cube's
+        // top face: separated by a 0.6-unit gap in world y, but the predicate
+        // returns 1 anyway because all four mid-right-top vertices are on the
+        // observer side of back-right-front's plane). Each spurious vote adds
+        // a topological edge in DepthSorter.checkDepthDependency. With the
+        // hasIntersection gate too lenient about boundary touches, these
+        // edges fire and push back-right's vertical faces to output positions
+        // 0-2, where they get painted over.
+        //
+        // After hasInteriorIntersection lands as the gate, only face pairs
+        // with non-trivial interior overlap in 2D screen projection produce
+        // edges, so back-right's vertical faces sit at reasonable output
+        // positions (≥ 3) and survive the painter's traversal.
+        val engine = IsometricEngine()
+        // Ground platform.
+        engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)
+        // 3x3 grid of unit prisms with column- and row-derived colors.
+        for (i in 0 until 9) {
+            val row = i / 3
+            val col = i % 3
+            engine.add(
+                Prism(Point(col * 1.8, row * 1.8, 0.1), 1.2, 1.2, 1.0),
+                IsoColor((col + 1) * 80.0, (row + 1) * 80.0, 150.0)
+            )
+        }
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Back-right cube occupies x in [3.6, 4.8], y in [3.6, 4.8], z in [0.1, 1.1].
+        // Its front face is the four vertices at y=3.6 (with x and z spanning).
+        // Its left face is the four vertices at x=3.6 (with y and z spanning).
+        val backRightFrontIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.y - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 4.8) < 1e-9 }
+        }
+        val backRightLeftIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.x - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 4.8) < 1e-9 }
+        }
+
+        assertTrue(backRightFrontIndex >= 0, "back-right cube's front face must appear in scene commands")
+        assertTrue(backRightLeftIndex >= 0, "back-right cube's left face must appear in scene commands")
+        assertTrue(
+            backRightFrontIndex >= 3,
+            "back-right cube's front face must not be at output positions 0-2 " +
+                "(was at $backRightFrontIndex); otherwise neighbour faces drawn afterward " +
+                "paint over it where iso-projected polygons overlap"
+        )
+        assertTrue(
+            backRightLeftIndex >= 3,
+            "back-right cube's left face must not be at output positions 0-2 " +
+                "(was at $backRightLeftIndex)"
+        )
+    }
 }

@@ -1,0 +1,14 @@
+appId: io.github.jayteealao.isometric.sample
+---
+- launchApp:
+    clearState: true
+- tapOn: "Interaction API"
+- waitForAnimationToEnd
+- tapOn: "onClick"
+- waitForAnimationToEnd
+- takeScreenshot: ".ai/workflows/depth-sort-shared-edge-overpaint/verify-evidence/maestro-onclick-before"
+- tapOn:
+    point: "60%,80%"
+- waitForAnimationToEnd:
+    timeout: 1500
+- takeScreenshot: ".ai/workflows/depth-sort-shared-edge-overpaint/verify-evidence/maestro-onclick-after-tap"
