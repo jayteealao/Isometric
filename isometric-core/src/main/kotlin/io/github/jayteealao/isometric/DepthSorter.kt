@@ -129,8 +129,19 @@ internal object DepthSorter {
         drawBefore: List<MutableList<Int>>,
         observer: Point
     ) {
-        // Check if 2D projections intersect
-        if (IntersectionUtils.hasIntersection(
+        // Check if 2D projections share a non-trivial INTERIOR overlap.
+        //
+        // hasInteriorIntersection (rather than the lenient hasIntersection) gates
+        // edge insertion: face pairs that only touch at a shared edge or vertex
+        // in screen-space cannot paint over each other regardless of closerThan's
+        // verdict, so adding a draw-order edge for them produces spurious
+        // dependencies. With the permissive `result > 0` threshold in
+        // [Path.countCloserThan], such spurious dependencies accumulate in 3x3
+        // grid layouts and push corner cubes' vertical faces to extreme positions
+        // in the topological order — visible regression in LongPress / Alpha
+        // samples. See workflow `depth-sort-shared-edge-overpaint` shape
+        // amendment 1 for the full diagnosis.
+        if (IntersectionUtils.hasInteriorIntersection(
                 itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
                 itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
             )

@@ -5,7 +5,7 @@ slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 4
 created-at: "2026-04-26T19:33:07Z"
-updated-at: "2026-04-26T19:33:07Z"
+updated-at: "2026-04-27T22:32:06Z"
 planning-mode: single
 slices-planned: 1
 slices-total: 1
@@ -34,16 +34,28 @@ Single-plan mode. No slicing. One coherent fix in one source file plus paired te
 
 ### `depth-sort-shared-edge-overpaint`
 
-- **Files to touch**: 5 source + 1 binary (3 modified, 2 new source, 1 new PNG).
-  - Modify: `isometric-core/.../Path.kt`, `isometric-core/.../test/PathTest.kt`, `isometric-core/.../test/DepthSorterTest.kt`, `isometric-compose/.../test/IsometricCanvasSnapshotTest.kt`.
-  - New: `isometric-core/.../test/IntersectionUtilsTest.kt`, `isometric-compose/.../test/scenes/WS10NodeIdScene.kt`, `isometric-compose/.../test/snapshots/images/...nodeIdSharedEdge.png`.
-- **Strategy**: strict red-green TDD. Write failing `closerThan` test for the hq-right + factory-top pair (returns 0 today). Apply two-line fix in `Path.countCloserThan` (replace integer-division with permissive `result > 0`; widen epsilon 1e-9 → 1e-6). Confirm test goes green. Add layered tests (parameterised `closerThan`, `DepthSorter` integration, antisymmetry invariant, `IntersectionUtils` baseline). Extract `WS10NodeIdScene` factory in test sources. Add Paparazzi snapshot test using the factory; record baseline PNG; commit atomically.
-- **Key risk**: permissive threshold (`result > 0`) accepts a single noisy vertex as evidence — in pathological scenes with extreme coordinates and high floating-point noise, this could create a spurious topological edge. Mitigated by widening epsilon to 1e-6. Relative-epsilon scaling is documented as deferred future work.
+**Original-scope (executed in commit `3e811aa`)**:
+
+- **Files touched**: 5 source + 1 binary (3 modified, 2 new source, 1 new PNG — the `nodeIdSharedEdge.png` baseline was generated locally but not yet committed; superseded by amendment-1 below).
+  - Modified: `Path.kt`, `PathTest.kt`, `DepthSorterTest.kt`, `IsometricCanvasSnapshotTest.kt`.
+  - New: `IntersectionUtilsTest.kt`, `WS10NodeIdScene.kt`.
+- **Strategy executed**: strict red-green TDD. Failing `closerThan` test for hq-right + factory-top → permissive `result > 0` fix in `Path.countCloserThan` + epsilon 1e-9 → 1e-6 → layered tests + snapshot infrastructure.
+- **Result**: WS10 NodeIdSample case fixed; latent regression in 3×3 grid layouts surfaced post-merge on emulator (LongPressSample, AlphaSample). Documented in `07-review-grid-regression-diagnostic.md`.
+
+**Amendment-1 scope (un-executed, the next target of `/wf-implement`)**:
+
+- **Additional files**: 9 (3 modified, 6 new) + 4 binary baselines.
+  - Modify: `IntersectionUtils.kt` (add `hasInteriorIntersection`), `DepthSorter.kt` (wire the new gate), `IntersectionUtilsTest.kt` (add AC-10 cases), `DepthSorterTest.kt` (add AC-9), `IsometricCanvasSnapshotTest.kt` (replace single snapshot with four).
+  - New: `OnClickRowScene.kt`, `LongPressGridScene.kt`, `AlphaSampleScene.kt`, plus four new baseline PNGs.
+- **Strategy**: directed fix overlaid on `3e811aa`. Add a stricter sibling helper rather than modifying existing `hasIntersection` (preserves contract for any non-DepthSorter callers). Wire `DepthSorter.checkDepthDependency` to call the new helper. Add AC-9 (3×3 grid integration test) and AC-10 (boundary-only hasIntersection cases). Replace the single `nodeIdSharedEdge` Paparazzi snapshot with four scene-factory snapshots.
+- **Key risk (amendment-1)**: the stricter gate could break the existing `coplanar tile grid` test — the tile-grid test relies on edges being added for tile-grid face pairs that DO have interior overlap in screen projection. The new `hasInteriorIntersection` must still return true for those genuine-overlap cases. Plan step A5 explicitly re-runs the full test suite to catch this.
 
 ## Cross-Cutting Concerns
 
-- **Build-logic Windows race** is still uncommitted in the working tree. Local Windows verification of `:isometric-compose:test` (which is required for the snapshot baseline) requires the documented `./gradlew --stop && mv build-logic/build aside` workaround. CI on Linux is unaffected. The build-logic CC fix can ride along as a separate `chore(build-logic):` commit at handoff if desired.
-- **Paparazzi baselines not committed to git** is pre-existing tech debt (11 of 13 snapshot tests have no baseline on disk; the 2 that do are untracked). The new `nodeIdSharedEdge` baseline must be explicitly `git add`ed. Recommend a separate follow-up workflow to record + commit baselines for the existing 11 tests; not in scope here.
+- **Build-logic Windows race** is still uncommitted in the working tree. Local Windows verification of `:isometric-compose:test` (which is required for the snapshot baseline) requires the documented `./gradlew --stop && mv build-logic/build aside` workaround plus killing leftover `java.exe` processes (`taskkill /F /IM java.exe`) when file locks persist across runs. CI on Linux is unaffected. The build-logic CC fix can ride along as a separate `chore(build-logic):` commit at handoff if desired.
+- **Paparazzi baselines on Windows render blank** in this environment — every `IsometricCanvasSnapshotTest` baseline produced 6917-byte empty frames during verify. CI on Linux produces real baselines. The amendment-1 work expects to record the four new baselines on Linux CI; do not commit blank PNGs.
+- **Pre-existing Paparazzi tech debt** (11 of 13 snapshot tests have no baseline on disk; the 2 that did were untracked) is unchanged by this work. Track separately.
+- **Amendment-1 reverted today's reviews-mode source changes** in the working tree (Path.kt and DepthSorter.kt). The DEPTH_SORT_DIAG temp logging was reverted as part of that. Diagnostic logs are preserved under `verify-evidence/`.
 
 ## Integration Points Between Slices
 
@@ -51,7 +63,7 @@ N/A — single slice.
 
 ## Recommended Implementation Order
 
-1. `depth-sort-shared-edge-overpaint` — only one. Execute in the strict order specified in `04-plan-depth-sort-shared-edge-overpaint.md` § Step-by-Step Plan: pre-flight → red → green → layered tests → snapshot infrastructure → record baseline → atomic commit.
+1. `depth-sort-shared-edge-overpaint` — only one. The original-scope work (steps 1–9) is already committed in `3e811aa`. The amendment-1 work (steps A1–A8) is the next implementation target. Execute amendment-1 steps in the strict order specified in `04-plan-depth-sort-shared-edge-overpaint.md` § Step-by-Step Plan: pre-flight → red AC-9 → red AC-10 → implement `hasInteriorIntersection` → wire gate in DepthSorter → replace Paparazzi snapshot test + add three new scene factories → re-run maestro flows for visual confirmation → atomic commit `fix(depth-sort): screen-overlap gate for 3x3 grid edge-cases`.
 
 ## Conflicts Found
 

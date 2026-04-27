@@ -70,3 +70,10 @@ Cumulative log of every product-owner answer collected across all stages. Most r
 - **Paparazzi canvas size**: `Box(800.dp, 600.dp)` — matches the `projectScene(800, 600)` dimensions used in `DepthSorterTest`. Aspect ratio is consistent with sibling Paparazzi tests.
 - **Conventional commit scope**: `fix(depth-sort): …`. Specific subsystem scope. Cliff maps to "Bug Fixes" group.
 - **Implementation order**: Strict red-green. Failing test FIRST → fix → confirm green → add remaining tests → snapshot → commit. Most defensible audit trail.
+
+## 2026-04-27T22:16:08Z — amend — Round 1 (3×3 grid regression scope expansion)
+
+- **Algorithm choice**: Pull **strict 2D screen-overlap gate** in `DepthSorter.checkDepthDependency` back into scope. AABB minimax pre-filter and full Newell minimax cascade remain explicitly deferred to future workflows. Rationale: the screen-overlap gate is the smallest behaviour change that addresses the over-aggressive-edge mechanism diagnosed in `07-review-grid-regression-diagnostic.md`, and it preserves the existing closerThan permissive threshold's correctness for asymmetric (row) layouts.
+- **WS10 case preservation**: Hard requirement. All 8 original AC must still pass after the amendment. The new gate must not break row-layout cases that already work.
+- **Test scenes added**: Paparazzi snapshots for LongPressSample default, AlphaSample default, OnClickSample (row of 5 with one selected), NodeIdSample (4 buildings in a row). Plus a synthetic 3×3 grid PathTest case asserting no spurious edge fires for non-overlapping faces.
+- **Algorithm preservation**: Keep `3e811aa`'s permissive `result > 0` threshold and the 1e-6 epsilon. Add the screen-overlap gate on top. The permissive threshold is geometrically correct in isolation — it just over-fires; the gate makes the firing precise.
