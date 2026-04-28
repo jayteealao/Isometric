@@ -1,11 +1,264 @@
 package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
+import io.github.jayteealao.isometric.shapes.Pyramid
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DepthSorterTest {
+
+    @Test
+    fun `diagnostic - TileGrid 6x6 default render reproduces missing-face report`() {
+        // Reproduces TileGridExample's exact scene under DEFAULT RenderOptions
+        // (culling + bounds + depth-sort + broad-phase all on, matching the
+        // live app). 6x6 unit prisms at integer xy. The user reports a missing
+        // TOP on an interior tile and a missing SIDE on a front-edge tile.
+        // This test enumerates which faces survive and prints any TOP that
+        // should be visible but is missing, to localise the bug.
+        val engine = IsometricEngine()
+        for (row in 0 until 6) {
+            for (col in 0 until 6) {
+                engine.add(
+                    Prism(Point(col.toDouble(), row.toDouble(), 0.0), 1.0, 1.0, 1.0),
+                    IsoColor.BLUE
+                )
+            }
+        }
+
+        val sceneDefault = engine.projectScene(800, 600, RenderOptions.Default)
+        val sceneNoCull = engine.projectScene(800, 600, RenderOptions.NoCulling)
+        val sceneNoBroad = engine.projectScene(
+            800, 600,
+            RenderOptions.Default.copy(enableBroadPhaseSort = false)
+        )
+
+        println("TileGrid 6x6 face counts:")
+        println("  Default       (cull + broad)  : ${sceneDefault.commands.size}")
+        println("  NoCulling                     : ${sceneNoCull.commands.size}")
+        println("  Default - broad               : ${sceneNoBroad.commands.size}")
+
+        // Helper: classify each face in a scene by (col, row, faceType).
+        fun classify(cmd: RenderCommand): Triple<Int, Int, String> {
+            val pts = cmd.originalPath.points
+            val cx = pts.sumOf { it.x } / pts.size
+            val cy = pts.sumOf { it.y } / pts.size
+            val cz = pts.sumOf { it.z } / pts.size
+            val col = kotlin.math.floor(cx).toInt().coerceIn(0, 5)
+            val row = kotlin.math.floor(cy).toInt().coerceIn(0, 5)
+            val ax = pts[1].x - pts[0].x; val ay = pts[1].y - pts[0].y; val az = pts[1].z - pts[0].z
+            val bx = pts[2].x - pts[0].x; val by = pts[2].y - pts[0].y; val bz = pts[2].z - pts[0].z
+            val nx = ay * bz - az * by
+            val ny = az * bx - ax * bz
+            val nz = ax * by - ay * bx
+            val face = when {
+                kotlin.math.abs(nz) > 0.5 -> if (nz > 0) "TOP" else "BOTTOM"
+                kotlin.math.abs(ny) > 0.5 -> if (ny > 0) "BACK" else "FRONT"
+                else -> if (nx > 0) "RIGHT" else "LEFT"
+            }
+            return Triple(col, row, face)
+        }
+
+        // Enumerate which TOPs are PRESENT in each scene.
+        fun topsPresent(scene: PreparedScene): Set<Pair<Int, Int>> {
+            return scene.commands.mapNotNull { cmd ->
+                val (col, row, face) = classify(cmd)
+                if (face == "TOP") col to row else null
+            }.toSet()
+        }
+        val topsDefault = topsPresent(sceneDefault)
+        val topsNoBroad = topsPresent(sceneNoBroad)
+        val topsNoCull = topsPresent(sceneNoCull)
+        val expected = (0 until 6).flatMap { c -> (0 until 6).map { r -> c to r } }.toSet()
+
+        println("Missing TOPs (Default):  ${(expected - topsDefault).sortedBy { it.first * 6 + it.second }}")
+        println("Missing TOPs (NoBroad):  ${(expected - topsNoBroad).sortedBy { it.first * 6 + it.second }}")
+        println("Missing TOPs (NoCulling): ${(expected - topsNoCull).sortedBy { it.first * 6 + it.second }}")
+
+        // Also enumerate front-edge SIDE faces (FRONT walls of row=0 tiles, LEFT walls of col=0 tiles).
+        fun frontSidesPresent(scene: PreparedScene): Set<Triple<Int, Int, String>> {
+            return scene.commands.mapNotNull { cmd ->
+                val cls = classify(cmd)
+                if ((cls.second == 0 && cls.third == "FRONT") ||
+                    (cls.first == 0 && cls.third == "LEFT")
+                ) cls else null
+            }.toSet()
+        }
+        val sidesDefault = frontSidesPresent(sceneDefault)
+        val expectedSides = (0 until 6).map { Triple(it, 0, "FRONT") } + (0 until 6).map { Triple(0, it, "LEFT") }
+        println("Missing front-edge sides (Default): ${(expectedSides.toSet() - sidesDefault).sortedWith(compareBy({ it.first }, { it.second }, { it.third }))}")
+
+        // No assertion yet — diagnostic only. Fail-line will be added once the
+        // bug is localised.
+    }
+
+    @Test
+    fun `diagnostic - Stack tower default render face order and overlap check`() {
+        // Reproduces StackExample sub-scene 1: 4 stacked prisms at world (1,1,0..3).
+        // Under default RenderOptions (culling on), enumerate every face that
+        // appears in scene.commands with index, classify it (per-prism, per-face-type),
+        // then for every iso-overlapping pair check the cascade verdict and
+        // verify the actual command-order matches the verdict.
+        val engine = IsometricEngine()
+        for (n in 0 until 4) {
+            engine.add(
+                Prism(Point(1.0, 1.0, n.toDouble()), 1.0, 1.0, 1.0),
+                IsoColor.BLUE
+            )
+        }
+        val scene = engine.projectScene(800, 600, RenderOptions.Default)
+
+        println("Stack tower face count (Default): ${scene.commands.size}")
+        scene.commands.forEachIndexed { idx, cmd ->
+            val pts = cmd.originalPath.points
+            val cz = pts.sumOf { it.z } / pts.size
+            val ax = pts[1].x - pts[0].x; val ay = pts[1].y - pts[0].y; val az = pts[1].z - pts[0].z
+            val bx = pts[2].x - pts[0].x; val by = pts[2].y - pts[0].y; val bz = pts[2].z - pts[0].z
+            val nx = ay * bz - az * by
+            val ny = az * bx - ax * bz
+            val nz = ax * by - ay * bx
+            val face = when {
+                kotlin.math.abs(nz) > 0.5 -> if (nz > 0) "TOP" else "BOTTOM"
+                kotlin.math.abs(ny) > 0.5 -> if (ny > 0) "BACK" else "FRONT"
+                else -> if (nx > 0) "RIGHT" else "LEFT"
+            }
+            val prismIdx = when {
+                face == "TOP" -> kotlin.math.floor(cz).toInt()  // TOP at z=N+1 belongs to prism N
+                face == "BOTTOM" -> kotlin.math.floor(cz).toInt()
+                else -> kotlin.math.floor(cz - 0.5).toInt()  // Side wall centroid z = N+0.5
+            }
+            println("  [$idx] prism=$prismIdx face=$face")
+        }
+
+        // Specific check: the boundary user reported (RED prism = 3 LEFT wall vs
+        // YELLOW prism = 2 TOP).
+        fun findFace(prism: Int, face: String): Int = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            val cz = pts.sumOf { it.z } / pts.size
+            val ax = pts[1].x - pts[0].x; val ay = pts[1].y - pts[0].y; val az = pts[1].z - pts[0].z
+            val bx = pts[2].x - pts[0].x; val by = pts[2].y - pts[0].y; val bz = pts[2].z - pts[0].z
+            val nx = ay * bz - az * by
+            val ny = az * bx - ax * bz
+            val nz = ax * by - ay * bx
+            val classifiedFace = when {
+                kotlin.math.abs(nz) > 0.5 -> if (nz > 0) "TOP" else "BOTTOM"
+                kotlin.math.abs(ny) > 0.5 -> if (ny > 0) "BACK" else "FRONT"
+                else -> if (nx > 0) "RIGHT" else "LEFT"
+            }
+            val classifiedPrism = when {
+                classifiedFace == "TOP" -> kotlin.math.floor(cz).toInt()
+                classifiedFace == "BOTTOM" -> kotlin.math.floor(cz).toInt()
+                else -> kotlin.math.floor(cz - 0.5).toInt()
+            }
+            classifiedPrism == prism && classifiedFace == face
+        }
+
+        val prism2Top = findFace(2, "TOP")  // YELLOW top
+        val prism3Left = findFace(3, "LEFT")  // RED left
+        val prism3Front = findFace(3, "FRONT")  // RED front
+        val prism2Left = findFace(2, "LEFT")  // YELLOW left
+        val prism2Front = findFace(2, "FRONT")  // YELLOW front
+        println("YELLOW(2)_TOP idx=$prism2Top, RED(3)_LEFT idx=$prism3Left, RED(3)_FRONT idx=$prism3Front")
+        println("YELLOW(2)_LEFT idx=$prism2Left, YELLOW(2)_FRONT idx=$prism2Front")
+
+        // Per painter's algorithm: closer face draws AFTER (higher index).
+        // RED's walls are higher z than YELLOW's TOP, but they share an EDGE
+        // at z=3, x=1 (or y=1). RED LEFT/FRONT iso-overlaps with YELLOW TOP
+        // (vertices on plane). The cascade should declare RED's wall closer →
+        // RED wall paints after YELLOW TOP → RED wall_index > YELLOW TOP_index.
+        if (prism2Top >= 0 && prism3Left >= 0) {
+            assertTrue(
+                prism3Left > prism2Top,
+                "RED(3)_LEFT (idx=$prism3Left) must draw after YELLOW(2)_TOP (idx=$prism2Top); " +
+                    "if not, YELLOW's top color shows through where RED's left wall should paint"
+            )
+        }
+        if (prism2Top >= 0 && prism3Front >= 0) {
+            assertTrue(
+                prism3Front > prism2Top,
+                "RED(3)_FRONT (idx=$prism3Front) must draw after YELLOW(2)_TOP (idx=$prism2Top)"
+            )
+        }
+    }
+
+    @Test
+    fun `diagnostic - full Stack sample tower-vs-pyramid ordering`() {
+        // Builds the entire StackExample scene: Z-tower (4 prisms at world (1,1,0..3)),
+        // X-row (4 prisms at world (-1+i*1.5, 4, 0)), Y-row pyramids (3 pyramids at
+        // world (4, i*1.5, 0)). Pyramid 3 (the back-most, at world (4, 3, 0))
+        // iso-projects to a region that overlaps with the central tower's right
+        // edge in iso. Test asserts the tower's FRONT/RIGHT walls render AFTER
+        // (higher index) any pyramid face whose iso-projection falls behind them.
+        val engine = IsometricEngine()
+        // Z-tower at (1, 1, 0..3)
+        for (n in 0 until 4) {
+            engine.add(Prism(Point(1.0, 1.0, n.toDouble()), 1.0, 1.0, 1.0), IsoColor.BLUE)
+        }
+        // X-row at (-1 + i*1.5, 4, 0) for i in 0..3
+        for (i in 0 until 4) {
+            engine.add(Prism(Point(-1.0 + i * 1.5, 4.0, 0.0), 1.0, 1.0, 1.0), IsoColor(120.0, 144.0, 156.0))
+        }
+        // Y-row pyramids at (4, i*1.5, 0) for i in 0..2
+        for (i in 0 until 3) {
+            engine.add(Pyramid(Point(4.0, i * 1.5, 0.0), 1.0, 1.0, 1.0), IsoColor(156.0, 39.0, 176.0))
+        }
+
+        val scene = engine.projectScene(800, 600, RenderOptions.Default)
+
+        println("Full Stack sample face count: ${scene.commands.size}")
+
+        // Find tower's RED prism (z=[3,4]) FRONT wall (y=1) — the wall the user labels "missing".
+        fun findTowerRedFront(): Int = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.y - 1.0) < 1e-9 } &&
+                pts.all { it.x in 0.999..2.001 } &&
+                pts.all { it.z in 2.999..4.001 } &&
+                run {
+                    val ax = pts[1].x - pts[0].x; val ay = pts[1].y - pts[0].y; val az = pts[1].z - pts[0].z
+                    val bx = pts[2].x - pts[0].x; val by = pts[2].y - pts[0].y; val bz = pts[2].z - pts[0].z
+                    val cy = az * bx - ax * bz
+                    cy < 0  // -y normal (FRONT)
+                }
+        }
+        val towerRedFront = findTowerRedFront()
+        // Also find tower RED LEFT (x=1, y=[1,2], z=[3,4], normal -x).
+        fun findTowerRedLeft(): Int = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.x - 1.0) < 1e-9 } &&
+                pts.all { it.y in 0.999..2.001 } &&
+                pts.all { it.z in 2.999..4.001 } &&
+                run {
+                    val ax = pts[1].x - pts[0].x; val ay = pts[1].y - pts[0].y; val az = pts[1].z - pts[0].z
+                    val bx = pts[2].x - pts[0].x; val by = pts[2].y - pts[0].y; val bz = pts[2].z - pts[0].z
+                    val cx = ay * bz - az * by
+                    cx < 0  // -x normal (LEFT)
+                }
+        }
+        val towerRedLeft = findTowerRedLeft()
+
+        // Find pyramid 3 (back-most, y=[3, 4]) all 4 triangular faces.
+        val pyramid3Faces = scene.commands.mapIndexedNotNull { idx, cmd ->
+            val pts = cmd.originalPath.points
+            if (pts.size == 3 && pts.all { it.x in 3.999..5.001 } && pts.all { it.y in 2.999..4.001 }) idx else null
+        }
+
+        println("Tower RED FRONT idx=$towerRedFront, RED LEFT idx=$towerRedLeft")
+        println("Pyramid 3 face indices: $pyramid3Faces")
+
+        // The tower's RED FRONT wall is closer to the observer than any pyramid 3
+        // face. Painter's algorithm: closer face draws AFTER (higher idx).
+        if (towerRedFront >= 0) {
+            for (pyrIdx in pyramid3Faces) {
+                assertTrue(
+                    towerRedFront > pyrIdx,
+                    "Tower RED FRONT (idx=$towerRedFront) must draw AFTER pyramid 3 face (idx=$pyrIdx); " +
+                        "if not, pyramid paints over tower wall and shows through"
+                )
+            }
+        }
+    }
 
     @Test
     fun `coplanar adjacent prisms produce deterministic order`() {
