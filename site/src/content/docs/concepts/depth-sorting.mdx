@@ -40,13 +40,13 @@ Faces are bucketed into a 2D spatial grid based on their screen-space bounding b
 
 The grid cell size is controlled by `broadPhaseCellSize` (default: `100.0` pixels).
 
-### Stage 3: Narrow Phase (AABB Intersection)
+### Stage 3: Narrow Phase (Strict Screen-Overlap Gate)
 
-For each pair of candidate faces within the same cell, `IntersectionUtils.hasIntersection()` performs an axis-aligned bounding box (AABB) test. Pairs that do not overlap on screen are discarded.
+For each pair of candidate faces within the same cell, `IntersectionUtils.hasInteriorIntersection()` performs a strict screen-overlap test: AABB rejection, then a SAT edge-crossing check, then a strict-inside fallback. Pairs that share only a boundary edge or vertex in screen space are correctly rejected — they cannot paint over each other regardless of depth, so adding a draw-order edge for them would produce spurious dependencies that can push unrelated faces to extreme positions in the final order. The lenient `hasIntersection()` variant (which treats any boundary contact as overlap) remains available for callers that want any-contact semantics.
 
 ### Stage 4: Topological Sort
 
-The remaining overlapping pairs are analyzed to determine which face is "in front of" the other. These relationships form a directed acyclic graph (DAG). A topological sort of this DAG produces the final draw order.
+The remaining interior-overlapping pairs are analyzed by `Path.closerThan` (a reduced Newell cascade — iso-depth extent minimax followed by plane-side tests) to determine which face is "in front of" the other. These relationships form a directed acyclic graph (DAG). A topological sort of this DAG produces the final draw order.
 
 ```
 All faces
@@ -54,10 +54,10 @@ All faces
   v  [Broad phase: bucket into grid cells]
 Candidate pairs
   |
-  v  [Narrow phase: AABB intersection test]
-Overlapping pairs
+  v  [Narrow phase: strict interior-overlap gate]
+Interior-overlapping pairs
   |
-  v  [Build DAG, topological sort]
+  v  [Build DAG via Newell-cascade comparator, topological sort]
 Final draw order
 ```
 

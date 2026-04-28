@@ -6,8 +6,11 @@ slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 7
 created-at: "2026-04-26T21:11:17Z"
-updated-at: "2026-04-26T21:11:17Z"
-verdict: dont-ship
+updated-at: "2026-04-28T09:47:38Z"
+verdict: ship-with-caveats
+review-round: 2
+review-against-commit: "452b1fc"
+review-against-base: "97416ba"
 commands-run:
   - correctness
   - security
@@ -15,32 +18,37 @@ commands-run:
   - testing
   - maintainability
   - reliability
-  - performance
   - refactor-safety
+  - performance
   - docs
   - style-consistency
 metric-commands-run: 10
 metric-findings-total: 25
-metric-findings-raw: 42
-metric-findings-blocker: 2
-metric-findings-high: 3
-metric-findings-med: 7
-metric-findings-low: 7
-metric-findings-nit: 6
+metric-findings-raw: 91
+metric-findings-blocker: 0
+metric-findings-high: 6
+metric-findings-med: 11
+metric-findings-low: 8
+metric-findings-nit: 0
+metric-fix-count: 16
+metric-defer-count: 1
+metric-dismiss-count: 0
 tags:
   - rendering
   - depth-sort
   - painter-algorithm
   - isometric-core
-  - bug
-  - numerical-robustness
-  - regression
+  - newell-cascade
+  - re-review
 refs:
   index: 00-index.md
-  slice-def: 03-slice-depth-sort-shared-edge-overpaint.md
+  shape: 02-shape.md
+  shape-amendment-1: 02-shape-amend-1.md
+  shape-amendment-2: 02-shape-amend-2.md
   plan: 04-plan-depth-sort-shared-edge-overpaint.md
   implement: 05-implement-depth-sort-shared-edge-overpaint.md
   verify: 06-verify-depth-sort-shared-edge-overpaint.md
+  prior-review-round: 07-review-round-1-archived.md
   sub-reviews:
     - 07-review-correctness.md
     - 07-review-security.md
@@ -48,405 +56,323 @@ refs:
     - 07-review-testing.md
     - 07-review-maintainability.md
     - 07-review-reliability.md
-    - 07-review-performance.md
     - 07-review-refactor-safety.md
+    - 07-review-performance.md
     - 07-review-docs.md
     - 07-review-style-consistency.md
 next-command: wf-implement
 next-invocation: "/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 ---
 
-# Review
+# Review (Round 2 — post-Newell cascade)
 
 ## Verdict
 
-**Don't Ship.**
+**Ship with caveats.**
 
-The fix correctly resolves the original WS10 NodeIdSample bug (verified at
-the unit level by 6 of 8 acceptance criteria), but introduces a new
-regression: the permissive `result > 0` threshold over-adds a
-wrong-direction dependency edge for tall faces straddling a farther
-horizontal plane. The correctness reviewer traced the failure through
-`OnClickSample` geometry vertex-by-vertex and identified the exact
-mechanism — the same geometric pattern that drives the user-observed
-"yellow box has missing faces/sides" symptom in the LongPress sample.
-The testing reviewer flagged the complementary coverage gap (no test
-exercises dynamic height-change adjacency, even though that is the
-geometry the regression manifests in). Both BLOCKERS must be addressed
-before merge.
+The Newell Z→X→Y minimax cascade in commit `452b1fc` resolves the visual
+regression that triggered Round-1's "Don't Ship". All 17 acceptance
+criteria are met (191 isometric-core tests green; four Maestro visual
+checks confirm the over-paint is gone in LongPress, Alpha, OnClick, and
+NodeId scenes). All 23 unit/integration tests across `PathTest` and
+`DepthSorterTest` were traced numerically by the correctness reviewer
+and are sound. **No BLOCKERs were found in this round.**
 
-A cluster of HIGH/MED findings around the predicate's epsilon semantics
-(`>= 1e-6` is a product threshold, not a per-distance threshold) and a
-vacuous antisymmetry test were independently surfaced by 3-4 reviewers
-each — strong triangulation that these are real, not noise.
+Six HIGH findings cluster around three themes: (1) numerical-robustness
+flaws that walked through the rewrite unchanged from Round 1 — most
+notably the EPSILON-applied-to-product flaw in `signOfPlaneSide`, plus
+NaN/Infinity propagation; (2) a ~20–30% per-frame performance regression
+driven by per-vertex `cos`/`sin` recomputation; (3) docs drift between
+the source, KDoc, inline comments, and the public concept docs at
+`docs/concepts/depth-sorting.md`. Eleven MED findings concentrate on
+cascade steps 2/3 (six independent reviewers triangulated this — the
+two screen-extent steps are dead code under the `hasInteriorIntersection`
+gate and have an "intuition-only" sign convention), workflow-vocabulary
+leakage into the public test API, and structural duplication between
+`hasIntersection` and `hasInteriorIntersection`.
+
+The user triaged 16 of the 17 BLOCKER+HIGH+MED findings as **Fix in
+this slice**; F-1 (Paparazzi CI baselines) was deferred as a Linux-CI
+ops follow-on, not a code defect. The next stage is a follow-on
+`/wf-implement` round to apply the 16 fixes.
 
 ## Domain Coverage
 
 | Domain | Command | Status |
-|---|---|---|
-| Algorithm correctness | `correctness` | **Blockers** |
-| Test coverage | `testing` | **Blockers** |
-| Numerical robustness | `reliability` | **High** |
-| API/contract change | `refactor-safety` | Clean |
+|--------|---------|--------|
+| Algorithm correctness | `correctness` | Issues (MED+LOW) |
+| Security | `security` | Clean (LOW only) |
+| Code simplification | `code-simplification` | Issues (MED) |
+| Test coverage | `testing` | Issues (HIGH) |
 | Source readability | `maintainability` | Issues (MED) |
-| In-source documentation | `docs` | Issues (MED) |
-| Render-loop perf | `performance` | Issues (MED) |
-| Code simplification | `code-simplification` | NIT only |
-| Security | `security` | Clean |
+| Numerical robustness | `reliability` | Issues (HIGH) |
+| Refactor safety | `refactor-safety` | Issues (HIGH) |
+| Render-loop perf | `performance` | Issues (HIGH) |
+| In-source documentation | `docs` | Issues (HIGH) |
 | Style consistency | `style-consistency` | NIT only |
 
 ## All Findings (Deduplicated)
 
 | ID | Sev | Conf | Source | File:Line | Issue |
-|---|---|---|---|---|---|
-| CR-1 | **BLOCKER** | High | correctness | `Path.kt:131-145` | Permissive `result > 0` over-adds wrong-direction edge for tall faces straddling a farther horizontal plane (LongPress yellow-box regression) |
-| TS-1 | **BLOCKER** | High | testing | (test gap) | No test covers dynamic height-change adjacency (`height = if (isSelected) 2.0 else 1.0`) — exact regression structural pattern |
-| RL-1 | **HIGH** | High | reliability + correctness + docs + maint + style | `Path.kt:140` | Epsilon `>= 1e-6` is on the *product* `observerPosition * pPosition`, not on each individual signed distance. KDoc misleads. (Merges CR-4, DC-1, partial ST-1, partial MA-3.) |
-| TS-2 | **HIGH** | High | testing + correctness + reliability | `DepthSorterTest.kt` (antisymmetry test) | Antisymmetry test (`a + b == 0`) is vacuous — binary 0/1 return forces sum to 0 by construction; would have passed even with pre-fix bug. (Merges CR-5, RL-5.) |
-| TS-3 | **HIGH** | High | testing | `IntersectionUtilsTest.kt` | Plan's shared-edge-only `hasIntersection` case was deferred; this is the gate that fires `closerThan`. If it returns false for screen-projected shared edges, the entire fix is silently bypassed. |
-| MA-1 | MED | High | maintainability | `Path.kt:103-115` | KDoc conflates contract with bug history; omits coplanar / observer-on-plane edge cases and the invariant `closerThan` relies on |
-| MA-2 | MED | Med | maintainability | `Path.kt:117` | `countCloserThan` name implies cardinality but returns binary {0,1}; the implicit contract with `closerThan`'s subtraction is fragile and undocumented. Recommend rename or `Boolean` return. |
-| PF-1 | MED | High | performance | `Path.kt:131-145` | Hot loop allocates N `Vector` per call and lacks early-exit. Inline OP arithmetic to 3 doubles + return on first hit eliminates allocations and halves expected iterations. |
-| RL-2 | MED | Med | reliability | (analytical) | **Deferred — superseded.** Alternative regression theory (threshold too tight → tie → fallback to wrong order). CR-1's concrete vertex trace contradicts: failure is over-aggressive, not too tight. Recorded for historical context. |
-| DC-2 | MED | High | docs | `Path.kt:95-98` | `closerThan`'s public-ish KDoc was not updated; never explains the permissive threshold, the subtraction pattern, or shared-edge rationale |
-| TS-4 | MED | High | testing | (coverage gap) | No integration test for dynamic height-change scenes through `DepthSorter` (folds into TS-1's fix scope) |
-| TS-5 | MED | Med | testing | (coverage gap) | No test pins the 1e-6 epsilon at its boundary; future tightening or widening goes unnoticed |
-| SEC-1 | LOW | Med | security | `Path.kt:140` | NaN/Infinity in vertex coordinates silently pass/fail the product comparison. Pre-existing — not introduced by this diff. |
-| MA-3 | LOW | High | maintainability + style | `Path.kt:140` | `0.000001` is a magic literal; sibling files use `1e-6` scientific notation and named constants would expose the coordinate-range dependency. (Overlaps ST-1 NIT.) |
-| MA-4 | LOW | High | maintainability | `Path.kt:129, 135` | `observerPosition` is a signed plane-distance, not a position; renaming to `observerPlaneDist` / `vertexPlaneDist` would make the sign-agreement test self-explanatory |
-| PF-3 | LOW | Med | performance | (upstream) | Pre-existing `Point` boxing in `hasIntersection` upstream is a larger allocation hotspot — not this diff |
-| RL-4 | LOW | High | reliability | `Path.kt:KDoc` | KDoc claims 0..100 coordinate range works but FP error product ~2.2e-4 dominates 1e-6 above ~10. Only validated for 0..10 range. |
-| DC-3 | LOW | High | docs + security | `Path.kt:115` | Internal workflow slug `depth-sort-shared-edge-overpaint` in KDoc is dead reference (no path, not navigable). (Merges SEC-2 NIT.) |
-| RS-LOW | LOW | Med | refactor-safety | (test gap) | Missing degenerate-coplanar unit test |
-| SEC-2 | NIT | High | security | `Path.kt:115` | Workflow vocabulary in source code KDoc — see DC-3 above (merged) |
-| CS-2 | NIT | High | code-simplification | `Path.kt:103-115` | KDoc history paragraph is changelog content in private function; trim to one sentence |
-| CS-4 | NIT | Med | code-simplification | `WS10NodeIdScene.kt` | Hardcoded geometry duplicates `NodeIdSample` (intentional — wrong module direction to share); a one-line drift-warning comment is all that's missing |
-| MA-5 | NIT | Med | maintainability | `Path.kt:103-115` | KDoc doesn't justify "any vertex" over strict-majority or all-but-one alternatives; future tuner can't distinguish minimal fix from deliberate choice |
-| DC-4 | NIT | High | docs | `02-shape.md` | Spec says "strict majority"; implementation chose "any vertex". Spec now contradicts source. |
-| DC-5 | NIT | Med | docs | (missing file) | `docs/internal/explanations/depth-sort-painter-pipeline.md` was never created (shape stage marked it optional/recommended) |
-| ST-2 | NIT | Med | style-consistency | `WS10NodeIdScene.kt` | `WS10` milestone prefix on a scene-factory file (only prior precedent is `WS6EscapeHatchesTest.kt`); functionally fine |
+|----|-----|------|--------|-----------|-------|
+| F-1 | **HIGH** | High | testing + refactor-safety | `isometric-compose/src/test/snapshots/images/` | Paparazzi CI gate broken: 4 new snapshot tests have no committed baselines + 16 pre-existing baselines are blank Windows renders |
+| F-2 | **HIGH** | High | reliability + correctness | `Path.kt` `signOfPlaneSide` | EPSILON applied to *product* `observerPosition × pPosition`, not per-distance. Same flaw Round-1 flagged in deleted `countCloserThan`; persists. |
+| F-3 | **HIGH** | High | reliability + security | `Path.kt` cascade | NaN/Infinity coordinates produce false-decisive returns from Step-1 minimax sentinels; antisymmetry breaks (both directions return −1) |
+| F-4 | **HIGH** | High | performance | `Path.kt` cascade hot loop | `cos`/`sin` recomputed per vertex × per pair × O(N²) pairs (~3480 transcendental calls/frame, 30-face scene); +20–30% per-frame |
+| F-5 | **HIGH** | High | docs + maintainability | `Path.kt` KDoc vs inline vs `PathTest.kt` header | Cascade step numbers disagree across artifacts (KDoc 4/5, inline 5/6, test header 5/6) |
+| F-6 | **HIGH** | High | refactor-safety | `docs/concepts/depth-sorting.md` + `site/src/content/docs/concepts/depth-sorting.mdx` | Public concept docs describe `hasIntersection` (old) instead of `hasInteriorIntersection` (current implementation) |
+| F-7 | MED | High | code-simpl + maint + testing + reliability + refactor-safety + correctness | `Path.kt` cascade steps 2–3 | Steps 2/3 (screen-x/y minimax, ~47 lines) dead under `hasInteriorIntersection` gate; sign convention is "intuition only" — six reviewers triangulated |
+| F-8 | MED | High | code-simpl + maint + style | `Path.kt`+`IntersectionUtils.kt` | Epsilon notation drift: `0.000001`, `1e-6`, unnamed `0.000000001` |
+| F-9 | MED | High | maint + correctness | `Path.kt` `signOfPlaneSide` | Name/KDoc inversion: returns +1 when "this farther", but name suggests "same side"; KDoc claims coplanar = same-side, code treats as neutral |
+| F-10 | MED | High | docs + maint + style | multiple files | Workflow vocabulary leakage: slug, "WS10", "amendment" in source / public test API. Violates `feedback_no_slice_vocab_in_pr` user memory |
+| F-11 | MED | High | code-simplification | `IntersectionUtils.kt` | ~70 lines AABB+SAT body verbatim copy-pasted from `hasIntersection` into `hasInteriorIntersection` |
+| F-12 | MED | High | performance | `IntersectionUtils.hasInteriorIntersection` | Pre-existing 2×N `Point` wrapper allocations per call (largest single allocation hotspot) |
+| F-13 | MED | Med | refactor-safety | `AlphaSampleScene.kt` | Test factory replicates 3 prisms as individual `Shape` calls; live app uses `Batch` — drift risk if `Batch` changes face decomposition |
+| F-14 | MED | High | refactor-safety | `Path.kt` companion | `ISO_ANGLE = PI/6.0` hardcoded independent of `IsometricEngine` instance; non-default-angle engine produces wrong results at steps 1–3 |
+| F-15 | MED | Med | code-simplification | `Path.kt` `closerThan` | Four vertex-scan loops could collapse to two — halves per-call traversal in hot path |
+| F-16 | MED | High | testing | `DepthSorterTest.kt` | AC-10 (`hasInteriorIntersection` boundary cases) only exercised at predicate level, never end-to-end through `DepthSorter` |
+| F-17 | MED | High | testing | `PathTest.kt` | Coplanar-non-overlapping test asserts `!= 0` instead of a specific sign — accepts wrong-sign regressions silently |
+| F-18 | LOW | Med | style | `DepthSorterTest.kt` `diagnostic` test | `println` calls clutter CI output |
+| F-19 | LOW | High | code-simpl + maint | `DepthSorterTest.kt` | Magic observer `Point(-10, -10, 20)` literal in 3+ places; should be a named constant |
+| F-20 | LOW | Med | code-simpl + style | `Path.kt` companion | Double-`private` redundancy on `private companion object { private const val … }` |
+| F-21 | LOW | Med | maintainability | `DepthSorter.kt` | `intersects`/`cmpPath` locals retained from reverted DIAG without explanation |
+| F-22 | LOW | High | docs | `Path.kt` `closerThan` KDoc | Newell 1972 citation lacks URL or `@see` link |
+| F-23 | LOW | Med | docs + refactor-safety | `docs/internal/explanations/` | `depth-sort-painter-pipeline.md` is DEFERRED but no tracking task exists |
+| F-24 | LOW | Med | refactor-safety | repo CI workflows | No `verifyPaparazzi` step in any CI workflow; "must rebaseline on Linux" is documented only in workflow files |
+| F-25 | LOW | Med | testing | `DepthSorterTest.kt` antisymmetry test | Cannot detect a symmetric sign-convention regression in plane-side steps 4–6 |
 
-**Total:** BLOCKER: **2** | HIGH: **3** | MED: **7** | LOW: **7** | NIT: **6** = **25 deduplicated** (from 42 raw across 10 commands).
+**Total:** BLOCKER: 0 | HIGH: 6 | MED: 11 | LOW: 8 | NIT: (rolled into LOW)
+*(After dedup: 25 findings merged from 91 raw findings across 10 commands.)*
 
 ## Findings (Detailed)
 
-### CR-1: Permissive threshold over-adds wrong-direction edges [BLOCKER]
+For each finding's full evidence, see the corresponding sub-review file:
+`07-review-<command>.md`. Inline detail below covers only the deduped
+HIGHs and merged-cluster MEDs.
 
-**Location:** `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Path.kt:131-145`
-**Source:** `correctness`
+### F-1: Paparazzi CI gate broken [HIGH]
 
-**Evidence:**
+**Location:** `isometric-compose/src/test/snapshots/images/`
+**Source:** testing (TS-1+TS-2), refactor-safety (RS-R2-8)
 
-Numerical trace from the correctness reviewer for the OnClickSample geometry — `Selected` (a long-pressed shape, height bumped from 1.0 to 2.0) adjacent to `Neighbor` (height 1.0):
+**Issue:** The four new snapshot tests added in commit `9cef055`
+(`nodeIdRowScene`, `onClickRowScene`, `longPressGridScene`,
+`alphaSampleScene`) have **no committed baseline PNGs**. Concurrently,
+all 16 pre-existing baselines on disk are blank 6917-byte
+Windows-toolchain renders (verify Round-1 documented this as
+environmental: Paparazzi 1.3.0 + Layoutlib + JDK17 + Windows produces
+empty PNGs for every scene). On the first Linux CI run, `verifyPaparazzi`
+will hard-fail twice over: missing-baseline error for the 4 new tests,
+and pixel-mismatch error against the 16 blank pre-existing baselines
+(once Linux records real frames).
 
-```
-Selected.right face (vertical, x = constant, z ∈ [0.1, 2.1]):
-  4 vertices, 2 above and 2 below Neighbor.top's z = 1.1 plane.
-Neighbor.top face (horizontal at z = 1.1):
-  4 vertices, all on its own plane.
+**Fix:** Run `./gradlew :isometric-compose:recordPaparazzi` on Linux CI;
+commit all 20 real baselines.
 
-countCloserThan(Selected.right, Neighbor.top):
-  observer is well above z = 1.1 → observerPosition > 0
-  2 of 4 vertices have pPosition > 0 (above the plane, same side as observer)
-  result = 2  →  return 1   ← spurious "Selected.right is closer" vote
-countCloserThan(Neighbor.top, Selected.right):
-  by symmetry result = 0   →  return 0
-closerThan(Selected.right, Neighbor.top) = 0 - 1 = -1
-DepthSorter then forces Neighbor.top to be drawn AFTER Selected.right
-→ Neighbor.top paints over Selected.right's contributing pixels
-→ Yellow box (Selected) loses its right wall.
+**Severity:** HIGH | **Confidence:** High | **Triage: Defer**
+*(User-deferred: this is a Linux-CI ops follow-on, not a code defect.
+The test sources are wired correctly. Track via separate workflow.)*
 
-2D projections confirm hasIntersection fires:
-  Selected.right x ∈ [182, 243]  vs  Neighbor.top x ∈ [212, 333]
-```
+### F-2: EPSILON applied to product, not per-distance [HIGH]
 
-**Issue:** The permissive `result > 0` threshold treats *any* vertex on the
-observer side as evidence that the entire face is closer. For a tall vertical
-face that straddles a horizontal face's plane, this is wrong — half the
-vertical face is above the horizontal, half is below. Neither face is
-unambiguously closer; the predicate should return 0 (no edge) and let
-the centroid pre-sort and `hasIntersection` broad-phase resolve it.
-
-**Fix:** Require both `result > 0` AND `resultOpposite == 0` (no vertex
-on the *opposite* side of the plane). This restores the original
-implementation's "all vertices observer-side" intent that was lost when
-`result0` was removed. The hq-right/factory-top WS10 case still passes
-because *all four* of factory-top's vertices are on the observer side
-of hq-right's plane (factory-top is geometrically entirely above hq-right's
-right face's plane in observer space).
-
-```kotlin
-// Proposed
-var result = 0
-var resultOpposite = 0
-for (point in points) {
-    val pPosition = ...
-    if (observerPosition * pPosition >= 1e-6) result++
-    else if (observerPosition * pPosition <= -1e-6) resultOpposite++
-}
-return if (result > 0 && resultOpposite == 0) 1 else 0
-```
-
-This was effectively the old algorithm's intent (the `(result + result0) / points.size`
-integer-division fraction equalled 1 only when every vertex was observer-side
-or coplanar) — but expressed correctly without the integer-division collapse.
-
-**Severity:** BLOCKER | **Confidence:** High
-
----
-
-### TS-1: No test exercises dynamic height-change adjacency [BLOCKER]
-
-**Location:** `isometric-core/src/test/kotlin/.../PathTest.kt`, `DepthSorterTest.kt`
-**Source:** `testing`
-
-**Evidence:** The `WS10NodeIdScene` factory and the `DepthSorterTest.WS10
-NodeIdSample four buildings render in correct front-to-back order` test
-both lock the heights at static values (3.0, 2.0, 1.5, 4.0). The actual
-regression manifests in `OnClickSample` and `LongPressSample`, where
-`height = if (isSelected) 2.0 else 1.0` — a height of 2 next to a
-neighbour height of 1 is precisely the geometry CR-1 traces through.
-None of the new PathTest cases exercises this configuration.
-
-**Issue:** The slice's test layering (closerThan unit + DepthSorter
-integration + Paparazzi snapshot) was scoped against the originally
-diagnosed bug case but did not generalise to other adjacent-prism
-configurations the fix could affect. A green test suite while a visual
-regression exists is the worst kind of false confidence.
-
-**Fix:** Add at minimum:
-
-1. `PathTest.\`closerThan returns zero for tall vertical face straddling shorter neighbour's top\`()` — reproduces the OnClickSample geometry (Selected height=2 vs Neighbor height=1) and asserts `closerThan == 0` (or whatever the corrected predicate returns) so neither face is forced ahead of the other.
-2. `DepthSorterTest.\`OnClickSample selection toggle preserves correct face ordering\`()` — builds the scene with one shape selected, runs `DepthSorter`, asserts that for every adjacent face pair the closer face's command appears later. Repeat with selection off. Pin both states.
-3. Optionally a Paparazzi snapshot of the LongPress sample with one shape selected.
-
-**Severity:** BLOCKER | **Confidence:** High
-
----
-
-### RL-1: Epsilon is on the product, not the per-distance [HIGH]
-
-**Location:** `Path.kt:140` (and KDoc lines 103-115, 137-138)
-**Source:** `reliability` (HIGH) + `correctness` CR-4 (MED) + `docs` DC-1 (MED) + partial `style-consistency` ST-1 + partial `maintainability` MA-3 — **four reviewers triangulated**
+**Location:** `Path.kt` `signOfPlaneSide` (the multiplication
+`observerPosition * pPosition` and the resulting `>= EPSILON` check)
+**Source:** reliability (RL-1), correctness (CR-3)
 
 **Evidence:**
-
 ```kotlin
-// Line 140 — current
-if (observerPosition * pPosition >= 0.000001) {
-    result++
+// signOfPlaneSide in Path.kt
+val product = observerPosition * pPosition
+if (product >= EPSILON) {
+    // counted as same-side as observer
 }
 ```
 
-KDoc claims "within a 1e-6 epsilon to absorb floating-point noise" —
-implying the epsilon is a per-distance threshold. But the inequality is
-on the *product*. Two same-side distances of 1e-3 each multiply to 1e-6,
-which barely passes. Two same-side distances of 5e-4 each multiply to
-2.5e-7, which fails (vertex skipped despite being non-coplanar).
-The geometric meaning of the threshold is non-obvious from the code
-and the KDoc misleads any reader trying to reason about numerical
-robustness.
+**Issue:** EPSILON 1e-6 is applied to the *product* of two signed
+distances, not to each distance individually. The effective plane-
+proximity threshold therefore scales inversely with observer distance.
+For thin faces (z-extent < 0.01) or near-degenerate normals (small
+cross-product magnitude), both distances can be small and same-sign yet
+their product falls below the threshold, causing a vertex genuinely on
+the observer's side to be classified as coplanar. **This is the same
+flaw Round-1 review CR-4/RL-1 flagged in the deleted `countCloserThan`
+— the predicate rewrite carried it forward unchanged.** Inert at WS10
+coordinates; active for thin decal faces or near-degenerate normals.
 
-**Issue:** The threshold semantics are confusing and don't match the
-KDoc. RL-1 also notes that for the project's claimed 0..100 coordinate
-range, FP error products dominate at ~2.2e-4 — well above 1e-6 — so the
-epsilon is too tight there and misclassifies true-coplanar vertices as
-on-plane (returning 0). The code is only validated for 0..10.
+**Fix:** Per-distance comparison: `pPosition > EPSILON && observerPosition > 0`
+(or sign-respective equivalents).
 
-**Fix:** Either of:
+**Severity:** HIGH | **Confidence:** High | **Triage: Fix in this slice**
 
-- **Option A (recommended):** Change to per-distance epsilon with sign agreement:
-  ```kotlin
-  val sameSign = (observerPosition >= 1e-6 && pPosition >= 1e-6) ||
-                 (observerPosition <= -1e-6 && pPosition <= -1e-6)
-  if (sameSign) result++
-  ```
-  Restores the geometric meaning the KDoc describes.
+### F-3: NaN/Infinity propagation [HIGH]
 
-- **Option B:** Update the KDoc to honestly describe the product
-  threshold and document the 0..10 validated range, deferring the
-  per-distance fix to a future numerical-robustness workflow.
+**Location:** `Path.kt` `closerThan` cascade Step 1; `Path.init`
+**Source:** reliability (RL-2/RL-5), security (SEC-1/SEC-2)
 
-This finding stands independent of CR-1's algorithmic fix; both
-threshold issues should be resolved together.
+**Issue:** No `isFinite` guard exists in `closerThan` or `Path.init`.
+NaN coordinates leave Step-1 minimax sentinel loops at
+`selfDepthMax = -INFINITY` / `selfDepthMin = +INFINITY`, which trigger
+spurious definitive returns (`-INFINITY < aDepthMin - EPSILON` is always
+true). Both directions of `closerThan` then return −1, breaking the
+antisymmetry contract; the NaN polygon is misrendered as closer. Pre-
+existing in old code; not introduced by this diff but persists.
 
-**Severity:** HIGH | **Confidence:** High
+**Fix:** Add `require(points.all { it.x.isFinite() && it.y.isFinite() && it.z.isFinite() })`
+to `Path.init` (boundary validation), or guard `signOfPlaneSide`
+internally.
 
----
+**Severity:** HIGH | **Confidence:** High | **Triage: Fix in this slice**
 
-### TS-2: Antisymmetry invariant test is vacuous [HIGH]
+### F-4: Hot-loop perf regression (~20–30% per frame) [HIGH]
 
-**Location:** `isometric-core/src/test/kotlin/.../DepthSorterTest.kt` — `closerThan is antisymmetric for representative non-coplanar pairs`
-**Source:** `testing` (HIGH) + `correctness` CR-5 (LOW) + `reliability` RL-5 (NIT) — **three reviewers**
+**Location:** `Path.kt` cascade hot loop; `signOfPlaneSide`
+**Source:** performance (PF-1+PF-2+PF-3)
 
-**Evidence:** With the new binary 0/1 return, `closerThan(A, B) =
-countCloserThan(A, B) - countCloserThan(B, A)` ∈ {−1, 0, +1}. For any
-non-coplanar pair `closerThan(A, B) + closerThan(B, A) == 0` is
-mathematically forced — at most one direction can return +1, and if it
-does, the other returns 0 or +1 (in which case both directions
-disagreeing about who is closer is impossible by the geometry). The
-implement note acknowledges this: "Antisymmetry test currently passes
-by construction." It would have passed with the pre-fix integer-division
-bug too.
+**Issue:** Three compounding regressions:
+1. `cos(ISO_ANGLE)`/`sin(ISO_ANGLE)` recomputed per vertex visit inside
+   `Point.depth(angle)`. For a 30-face scene: ~3480 transcendental calls
+   per frame at Step 1 alone.
+2. Combined Step-2/3 loop computes screen-Y extents for both polygons
+   before checking Step-2 — wastes 2×N ops per Step-2-resolving pair.
+3. `signOfPlaneSide` allocates 5+N `Vector` objects per call vs 4+N in
+   deleted `countCloserThan`: 2.25× allocation regression for Step-6
+   pairs.
 
-**Issue:** The test gives false confidence — it claims to guard an
-invariant that the new return type makes trivially true.
+Net estimate: +20–30% per-frame overhead vs prior code.
 
-**Fix:** Strengthen with explicit magnitude assertions on a hand-picked
-pair set known to produce unambiguous orderings:
+**Fix:** Hoist `ISO_COS`/`ISO_SIN` to companion constants (single-line
+change; alone reverses the regression). Split the Step-2/3 loop. Inline
+the per-vertex dot product in `signOfPlaneSide`.
 
-```kotlin
-@Test
-fun `closerThan returns nonzero magnitudes for unambiguous non-coplanar pairs`() {
-    val pairs = listOf(/* hq_right + factory_top, plus 3-4 unambiguous pairs */)
-    pairs.forEach { (a, b) ->
-        val ab = a.closerThan(b, observer)
-        val ba = b.closerThan(a, observer)
-        assertEquals(0, ab + ba, "antisymmetric")
-        assertTrue(abs(ab) >= 1, "magnitude non-zero for $a vs $b")
-        assertTrue(abs(ba) >= 1, "magnitude non-zero for $a vs $b")
-    }
-}
-```
+**Severity:** HIGH | **Confidence:** High | **Triage: Fix in this slice**
 
-**Severity:** HIGH | **Confidence:** High
+### F-5: Cascade step-numbering mismatch across artifacts [HIGH]
 
----
+**Location:** `Path.kt` `closerThan` KDoc + inline comments;
+`PathTest.kt` test-suite header comment
+**Source:** docs (DC-1/DC-2), maintainability (MA-3)
 
-### TS-3: Deferred shared-edge `hasIntersection` case is load-bearing [HIGH]
+**Issue:** The `closerThan` KDoc enumerates 6 cascade steps. The inline
+comments label 7 points. The plane-side tests are KDoc step 4/5, inline
+step 5/6, and PathTest header step 5/6. A reader cross-referencing the
+KDoc while reading code or tests gets contradictory step numbers.
+Three independent reviewers flagged this.
 
-**Location:** `isometric-core/src/test/kotlin/.../IntersectionUtilsTest.kt`
-**Source:** `testing`
+**Fix:** Renumber consistently across all three artifacts (KDoc, inline
+comments, PathTest header). Pick one convention (recommend 6-step,
+matching the KDoc) and propagate.
 
-**Evidence:** The plan called for a "shared-edge-only behaviour TBD"
-test case in the new `IntersectionUtilsTest`. The implementation (per
-implement § Deviations) replaced it with "outer contains inner" because
-the shared-edge behaviour was unclear without running the test.
-`IntersectionUtils.hasIntersection` is the broad-phase gate — it
-determines whether `closerThan` is called for a face pair at all. If
-`hasIntersection` returns `false` for two 2D-projected polygons that
-share only an edge (no interior overlap), the entire `closerThan` fix
-is bypassed for that pair.
+**Severity:** HIGH | **Confidence:** High | **Triage: Fix in this slice**
 
-**Issue:** A core assumption of the fix (that `closerThan` will run on
-shared-edge polygon pairs in screen space) is unverified. If
-`hasIntersection`'s `isPointInPoly` fallback rejects shared-edge cases,
-the regression class is wider than diagnosed.
+### F-6: Public concept docs describe wrong gate [HIGH]
 
-**Fix:** Add the deferred test case — either (a) two screen-projected
-polygons that share exactly one edge with no interior overlap and
-assert the actual current behaviour (true or false, with an inline
-comment documenting the choice), or (b) two polygons sharing a vertex
-only. Either way, lock down what the broad phase does for the geometry
-class this fix targets.
+**Location:** `docs/concepts/depth-sorting.md`,
+`site/src/content/docs/concepts/depth-sorting.mdx`
+**Source:** refactor-safety (RS-R2-4)
 
-**Severity:** HIGH | **Confidence:** High
+**Issue:** Both public concept docs describe
+`IntersectionUtils.hasIntersection()` as the depth-sort narrow-phase
+gate. `DepthSorter` has used `hasInteriorIntersection` (strict screen-
+overlap) since commit `9cef055`. Public-facing docs lie about the
+implementation; a future maintainer auditing against the docs would get
+a wrong mental model and might "fix" the implementation back to the
+lenient version.
 
----
+**Fix:** Update both files to describe `hasInteriorIntersection` and
+explain why the strict variant is needed (boundary-only contact must
+not fire a depth edge for the 3×3 grid corner regression).
 
-### MED findings (selected for fix)
+**Severity:** HIGH | **Confidence:** High | **Triage: Fix in this slice**
 
-#### MA-1: KDoc conflates contract with bug history [MED]
-`Path.kt:103-115`. KDoc reads as a changelog. Trim to: (1) one sentence
-on contract, (2) one sentence on coplanar handling, (3) one sentence
-referencing where the historical bug context lives (e.g.,
-`docs/internal/explanations/depth-sort-painter-pipeline.md` once
-DC-5 is created).
+### MED findings — summary
 
-#### MA-2: `countCloserThan` name implies cardinality [MED]
-`Path.kt:117`. Function returns binary {0, 1} but is named like a
-count. Two acceptable resolutions:
-- Rename to `hasAnyVertexCloserThan` returning `Boolean`; update
-  `closerThan` to subtract `Int` conversions.
-- Keep `Int` and document the {0, 1} contract explicitly in KDoc.
-Either makes the implicit contract with `closerThan`'s subtraction
-explicit.
+All eleven MED findings (F-7 through F-17) are triaged **Fix in this
+slice**. Full evidence and fix detail in the per-command sub-reviews:
 
-#### PF-1: Hot loop allocates + lacks early-exit [MED]
-`Path.kt:131-145`. Per call, allocates N `Vector` instances and iterates
-all N vertices even after `result` first goes positive. Inline the OP
-arithmetic to three Double locals and `return 1` on the first hit.
-Saves O(faces²) allocations per frame; not a measurable user-visible
-change today but compounds with PF-3's pre-existing upstream boxing.
+- **F-7** (cascade steps 2/3 dead+untested): six-reviewer triangulation;
+  see `07-review-code-simplification.md` CS-5, `07-review-maintainability.md`
+  MA-2, `07-review-testing.md` TS-3, `07-review-reliability.md` RL-3,
+  `07-review-refactor-safety.md` RS-R2-6, `07-review-correctness.md` CR-2/CR-4.
+  **Fix decision:** delete steps 2/3 entirely (the gate prevents reaching
+  them) OR add tests + sign validation. Recommend delete — they're dead
+  weight under the current gate.
+- **F-8** (epsilon notation): consolidate to `1e-6` everywhere; name the
+  unnamed `0.000000001` SAT threshold.
+- **F-9** (`signOfPlaneSide` naming): either rename to clarify "+1 means
+  this farther" semantics or invert the return convention to match the
+  name; update KDoc.
+- **F-10** (workflow vocabulary): rename `WS10NodeIdScene` → `NodeIdRowScene`
+  (or similar); strip "WS10"/"amendment"/slug from KDocs and comments.
+- **F-11** (AABB+SAT duplication): extract shared `private` helpers in
+  `IntersectionUtils`.
+- **F-12** (Point allocations): cache `Point` arrays at `hasInteriorIntersection`
+  call site, or accept `DoubleArray` directly.
+- **F-13** (AlphaSampleScene divergence): replicate using `Batch` to
+  match the live app, or assert geometry equivalence in a unit test.
+- **F-14** (ISO_ANGLE coupling): take the angle as a parameter, or
+  accept the constraint and document the coupling explicitly.
+- **F-15** (vertex-scan loop collapse): merge the four scan loops where
+  the same vertices are walked.
+- **F-16** (AC-10 not end-to-end): add a `DepthSorterTest` integration
+  case that exercises the gate's reject path through `sort()`.
+- **F-17** (coplanar test): change `assertNotEquals(0, …)` to a specific
+  sign assertion.
 
-#### DC-2: Public `closerThan` KDoc not updated [MED]
-`Path.kt:95-98`. The current text ("It is closer if one of its vertices
-and the observer are on the same side") is *coincidentally* correct for
-the new permissive predicate but doesn't acknowledge the threshold
-change or shared-edge rationale. Update to match the corrected
-predicate from CR-1.
+### LOW findings — listed only
 
-#### TS-5: 1e-6 epsilon not pinned at boundary [MED — DEFERRED]
-**Triage decision: defer.** Resolved more naturally by RL-1's per-distance
-fix; revisit after CR-1 + RL-1 land.
-
-Wait — TS-5 was triaged "Fix" not "Defer". Recording correctly:
-
-#### TS-5: 1e-6 epsilon not pinned at boundary [MED]
-**Triage decision: fix.** Add a parametric PathTest case where the
-per-distance product (or, after RL-1's fix, individual distance) is at
-the ±1e-6 boundary. Locks the threshold semantics so future tweaks
-surface as test failures rather than silent behavioural drift.
-
-#### RL-2: Alternative regression theory [MED — DEFERRED]
-The reliability reviewer hypothesised the regression came from
-threshold being too tight (returning 0 → fallback to centroid sort →
-wrong order). CR-1's concrete vertex trace contradicts this. Recording
-as superseded; if CR-1's fix doesn't fully resolve the LongPress
-artefact, revisit RL-2 as the alternative hypothesis.
+F-18 through F-25: not individually triaged per spec. See per-command
+sub-reviews for evidence and detail. Recommend rolling LOW fixes into
+the F-2..F-17 follow-on round opportunistically.
 
 ## Triage Decisions
 
 | ID | Sev | Source | Decision | Notes |
-|---|---|---|---|---|
-| CR-1 | BLOCKER | correctness | **fix** | Land alongside TS-1 in next /wf-implement |
-| TS-1 | BLOCKER | testing | **fix** | Same implement pass as CR-1 |
-| RL-1 | HIGH | reliability + 3 others | **fix** | Option A (per-distance epsilon with sign agreement) preferred |
-| TS-2 | HIGH | testing + 2 others | **fix** | Strengthen with explicit magnitude assertions |
-| TS-3 | HIGH | testing | **fix** | Land deferred shared-edge case |
-| MA-1 | MED | maintainability | **fix** | KDoc rewrite |
-| MA-2 | MED | maintainability | **fix** | Rename or document binary contract |
-| PF-1 | MED | performance | **fix** | Inline arithmetic + early-exit |
-| DC-2 | MED | docs | **fix** | Update public `closerThan` KDoc |
-| TS-5 | MED | testing | **fix** | Boundary parametric test |
-| RL-2 | MED | reliability | **defer** | Superseded by CR-1; record as historical hypothesis |
-| TS-4 | MED | testing | (folded into TS-1) | Same fix scope |
-| SEC-1 | LOW | security | untriaged | Pre-existing, separate concern |
-| MA-3 | LOW | maintainability + style | untriaged | Folded under RL-1 (literal style + named constant) |
-| MA-4 | LOW | maintainability | untriaged | Variable naming polish |
-| PF-3 | LOW | performance | untriaged | Pre-existing upstream alloc |
-| RL-4 | LOW | reliability | untriaged | KDoc range claim |
-| DC-3 | LOW | docs + security | untriaged | Workflow vocab in KDoc — see saved feedback `feedback_no_slice_vocab_in_pr.md` |
-| RS-LOW | LOW | refactor-safety | untriaged | Missing degenerate-coplanar test |
-| SEC-2, CS-2, CS-4, MA-5, DC-4, DC-5, ST-2 | NIT | various | untriaged | Polish-grade; consider during implement |
+|----|-----|--------|----------|-------|
+| F-1 | HIGH | testing + refactor-safety | **defer** | Linux-CI ops follow-on; not a code defect. Track separately. |
+| F-2 | HIGH | reliability + correctness | **fix** | Persistent flaw from Round 1; per-distance comparison. |
+| F-3 | HIGH | reliability + security | **fix** | Add `isFinite` guards in `Path.init` or `signOfPlaneSide`. |
+| F-4 | HIGH | performance | **fix** | Hoist cos/sin; split step 2/3 loop; inline `signOfPlaneSide` dot product. |
+| F-5 | HIGH | docs + maintainability | **fix** | Renumber cascade steps consistently across KDoc, inline, PathTest header. |
+| F-6 | HIGH | refactor-safety | **fix** | Update `docs/concepts/depth-sorting.md` + `site/.../depth-sorting.mdx`. |
+| F-7 | MED | 6 sources | **fix** | Recommend deleting steps 2/3 — dead under gate. |
+| F-8 | MED | code-simpl + maint + style | **fix** | Consolidate epsilon notation. |
+| F-9 | MED | maint + correctness | **fix** | Rename or invert sign convention; update KDoc. |
+| F-10 | MED | docs + maint + style | **fix** | Strip workflow vocabulary; rename `WS10NodeIdScene`. |
+| F-11 | MED | code-simplification | **fix** | Extract AABB+SAT shared helpers. |
+| F-12 | MED | performance | **fix** | Reduce Point wrapper allocations. |
+| F-13 | MED | refactor-safety | **fix** | Use `Batch` in `AlphaSampleScene` or add geometry-equivalence test. |
+| F-14 | MED | refactor-safety | **fix** | Parameterise `ISO_ANGLE` or document coupling. |
+| F-15 | MED | code-simplification | **fix** | Collapse 4 vertex-scan loops to 2. |
+| F-16 | MED | testing | **fix** | Add end-to-end gate-reject test through `DepthSorter`. |
+| F-17 | MED | testing | **fix** | Change `!= 0` assertion to specific sign. |
+| F-18..F-25 | LOW | various | untriaged | Roll opportunistically into the follow-on; revisit via `/wf-review depth-sort-shared-edge-overpaint triage`. |
 
 ## Recommendations
 
-### Must Fix (BLOCKERs + HIGHs triaged "fix")
+### Must Fix (16 items, triaged "fix")
 
-1. **CR-1** — predicate fix: require `result > 0 AND resultOpposite == 0`
-   (no straddling). Restore "all vertices observer-side" intent without
-   integer-division collapse. **Effort: ~10 lines in Path.kt.**
-2. **TS-1** — add height-change adjacency tests (PathTest unit + DepthSorter
-   integration). Pin both selection states. **Effort: ~50 lines new tests.**
-3. **RL-1** — per-distance epsilon with sign agreement OR honest KDoc.
-   Recommended: per-distance fix. **Effort: ~5 lines in Path.kt + KDoc rewrite.**
-4. **TS-2** — strengthen antisymmetry test with magnitude assertions.
-   **Effort: ~10 lines extra in DepthSorterTest.**
-5. **TS-3** — land deferred shared-edge `hasIntersection` test case.
-   **Effort: ~15 lines new in IntersectionUtilsTest.**
+Bundle as a single `/wf-implement` round on top of `452b1fc`. Rough
+order of attack to reduce churn:
+1. **F-2, F-3** (numerical robustness in `signOfPlaneSide` / `Path.init`).
+2. **F-4** (perf — hoist trig, split loop, inline dot product).
+3. **F-7, F-15** (delete dead steps 2/3 + collapse loops in `closerThan`).
+4. **F-9, F-5** (rename `signOfPlaneSide` semantics + renumber cascade steps).
+5. **F-8** (consolidate epsilon notation across `Path.kt` + `IntersectionUtils.kt`).
+6. **F-11** (extract AABB+SAT helpers).
+7. **F-12, F-14** (Point allocations + ISO_ANGLE coupling).
+8. **F-10** (strip workflow vocabulary; rename `WS10NodeIdScene`).
+9. **F-13, F-16, F-17** (test layer: Batch parity, gate-reject end-to-end, coplanar sign assertion).
+10. **F-6** (update public concept docs to describe `hasInteriorIntersection`).
 
-### Should Fix (MEDs triaged "fix")
+Estimated effort: medium-large — same shape as Round 4 (one focused
+implement round), with most changes in `Path.kt`, `IntersectionUtils.kt`,
+`DepthSorter.kt`, and the test files. The 16-item count looks heavy but
+many are 1–3 line edits clustered in two files.
 
-6. **MA-1, MA-2, DC-2** — KDoc rewrites + name/return clarification on
-   `countCloserThan`. **Effort: ~30 lines KDoc total + decision on rename.**
-7. **PF-1** — inline OP arithmetic + early-exit. **Effort: ~15 lines.**
-8. **TS-5** — epsilon-boundary parametric test. **Effort: ~10 lines.**
+### Deferred (1 item, triaged "defer")
 
-### Deferred (triaged "defer")
-
-- **RL-2** — superseded by CR-1; keep as historical hypothesis if CR-1 fix
-  doesn't fully resolve the visual regression on emulator.
+- **F-1**: Paparazzi CI baseline regeneration on Linux. Track as a
+  separate ops workflow; no code change in this slice.
 
 ### Dismissed
 
@@ -454,46 +380,65 @@ None.
 
 ### Consider (LOW/NIT — not triaged)
 
-- **DC-3 / SEC-2** — workflow slug `depth-sort-shared-edge-overpaint` in
-  KDoc violates the saved user preference (`feedback_no_slice_vocab_in_pr.md`).
-  Recommend dropping the reference during the same KDoc rewrite that
-  resolves MA-1.
-- **DC-5** — create `docs/internal/explanations/depth-sort-painter-pipeline.md`
-  per shape-stage Documentation Plan; gives future readers a single source
-  for "why centroid pre-sort + Kahn + plane-side test" rationale.
-- **MA-3 + ST-1** — change `0.000001` literal to `1e-6` and consider a
-  named constant.
-- **MA-4** — rename `observerPosition` / `pPosition` to make plane-distance
-  semantics explicit.
-- **DC-4** — `02-shape.md` "strict majority" wording contradicts source
-  (after CR-1 fix this becomes "all vertices observer-side"); update spec
-  to match.
-- **CS-2, CS-4, MA-5** — KDoc/comment trims.
-- **ST-2** — drop `WS10` milestone prefix on the scene factory file name.
-- **SEC-1, PF-3** — pre-existing, out of scope for this fix.
-- **RS-LOW** — degenerate-coplanar regression test for completeness.
+F-18 through F-25 — recommend rolling opportunistically into the follow-on
+implement round when the surrounding code is already being touched. None
+are blocking.
 
 ## Recommended Next Stage
 
-- **Option A (recommended):** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
-  — fix the BLOCKERs (CR-1, TS-1) and HIGHs (RL-1, TS-2, TS-3) plus the
-  selected MEDs (MA-1, MA-2, PF-1, DC-2, TS-5). This is the same slice
-  re-implemented; not a new slice.
-  **Compact recommended before invoking** — review chatter (10 sub-agents,
-  triage Q&A, dedup) is noise for the implement pass; the PreCompact hook
-  preserves workflow state, and triage decisions are persisted in this file.
+- **Option A (default):** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
+  — apply the 16 triaged fixes (F-2..F-17). Compact recommended before:
+  the Round-2 review chatter (sub-agent outputs, aggregation, triage) is
+  noise for the implement pass; the PreCompact hook preserves workflow
+  state and the triage decisions live in this file.
 
 - **Option B:** `/wf-amend depth-sort-shared-edge-overpaint from-review`
-  — only if the PO disagrees with the proposed CR-1 fix and wants to
-  reconsider the threshold semantics from scratch (e.g., adopt the
-  AABB-minimax alternative from shape-stage out-of-scope list). Not
-  recommended; CR-1's fix is a small additive change to the current
-  approach.
+  — only if you decide the F-7 cluster (steps 2/3 dead) reframes the
+  shape. Not recommended: the cascade structure is correct; deletion of
+  inert steps is a localised implementation choice.
 
-- **Option C:** `/wf-handoff depth-sort-shared-edge-overpaint` — **not
-  applicable**. Verdict is Don't Ship; cannot hand off a known regression.
+- **Option C:** `/wf-extend depth-sort-shared-edge-overpaint from-review`
+  — only if F-1 or F-12 (allocation hot-spots, CI baselines) should
+  spawn standalone follow-up workflows. Reasonable for F-1 (Linux CI
+  baselines deserve their own ops slice).
 
-- **Option D:** `/wf-extend depth-sort-shared-edge-overpaint from-review`
-  — could spawn separate slices for the deferred items (RL-2 as alternative
-  hypothesis investigation, PF-3 upstream allocation, DC-5 internal docs).
-  Better done after the BLOCKERs are resolved; not the immediate next step.
+- **Option D:** `/wf-handoff depth-sort-shared-edge-overpaint`
+  — **not viable** with 16 triaged-fix items outstanding. Re-evaluate
+  after the follow-on `/wf-implement` round closes them.
+
+- **Option E:** `/wf-ship depth-sort-shared-edge-overpaint`
+  — **not viable** for the same reason as D.
+
+- **Option F:** `/wf-review depth-sort-shared-edge-overpaint triage`
+  — re-triage the deferred F-1 and untriaged LOWs (F-18..F-25) after
+  the implement pass closes the HIGH+MED items.
+
+---
+
+## Fix Status (Round 5 implement-from-reviews pass)
+
+| ID | Severity | Status | Notes |
+|----|----------|--------|-------|
+| F-1 | HIGH | Deferred | Linux-CI ops follow-on; not a code defect |
+| F-2 | HIGH | Fixed | `Path.relativePlaneSide` now applies EPSILON per-distance |
+| F-3 | HIGH | Fixed | `Path.init` requires all coordinates finite |
+| F-4 | HIGH | Fixed | `ISO_COS`/`ISO_SIN` hoisted; per-vertex Vector dot product inlined |
+| F-5 | HIGH | Fixed | Cascade now 4 steps with consistent numbering across KDoc/inline/PathTest header |
+| F-6 | HIGH | Fixed | `docs/concepts/depth-sorting.md` + `site/.../depth-sorting.mdx` updated to describe `hasInteriorIntersection` |
+| F-7 | MED | Fixed | Cascade steps 2/3 (screen-x/y minimax) deleted — dead under hasInteriorIntersection gate |
+| F-8 | MED | Fixed | EPSILON = 1e-6; SAT_CROSS_THRESHOLD = -1e-9 named |
+| F-9 | MED | Fixed | `signOfPlaneSide` -> `relativePlaneSide`; KDoc clarified |
+| F-10 | MED | Fixed | Workflow vocabulary stripped; `WS10NodeIdScene` -> `NodeIdRowScene` |
+| F-11 | MED | Fixed | `IntersectionUtils` AABB+SAT extracted into shared private helpers |
+| F-12 | MED | Fixed | `pointsA + pointsA[0]` polygon-close concatenations removed |
+| F-13 | MED | Fixed | `AlphaSampleScene` wraps 3 CYAN prisms in Batch to mirror live app |
+| F-14 | MED | Documented | `ISO_ANGLE` companion KDoc explicitly notes IsometricEngine coupling; not parameterised |
+| F-15 | MED | Auto-fixed | After F-7 deletion, only 2 vertex-scan loops remain |
+| F-16 | MED | Fixed | New `DepthSorterTest` "gate rejection preserves natural centroid order for adjacent same-height prisms" |
+| F-17 | MED | Fixed | `PathTest` coplanar-non-overlap asserts `< 0` instead of `!= 0` |
+| F-18..F-25 | LOW | Untriaged | Roll opportunistically into a future polish pass |
+
+Round 5 implement-from-reviews commit applies fixes F-2 through F-17
+(16 of 17 BLOCKER+HIGH+MED items). F-1 deferred per user triage.
+Local tests not re-run on Windows; verify-stage on Linux CI is the
+authoritative gate.

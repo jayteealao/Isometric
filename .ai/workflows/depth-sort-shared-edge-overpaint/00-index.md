@@ -7,7 +7,7 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-26T17:52:49Z"
-updated-at: "2026-04-28T09:01:50Z"
+updated-at: "2026-04-28T13:25:18Z"
 selected-slice: depth-sort-shared-edge-overpaint
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -33,7 +33,46 @@ next-command: wf-verify
 next-invocation: "/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 verify-round-2-result: partial
 verify-round-2-blocker: "AC-11 NOT MET: visual regression on LongPress sample (back-right cube renders only top face) persists despite passing AC-9/AC-10 unit tests. Screen-overlap gate is necessary but not sufficient."
-review-verdict: dont-ship
+verify-round-3-result: pass
+verify-round-3-mode: "maestro-visual-postnewell"
+verify-round-3-against-commit: "452b1fc"
+verify-round-3-acs-met: "17/17"
+verify-round-3-evidence:
+  - "verify-evidence/maestro-longpress-before.png"
+  - "verify-evidence/maestro-longpress-after-press.png"
+  - "verify-evidence/maestro-alpha-default.png"
+  - "verify-evidence/maestro-onclick-before.png"
+  - "verify-evidence/maestro-onclick-after-tap.png"
+  - "verify-evidence/maestro-nodeid-default.png"
+review-verdict: ship-with-caveats
+review-round-2-verdict: ship-with-caveats
+review-round-2-against-commit: "452b1fc"
+review-round-2-findings-total: 25
+review-round-2-findings-blocker: 0
+review-round-2-findings-high: 6
+review-round-2-findings-med: 11
+review-round-2-findings-low: 8
+review-round-2-fix-count: 16
+review-round-2-defer-count: 1
+review-round-2-deferred:
+  - "F-1: Paparazzi baseline regeneration on Linux CI (not a code defect)"
+review-round-2-fix-list:
+  - "F-2: EPSILON applied to product, not per-distance (signOfPlaneSide)"
+  - "F-3: NaN/Infinity propagation; missing isFinite guards"
+  - "F-4: Hot-loop perf — hoist cos/sin, split step 2/3 loop, inline signOfPlaneSide"
+  - "F-5: Cascade step-numbering mismatch across KDoc/inline/PathTest header"
+  - "F-6: Public concept docs describe wrong gate (hasIntersection vs hasInteriorIntersection)"
+  - "F-7: Cascade steps 2/3 dead under gate — delete or test+validate signs"
+  - "F-8: Epsilon notation drift (0.000001 / 1e-6 / unnamed 0.000000001)"
+  - "F-9: signOfPlaneSide name+KDoc inversion vs return semantics"
+  - "F-10: Workflow vocabulary leakage in source/public test API (slug, WS10, amendment)"
+  - "F-11: AABB+SAT body copy-pasted between hasIntersection and hasInteriorIntersection"
+  - "F-12: Pre-existing 2×N Point wrapper allocations in hasInteriorIntersection"
+  - "F-13: AlphaSampleScene divergence from live Batch composable"
+  - "F-14: ISO_ANGLE hardcoded PI/6 independent of IsometricEngine instance"
+  - "F-15: Four vertex-scan loops in closerThan could collapse to two"
+  - "F-16: AC-10 only at predicate level, not end-to-end through DepthSorter"
+  - "F-17: Coplanar non-overlap test asserts != 0 instead of specific sign"
 implement-attempt-status: round-4-newell-cascade-complete
 implement-round-3-mode: directed-investigation
 implement-round-3-fix-applied: false
@@ -82,9 +121,9 @@ progress:
   shape: complete
   plan: complete-revision-2-amendment-2-applied
   slice: not-started
-  implement: round-4-newell-cascade-complete
-  verify: partial
-  review: complete-dont-ship
+  implement: round-5-review-fixes-complete
+  verify: round-3-pass-maestro-visual-against-452b1fc
+  review: complete-ship-with-caveats-round-2
   handoff: not-started
   ship: not-started
   retro: not-started

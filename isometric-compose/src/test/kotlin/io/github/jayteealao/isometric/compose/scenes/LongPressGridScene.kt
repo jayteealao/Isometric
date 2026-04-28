@@ -16,10 +16,12 @@ import io.github.jayteealao.isometric.shapes.Prism
  * column- and row-derived colors.
  *
  * This factory's **default static state** (no shape locked) is the canonical
- * regression case for amendment 1: the over-aggressive topological-edge
- * regression in commit `3e811aa` caused the back-right cube to render with
- * only its top face visible. The screen-overlap gate added in this fix
- * (`IntersectionUtils.hasInteriorIntersection`) restores correct rendering.
+ * marker for the over-aggressive-edge regression in the depth-sort pipeline.
+ * Without [IntersectionUtils.hasInteriorIntersection] gating edge insertion in
+ * [DepthSorter.checkDepthDependency], the back-right cube renders with only
+ * its top face visible because boundary-only-contact face pairs add spurious
+ * topological edges that pin the cube's vertical sides too early in the draw
+ * order. The strict screen-overlap gate restores correct rendering.
  *
  * Geometry kept in sync with `app/.../InteractionSamplesActivity.kt` ::
  * `LongPressSample`. If the sample changes, update here to match.
