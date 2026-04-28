@@ -241,6 +241,54 @@ class PathTest {
     }
 
     @Test
+    fun `closerThan coincident TOP-vs-BOTTOM returns deterministic order`() {
+        // Stack tower regression: prism N's TOP face (z=N+1, normal +z) is
+        // coincident with prism N+1's BOTTOM face (same z, normal -z).
+        // Same plane, same xy projection, opposite outward normals.
+        //
+        // Pre-fix the cascade returned 0 because step 1 saw identical
+        // iso-depth and step 2/3 saw all vertices on pathA's plane (every
+        // pPosition exactly 0). Without an edge, Kahn falls back to the
+        // depth-descending centroid pre-sort, which ties for these two
+        // faces (centroids identical) and produces non-deterministic
+        // painter output.
+        //
+        // Post-fix relativePlaneSide's all-coplanar branch checks the two
+        // polygons' outward-normal alignment: opposite normals (+z vs -z)
+        // get a deterministic tiebreak based on which face's normal aligns
+        // with the observer-direction. The TOP (+z, observer above) is
+        // front-facing → closer → paint last. The BOTTOM is back-facing →
+        // farther → paint first.
+        val top = Path(
+            Point(1.0, 1.0, 1.0), Point(2.0, 1.0, 1.0),
+            Point(2.0, 2.0, 1.0), Point(1.0, 2.0, 1.0)
+        )
+        // BOTTOM is the same plane traversed in the opposite winding
+        // (Prism's createPaths reverses face3 to point the normal -z).
+        val bottom = Path(
+            Point(1.0, 2.0, 1.0), Point(2.0, 2.0, 1.0),
+            Point(2.0, 1.0, 1.0), Point(1.0, 1.0, 1.0)
+        )
+
+        val topVsBottom = top.closerThan(bottom, observer)
+        val bottomVsTop = bottom.closerThan(top, observer)
+        assertTrue(
+            topVsBottom < 0,
+            "TOP (front-facing observer) must be closer than BOTTOM (back-facing) " +
+                "at the same coincident plane; got $topVsBottom"
+        )
+        assertTrue(
+            bottomVsTop > 0,
+            "BOTTOM must be farther than TOP; got $bottomVsTop"
+        )
+        assertEquals(
+            0,
+            topVsBottom + bottomVsTop,
+            "antisymmetry must hold for the coincident-plane tiebreak"
+        )
+    }
+
+    @Test
     fun `closerThan resolves wall-vs-floor straddle via plane-side test`() {
         // The cmpPath=0 wall-vs-floor symmetric-straddle regression class.
         // The vertical wall at x=1 spans z=[0,1]; the floor (ground top) at
