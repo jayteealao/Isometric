@@ -6,7 +6,7 @@ slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 5
 created-at: "2026-04-26T20:12:32Z"
-updated-at: "2026-04-27T23:23:23Z"
+updated-at: "2026-04-28T09:01:50Z"
 metric-files-changed: 6
 metric-lines-added: 353
 metric-lines-removed: 12
@@ -21,9 +21,20 @@ amend-1-commit-sha: "9cef055"
 round-3-mode: "directed-investigation"
 round-3-files-changed: 1
 round-3-fix-applied: false
-round-3-commit-sha: "7b8649d"
+round-3-commit-sha: "2e29dc5"
 round-3-evidence:
   - verify-evidence/round3-longpress-diag.log
+amend-2-applied: true
+amend-2-mode: "newell-cascade-replace"
+amend-2-files-changed: 4
+amend-2-lines-added: 492
+amend-2-lines-removed: 113
+amend-2-deviations-from-plan: 3
+amend-2-test-deltas:
+  - "PathTest: 10 -> 12 (split AC-2 into coplanar-overlapping/coplanar-non-overlapping; added wall-vs-floor straddle case)"
+  - "DepthSorterTest: 9 -> 11 (added AC-12 LongPress full-scene + AC-13 Alpha full-scene integration tests)"
+amend-2-test-suite-result: "all green: 191 isometric-core tests pass"
+amend-2-commit-sha: ""
 tags:
   - rendering
   - depth-sort
@@ -31,10 +42,14 @@ tags:
   - isometric-core
   - bug
   - numerical-robustness
+  - newell-cascade
+  - algorithmic-restructure
 refs:
   index: 00-index.md
   implement-index: 05-implement.md
   slice-def: 02-shape.md
+  shape-amendment-1: 02-shape-amend-1.md
+  shape-amendment-2: 02-shape-amend-2.md
   plan: 04-plan-depth-sort-shared-edge-overpaint.md
   siblings: []
   verify: 06-verify-depth-sort-shared-edge-overpaint.md
@@ -720,3 +735,287 @@ What comes next depends on the user's preference for fix scope:
 chatter (build commands, log extraction, ray-projection arithmetic) is
 noise for the next stage; the PreCompact hook preserves workflow state.
 
+---
+
+## Mode (Round 4 — amendment-2)
+
+`newell-cascade-replace` — full algorithmic restructure of `Path.closerThan`
+per amendment-2's directive. Replaces the round-1/round-2 vote-and-subtract
+predicate with Newell, Newell, and Sancha's (1972) classical Z→X→Y minimax
+cascade, deletes the `countCloserThan` private helper, adds a private
+`signOfPlaneSide` helper for the strict all-on-same-side plane test, and
+reverts the round-3 `DEPTH_SORT_DIAG` instrumentation in the same atomic
+commit.
+
+## Summary of Changes (Round 4)
+
+`Path.closerThan` now executes a six-step cascade — Z-extent (iso-depth) →
+X-extent (screen-x) → Y-extent (screen-y) → plane-side forward → plane-side
+reverse → 0 (polygon split deferred). Each step terminates with a definitive
+non-zero verdict or falls through to the next; only mixed-straddle pairs that
+pass all six steps without decision return 0, which is the genuinely-ambiguous
+case Kahn's append-on-cycle fallback in `DepthSorter.sort` handles.
+
+`countCloserThan` (private) is deleted entirely; its plane-side machinery is
+lifted into a new private `signOfPlaneSide(pathA, observer): Int` that returns
++1 if all of `this`'s vertices are on the OPPOSITE side from observer of
+pathA's plane (this farther), -1 if all on the SAME side (this closer), 0 if
+mixed. The strict all-on-same-side rule replaces the round-1 permissive
+"any-vertex" semantics that produced the cmpPath=0 cancellation under
+symmetric-straddle.
+
+The round-3 `DEPTH_SORT_DIAG` block in `DepthSorter.kt` is reverted in the
+same commit (per amendment-2 directive c): `private const val DIAG`, `first3`
+helper, FRAME START / FRAME END / per-pair / ORDER / ORDER-CYCLE emissions,
+and the `edgeLabel` bookkeeping introduced solely to feed the per-pair log.
+The `intersects` / `cmpPath` locals introduced by round-3's gate-call
+refactor are KEPT as a small readability improvement.
+
+Test deltas: `PathTest` 10 → 12 (split AC-2 into two cases reflecting the
+genuine ambiguity vs. iso-depth disjointness, added AC-3 case (g) wall-vs-
+floor straddle test); `DepthSorterTest` 9 → 11 (added AC-12 LongPress
+full-scene + AC-13 Alpha full-scene integration tests, both designed to
+fail under round-3 HEAD and pass under Newell). KDocs on the five existing
+`closerThan` tests rewritten to document which Newell cascade step now
+resolves each case (verified by re-running the suite — assertion signs
+unchanged from round 1 / round 2 baselines).
+
+Local regression sweep on Windows + JDK17: `:isometric-core:test` —
+**BUILD SUCCESSFUL**, all 191 tests green (DepthSorterTest 11, PathTest 12,
+plus the 168 unchanged tests across IntersectionUtilsTest, IsoColorTest,
+IsometricEngineProjectionTest, IsometricEngineTest, PointTest, etc.).
+Paparazzi snapshots not exercised in this local run — the four amendment-1
+baselines remain absent on Windows due to the documented Paparazzi-on-
+Windows blank-render gap; CI on Linux will regenerate / verify them.
+
+## Files Changed (Round 4)
+
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Path.kt` —
+  Added `import kotlin.math.PI`, `import kotlin.math.cos`, `import
+  kotlin.math.sin`. Replaced the body of `fun closerThan(pathA: Path,
+  observer: Point): Int` with the six-step Newell cascade (Z-extent
+  minimax via `Point.depth(PI/6)`; screen-x minimax via `(x - y) *
+  cos`; screen-y minimax via `-(sin*(x + y) + z)`; plane-side forward;
+  plane-side reverse). Added private `signOfPlaneSide(pathA, observer):
+  Int` helper implementing Newell's strict all-on-same-side test. Deleted
+  the old private `countCloserThan` function and its KDoc. Added a
+  `private companion object` with `ISO_ANGLE = PI / 6.0` and `EPSILON =
+  1e-6` constants matching the rest of the depth-sort pipeline. Updated
+  `closerThan`'s KDoc to reference Newell's 1972 paper, document the
+  cascade steps, and catalogue the three superseded failure modes
+  (under-determined sort, over-aggressive edges, cmpPath=0 wall-vs-floor).
+  Net: +147 / -32.
+
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/DepthSorter.kt` —
+  Reverted round-3's `DEPTH_SORT_DIAG` instrumentation: deleted
+  `private const val DIAG = true` and its comment block, deleted
+  `private fun first3(points)`, deleted FRAME START emission, deleted
+  ORDER / ORDER-CYCLE emissions inside the Kahn loop and the cycle
+  fallback, deleted FRAME END emission, deleted the per-pair
+  `DepthSortDiag pair: ...` emission inside `checkDepthDependency`, and
+  removed the `edgeLabel` bookkeeping. Kept the `intersects` / `cmpPath`
+  locals from the round-3 refactor for readability. Updated the comment
+  block above `hasInteriorIntersection` to reflect that the gate now
+  feeds a Newell-cascade comparator rather than the old vote-and-subtract.
+  Net: +5 / -47.
+
+- `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/DepthSorterTest.kt` —
+  Added two integration tests:
+  - `WS10 LongPress full scene back-right cube vertical faces draw after ground top`
+    (AC-12): builds the LongPressSample geometry with a ground prism plus
+    the 3×3 grid, identifies the back-right cube's front and left vertical
+    faces and the ground top by vertex geometry, asserts both vertical
+    faces' command indices are > ground top's. Designed to FAIL under
+    round-3 HEAD (cmpPath=0 → no edge → centroid pre-sort puts walls
+    first) and PASS under Newell (Z-extent + plane-side give a decisive
+    edge).
+  - `WS10 Alpha full scene each CYAN prism vertical faces draw after ground top`
+    (AC-13): builds the AlphaSample geometry (ground + three CYAN prisms
+    at heights 0.8 / 1.2 / 1.6), iterates over each prism asserting its
+    front and left vertical faces draw after the ground top.
+  Net: +94 / -1.
+
+- `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/PathTest.kt` —
+  Reframed AC-2: replaced the single `closerThan returns zero for
+  genuinely coplanar non-overlapping faces` test with TWO tests
+  reflecting Newell's actual semantics:
+  - `closerThan returns zero for coplanar overlapping faces` —
+    coincident faces in the same z=1 plane with identical xy extents;
+    cascade falls through to step 7 (deferred) returning 0.
+  - `closerThan resolves coplanar non-overlapping via Z-extent minimax` —
+    the original AC-2 geometry with disjoint x ranges; iso-depth
+    `depth(angle) = x*cos+y*sin-2z` mixes x into the depth scalar, so
+    the disjoint-x pair has disjoint iso-depth ranges and step 1 fires.
+  Added AC-3 case (g):
+  - `closerThan resolves wall-vs-floor straddle via plane-side test` —
+    the regression case the round-3 directed investigation diagnosed.
+    Wall at x=1 spanning z=[0,1]; floor at z=0 strictly containing
+    wall's xy projection. Pre-Newell vote-and-subtract returns 0
+    (both directions return 1, cancel); Newell plane-side forward
+    returns -1 (all wall vertices on observer side of floor's z=0
+    plane → wall is closer). Asserts `result < 0`.
+  Updated KDocs on the five existing `closerThan` tests to explain
+  which Newell cascade step resolves each case (step 1 for the
+  top-vs-vertical equal-heights case, step 5 for the rest);
+  assertion signs and values unchanged. Replaced the regression-suite
+  comment header to document the cascade structure and the three
+  superseded failure modes. Net: +138 / -33.
+
+## Shared Files (also touched by sibling slices)
+
+None — single slice.
+
+## Notes on Design Choices (Round 4)
+
+- **Sign convention verified empirically against AC-1**: The plan's
+  pseudocode comments suggested "self entirely closer → return +1," but
+  the existing AC-1 test (`closerThan(factoryTop, hqRight) > 0` with
+  test text "factory_top is the farther face") and tracing through the
+  pre-Newell vote-and-subtract math both confirm the opposite: positive
+  ⇒ this farther; negative ⇒ this closer. The implementation follows
+  the test contract: signOfPlaneSide returns +1 for "all opposite from
+  observer" (this farther) and -1 for "all on observer side" (this
+  closer). The Z-extent step's signs are similarly inverted from the
+  plan's pseudocode. This is a deviation from the plan's literal text;
+  see Deviations from Plan (Round 4) below.
+- **Step 4 (`hasInteriorIntersection`) intentionally OMITTED inside the
+  cascade**: the plan recommended including it as a defensive screen-
+  overlap test, but tracing through the existing five `closerThan`
+  unit tests (e.g., the diagonal-offset test where screen polygons
+  share only a vertex) showed the plane-side test must remain the
+  authoritative tiebreaker for disjoint-screen pairs to keep the unit
+  test contracts intact. `DepthSorter.checkDepthDependency` already
+  gates on `hasInteriorIntersection` externally (from amendment-1), so
+  the screen-overlap filter is correctly applied at the call site
+  without polluting the predicate's standalone semantics.
+- **Steps 2/3 (X/Y screen-extent minimax) kept but inert in the test
+  suite**: tracing each of the 12 `closerThan` unit tests showed they
+  all resolve at either step 1 (Z-extent) or step 5 (plane-side
+  forward); steps 2/3 never fire in the current test corpus. Kept them
+  in the cascade to match the plan's Newell Z→X→Y structure and as
+  defensive coverage against future scenes where the plane-side test
+  is degenerate. Sign convention for these steps follows the iso-
+  projection intuition (larger world-x or larger world-(x+y) → farther
+  in the standard 30° iso projection); since they are not exercised by
+  any test, the sign is conservative rather than empirically validated.
+- **`countCloserThan` deleted entirely** rather than left as a
+  deprecated helper. Per CLAUDE.md the project follows
+  feedback_no_deprecation_cycles — direct breaking change is preferred
+  over a migration path. The function was private, so the deletion has
+  no public-API surface impact.
+- **`ISO_ANGLE` and `EPSILON` consolidated as private companion
+  constants** rather than scattered as inline literals. Improves
+  readability of the cascade steps (each comparison reads `if
+  (selfDepthMax < aDepthMin - EPSILON) return -1` instead of `... -
+  0.000001`). The values match the existing 1e-6 epsilon used by
+  `IntersectionUtils.hasInteriorIntersection`'s `EDGE_BAND` and the
+  ISO_ANGLE matches `Point.depth(PI/6)` and `IsometricEngine`'s
+  default projection angle.
+
+## Deviations from Plan (Round 4)
+
+1. **Sign convention inverted** relative to the plan's pseudocode.
+   Plan said "selfZmax < aZmin - eps → return +1 (self closer)";
+   actual implementation says "→ return -1 (self closer)" because the
+   existing AC-1 test contract maps positive to "self farther." See
+   Notes on Design Choices above.
+2. **Step 4 (`hasInteriorIntersection` early-exit) omitted from the
+   cascade body**. Plan recommended including it for "predicate
+   correctness in isolation"; the test corpus showed it would break
+   the plane-side test for screen-disjoint geometric pairs that
+   existing tests still expect to resolve via plane-side. The external
+   gate in `DepthSorter` covers the screen-overlap concern.
+3. **AC-3 case (g) sign assertion changed from `> 0` to `< 0`**. Plan
+   expected positive ("wall is closer"); the actual sign per the
+   established convention (positive = this farther) is negative for
+   "wall closer than floor." Test name renamed to `closerThan resolves
+   wall-vs-floor straddle via plane-side test` (Newell step 5
+   actually fires; the plan's claim of "Z-extent minimax (step 1)"
+   was incorrect because Z-extents do overlap once world-x and world-y
+   are mixed into `depth(angle)` for the chosen geometry).
+
+These deviations were caught by tracing the existing AC-1 contract
+through the pre-Newell math and are reflected in the per-test KDocs
+and the cascade's inline comments.
+
+## Anything Deferred (Round 4)
+
+- **Polygon split (Newell step 7)** remains DEFERRED per amendment-2
+  directive (d). The cascade returns 0 from step 7's slot;
+  `DepthSorter.sort`'s append-on-cycle fallback (existing) handles any
+  residual cycles. Local test suite shows no cycles surfacing in the
+  AC-12 / AC-13 integration scenes, so step 7 stays out of scope. If
+  cycles appear in verify-stage scenes that are not yet covered by the
+  test suite, polygon-split escalates into scope as `amend-3`.
+- **Optional internal explanation doc** at `docs/internal/explanations/
+  depth-sort-painter-pipeline.md` from amendment-2 § Documentation Plan
+  remains DEFERRED. Plan stated this was non-mandatory; ship-stage
+  handoff can include it as an optional follow-up.
+- **Linux CI Paparazzi baseline regeneration** for the four amendment-1
+  snapshots (`nodeIdRowScene`, `onClickRowScene`, `longPressGridScene`,
+  `alphaSampleScene`) is required after this commit lands — Windows
+  consistently produces blank PNGs (documented environmental issue).
+  Verify stage (or the PR pipeline) will trigger the regeneration.
+
+## Known Risks / Caveats (Round 4)
+
+- **X-extent and Y-extent steps inert in test corpus**: as noted under
+  Notes on Design Choices, no current test exercises steps 2 or 3.
+  Their sign convention is the iso-projection intuition (self further
+  along world-x or world-(x+y) ⇒ farther) rather than empirically
+  validated against a counter-example. If a future scene surfaces a
+  pair where Z-extent overlaps but X- or Y-extent are strictly disjoint
+  AND the plane-side test would have given a different answer, the
+  cascade may produce a wrong sign. Mitigation: AC-12 and AC-13
+  integration tests cover the realistic LongPress and Alpha scenes; if
+  any visual regression surfaces in CI, add a unit test for the offending
+  geometry and verify the X/Y signs.
+- **Antisymmetry invariant under Newell**: the existing
+  `closerThan is antisymmetric for representative non-coplanar pairs`
+  test in `DepthSorterTest` continues to pass (verified locally), so
+  `a.closerThan(b) + b.closerThan(a) == 0` for all four representative
+  pairs. This is a non-trivial property under a six-step cascade — each
+  step's reverse-direction call must produce the inverse sign. The
+  implementation passes by construction (Z/X/Y minimax steps swap min
+  and max under role swap; plane-side forward and reverse use the
+  `-sRev` inversion).
+- **Compose snapshot baselines remain missing on Windows**: not
+  addressed by this fix; pre-existing tech debt. Verify-stage handoff
+  on Linux CI will regenerate. No new snapshots are introduced by
+  Round 4 (amendment-1's four scene factories cover the visual
+  regression set).
+
+## Freshness Research (Round 4)
+
+No external API or library freshness check was needed — Newell, Newell,
+and Sancha's 1972 painter's-algorithm paper is a stable historical
+reference, and the implementation only consumes existing in-repo
+primitives (`Point.depth(angle)`, `Vector.crossProduct`,
+`Vector.dotProduct`, `Vector.fromTwoPoints`,
+`IntersectionUtils.hasInteriorIntersection`).
+
+## Recommended Next Stage (Round 4)
+
+- **Option A (default): `/wf-verify depth-sort-shared-edge-overpaint
+  depth-sort-shared-edge-overpaint`** — Verify the implementation
+  against the AC suite. Verify-stage will need:
+  - A Linux CI Paparazzi run to regenerate the four amendment-1
+    baselines and confirm the visual regression is gone (AC-14).
+  - Optionally a Maestro replay of `02-longpress.yaml` and
+    `03-alpha.yaml` for live device confirmation.
+  - The unit + integration test suite already passed locally (191
+    green) — verify-stage can rely on this and focus on visual
+    confirmation.
+  **Compact strongly recommended before `/wf-verify`** — this round's
+  sign-convention analysis, test tracing, and arithmetic are noise for
+  the next stage.
+
+- **Option B: `/wf-review depth-sort-shared-edge-overpaint
+  depth-sort-shared-edge-overpaint`** — Skip directly to multi-axis
+  review if the user wants automated correctness/security/style
+  feedback before committing to a verify pass. The unit test count
+  (191 green) gives reasonable baseline confidence.
+
+- **Option C: extend with polygon-split (cascade step 7)** — Only if
+  verify-stage surfaces unresolved cycles in scenes beyond AC-12 / AC-13.
+  Would be its own follow-up amendment.

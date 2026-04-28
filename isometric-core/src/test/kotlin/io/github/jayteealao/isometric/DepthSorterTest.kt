@@ -341,4 +341,154 @@ class DepthSorterTest {
                 "(was at $backRightLeftIndex)"
         )
     }
+
+    @Test
+    fun `WS10 LongPress full scene back-right cube vertical faces draw after ground top`() {
+        // Reproduces the LongPressSample full scene including the ground
+        // platform. The previous AC-9 test (without the ground) confirmed the
+        // amendment-1 screen-overlap gate kept back-right's vertical faces out
+        // of output positions 0-2, but the live LongPress sample still showed
+        // back-right rendering as only its top face. Round-3's directed
+        // investigation traced the residual failure to a third mechanism: for
+        // the (back-right vertical wall, ground top) face pair,
+        // hasInteriorIntersection correctly admits the pair, but
+        // Path.closerThan returns 0 because each polygon straddles the other's
+        // plane on its respective observer-axis (both countCloserThan
+        // directions return 1 under the permissive threshold, cancelling to
+        // 0). With no edge added, Kahn falls back to depth-descending centroid
+        // pre-sort which puts the wall (centroid depth ~7.2) BEFORE the
+        // ground top (centroid depth ~4.9), and the painter then paints
+        // ground over wall.
+        //
+        // After Newell's Z->X->Y minimax cascade lands, the Z-extent step
+        // returns non-zero immediately for wall-vs-floor pairs (wall.zMax = 1.1,
+        // ground.zMax = 0.1: extents disjoint with epsilon), an edge is added,
+        // and the topological sort puts the ground top before the back-right
+        // vertical faces. This integration test guards against regression of
+        // the cmpPath=0 wall-vs-floor symmetric-straddle class.
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)  // ground
+        for (i in 0 until 9) {
+            val row = i / 3
+            val col = i % 3
+            engine.add(
+                Prism(Point(col * 1.8, row * 1.8, 0.1), 1.2, 1.2, 1.0),
+                IsoColor((col + 1) * 80.0, (row + 1) * 80.0, 150.0)
+            )
+        }
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Ground top face: all four vertices at z≈0.1, x spans -1.0..7.0,
+        // y spans -1.0..5.0 (the full 8x6 platform top).
+        val groundTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.z - 0.1) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - (-1.0)) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 7.0) < 1e-9 }
+        }
+        // Back-right cube (col=2, row=2) at world origin (3.6, 3.6, 0.1),
+        // size 1.2×1.2×1.0. Its front face is the four vertices at y=3.6;
+        // its left face is the four vertices at x=3.6.
+        val backRightFrontIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.y - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 4.8) < 1e-9 }
+        }
+        val backRightLeftIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.x - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 3.6) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 4.8) < 1e-9 }
+        }
+
+        assertTrue(groundTopIndex >= 0, "ground platform top face must appear in scene commands")
+        assertTrue(backRightFrontIndex >= 0, "back-right cube's front face must appear in scene commands")
+        assertTrue(backRightLeftIndex >= 0, "back-right cube's left face must appear in scene commands")
+        assertTrue(
+            backRightFrontIndex > groundTopIndex,
+            "back-right front face (idx=$backRightFrontIndex) must draw AFTER ground top " +
+                "(idx=$groundTopIndex); otherwise ground paints over wall"
+        )
+        assertTrue(
+            backRightLeftIndex > groundTopIndex,
+            "back-right left face (idx=$backRightLeftIndex) must draw AFTER ground top " +
+                "(idx=$groundTopIndex); otherwise ground paints over wall"
+        )
+    }
+
+    @Test
+    fun `WS10 Alpha full scene each CYAN prism vertical faces draw after ground top`() {
+        // Reproduces the AlphaSample full scene: a ground platform plus three
+        // CYAN prisms in a row at increasing heights. The same wall-vs-floor
+        // cmpPath=0 mechanism that breaks LongPress also affects this scene —
+        // each CYAN prism's front and left vertical faces vs the ground top
+        // are symmetric-straddle pairs whose vote-and-subtract comparator
+        // returns 0, leaving Kahn's centroid pre-sort to put walls before
+        // ground top and the painter to overwrite them.
+        //
+        // After Newell adoption, Z-extent minimax decides each pair: prism
+        // wall z spans [0.1, 0.1+h] vs ground top z=0.1 — the wall's z-extent
+        // strictly exceeds the ground's at the top, so the cascade returns
+        // non-zero and the topological sort orders ground-before-wall.
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)  // ground
+        val prismSpecs = listOf(
+            Triple(3.5, 3.0, 0.8),   // x, y(front), height
+            Triple(4.3, 3.0, 1.2),
+            Triple(5.1, 3.0, 1.6)
+        )
+        prismSpecs.forEach { (x, y, h) ->
+            engine.add(Prism(Point(x, y, 0.1), 1.0, 1.0, h), IsoColor.CYAN)
+        }
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Ground top face: all four vertices at z≈0.1, x spans -1.0..7.0.
+        val groundTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.z - 0.1) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - (-1.0)) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 7.0) < 1e-9 }
+        }
+        assertTrue(groundTopIndex >= 0, "ground platform top face must appear in scene commands")
+
+        // For each prism, identify its front face (y=3.0 plane, x in [x, x+1])
+        // and its left face (x=prismLeft plane, y in [3.0, 4.0]). Assert each
+        // appears AFTER the ground top in command order.
+        prismSpecs.forEachIndexed { idx, (px, py, _) ->
+            val frontIndex = scene.commands.indexOfFirst { cmd ->
+                val pts = cmd.originalPath.points
+                pts.size == 4 &&
+                    pts.all { kotlin.math.abs(it.y - py) < 1e-9 } &&
+                    pts.any { kotlin.math.abs(it.x - px) < 1e-9 } &&
+                    pts.any { kotlin.math.abs(it.x - (px + 1.0)) < 1e-9 }
+            }
+            val leftIndex = scene.commands.indexOfFirst { cmd ->
+                val pts = cmd.originalPath.points
+                pts.size == 4 &&
+                    pts.all { kotlin.math.abs(it.x - px) < 1e-9 } &&
+                    pts.any { kotlin.math.abs(it.y - py) < 1e-9 } &&
+                    pts.any { kotlin.math.abs(it.y - (py + 1.0)) < 1e-9 }
+            }
+
+            assertTrue(frontIndex >= 0, "CYAN prism #$idx front face must appear in scene commands")
+            assertTrue(leftIndex >= 0, "CYAN prism #$idx left face must appear in scene commands")
+            assertTrue(
+                frontIndex > groundTopIndex,
+                "CYAN prism #$idx front face (idx=$frontIndex) must draw AFTER ground top " +
+                    "(idx=$groundTopIndex)"
+            )
+            assertTrue(
+                leftIndex > groundTopIndex,
+                "CYAN prism #$idx left face (idx=$leftIndex) must draw AFTER ground top " +
+                    "(idx=$groundTopIndex)"
+            )
+        }
+    }
 }

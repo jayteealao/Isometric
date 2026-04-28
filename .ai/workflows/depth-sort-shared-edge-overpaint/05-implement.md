@@ -2,17 +2,18 @@
 schema: sdlc/v1
 type: implement-index
 slug: depth-sort-shared-edge-overpaint
-status: in-progress
+status: complete
 stage-number: 5
 created-at: "2026-04-26T20:12:32Z"
-updated-at: "2026-04-27T23:23:23Z"
+updated-at: "2026-04-28T09:01:50Z"
 slices-implemented: 1
 slices-total: 1
-rounds: 3
+rounds: 4
 round-3-mode: directed-investigation
-metric-total-files-changed: 15
-metric-total-lines-added: 866
-metric-total-lines-removed: 21
+round-4-mode: newell-cascade-replace
+metric-total-files-changed: 19
+metric-total-lines-added: 1358
+metric-total-lines-removed: 134
 tags:
   - rendering
   - depth-sort
@@ -20,22 +21,24 @@ tags:
   - isometric-core
   - bug
   - numerical-robustness
+  - newell-cascade
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
-next-command: wf-amend
-next-invocation: "/wf-amend depth-sort-shared-edge-overpaint from-review"
+next-command: wf-verify
+next-invocation: "/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 ---
 
 # Implement Index
 
-This is a single-slice plan; the index lists exactly one implementation record. The slice has been worked in three rounds:
+This is a single-slice plan; the index lists exactly one implementation record. The slice has been worked in four rounds:
 
 | Slice | Status | Round | Commit | Files | +/- | Record |
 |---|---|---|---|---|---|---|
 | `depth-sort-shared-edge-overpaint` | complete | 1 (original) | `3e811aa` | 6 | +353 / -12 | [05-implement-depth-sort-shared-edge-overpaint.md](05-implement-depth-sort-shared-edge-overpaint.md) |
 | `depth-sort-shared-edge-overpaint` | complete | 2 (amendment-1) | `9cef055` | 8 | +466 / -7 | (same file, Round 2 section) |
-| `depth-sort-shared-edge-overpaint` | diagnostic-only | 3 (directed investigation) | `7b8649d` | 1 source + 1 evidence | +47 / -2 (source) + 368 (evidence) | (same file, Round 3 section) |
+| `depth-sort-shared-edge-overpaint` | diagnostic-only | 3 (directed investigation) | `2e29dc5` | 1 source + 1 evidence | +47 / -2 (source) + 368 (evidence) | (same file, Round 3 section) |
+| `depth-sort-shared-edge-overpaint` | complete | 4 (amendment-2: Newell cascade) | _pending_ | 4 | +492 / -113 | (same file, Round 4 section) |
 
 ## Cross-Slice Integration Notes
 
@@ -59,10 +62,19 @@ None — single slice. Round 2 applies entirely on top of Round 1's commit; no r
 - AC-11 Paparazzi snapshots (4): replaced the single `nodeIdSharedEdge` baseline with `nodeIdRowScene`, `onClickRowScene`, `longPressGridScene`, `alphaSampleScene` — covering both bug classes (row layout + 3×3 grid + mixed geometry).
 - 3 new scene factories (`OnClickRowScene`, `LongPressGridScene`, `AlphaSampleScene`) under `isometric-compose/src/test/.../scenes/`.
 
+## Round 4 Highlights (amendment-2: Newell cascade adoption)
+
+- **Replaced `Path.closerThan` with Newell, Newell, and Sancha's (1972) Z→X→Y minimax cascade.** Six-step decision tree (iso-depth extent → screen-x extent → screen-y extent → plane-side forward → plane-side reverse → 0). Each step terminates with a definitive sign or falls through; only mixed-straddle pairs return 0, which is the genuinely-ambiguous case Kahn's append-on-cycle fallback handles.
+- **Deleted the private `countCloserThan`** entirely (per `feedback_no_deprecation_cycles`). Lifted its plane-side machinery into a new private `signOfPlaneSide(pathA, observer): Int` implementing Newell's strict all-on-same-side test (returns 0 unless every vertex agrees, no permissive "any vertex" voting).
+- **Reverted round-3 DEPTH_SORT_DIAG instrumentation** in the same atomic commit (per amendment-2 directive c): const flag, helper, FRAME START/END, ORDER, ORDER-CYCLE, per-pair emissions, and `edgeLabel` bookkeeping. Kept the `intersects`/`cmpPath` locals for readability.
+- **Test deltas**: PathTest 10 → 12 (split AC-2 + add wall-vs-floor straddle); DepthSorterTest 9 → 11 (add AC-12 LongPress full-scene + AC-13 Alpha full-scene integration tests). Local `:isometric-core:test` — **BUILD SUCCESSFUL**, 191 tests green.
+- **Three deviations from the plan caught at implement time**: (1) sign convention inverted (positive = this farther per the empirical AC-1 contract, not "self closer" as the plan's pseudocode comments suggested); (2) cascade step 4 (`hasInteriorIntersection` early-exit) omitted from the cascade body to preserve unit-test contracts (DepthSorter still gates externally via amendment-1's gate); (3) AC-3 case (g) sign assertion changed from `> 0` to `< 0`. Documented in the per-slice Round 4 section.
+- **Polygon split (Newell step 7) DEFERRED** per amendment-2 directive (d). No cycles surfaced in the local AC-12/AC-13 runs, so step 7 stays out of scope.
+
 ## Recommended Next Stage
 
-- **Option A (recommended):** `/wf-amend depth-sort-shared-edge-overpaint from-review` — incorporate the round-3 diagnosis (cmpPath=0 + centroid-descending fallback for wall-vs-ground-top) as a new Acceptance Criterion + pull "iso minimax for shared-plane straddling pairs" from the original out-of-scope list into in-scope. Then `/wf-plan` → `/wf-implement` produces the actual fix.
-- **Option B:** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — directly apply Fix Space option (1) restricted to wall-vs-ground-top + revert the DEPTH_SORT_DIAG block. Faster but bypasses the shape stage.
-- **Option C:** revert the diag block and pause the workflow if the user wants to redesign the depth-sort algorithm wholesale before continuing. The captured log + Round 3 diagnosis remain as the authoritative reference for the next attempt.
+- **Option A (default):** `/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — Verify the Round 4 implementation. Verify-stage will need: (a) Linux CI Paparazzi run to regenerate the four amendment-1 baselines and confirm the visual regression is gone (AC-14); (b) optionally a Maestro replay of `02-longpress.yaml` and `03-alpha.yaml` for live device confirmation. The unit + integration test suite already passed locally (191 green); verify-stage can rely on this and focus on visual confirmation.
+- **Option B:** `/wf-review depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint` — Skip directly to multi-axis review. The 191-green baseline gives reasonable confidence to ask for automated correctness/security/style feedback before the verify pass.
+- **Option C:** Extend with polygon-split (cascade step 7) — Only if verify-stage surfaces unresolved cycles in scenes beyond AC-12/AC-13. Would be its own follow-up amendment (`amend-3`).
 
-**Compact strongly recommended before whichever option** — round-3 chatter (build commands, log extraction, ray-projection math) is noise for the next stage.
+**Compact strongly recommended before whichever option** — Round 4's sign-convention analysis, test tracing, and arithmetic are noise for the next stage; the PreCompact hook preserves workflow state.

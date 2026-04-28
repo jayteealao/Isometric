@@ -6,15 +6,18 @@ slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 6
 created-at: "2026-04-26T20:32:14Z"
-updated-at: "2026-04-26T20:32:14Z"
+updated-at: "2026-04-27T22:58:16Z"
 result: partial
-metric-checks-run: 4
-metric-checks-passed: 4
-metric-acceptance-met: 6
-metric-acceptance-total: 8
-metric-interactive-checks-run: 1
+rounds: 2
+round-1-result: partial
+round-2-result: partial
+metric-checks-run: 8
+metric-checks-passed: 7
+metric-acceptance-met: 14
+metric-acceptance-total: 17
+metric-interactive-checks-run: 2
 metric-interactive-checks-passed: 0
-metric-issues-found: 1
+metric-issues-found: 2
 evidence-dir: ".ai/workflows/depth-sort-shared-edge-overpaint/verify-evidence/"
 tags:
   - rendering
@@ -30,8 +33,8 @@ refs:
   plan: 04-plan-depth-sort-shared-edge-overpaint.md
   implement: 05-implement-depth-sort-shared-edge-overpaint.md
   review: 07-review.md
-next-command: wf-review
-next-invocation: "/wf-review depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
+next-command: wf-implement
+next-invocation: "/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 ---
 
 # Verify: depth-sort-shared-edge-overpaint
@@ -244,3 +247,238 @@ that were correctly noted in `05-implement-...md`.
 
 - **Option D:** `/wf-plan depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
   — **not applicable**. The plan was sound and execution matched it.
+
+---
+
+# Round 2: Amendment-1 Verification
+
+## Verification Summary (Round 2)
+
+The amendment-1 implementation in commit `9cef055` adds
+`IntersectionUtils.hasInteriorIntersection` and wires it as the gate in
+`DepthSorter.checkDepthDependency`. Verification result: **PARTIAL**.
+
+**What works:**
+- All automated checks pass at the test-suite level (189 tests, 0 fail).
+- AC-9 (3×3 grid back-right corner cube vertical faces NOT at output positions
+  0–2) — **MET** at the unit-test level.
+- AC-10 (5 `hasInteriorIntersection` boundary-case tests) — **MET**.
+- AC-1 through AC-8 (round-1 ACs) — **MET** (still pass under round-2 source).
+- AC-6 canary (`coplanar tile grid` test) — **MET** (the gate-tightening did
+  NOT over-reject for legitimate tile-grid overlaps).
+
+**What does not work:**
+- AC-11 (visual confirmation via Paparazzi + emulator) — **NOT MET**. The
+  emulator render of `LongPressSample` (the primary regression marker) is
+  visually unchanged from pre-fix. The back-right cube of the 3×3 grid still
+  renders with only its top face visible; its vertical sides are still being
+  painted over by something.
+
+**Implication:** the unit-test pass + visual-regression-persists combination
+means the new screen-overlap gate IS doing what we asked it to do (rejecting
+spurious topological edges for non-overlapping face pairs, putting back-right's
+vertical faces at output positions ≥ 3), but that improvement is **necessary
+but not sufficient** for fixing the user-visible regression. Some other
+mechanism — likely a face we didn't trace in the original diagnostic — is
+still painting over back-right's vertical faces in screen-space regions where
+they should be visible.
+
+Result: **partial** — the amendment-1 fix is structurally correct but doesn't
+visually resolve the regression. The next round needs a fresh diagnostic to
+identify which specific face(s) are still over-painting back-right.
+
+## Automated Checks Run (Round 2)
+
+| Check | Command | Result |
+|---|---|---|
+| Build / typecheck | `./gradlew :isometric-core:assemble :isometric-compose:assemble` | **PASS** — 19 tasks executed, 42 up-to-date. Compile-clean. |
+| Unit tests | `./gradlew :isometric-core:test` | **PASS** — 189 tests across 16 classes, 0 failures, 0 errors, 0 skipped. Up from 183 in round 1: DepthSorterTest 8→9 (+AC-9), IntersectionUtilsTest 3→8 (+5 AC-10 cases). |
+| App install | `./gradlew :app:installDebug` | **PASS** — APK installed on emulator-5554. |
+| Maestro flow | `maestro test 02-longpress.yaml` | **PASS at flow level** (all steps COMPLETED) but **FAIL at visual level** — captured screenshot still shows the regression. |
+| Paparazzi snapshots | `./gradlew :isometric-compose:recordPaparazzi` | **DEFERRED to Linux CI** — Windows + JDK17 + Layoutlib produces blank renders (documented in round-1 verify). Even if recorded on Linux, baselines would encode the broken visual state per AC-11 NOT MET below. |
+
+The same Windows toolchain workaround stack from round 1 was needed:
+`./gradlew --stop`, `taskkill /F /IM java.exe` (kill stale Kotlin daemons), move
+stale `build-logic/build` aside, then run with `--no-configuration-cache
+-Dkotlin.incremental=false -Dkotlin.compiler.execution.strategy=in-process
+--no-daemon`.
+
+### isometric-core test breakdown (189 tests, all green)
+
+| Class | Round 1 | Round 2 | Slice-relevant cases (Round 2 only) |
+| --- | --- | --- | --- |
+| `PathTest` | 10 | 10 | (round-1 ACs unchanged) |
+| `DepthSorterTest` | 8 | **9** | **+AC-9**: `WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first` (0.002s, green) |
+| `IntersectionUtilsTest` | 3 | **8** | **+5 AC-10 cases**: `hasInteriorIntersection returns false for polygons sharing only an edge`, `... only a vertex`, `... for fully disjoint polygons`; `... returns true for genuine interior overlap`, `... when one polygon strictly contains the other` |
+| Other 13 classes | 162 | 162 | All round-1 baselines green. **Canary `coplanar tile grid has expected face count and no duplicates` and `coplanar tile grid with broad phase matches baseline order` both still green** — gate tightening didn't over-reject. |
+
+## Interactive Verification Results (Round 2)
+
+### AC-11 (longPressGridScene) — primary regression marker
+
+- **Criterion**: rendering of LongPressSample (3×3 grid, default static state)
+  shows all 9 cubes with all expected faces visible. Specifically the
+  back-right cube must render with its top, front, and left faces all visible.
+- **Platform & tool**: Android emulator-5554, Maestro 2.2.0 flow
+  `02-longpress.yaml` (clearState + tap "Interaction API" → "Long Press" tab
+  + screenshot).
+- **Steps performed**:
+  1. `./gradlew :app:installDebug` (BUILD SUCCESSFUL).
+  2. `maestro test .ai/workflows/depth-sort-shared-edge-overpaint/maestro/02-longpress.yaml`.
+  3. The flow captured `verify-evidence/maestro-longpress-after-press.png`
+     showing the LongPress tab in default state.
+- **Evidence**: `verify-evidence/maestro-longpress-after-press.png` (post-fix
+  screenshot, ~92 KB).
+- **Observation**: 8 of 9 cubes render correctly with all faces. The 9th cube
+  (back-right, world position (3.6, 3.6) to (4.8, 4.8) z∈[0.1, 1.1], color
+  `IsoColor((col+1)*80, (row+1)*80, 150)` = (240, 240, 150) ≈ yellow) renders
+  ONLY its top face — visible as a yellow trapezoid floating in the back-right
+  of the grid. Its left face (x=3.6 plane) and front face (y=3.6 plane) are
+  not visible. **Visually identical to the pre-fix screenshot from
+  yesterday's diagnostic session.**
+- **Result**: **NOT MET**. The unit-test improvement (back-right's vertical
+  faces at output positions ≥ 3) didn't translate into a visual fix.
+
+## Acceptance Criteria Status (Round 2)
+
+| AC | Status | Method | Evidence |
+| --- | --- | --- | --- |
+| **AC-1** | **MET** (round 1) | automated unit | re-confirmed green under round-2 source |
+| **AC-2** | **MET** (round 1) | automated unit | re-confirmed green |
+| **AC-3** | **MET** (round 1) | automated unit | re-confirmed green |
+| **AC-4** | **MET** (round 1) | automated integration | re-confirmed green; `WS10 NodeIdSample four buildings render in correct front-to-back order` still passes — gate tightening didn't break the row-layout case |
+| **AC-5** | superseded | — | replaced by AC-11 per amendment-1 |
+| **AC-6** | **MET** (canary held) | automated regression | `coplanar tile grid` tests still green; new gate doesn't over-reject for legitimate overlaps |
+| **AC-7** | **MET** (round 1) | automated invariant | antisymmetry test green |
+| **AC-8** | **MET** (round 1) | source diff | `Path.kt` public signatures unchanged (round 2 didn't touch Path.kt) |
+| **AC-9** | **MET** (unit test only) | automated integration | `DepthSorterTest.WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first` passed (0.002s). Back-right's front (y=3.6) and left (x=3.6) faces both at output position ≥ 3. |
+| **AC-10** | **MET** | automated unit | All 5 `hasInteriorIntersection` cases passed: shared-edge → false, shared-vertex → false, interior-overlap → true, disjoint → false, strict-containment → true. Plus regression marker confirms `hasIntersection` keeps its lenient contract. |
+| **AC-11** | **NOT MET** | interactive (Maestro + emulator) | LongPress sample's back-right cube still renders with only its top face visible. Visual identical to pre-fix screenshot. |
+
+**Met: 8/10 (AC-5 superseded). Partial: 0. Unverified: 0. Not Met: 1 (AC-11
+visual; the primary regression marker).**
+
+## Issues Found (Round 2)
+
+### Issue 1 — Visual regression persists despite passing unit tests [BLOCKER]
+
+- **Severity**: BLOCKER (visual regression on the primary failure case
+  remains; this is what the workflow exists to fix)
+- **Scope**: LongPressSample 3×3 grid default render. Likely also affects
+  AlphaSample (same regression class per round-1 user report). The OnClick
+  and NodeId row-layout samples still render correctly per round-1 verify
+  and integration tests.
+- **Symptom**: back-right cube of LongPressSample renders only its top
+  face. Vertical sides are missing. Yellow trapezoid floats in the
+  back-right region without walls.
+- **What works (necessary improvement, not sufficient fix)**:
+  - The screen-overlap gate is correctly rejecting boundary-only-contact
+    pairs (AC-10 unit cases all green).
+  - Back-right's vertical faces moved from output positions 0–1 (pre-fix)
+    to positions ≥ 3 (post-fix per AC-9). That's a real improvement at the
+    topological level.
+- **Why the visual didn't fix**: position ≥ 3 is still very early for a
+  30-face scene. Some face(s) at output positions > the back-right vertical
+  faces are still painting over them in screen-space regions where their
+  iso-projections overlap. The original diagnostic in
+  `07-review-grid-regression-diagnostic.md` traced edges from middle-right's
+  top + middle-right's left + middle-middle's top forcing back-right's
+  faces "before X". With the new gate, fewer such edges fire (per AC-9),
+  but the BACK-RIGHT FACE STILL ISN'T LATE ENOUGH. We need a fresh
+  diagnostic against the post-fix code to identify which specific face is
+  drawn LAST and overlaps back-right's faces in screen.
+- **Recommended follow-up**:
+  1. Re-add temporary `DEPTH_SORT_DIAG` logging (the helper from yesterday's
+     session) to the post-fix DepthSorter.
+  2. Reinstall + capture LongPress logcat.
+  3. Identify (a) what output position back-right's vertical faces are at
+     now, (b) which face IDs are drawn AFTER them, (c) which of those
+     overlap back-right's vertical faces in screen-space iso projection.
+  4. Determine whether the over-painting face's screen-overlap should
+     actually fire an edge under the new gate, or whether the gate is
+     correctly rejecting it but it's still drawn after due to centroid
+     pre-sort default order.
+- **Possible mechanisms** (to disambiguate in follow-up):
+  - The floor's top face (z=0.1, spans the entire scene) might be drawn
+    after back-right's vertical faces if no edge fires between them. The
+    floor's top face's screen projection could overlap back-right's
+    vertical faces' lower regions.
+  - Specific neighbour faces (e.g., middle-right's TOP face at z=1.1,
+    y∈[1.8, 3.0]) MAY share interior overlap with back-right's front face
+    in iso projection (computed: ~0.6 unit × 0.6 unit overlap region).
+    The new gate may correctly admit this pair, and the resulting edge
+    forces back-right early — exactly the original mechanism. If so, the
+    gate-tightening is insufficient and the algorithm needs further work
+    (e.g., AABB minimax or Newell cascade).
+  - The render pipeline downstream of DepthSorter may have its own
+    ordering logic. Check `IsometricNode.renderFunction` and the Compose
+    `IsometricCanvas` painter implementation.
+
+## Gaps / Unverified Areas (Round 2)
+
+- **Paparazzi baselines** — Linux CI required to record real (non-blank)
+  baselines. Even when recorded, the longPressGridScene baseline would
+  encode the still-broken visual state. Recommend NOT recording until the
+  visual fix is actually complete in a future round.
+- **AlphaSample visual** — not directly verified this round. Per round-1
+  user report, AlphaSample exhibits the same regression class as LongPress.
+  Maestro flow `03-alpha.yaml` exists; running it would confirm whether
+  AlphaSample is similarly affected post-amendment-1. Not run this round
+  to focus on the primary regression marker (LongPress).
+- **DEPTH_SORT_DIAG logging** — was reverted with the working-tree
+  rollback before the amend-1 implement. Re-adding it temporarily is the
+  recommended next step for diagnosing why AC-11 is NOT MET despite AC-9
+  PASSING.
+
+## Freshness Research (Round 2)
+
+No new external research at the verify stage. The diagnostic chain in
+`07-review-grid-regression-diagnostic.md` and the round-1 Newell algorithm
+references remain authoritative.
+
+## Recommendation (Round 2)
+
+**The amend-1 implementation is structurally sound but does not visually
+resolve the regression.** Five of the seven non-superseded ACs are MET;
+AC-11 (the primary regression marker) is NOT MET. The fix improved the
+algorithm correctly but missed at least one over-painting mechanism.
+
+The next round should be a directed investigation:
+
+1. Re-enable `DEPTH_SORT_DIAG` logging temporarily on the post-fix code.
+2. Capture LongPress emulator logcat with the new build.
+3. Trace which face is drawn AFTER back-right's vertical faces and overlaps
+   them in screen-space.
+4. Either tighten the gate further OR adopt one of the deferred algorithmic
+   alternatives (AABB minimax, Newell cascade, polygon splitting on
+   cycle).
+
+Reviewers can read the round-2 diff and validate the screen-overlap gate's
+correctness at the algorithmic level (it works as designed) — that part of
+the work is mergeable in isolation. But the workflow's success criterion is
+"WS10 NodeIdSample renders without overpaint AND the broader bug class is
+fixed" — round 2 did not achieve the second half.
+
+## Recommended Next Stage (Round 2)
+
+- **Option A:** `/wf-implement depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
+  — directed investigation: re-add diagnostic logging, capture logcat from
+  the new build, identify the specific face still over-painting back-right.
+  This is a focused diagnostic + fix loop, not a full re-plan.
+  **Compact recommended before /wf-implement** — verify chatter is noise
+  for the diagnostic dive.
+
+- **Option B:** `/wf-amend depth-sort-shared-edge-overpaint from-review`
+  — only if the diagnostic reveals that a deeper algorithmic redesign
+  (AABB minimax, Newell cascade) is needed instead of further gate
+  tightening. Defer until Option A's diagnostic concludes.
+
+- **Option C:** `/wf-review depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`
+  — only if the user wants reviewers to validate the *algorithmic
+  correctness* of the screen-overlap gate (which it has) and accept that
+  the visual fix is a follow-up. Routes to a Don't-Ship verdict almost
+  certainly because AC-11 is the load-bearing visual criterion.
+
+- **Option D:** `/wf-handoff depth-sort-shared-edge-overpaint`
+  — **NOT VIABLE**. AC-11 NOT MET means the user-visible regression
+  remains. Cannot hand off a known regression.
