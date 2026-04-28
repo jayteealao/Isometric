@@ -77,3 +77,15 @@ Cumulative log of every product-owner answer collected across all stages. Most r
 - **WS10 case preservation**: Hard requirement. All 8 original AC must still pass after the amendment. The new gate must not break row-layout cases that already work.
 - **Test scenes added**: Paparazzi snapshots for LongPressSample default, AlphaSample default, OnClickSample (row of 5 with one selected), NodeIdSample (4 buildings in a row). Plus a synthetic 3×3 grid PathTest case asserting no spurious edge fires for non-overlapping faces.
 - **Algorithm preservation**: Keep `3e811aa`'s permissive `result > 0` threshold and the 1e-6 epsilon. Add the screen-overlap gate on top. The permissive threshold is geometrically correct in isolation — it just over-fires; the gate makes the firing precise.
+
+## 2026-04-28T08:15:48Z — plan — Revision 2 (apply amendment-2: full Newell adoption)
+
+Plan revision applied per the directed-fix invocation:
+`/wf-plan depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint replace closerThan with full Newell Z->X->Y minimax cascade per amend-2`
+
+Four directives resolved (no new PO questions; revision is mechanical application of the amendment-2 directives):
+
+- **(a) Cascade entry-point**: replace `closerThan`'s body in place. Keep public signature `(pathA: Path, observer: Point): Int` (preserves AC-8). Delete the private `countCloserThan`; lift its plane-side machinery into a private `signOfPlaneSide` helper used by Newell cascade steps 5/6. Rejected: separate top-level `Newell.compare(...)` helper — adds indirection without benefit since Path is the natural home for a per-Path cascade entry point.
+- **(b) PathTest assertion reframings**: enumerated each of six existing `closerThan` tests against new Newell semantics. Five tests preserve `assertTrue(result > 0, ...)` direction with KDoc updates only (resolved via Z/X/Y minimax steps before plane-side step is reached). AC-2 splits into two tests: "coplanar overlapping returns 0" (Newell step 7 deferred-fallback) and "coplanar non-overlapping returns non-zero via X-extent minimax" (Newell step 2). AC-3 case (g) added: wall-vs-floor straddle test, expects non-zero from Newell Z-extent step.
+- **(c) DIAG revert scheduling**: bundled into the same atomic commit as Newell adoption — `fix(depth-sort): replace closerThan with Newell Z->X->Y minimax cascade`. Step R6 of the plan executes the revert immediately after step R5 (Newell implementation).
+- **(d) Polygon-splitting status**: DEFERRED. Cascade step 7 returns 0 unconditionally; Kahn's existing append-on-cycle fallback in `DepthSorter.sort` (lines 139–149) handles any residual cycles. Re-evaluation gate: if AC-12/AC-13 verification surfaces a Kahn cycle, escalate to amend-3.

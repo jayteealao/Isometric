@@ -7,7 +7,7 @@ status: active
 current-stage: implement
 stage-number: 5
 created-at: "2026-04-26T17:52:49Z"
-updated-at: "2026-04-27T23:23:23Z"
+updated-at: "2026-04-28T09:01:50Z"
 selected-slice: depth-sort-shared-edge-overpaint
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -15,7 +15,7 @@ base-branch: "feat/ws10-interaction-props"
 pr-url: ""
 pr-number: 0
 open-questions:
-  - "Round 3 directed investigation identified the over-painter as the GROUND TOP face (depthIdx=3, output pos=2) painting over back-right cube's vertical walls (pos=0/1). Mechanism: closerThan returns 0 for wall-vs-floor pairs (predicate symmetric); no edge added; Kahn falls back to depth-descending centroid which puts walls first → ground over walls. Fix space recorded; not applied this round."
+  - "Round 3 directed investigation identified the over-painter as the GROUND TOP face (depthIdx=3, output pos=2) painting over back-right cube's vertical walls (pos=0/1). Mechanism: closerThan returns 0 for wall-vs-floor pairs (predicate symmetric); no edge added; Kahn falls back to depth-descending centroid which puts walls first → ground over walls. Amendment-2 (2026-04-27) responds by replacing closerThan in full with Newell's Z→X→Y minimax cascade — algorithmic restructure, not a localized patch."
   - "Round 3 source change is DIAGNOSTIC ONLY (DEPTH_SORT_DIAG re-enabled). MUST be reverted before any non-investigation commit. The next round's fix should land alongside the revert."
   - "AlphaSample's three CYAN prisms (alpha-batch) are predicted to fail by the same mechanism but not directly captured in this round. Run 03-alpha.yaml diag capture in a future round if direct empirical confirmation is wanted."
   - "Paparazzi rendered all 16 IsometricCanvasSnapshotTest baselines as identical 6917-byte blank PNGs on Windows + JDK17 in earlier rounds. Pre-existing tests (pyramid, cylinder, etc.) also blank — environmental, not slice-related. AC-11 visual confirmation must come from Linux CI; do NOT commit the locally-generated blank PNGs."
@@ -29,18 +29,25 @@ tags:
   - isometric-core
   - bug
   - numerical-robustness
-next-command: wf-amend
-next-invocation: "/wf-amend depth-sort-shared-edge-overpaint from-review"
+next-command: wf-verify
+next-invocation: "/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint"
 verify-round-2-result: partial
 verify-round-2-blocker: "AC-11 NOT MET: visual regression on LongPress sample (back-right cube renders only top face) persists despite passing AC-9/AC-10 unit tests. Screen-overlap gate is necessary but not sufficient."
 review-verdict: dont-ship
-implement-attempt-status: round-3-directed-investigation-complete
+implement-attempt-status: round-4-newell-cascade-complete
 implement-round-3-mode: directed-investigation
 implement-round-3-fix-applied: false
 implement-round-3-diagnostic-overpainter: "GROUND TOP face (depthIdx=3, output pos=2) paints over back-right cube's FRONT face (pos=0) and LEFT face (pos=1). Mechanism: closerThan returns 0 for wall-vs-floor pairs (symmetric predicate), no edge added, Kahn falls back to depth-descending centroid order which puts walls first."
+implement-round-4-mode: newell-cascade-replace
+implement-round-4-fix-applied: true
+implement-round-4-test-suite-result: "all green: 191 isometric-core tests pass locally"
+implement-round-4-test-deltas:
+  - "PathTest: 10 -> 12 (split AC-2 + added AC-3 case g)"
+  - "DepthSorterTest: 9 -> 11 (added AC-12 LongPress + AC-13 Alpha integration tests)"
 diagnostic-finding: "Round 1 diagnostic (07-review-grid-regression-diagnostic.md): permissive result>0 threshold over-adds topological edges in 3x3 grid layouts. Round 3 diagnostic (05-implement-...md § Round 3): the over-painter is the GROUND TOP, not a neighbour-cube face. closerThan symmetric returns 0 for any (vertical-face, ground-top) pair where each face straddles the other's plane on its respective observer-axis. The amendment-1 hasInteriorIntersection gate is structurally correct but the failure is downstream at the Kahn-tiebreaker / centroid-pre-sort fallback. The CR-1 no-straddling rule from the original review would not fix this regression class either."
 amendments:
   - 02-shape-amend-1.md
+  - 02-shape-amend-2.md
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -64,6 +71,7 @@ workflow-files:
   - 07-review-style-consistency.md
   - 07-review-grid-regression-diagnostic.md
   - 02-shape-amend-1.md
+  - 02-shape-amend-2.md
   - maestro/01-onclick.yaml
   - maestro/02-longpress.yaml
   - maestro/03-alpha.yaml
@@ -72,12 +80,23 @@ workflow-files:
 progress:
   intake: complete
   shape: complete
-  plan: complete
+  plan: complete-revision-2-amendment-2-applied
   slice: not-started
-  implement: round-3-directed-investigation-complete
+  implement: round-4-newell-cascade-complete
   verify: partial
   review: complete-dont-ship
   handoff: not-started
   ship: not-started
   retro: not-started
+plan-revision-2:
+  applied-amendment: 2
+  cascade-entry-point: in-place-replace-closerThan
+  diag-revert-bundling: same-commit-as-newell
+  polygon-split-status: deferred-unless-cycles-observed
+  test-reframings:
+    - "AC-2 split into coplanar-overlapping (returns 0 via deferred step 7) and coplanar-non-overlapping (returns non-zero via X-extent step 2)"
+    - "AC-3 case (g) added: wall-vs-floor straddle test, expects non-zero from Z-extent step"
+    - "AC-12 added: LongPress full-scene + ground top ordering integration test"
+    - "AC-13 added: Alpha full-scene + ground top ordering integration test"
+    - "Five existing closerThan PathTest cases: KDoc-only updates documenting which Newell step resolves each case"
 ---

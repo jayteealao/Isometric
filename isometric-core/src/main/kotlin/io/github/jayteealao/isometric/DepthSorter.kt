@@ -10,22 +10,6 @@ import kotlin.math.floor
  */
 internal object DepthSorter {
 
-    // DIAG: temporary diagnostic logging for the
-    // depth-sort-shared-edge-overpaint workflow's directed investigation
-    // (round 3). Emits FRAME START, per-pair edge decisions, and the final
-    // draw order so we can identify which face is over-painting back-right's
-    // verticals despite the post-amendment-1 screen-overlap gate. REVERT
-    // before any non-diagnostic commit.
-    private const val DIAG = true
-
-    private fun first3(points: List<Point>): String {
-        val n = minOf(3, points.size)
-        return (0 until n).joinToString(";") {
-            val p = points[it]
-            "(${p.x},${p.y},${p.z})"
-        }
-    }
-
     internal data class TransformedItem(
         val item: SceneGraph.SceneItem,
         val transformedPoints: List<Point2D>,
@@ -52,8 +36,6 @@ internal object DepthSorter {
         val sortedItems = mutableListOf<TransformedItem>()
         val observer = Point(-10.0, -10.0, 20.0)
         val length = depthSorted.size
-
-        if (DIAG) System.err.println("DepthSortDiag FRAME START itemCount=$length")
 
         // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
         val drawBefore = List(length) { mutableListOf<Int>() }
@@ -117,12 +99,6 @@ internal object DepthSorter {
         // Process queue
         while (qHead < qTail) {
             val node = queue[qHead++]
-            if (DIAG) {
-                System.err.println(
-                    "DepthSortDiag ORDER pos=${sortedItems.size} depthIdx=$node " +
-                        "first3=${first3(depthSorted[node].item.path.points)}"
-                )
-            }
             sortedItems.add(depthSorted[node])
             val depStart = depOffsets[node]
             val depEnd = depOffsets[node + 1]
@@ -138,17 +114,10 @@ internal object DepthSorter {
         // Append any remaining items (circular dependencies — fallback)
         for (i in 0 until length) {
             if (inDegree[i] > 0) {
-                if (DIAG) {
-                    System.err.println(
-                        "DepthSortDiag ORDER-CYCLE pos=${sortedItems.size} depthIdx=$i " +
-                            "first3=${first3(depthSorted[i].item.path.points)}"
-                    )
-                }
                 sortedItems.add(depthSorted[i])
             }
         }
 
-        if (DIAG) System.err.println("DepthSortDiag FRAME END")
         return sortedItems
     }
 
@@ -166,39 +135,25 @@ internal object DepthSorter {
         // edge insertion: face pairs that only touch at a shared edge or vertex
         // in screen-space cannot paint over each other regardless of closerThan's
         // verdict, so adding a draw-order edge for them produces spurious
-        // dependencies. With the permissive `result > 0` threshold in
-        // [Path.countCloserThan], such spurious dependencies accumulate in 3x3
-        // grid layouts and push corner cubes' vertical faces to extreme positions
-        // in the topological order — visible regression in LongPress / Alpha
-        // samples. See workflow `depth-sort-shared-edge-overpaint` shape
-        // amendment 1 for the full diagnosis.
+        // dependencies. Pairs that pass the gate then go through Path.closerThan's
+        // Newell Z->X->Y minimax cascade for the actual depth verdict.
+        // See workflow `depth-sort-shared-edge-overpaint` for the full diagnosis.
         val intersects = IntersectionUtils.hasInteriorIntersection(
             itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
             itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
         )
-        var cmpPath = 0
-        var edgeLabel = "none"
         if (intersects) {
             // Use 3D depth comparison
-            cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
+            val cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
             if (cmpPath < 0) {
                 drawBefore[i].add(j)
-                edgeLabel = "i->j"
             } else if (cmpPath > 0) {
                 drawBefore[j].add(i)
-                edgeLabel = "j->i"
             }
             // When cmpPath == 0 (coplanar or ambiguous), intentionally add no edge.
             // Adding edges for these pairs disrupts correct top-face vs side-face
             // ordering in tile grids. Kahn's algorithm handles the resulting
             // zero-in-degree nodes in index order, which is deterministic enough.
-        }
-        if (DIAG) {
-            System.err.println(
-                "DepthSortDiag pair: A.idx=$i A.first3=${first3(itemA.item.path.points)} " +
-                    "B.idx=$j B.first3=${first3(itemB.item.path.points)} " +
-                    "intersects=$intersects edge=$edgeLabel cmpPath=$cmpPath"
-            )
         }
     }
 
