@@ -199,16 +199,8 @@ open class Path(
      *   [pathA]'s plane from [observer] — `this` is entirely behind [pathA] (farther).
      * - **-1** if every vertex of `this` lies strictly on the SAME side of [pathA]'s
      *   plane as [observer] — `this` is entirely in front of [pathA] (closer).
-     * - For the genuinely-coincident case (every vertex of `this` is within
-     *   [EPSILON] of [pathA]'s plane AND the two faces' outward normals point in
-     *   opposite directions, e.g., the TOP of one prism vs the BOTTOM of a prism
-     *   stacked directly above), a deterministic tiebreak based on which face's
-     *   normal aligns with the observer direction. The face whose normal faces the
-     *   observer is "in front" and should paint last (returns -1, this closer);
-     *   the back-facing one returns +1.
-     * - **0** for: mixed straddle (some vertices on each side); coincident
-     *   same-direction normals (no geometric basis to prefer one); or degenerate
-     *   normals.
+     * - **0** otherwise: at least one vertex on each side, OR every vertex is within
+     *   [EPSILON] of the plane (genuinely coplanar). The cascade falls through.
      *
      * The threshold is applied to each signed plane-distance independently
      * (`pPosition` and `observerPosition` are each compared against [EPSILON] before
@@ -245,34 +237,10 @@ open class Path(
             if (pSign == observerSign) anySameSide = true
             else anyOppositeSide = true
         }
-        if (anyOppositeSide && !anySameSide) return 1   // all opposite -> self farther.
-        if (anySameSide && !anyOppositeSide) return -1  // all same -> self closer.
-        if (anySameSide || anyOppositeSide) return 0    // mixed straddle -> undecided.
-
-        // Coincident-plane case: every vertex of `this` lies on pathA's plane
-        // (the all-coplanar/undecided fallback). Differentiate opposite-facing
-        // pairs (TOP vs BOTTOM of stacked prisms; LEFT vs RIGHT of adjacent
-        // tiles) from same-facing pairs (two coincident TOPs — the genuine
-        // ambiguity case PathTest's coplanar-overlapping case asserts).
-        val tAB = Vector.fromTwoPoints(points[0], points[1])
-        val tAC = Vector.fromTwoPoints(points[0], points[2])
-        val tnX = tAB.y * tAC.z - tAB.z * tAC.y
-        val tnY = tAB.z * tAC.x - tAB.x * tAC.z
-        val tnZ = tAB.x * tAC.y - tAB.y * tAC.x
-        val normalAlignment = tnX * n.x + tnY * n.y + tnZ * n.z
-        if (normalAlignment >= -EPSILON) return 0  // same-direction or perpendicular -> undecided.
-
-        // Opposite-direction normals at the same plane. Tiebreak by which face's
-        // outward normal aligns with the observer-direction from the face centroid.
-        var cx = 0.0; var cy = 0.0; var cz = 0.0
-        for (p in points) { cx += p.x; cy += p.y; cz += p.z }
-        val invN = 1.0 / points.size
-        cx *= invN; cy *= invN; cz *= invN
-        val facing = tnX * (observer.x - cx) + tnY * (observer.y - cy) + tnZ * (observer.z - cz)
         return when {
-            facing > EPSILON -> -1   // this front-faces observer -> closer (paints last).
-            facing < -EPSILON -> 1   // this back-faces observer -> farther (paints first).
-            else -> 0                // edge-on -> undecided.
+            anyOppositeSide && !anySameSide -> 1   // all opposite -> self farther.
+            anySameSide && !anyOppositeSide -> -1  // all same -> self closer.
+            else -> 0                              // mixed or all coplanar -> undecided.
         }
     }
 

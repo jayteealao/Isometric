@@ -138,20 +138,9 @@ internal object DepthSorter {
         // dependencies. Pairs that pass the gate then go through Path.closerThan's
         // reduced Newell cascade (Z-extent minimax + plane-side test) for the
         // actual depth verdict.
-        //
-        // Coincident-polygon special case: when both faces project to the SAME
-        // screen polygon (every vertex of one matches a vertex of the other —
-        // e.g., the TOP of one prism vs the BOTTOM of a prism stacked above, or
-        // the RIGHT wall of one tile vs the LEFT wall of an adjacent tile),
-        // hasInteriorIntersection returns false because all vertices fall on
-        // each other's boundary. These pairs share their entire 2D interior and
-        // MUST be ordered by closerThan, not gate-rejected.
-        val pointsA = itemA.transformedPoints
-        val pointsB = itemB.transformedPoints
-        val coincident = areCoincidentScreenPolygons(pointsA, pointsB)
-        val intersects = coincident || IntersectionUtils.hasInteriorIntersection(
-            pointsA.map { Point(it.x, it.y, 0.0) },
-            pointsB.map { Point(it.x, it.y, 0.0) }
+        val intersects = IntersectionUtils.hasInteriorIntersection(
+            itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
+            itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
         )
         if (intersects) {
             // Use 3D depth comparison
@@ -167,36 +156,6 @@ internal object DepthSorter {
             // zero-in-degree nodes in index order, which is deterministic enough.
         }
     }
-
-    /**
-     * Tests whether two projected screen polygons are vertex-for-vertex
-     * coincident (every vertex of one matches a vertex of the other within
-     * COINCIDENT_TOLERANCE). Used by [checkDepthDependency] to bypass the
-     * strict-interior gate for fully-coincident pairs whose 100% overlap
-     * the gate's "vertices on the other polygon's boundary" tests reject
-     * incorrectly. O(n²) but n is the face vertex count (typically 3–4
-     * for the prism corpus).
-     */
-    private fun areCoincidentScreenPolygons(a: List<Point2D>, b: List<Point2D>): Boolean {
-        if (a.size != b.size || a.isEmpty()) return false
-        val tol2 = COINCIDENT_TOLERANCE * COINCIDENT_TOLERANCE
-        for (pa in a) {
-            var matched = false
-            for (pb in b) {
-                val dx = pa.x - pb.x
-                val dy = pa.y - pb.y
-                if (dx * dx + dy * dy < tol2) {
-                    matched = true
-                    break
-                }
-            }
-            if (!matched) return false
-        }
-        return true
-    }
-
-    /** Squared-distance tolerance for treating two screen vertices as coincident. */
-    private const val COINCIDENT_TOLERANCE: Double = 1e-6
 
     /**
      * Returns candidate pairs as Long-packed values: high 32 bits = larger index,
