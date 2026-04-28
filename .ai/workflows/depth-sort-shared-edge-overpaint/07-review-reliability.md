@@ -6,342 +6,518 @@ slug: depth-sort-shared-edge-overpaint
 slice-slug: depth-sort-shared-edge-overpaint
 status: complete
 stage-number: 7
-created-at: "2026-04-26T20:44:25Z"
-updated-at: "2026-04-26T20:44:25Z"
+created-at: "2026-04-28T00:00:00Z"
+updated-at: "2026-04-28T00:00:00Z"
 result: pass-with-concerns
-metric-findings-total: 5
+diff-base: 97416ba
+diff-head: HEAD
+metric-findings-total: 9
 metric-findings-blocker: 0
-metric-findings-high: 1
-metric-findings-med: 2
-metric-findings-low: 1
-metric-findings-nit: 1
+metric-findings-high: 2
+metric-findings-med: 3
+metric-findings-low: 2
+metric-findings-nit: 2
 tags:
-  - rendering
-  - depth-sort
-  - painter-algorithm
-  - isometric-core
+  - reliability
   - numerical-robustness
+  - depth-sort
+  - floating-point
 refs:
   index: 00-index.md
-  verify: 06-verify-depth-sort-shared-edge-overpaint.md
   implement: 05-implement-depth-sort-shared-edge-overpaint.md
+  shape: 02-shape.md
   plan: 04-plan-depth-sort-shared-edge-overpaint.md
-  security-review: 07-review-security.md
 ---
 
-# Review: reliability
+# Review: reliability — Newell cascade rewrite (`97416ba..HEAD`)
 
-Scope: `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Path.kt`
-lines 99–146 — `closerThan` and its private helper `countCloserThan`. Reading also
-covers `Vector.kt` (cross/dot product implementations) and
-`DepthSorter.kt` (`checkDepthDependency`, `sort`).
+Scope: cumulative diff `97416ba..452b1fc` on `feat/ws10-interaction-props`.
+Primary change: `Path.closerThan` rewritten as Newell Z→X→Y minimax cascade;
+`countCloserThan` deleted; `signOfPlaneSide` added; round-3 `DEPTH_SORT_DIAG`
+reverted. Secondary changes: `hasInteriorIntersection` gate in
+`DepthSorter.checkDepthDependency`; two integration tests (AC-12, AC-13).
+
+Files read:
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Path.kt`
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/DepthSorter.kt`
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt`
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Point.kt`
+- `isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Vector.kt`
+- `isometric-core/src/test/kotlin/io/github/jayteealao/isometric/PathTest.kt`
+- `.ai/workflows/depth-sort-shared-edge-overpaint/05-implement-depth-sort-shared-edge-overpaint.md`
+- `.ai/workflows/depth-sort-shared-edge-overpaint/02-shape.md`
+
+---
 
 ## Findings
 
-| ID   | Severity | Confidence | Location                              | Summary                                                                                 |
-|------|----------|------------|---------------------------------------|-----------------------------------------------------------------------------------------|
-| RL-1 | HIGH     | High       | `Path.kt:140` — product threshold     | Product check mixes distance scales; both distances can be 1e-3 and still pass — semantically ambiguous |
-| RL-2 | MED      | High       | `Path.kt:117-146` — antisymmetry      | Near-coplanar noise can cause `countCloserThan(A,B)=1` AND `countCloserThan(B,A)=1`, adding a cycle |
-| RL-3 | MED      | High       | `Path.kt:117-121` — degenerate face   | Collinear first three points yield zero normal; `observerPosition = 0 - 0 = 0`; EC-3 claim is correct but the proof path needs documenting |
-| RL-4 | LOW      | Med        | `Path.kt:140` — epsilon tightness     | 1e-6 absolute threshold is tight enough for 0..10 range but was documented as 0..100; the epsilon is borderline for the upper end |
-| RL-5 | NIT      | High       | `DepthSorter.kt:145` — `result0` use  | `result0` (boundary tally) was never read by `DepthSorter`; its removal is safe and confirmed |
+| ID    | Severity | Confidence | Location                                        | Summary                                                                                    |
+|-------|----------|------------|-------------------------------------------------|--------------------------------------------------------------------------------------------|
+| RL-1  | HIGH     | High       | `Path.kt:273-275` — product threshold           | EPSILON applied to a **product** of two signed distances, not to each individually; this is a scale-dependent threshold that silently misbehaves as coordinates grow beyond ~100 units |
+| RL-2  | HIGH     | High       | `Path.kt:257-282` — `signOfPlaneSide` degenerate | Zero-normal plane (3 collinear vertices in pathA) sets `n = (0,0,0)`: `observerPosition = 0`, `d = 0`, every `pPosition = 0`. Product `0 * 0 = 0`, fails `> EPSILON` and `< -EPSILON`; returns 0. Correct result, but also means NaN-poisoned normals would silently fall through to 0 rather than crash — the NaN path is unguarded |
+| RL-3  | MED      | High       | `Path.kt:185-214` — screen-y sign convention    | Step 3 sign convention is **not exercised by any test**; the comment says "larger world (x+y) → farther → self entirely-below is farther → +1", but the direction is the inverse of step 1 without empirical validation. A wrong sign here produces a silent incorrect edge for screen-y-disjoint pairs that never reach plane-side |
+| RL-4  | MED      | High       | `Path.kt:164-166` — EPSILON not scale-relative  | `EPSILON = 1e-6` is compared against `selfDepthMax - aDepthMin`, a raw difference of `Point.depth(angle)` values. For coordinates in [0,100], depth values reach ~87 units; the 1e-6 margin becomes sub-pixel noise-safe at small scale but would trivially pass at large scale. The opposite direction: at coord scale 0.001, the 1e-6 threshold would swallow real separations. EC-8 (coords >1000) is flagged as out-of-scope but the transition scale for step 1 is as low as coord ~10 for the "too tight" direction and coord ~1000 for the "too loose" direction |
+| RL-5  | MED      | Medium     | `Path.kt:264-266` — NaN silent fall-through     | `<` and `>` comparisons against NaN always return false. If any vertex coordinate is NaN (e.g., after a divide-by-zero in a caller's transform chain), all minimax loops end with their initial `POSITIVE_INFINITY`/`NEGATIVE_INFINITY` sentinels intact; the disjoint-extent tests fire against ±Infinity and may return spurious ±1 rather than 0. No guard or `isFinite` check is present |
+| RL-6  | LOW      | High       | `Path.kt:260-265` — first-three-point assumption | `signOfPlaneSide` always uses `pathA.points[0..2]` for the plane; for a nearly-degenerate face where only points 0–2 are near-collinear but point 3 is not, the plane normal is computed from the worst possible triangle. A more robust choice is the Newell polygon normal (average of per-triangle normals over all edges), which degrades gracefully for skewed quads |
+| RL-7  | LOW      | High       | `DepthSorter.kt:114-119` — cycle fallback ordering | When cycles are present, `inDegree[i] > 0` nodes are appended in **depth-sorted index order** (outer loop `for i in 0 until length`). This is deterministic but may produce a visually poor fallback: the items stuck in cycles are not resorted by any depth metric among themselves. If polygon-split (step 7 deferred) eventually introduces cycles, the cycle-bucket fallback order becomes load-bearing and the current first-in-index-order behaviour is undocumented |
+| RL-8  | NIT      | High       | `Path.kt:284-299` — ISO_ANGLE hardcoded         | `ISO_ANGLE = PI / 6.0` is baked into the cascade. If the caller ever uses a non-30° engine angle, the screen-x/y extent steps compute extents in a different projection than the engine renders. There is no mechanism to pass the engine angle to `closerThan`; the mismatch is currently invisible because `DepthSorter` hardcodes the same 30° observer, but it is a latent coupling |
+| RL-9  | NIT      | High       | `DepthSorter.kt:37` — observer hardcoded        | `val observer = Point(-10.0, -10.0, 20.0)` inside `sort()` is not passed from `RenderOptions` or `IsometricEngine`. If the library ever exposes a configurable observer / camera position, the hardcoded value becomes a hidden divergence between the sort order and the visual projection |
 
 ---
 
 ## Detailed Findings
 
-### RL-1 — Product threshold is semantically ambiguous (HIGH)
+### RL-1 — EPSILON applied to a product, not to each distance independently (HIGH)
 
-**Location:** `Path.kt` line 140
+**Location:** `Path.kt:273-275`
 
 ```kotlin
-if (observerPosition * pPosition >= 0.000001)
+val signed = observerPosition * pPosition
+if (signed > EPSILON) anySameSide = true
+if (signed < -EPSILON) anyOppositeSide = true
 ```
 
 **Description:**
 
-The predicate checks whether the *product* of two signed distances is ≥ 1e-6. The
-intended meaning is "observer and vertex are on the same side of the plane AND not
-coplanar". Using the product conflates two independent axes:
+`EPSILON = 1e-6` is applied to the **product** `observerPosition * pPosition`, not to
+each distance independently. This was identified as a pre-existing issue in round-1
+review (`07-review-correctness.md § CR-1`) and is **still present** in the Newell
+rewrite — the `countCloserThan` product check was carried over verbatim into
+`signOfPlaneSide`.
 
-1. **Same-side check:** the product is positive iff the two distances have the same
-   sign — correct.
-2. **Not-coplanar guard:** the product magnitude is used to filter out near-zero
-   distances.
+The semantic intent is "vertex and observer are on the same side AND neither is
+coplanar." The product threshold fuses both concerns onto a single scalar, creating
+scale-dependent behaviour:
 
-The problem with (2) is that the product magnitude depends on *both* factors
-multiplicatively. Consider:
+- `observerPosition = 1e-3`, `pPosition = 1e-3` → product = 1e-6, **passes** (both
+  genuinely on same side, ~1 mm from plane in a typical scene — should count as
+  "same side").
+- `observerPosition = 1e-3`, `pPosition = 9e-4` → product = 9e-7, **fails** (both
+  genuinely on same side, but product just below threshold — incorrectly rejected as
+  coplanar).
+- `observerPosition = 100.0`, `pPosition = 1e-8` → product = 1e-6, **passes** (vertex
+  is 10 nm from the plane — should be coplanar — but observer is far away so the
+  product is inflated to threshold).
 
-- `observerPosition = 1e-3`, `pPosition = 1e-3` → product = 1e-6, passes.
-- `observerPosition = 1.0`, `pPosition = 1e-6` → product = 1e-6, passes.
-- `observerPosition = 1e-3`, `pPosition = 9.9e-4` → product = 9.9e-7, **fails**,
-  even though neither distance is near-coplanar in absolute terms.
+For the current WS10 geometry (coords ~0..10, observer at ~(-10,-10,20)):
+- `observerPosition` is typically O(100..3000) (cross-product magnitude ~O(1..10²),
+  times observer distance ~O(20..30)).
+- `pPosition` for a non-coplanar vertex is typically O(1..100).
+- Product typically O(100..300000) — far above 1e-6. The bug is inert in the nominal
+  range.
 
-In the last case, a vertex that is clearly on the same side as the observer (both
-distances ~1e-3, i.e., ~0.1% of a unit away from the plane) is incorrectly excluded.
-The fix's intent was to guard against *true* coplanar vertices (distance ≈ 0), but the
-guard also fires for pairs where *both* distances are small but non-zero and same-sign.
+The bug fires when both values are simultaneously small — e.g., a thin face (small
+normal magnitude due to nearly-collinear first three points) combined with a vertex
+close to but not on the reference plane. In that case the product under-shoots 1e-6
+even though both signed distances have the same sign and are geometrically meaningful.
+Result: `anySameSide` remains false, `signOfPlaneSide` returns 0 instead of -1, the
+cascade falls through to step 7 and returns 0, and DepthSorter adds no edge.
 
-**For the 0..10 coordinate range:** `Vector.crossProduct` on unit-scale vectors produces
-a normal with magnitude O(1). The observer is at `(-10, -10, 20)` and typical face
-centroids sit in 0..10; observer distances are typically O(10..30). Vertex distances for
-non-coplanar faces are typically O(1..10). The product is O(10..300), comfortably above
-1e-6. So for *typical* scenes the semantic ambiguity does not fire.
+**Consequence:** For the nominal coordinate range this is a latent bug, not an
+active regression. It will surface in scenes with thin/flat faces (e.g., decal quads
+with z-extent < 0.01) or scenes where pathA's first three points are nearly collinear
+(small normal), reducing the product scale.
 
-However, for thin prisms with depth << 1 (e.g., a floor tile with z-extent 0.1), a
-vertex on an adjacent face could sit only 0.05 units from the reference plane, yielding
-a product of `~20 * 0.05 = 1.0` — still fine. The failure mode only matters when *both*
-distances are simultaneously small (< ~1e-3 each), which is geometrically unusual in
-isometric scenes.
-
-**Recommended fix (non-blocking):** Check each distance independently:
+**Recommended fix:** Check each distance independently, lifting the observer check
+out of the loop:
 
 ```kotlin
-if (observerPosition * pPosition > 0.0 &&
-    kotlin.math.abs(observerPosition) >= 1e-6 &&
-    kotlin.math.abs(pPosition) >= 1e-6) {
-    result++
+val obsAbs = kotlin.math.abs(observerPosition)
+if (obsAbs < EPSILON) return 0          // pathA's plane degenerate or observer coplanar
+
+for (p in points) {
+    val OP = Vector.fromTwoPoints(Point.ORIGIN, p)
+    val pPosition = Vector.dotProduct(n, OP) - d
+    when {
+        pPosition > EPSILON  -> if (observerPosition > 0) anySameSide = true else anyOppositeSide = true
+        pPosition < -EPSILON -> if (observerPosition > 0) anyOppositeSide = true else anySameSide = true
+        // else: coplanar — skip
+    }
 }
 ```
 
-This is semantically cleaner: same side (product positive) AND neither is coplanar.
-The observer distance check can be lifted out of the loop since `observerPosition` is
-loop-invariant.
-
-**This does not explain the reported yellow-box regression** (missing faces). The
-regression is more likely RL-2 (spurious cycle).
+This separates the two concerns and is sign-correct regardless of the magnitude of
+`observerPosition`.
 
 ---
 
-### RL-2 — Near-coplanar noise can break antisymmetry and add a dependency cycle (MED)
+### RL-2 — Degenerate plane: zero normal is safe but NaN-poisoned coordinates are not (HIGH)
 
-**Location:** `Path.kt:117-146`
+**Location:** `Path.kt:257-282`
 
 **Description:**
 
-`closerThan(pathA, observer)` returns:
+**Zero-normal case (collinear first three points of pathA):**
 
+- `AB` and `AC` are parallel → `n = Vector(0, 0, 0)`.
+- `d = dotProduct(n, OA) = 0`.
+- `observerPosition = dotProduct(n, OU) - d = 0`.
+- Every `pPosition = 0`.
+- `signed = 0 * 0 = 0`; neither `> EPSILON` nor `< -EPSILON`.
+- `anySameSide = false`, `anyOppositeSide = false` → returns 0.
+
+This is **correct and safe**: a degenerate plane yields no ordering, which is the
+conservative result. No division occurs in the entire `signOfPlaneSide` body, so no
+divide-by-zero. The EC-3 claim from 02-shape.md holds under the Newell rewrite.
+
+**NaN-coordinate case (unguarded):**
+
+If any vertex in `pathA.points[0..2]` has a NaN coordinate, the cross-product produces
+NaN components. NaN comparisons (`<`, `>`) always return false in IEEE 754. The
+consequence varies by step:
+
+- **Steps 1–3 (minimax loops):** `if (d < selfDepthMin)` with `d = NaN` → false; the
+  sentinel `POSITIVE_INFINITY`/`NEGATIVE_INFINITY` is never updated. After the loop,
+  `selfDepthMax = NEGATIVE_INFINITY` and `selfDepthMin = POSITIVE_INFINITY` for the
+  NaN path. Then `selfDepthMax < aDepthMin - EPSILON` becomes
+  `NEGATIVE_INFINITY < something` → **true** → returns -1 spuriously. The cascade
+  returns a definitive but wrong answer instead of 0.
+
+- **Steps 5–6 (signOfPlaneSide with NaN normal):** `d = NaN`, `observerPosition = NaN`.
+  `NaN > EPSILON` → false; `NaN < -EPSILON` → false. Returns 0. This is safe.
+
+The minimax steps (1–3) are therefore more dangerous than the plane-side steps when
+NaN coordinates are present: they will produce spurious definitive verdicts (-1 or +1)
+because the sentinel initialisation is not updated by NaN inputs. The effect in
+DepthSorter is a spurious draw-before edge for a face with NaN coordinates, leading to
+undefined rendering order.
+
+**Likelihood:** NaN coordinates can arise from `rotateX/Y/Z` if the angle is NaN
+(e.g., computed from `asin` of an out-of-range input), or from `scale(..., 0.0)` if
+followed by a divide (though `Path` itself contains no division). Currently no guard
+exists in `Path.closerThan` or `DepthSorter.sort`. Since `Path` validates only
+`points.size >= 3` (not coordinate finiteness), NaN can enter silently.
+
+**Recommended fix (defensive):** At the top of `closerThan`, a single check:
+
+```kotlin
+// Guard: degenerate or NaN inputs fall through to 0 rather than producing spurious edges.
+if (points.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }) return 0
+if (pathA.points.any { !it.x.isFinite() || !it.y.isFinite() || !it.z.isFinite() }) return 0
 ```
-countCloserThan(this, pathA, observer) - countCloserThan(pathA, this, observer)
+
+This is O(N) per call (same as the existing minimax loops) and eliminates the silent
+spurious-verdict risk. Alternatively, validate at `Path.init` with a `require` — this
+would be the earlier detection the api-design-guideline §7 recommends.
+
+---
+
+### RL-3 — Screen-y extent (step 3) sign convention untested and potentially inverted (MED)
+
+**Location:** `Path.kt:212-214`
+
+```kotlin
+// Step 3: screen-y. screenY = -(sin*(x+y) + z). Smaller (more negative)
+// screen-y means lower on screen — in iso this dominantly tracks
+// "deeper into the scene" (larger world (x+y) → larger iso depth →
+// farther). Self entirely-below pathA on screen → self farther → +1.
+if (selfScreenYMax < aScreenYMin - EPSILON) return 1
+if (aScreenYMax < selfScreenYMin - EPSILON) return -1
 ```
 
-Where each `countCloserThan` returns 0 or 1. The possible return values are −1, 0, +1.
+**Description:**
 
-The implement note claims "antisymmetry holds because for non-coplanar pairs at most
-one direction can return 1." This is true for pairs with a geometrically clear
-separation. But consider two faces that are nearly coplanar (e.g., the top face and an
-adjacent side face of the same prism, sharing an edge):
+The comment's reasoning chain is:
+1. `screenY = -(sin*(x+y) + z)` — so lower screen-y (more negative) = larger `(x+y)+z`.
+2. Larger world `(x+y)` = larger iso depth = farther from observer.
+3. Therefore: "self entirely below pathA" (selfScreenYMax < aScreenYMin) → self is
+   farther → return +1.
 
-- Each face has some vertices strictly on one side of the other's plane.
-- Due to floating-point cancellation in the cross-product and dot-product chain, a
-  vertex that *should* be exactly on the plane (shared edge vertex) may be pushed to
-  ±1e-7 of the plane.
-- With a 1e-6 epsilon (product threshold), a vertex at distance 1e-7 from pathA and an
-  observer at distance ~20 produces a product of ~2e-6 > 1e-6 → **passes**.
-- This same spurious-pass can occur in *both* directions simultaneously.
+Step (2) is incomplete: `depth(angle) = x*cos + y*sin - 2z`, not `x+y-2z`. For the
+30° projection, `cos ≈ 0.866`, `sin = 0.5`. A low screen-y (more negative) could be
+caused by a large z (which contributes **positively** to iso-depth, making the polygon
+**closer**, not farther). The comment ignores the z-contribution to screen-y.
 
-**Concrete failure path:**
+Example: polygon A is a floor tile at `z=0`, large `(x+y)=20`, screenY ≈ -10.
+Polygon B is a ceiling tile at `z=10`, small `(x+y)=2`, screenY ≈ -(0.5*2 + 10) = -11.
+B has lower screen-y but is at `z=10` → B is **closer** to the observer (iso-depth
+= 2*0.866 + 2*0.5 - 20 = -16.27), while A has iso-depth = 20*0.866 + 20*0.5 - 0 ≈ 27.3.
+So B is closer (smaller depth) — but the current code would return `+1` for self=B vs
+pathA=A (self entirely below) claiming self=B is farther, which is **wrong**.
 
-Let face A and face B share an edge. Both have two shared-edge vertices (distance ≈ 0
-from the other's plane, possibly ±1e-7 after FP) and two private vertices clearly on
-one side. With the product threshold at 1e-6:
+**Severity caveat:** The implement notes (Round 4) acknowledge "Steps 2/3 never fire
+in the current test corpus" and "sign convention is iso-projection intuition rather
+than empirically validated." The Round 4 notes explicitly flag this as a known risk.
+It is recorded here at MED because the fix path is clear and the wrong sign could
+produce a silent ordering regression for any screen-y-disjoint face pair that happens
+to resolve at step 3 before reaching the plane-side test.
 
-- The private vertices of A clearly pass `countCloserThan(A, B)` → 1.
-- The private vertices of B clearly pass `countCloserThan(B, A)` → 1.
-- `closerThan` returns `1 - 1 = 0`.
-
-That case is handled correctly (0 → no edge added). But:
-
-- If the shared-edge vertices of A are at distance +1.1e-7 (FP drift) and observer is
-  at distance ~20: product = 2.2e-6 > 1e-6 → they vote for `countCloserThan(A, B) = 1`
-  even when the private vertices also vote. `countCloserThan` is already 1 from the
-  private vertices, so the shared-edge-vertex drift adds no *new* votes — `result` only
-  becomes 1 once.
-
-Wait — re-reading line 145: `return if (result > 0) 1 else 0`. The `result` counter
-increments per vertex, but the return is clamped to {0, 1}. So shared-edge drift cannot
-increase the return value beyond 1.
-
-**Revised assessment:** The clamping `result > 0 → 1` means antisymmetry is:
-
-- `countCloserThan(A, B)` ∈ {0, 1}
-- `countCloserThan(B, A)` ∈ {0, 1}
-- `closerThan` ∈ {-1, 0, +1}
-
-For `closerThan(A, B) = 1` (A is closer): `countCloserThan(A, B) = 1` AND
-`countCloserThan(B, A) = 0`. For the second to be 0, **none** of B's vertices must pass
-the threshold relative to A's plane. But if B has a private vertex clearly on B's side
-of A's plane, `countCloserThan(B, A) = 1` and `closerThan` would return 0, not ±1.
-
-**The actual cycle risk is:** When floating-point drift causes
-`countCloserThan(A, B) = 1` AND `countCloserThan(B, A) = 1` simultaneously — both
-returning 1 — `closerThan(A, B) = 0` and `closerThan(B, A) = 0`. No edge is added in
-`checkDepthDependency` (line 145 of DepthSorter). So the "cycle" is actually handled
-as a tie, not a bidirectional dependency edge. **No hard cycle can be added** by the
-binary clamping.
-
-However, **the reported regression (missing faces on yellow box)** is consistent with
-the tie-resolution pathway: when `closerThan` returns 0 for a pair that *should* have
-a clear ordering, `DepthSorter` falls back to the pre-sort depth order (line 34,
-`sortedByDescending { path.depth }`). If the average-depth metric agrees with the wrong
-order for some face pair (e.g., the yellow box's right face has a slightly higher average
-depth than an adjacent face of another prism), the fallback produces the wrong paint order.
-
-The regression appears to be a case where the permissive threshold (intended to fix the
-original bug) is now causing the opposite mis-classification for the yellow box geometry:
-a face that should clearly be "closer" returns `countCloserThan = 0` because no vertex
-passes the product threshold. This would happen if the yellow box has a face with all
-vertices nearly coplanar with the reference plane AND the product threshold of 1e-6
-rejects them all.
-
-**Recommended investigation:** Log `observerPosition`, `pPosition`, and their product
-for the yellow box's affected face pair. If any product falls in the [0, 1e-6) band for
-vertices that should be classified as "closer", the threshold is too tight for that
-geometry.
+**Recommended fix:** Reverse the step 3 signs so that "self entirely below pathA on
+screen" maps to self being closer (not farther), or remove step 3 entirely and let
+the plane-side steps decide. Alternatively, add a unit test with a screen-y-disjoint
+pair and verify the sign empirically before relying on this step.
 
 ---
 
-### RL-3 — Degenerate face (zero normal): EC-3 claim verification (MED)
+### RL-4 — EPSILON not relative to coordinate scale; EC-8 transition point is lower than documented (MED)
 
-**Location:** `Path.kt:117-121`
+**Location:** `Path.kt:298` (`EPSILON = 0.000001`) and the cascade comparisons at
+lines 164-166, 206-207, 213-214.
 
 **Description:**
 
-The implement note (§ EC-3) claims: "collinear first three points → cross product is
-zero vector → n is zero → all dot products are 0 → observerPosition = 0 - d where
-d = 0 → returns 0, which is the correct conservative answer."
+Every cascade comparison uses `< aDepthMin - EPSILON` / `> selfDepthMin - EPSILON`
+where the quantities are raw projection values (iso-depth, screen-x, screen-y) in
+world units. For the standard 30° projection:
 
-**Tracing the math:**
+- `depth(PI/6) = x*cos(30°) + y*sin(30°) - 2z ≈ 0.866x + 0.5y - 2z`.
+- For coordinates in [0, C], depth values span roughly `[−2C, 1.37C]`.
 
-1. Points[0], [1], [2] are collinear.  
-   `AB = points[1] - points[0]`, `AC = points[2] - points[0]` are parallel.  
-   `n = crossProduct(AB, AC) = Vector(0, 0, 0)`.
+The EPSILON = 1e-6 threshold means the cascade calls a "strict separation" whenever
+the gap between two extents exceeds 1 micron in world coordinates. This is:
 
-2. `d = dotProduct(n, OA) = 0*OA.x + 0*OA.y + 0*OA.z = 0`.
+- **For C = 10 (current WS10 range):** separation > 1e-6 world units ≈ safely
+  above FP noise. No false separations from FP rounding.
+- **For C = 100:** same analysis — still safe.
+- **For C = 10000 (EC-8):** FP rounding on a 10000-unit depth sum (`0.866*10000`)
+  is approximately `8660 * 2^-52 ≈ 1.9e-12` per vertex; over 4 vertices summed for
+  a depth value, absolute rounding error is ~O(1e-11). Still below 1e-6. Safe
+  direction: the threshold does not collapse.
+- **Coplanar vertex risk at large scale:** The product-threshold issue in RL-1
+  could cause "too permissive" classifications at large scale, but the raw extent
+  EPSILON used in steps 1-3 is a difference, not a product, so it does not share
+  the product-scale problem. Steps 1-3 EPSILON is safe up to very large coordinates.
 
-3. `observerPosition = dotProduct(n, OU) - d = 0 - 0 = 0`.
+However, the documented EC-8 concern is about the **plane-side product** (RL-1),
+not the extent EPSILON. The 02-shape.md EC-8 note "coordinates above ~1000 would
+warrant relative-epsilon scaling" refers to the product in `signOfPlaneSide`, not
+to the extent comparisons. The extent comparisons are safe at all practical scales.
 
-4. Inner loop: for each vertex P,  
-   `pPosition = dotProduct(n, OP) - d = 0 - 0 = 0`.
+**Net assessment:** EPSILON = 1e-6 in the extent steps (1–3) is sound for any
+reasonable coordinate range. The scale concern belongs to RL-1 (the product in
+step 5). This finding is downgraded from what a raw reading of EC-8 might suggest.
 
-5. `observerPosition * pPosition = 0 * 0 = 0 >= 0.000001` → **false**. `result`
-   stays 0.
-
-6. Returns `if (0 > 0) 1 else 0` = **0**.
-
-EC-3 claim is **correct**. A degenerate face returns 0, no edge is added. The math
-traces cleanly. No NaN or Infinity is produced (0/0 is avoided — no division occurs in
-the cross/dot chain). The behaviour is safely conservative.
-
-**Note:** The degenerate case also affects the *caller's* face when it is pathA:
-`countCloserThan(pathA=degenerate, this, observer)` likewise returns 0 for the same
-reason. `closerThan` returns 0 - 0 = 0. No edge. Conservative and correct.
-
-**Recommendation:** Add an inline comment at line 121 or in the KDoc noting this
-invariant explicitly. Currently the degenerate-face behaviour is only documented in the
-implement note, not in source.
+**Recommendation:** Add a comment in the `EPSILON` companion declaration distinguishing
+its role in steps 1-3 (extent gap, scale-safe) from its role in steps 5-6 (via
+product, scale-dependent per RL-1).
 
 ---
 
-### RL-4 — 1e-6 absolute epsilon: adequacy for 0..10 vs 0..100 coordinate range (LOW)
+### RL-5 — NaN propagation through minimax sentinels produces spurious definitive results (MED)
 
-**Location:** `Path.kt:137-139` (comment) and line 140
+*(Partially covered in RL-2; this entry isolates the minimax-specific failure mode.)*
+
+**Location:** `Path.kt:149-202` — the four minimax loops.
 
 **Description:**
 
-The KDoc states the typical coordinate range is "0..100" and the epsilon is 1e-6. The
-actual scene in `DepthSorter.kt` line 37 shows the observer at `(-10, -10, 20)`, and
-the WS10 sample uses building dimensions in roughly 1..5 units. The coordinate range in
-practice appears to be 0..10, not 0..100.
+Each minimax loop initialises sentinels at `±INFINITY` and updates them via `<` and `>`
+comparisons. IEEE 754 specifies that all ordered comparisons involving NaN return false.
+If any vertex `p` returns `NaN` from `p.depth(ISO_ANGLE)` or from the screen projection
+`(p.x - p.y) * cosAngle`, the sentinel is never updated for that vertex.
 
-For the cross-product/dot-product chain with inputs of magnitude O(10):
-- `AB`, `AC` vectors have components O(10).
-- `n = crossProduct(AB, AC)` has components O(100) (product of two O(10) values).
-- `d = dotProduct(n, OA)` has magnitude O(1000).
-- `observerPosition = dotProduct(n, OU) - d` has magnitude O(1000).
-- `pPosition` for a vertex 1 unit from the plane has magnitude O(100).
-- Product: O(100 * 1000) = O(100,000) >> 1e-6. Very safe.
+For self's loop: if **all** of self's vertices produce NaN depths, `selfDepthMin =
++INFINITY` and `selfDepthMax = -INFINITY`. Then:
+- `selfDepthMax < aDepthMin - EPSILON` → `-INFINITY < (finite value)` → **true** →
+  returns -1 (self declared "entirely closer").
 
-For a vertex *intended* to be exactly on the plane (e.g., shared-edge vertex), FP
-error in the chain accumulates from subtractions of O(1000) values. IEEE 754 double
-has ~15 decimal digits of precision; for O(1000) values, absolute error is ~1000 *
-2^-52 ≈ 2.2e-13. The product of observer-distance O(1000) and FP-error O(2.2e-13) is
-~2.2e-10, well below 1e-6. So truly-coplanar vertices are correctly rejected.
+This is a spurious conclusion from all-NaN input. The result is a false dependency
+edge in DepthSorter, which may cause one face to always be drawn before another
+regardless of actual geometry.
 
-**The epsilon is safe for 0..10 coordinates.** For 0..100, the same analysis scales
-by 10x in each dimension: cross-product components O(10,000), d O(1,000,000), FP error
-O(2.2e-10), product O(2.2e-4). This is still below 1e-6 for the product threshold...
-wait — product would be O(1,000,000 * 2.2e-10) = O(2.2e-4) > 1e-6. A truly-coplanar
-vertex in the 0..100 range would have a product of ~2.2e-4, which **exceeds 1e-6** and
-would be incorrectly classified as "closer".
+For partial NaN (some vertices NaN, some finite): the NaN vertices silently skip
+the sentinel update, so the loop computes min/max over only the finite vertices.
+This is a silent data corruption — the computed extent is smaller than the true
+extent, increasing the chance of a false "disjoint" conclusion.
 
-**Revised assessment:** For 0..100 coordinates, the 1e-6 epsilon is *too permissive*:
-coplanar vertices that should be excluded will pass the threshold. The KDoc comment
-says "typical 0..100 range" but the epsilon was only validated (implicitly) for the
-0..10 range of the WS10 scene. If any scene uses coordinates in the tens-of-units range,
-false-positive coplanar-vertex classifications are expected.
-
-**Recommendation:** Either correct the KDoc to say "0..10 range" to match actual usage,
-or derive a scene-scale-relative epsilon. This is the same deferred work flagged in the
-implement note.
+**Combined with RL-2 recommendation:** a single `isFinite` guard at the top of
+`closerThan` eliminates both this and RL-2's NaN risk path.
 
 ---
 
-### RL-5 — `result0` removal: downstream usage confirmed absent (NIT)
+### RL-6 — First-three-vertex plane is fragile for skewed quads (LOW)
 
-**Location:** `DepthSorter.kt:124-149` (`checkDepthDependency`)
+**Location:** `Path.kt:260-262`
+
+```kotlin
+val AB = Vector.fromTwoPoints(pathA.points[0], pathA.points[1])
+val AC = Vector.fromTwoPoints(pathA.points[0], pathA.points[2])
+val n = Vector.crossProduct(AB, AC)
+```
 
 **Description:**
 
-The old `countCloserThan` returned `(result + result0) / points.size` as a normalized
-integer. The removal question is whether `result0` (the boundary-coplanar tally) was
-ever consumed by `DepthSorter`.
+The plane normal is computed from three points: index 0, 1, 2. For axis-aligned
+prism faces (the dominant case in this library), these three points always span
+the full face and the normal is exact. However:
 
-**Confirmed not consumed.** `checkDepthDependency` reads `closerThan` (which calls
-`countCloserThan` internally) and branches only on `< 0`, `> 0`, `== 0`. The *value*
-of the `result0` tally was only ever visible through the integer division return of the
-old `countCloserThan` — it affected the magnitude of the returned integer (e.g.,
-whether 2/4 vertices coplanar made the result 1 or 0). `DepthSorter` never received the
-raw `result0` count and never needed it. The removal is safe.
+1. If the first three points happen to be nearly collinear (e.g., a face where
+   points are listed 0°, 0.1°, 180°, 270° around the face), the computed normal
+   has very small magnitude, amplifying the product-scale problem in RL-1.
+2. For a non-planar quad (four points not exactly coplanar due to FP rounding),
+   using only the first triangle may give a slightly different normal than using
+   the diagonally opposite triangle.
 
-**Additionally:** The old `(result + result0) / points.size` return could produce values
-> 1 for paths with many vertices (e.g., `result=3, result0=0, size=4` → returns 0, but
-`result=3, result0=1, size=4` → returns 1). The new binary clamp `if (result > 0) 1 else 0`
-is strictly simpler and more predictable. No downstream code depended on the multi-valued
-return.
+**Consequence:** For the current codebase's axis-aligned prism faces, points[0..2]
+always form a right angle and the normal is correct. This is a latent robustness
+concern for any caller that passes non-standard polygon winding.
+
+**Recommendation:** Document in `signOfPlaneSide`'s KDoc that the plane is defined
+by `points[0..2]` and that callers must ensure these are non-collinear. Alternatively,
+compute the Newell polygon normal (sum of cross products of consecutive edges) for
+better robustness with arbitrary polygons, at the cost of an O(N) instead of O(1)
+normal computation.
 
 ---
 
-## Antisymmetry proof under noise (summary for RL-2)
+### RL-7 — Cycle fallback ordering is undocumented and depth-unordered (LOW)
 
-The new implementation is **structurally antisymmetric** by construction:
+**Location:** `DepthSorter.kt:114-119`
 
-- `countCloserThan` returns {0, 1} — clamped binary.
-- `closerThan(A, B) = count(A→B) - count(B→A)` ∈ {-1, 0, +1}.
-- `closerThan(A, B) + closerThan(B, A) = (count(A→B) - count(B→A)) + (count(B→A) - count(A→B)) = 0`.
+```kotlin
+// Append any remaining items (circular dependencies — fallback)
+for (i in 0 until length) {
+    if (inDegree[i] > 0) {
+        sortedItems.add(depthSorted[i])
+    }
+}
+```
 
-This is a mathematical identity, not an assumption about the inputs. For **any** inputs
-(including degenerate or noisy), `closerThan(A, B) + closerThan(B, A) = 0` exactly.
-The antisymmetry test is therefore trivially guaranteed by the formula, not by the
-numerical properties of the plane-side predicate.
+**Description:**
 
-**Implication:** The antisymmetry invariant cannot be broken by the new implementation.
-The concern in the critical context is not applicable. Spurious edges are impossible (no
-cycle can be added). The risk is the opposite: a tie (0) when the ordering should be
-clear, leading to depth-fallback producing the wrong order.
+When cycles are present in the dependency graph, items stuck in cycles are appended
+in `depthSorted` index order (i.e., in descending `path.depth` order, the pre-sort).
+This is deterministic but is not a topologically valid ordering for the cycle members
+among themselves.
+
+For the current codebase, the implement notes state "local test suite shows no
+cycles surfacing in the AC-12/AC-13 integration scenes." The fallback is therefore
+never exercised by any test. If polygon-split (cascade step 7) is deferred
+indefinitely, the only observable cycle trigger is a pair where `closerThan` returns
+0 and DepthSorter's no-edge behaviour happens to leave cycles. The implement notes
+say "DepthSorter's append-on-cycle fallback handles any residual cycles" — but the
+fallback's ordering quality is never tested.
+
+**Symptom if cycles surface:** Faces in the cycle will appear in their initial
+depth-sorted order, which is typically back-to-front. This is visually correct
+for non-overlapping faces and only wrong if two cycle-member faces actually overlap
+in screen space. Graceful degradation, not a crash.
+
+**Recommendation:** Add a `// TODO: polygon-split (cascade step 7) is deferred;
+// when implemented, this fallback should be unreachable for non-pathological scenes`
+comment to document the expected state of this branch.
+
+---
+
+### RL-8 — ISO_ANGLE hardcoded in cascade; engine angle coupling (NIT)
+
+**Location:** `Path.kt:290` and cascade steps 1–3
+
+```kotlin
+private const val ISO_ANGLE: Double = PI / 6.0
+```
+
+**Description:**
+
+`ISO_ANGLE` is a compile-time constant. `DepthSorter.sort` uses the same hardcoded
+30° projection via `Point.depth()` (which also uses `x+y-2z` internally — not even
+the same formula as `Point.depth(PI/6)`, per the KDoc on `Point.depth()`). The
+cascade's steps 1–3 call `p.depth(ISO_ANGLE)` which is `x*cos(30°)+y*sin(30°)-2z`,
+while `path.depth` (the pre-sort at `DepthSorter.kt:34`) calls `p.depth()` which
+is `x+y-2z` — a different formula. These two depth metrics are in agreement for
+the sign ordering in practice (both have `x`, `y`, and `-2z` contributions), but
+they are not identical. If the depth pre-sort and the cascade's extent tests disagree
+on which polygon is "farther," the Kahn tiebreaker could pick a suboptimal initial
+ordering.
+
+The coupling is currently invisible because `IsometricEngine` is also hardcoded at
+30°. If the engine ever exposes a variable angle, `closerThan` would silently use
+the wrong projection.
+
+---
+
+### RL-9 — Observer hardcoded in `DepthSorter.sort`; not passed from `RenderOptions` (NIT)
+
+**Location:** `DepthSorter.kt:37`
+
+```kotlin
+val observer = Point(-10.0, -10.0, 20.0)
+```
+
+**Description:**
+
+Same structural concern as RL-8 but for the observer position. The observer is
+hardcoded inside `sort()` rather than derived from `RenderOptions` or the engine
+configuration. `Path.closerThan` takes `observer` as a parameter and is therefore
+testable with any observer, but the production call site pins it at `(-10,-10,20)`
+with no override mechanism.
+
+This is a latent API-evolution concern. If `RenderOptions` grows a camera or
+observer field, the `DepthSorter` hardcode becomes a silent divergence.
+
+---
+
+## Antisymmetry under the Newell cascade
+
+The antisymmetry property `closerThan(A,B) + closerThan(B,A) == 0` holds by
+construction for all six steps:
+
+- **Steps 1–3 (extent minimax):** for each axis, `selfMax < aMin - ε` and
+  `aMax < selfMin - ε` are mutually exclusive (they cannot both be true simultaneously
+  because if selfMax < aMin then aMax > aMin > selfMax, so `aMax < selfMin` would
+  require `aMax < selfMin <= selfMax < aMin <= aMax`, a contradiction). So at most one
+  of the two role-swapped calls returns non-zero. If one returns -1, the other returns
+  nothing from this step (falls through), and later steps will also be symmetric.
+- **Steps 5–6 (plane-side):** step 5 calls `signOfPlaneSide(pathA, observer)` and
+  returns `sFwd`; step 6 calls `pathA.signOfPlaneSide(this, observer)` and returns
+  `-sRev`. Under role swap, the step-5 of the swapped call is the step-6 of the
+  original (with sign negated), so antisymmetry holds structurally.
+- **Step 7:** both return 0 symmetrically.
+
+The antisymmetry invariant test passes by construction. **Hard cycles cannot be added
+to the dependency graph by this predicate.**
+
+---
+
+## DEPTH_SORT_DIAG revert verification
+
+Round 3 added `private const val DIAG = true` and extensive `System.err` emissions.
+Round 4 claims to revert these. Current `DepthSorter.kt` source (read above) contains:
+
+- No `DIAG` constant or `DEPTH_SORT_DIAG` string.
+- No `first3` helper.
+- No `System.err` calls.
+- The `intersects` and `cmpPath` locals (lines 141-147) are retained from round 3
+  as a readability improvement; these are read-only locals that feed no I/O path.
+
+**Revert is clean.** The retained `intersects`/`cmpPath` locals are benign.
+
+---
+
+## Kahn fallback: graceful degradation under deferred step 7
+
+If `closerThan` returns 0 for a pair that genuinely needs ordering (a cycle
+participant), `DepthSorter` adds no edge and Kahn processes the pair in
+depth-sorted pre-order (back-to-front by centroid depth). The visual symptom
+is that faces in the unresolved pair are drawn in centroid-depth order, which
+is usually correct for non-overlapping faces. For overlapping faces (which passed
+the `hasInteriorIntersection` gate), a wrong centroid order produces over-painting
+where the farther face appears on top. This is visible as a z-fighting artefact but
+does not crash the renderer. The `ORDER-CYCLE` diagnostic log path from round 3 was
+the intended observability tool; its removal means a future operator would need to
+add new diagnostic logging to detect cycle members.
+
+**Recommended observability:** A `if (BuildConfig.DEBUG) Log.w("DepthSorter", "cycle fallback for face N")` (or equivalent `kotlin.assert`) at line 116 would surface
+cycles in debug builds without impacting release performance.
 
 ---
 
 ## Summary
 
-The numerical analysis confirms the fix is structurally sound for the typical WS10
-geometry. The antisymmetry concern is provably resolved. The EC-3 degenerate-face
-behaviour is correct. The reported yellow-box regression most likely originates from the
-product threshold being *too tight* for a specific face pair (RL-2 tie-instead-of-order
-pathway), or from the epsilon being borderline for 0..100-range coordinates (RL-4). The
-highest-priority action is diagnostic logging to measure actual `pPosition` values for
-the affected face pair.
+The Newell cascade rewrite is structurally sound and the antisymmetry invariant is
+guaranteed by construction. The DEPTH_SORT_DIAG revert is clean. The most actionable
+reliability concerns are:
 
-**Result: PASS-WITH-CONCERNS.** No blockers. RL-1 (product semantics) and RL-2
-(tie→fallback regression path) are the most actionable findings for the yellow-box
-regression investigation.
+1. **RL-1 (HIGH):** EPSILON applied to the product `observerPosition * pPosition` in
+   `signOfPlaneSide` — a dimension-mixing threshold that becomes unreliable for thin
+   faces or near-degenerate normals. The fix is to test each distance independently
+   with individual per-distance comparisons.
+2. **RL-2/RL-5 (HIGH/MED combined):** No `isFinite` guard in `closerThan` or `Path.init`;
+   NaN vertex coordinates produce spurious definitive verdicts from the minimax sentinels
+   (returning ±1 instead of 0), and an all-zero normal falls through to 0 safely but
+   NaN normals do not.
+3. **RL-3 (MED):** The screen-y step 3 sign convention is untested and the inline
+   comment's reasoning ignores the z-contribution to screen-y, suggesting the sign is
+   inverted for faces where z dominates the screen-y range.
+
+No blockers. **Result: PASS-WITH-CONCERNS.**

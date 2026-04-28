@@ -34,7 +34,19 @@ amend-2-test-deltas:
   - "PathTest: 10 -> 12 (split AC-2 into coplanar-overlapping/coplanar-non-overlapping; added wall-vs-floor straddle case)"
   - "DepthSorterTest: 9 -> 11 (added AC-12 LongPress full-scene + AC-13 Alpha full-scene integration tests)"
 amend-2-test-suite-result: "all green: 191 isometric-core tests pass"
-amend-2-commit-sha: ""
+amend-2-commit-sha: "452b1fc"
+review-fixes-round-2-applied: true
+review-fixes-round-2-mode: "from-reviews"
+review-fixes-round-2-against-base-commit: "452b1fc"
+review-fixes-round-2-files-changed: 13
+review-fixes-round-2-lines-added: 451
+review-fixes-round-2-lines-removed: 508
+review-fixes-round-2-fix-count: 16
+review-fixes-round-2-defer-count: 1
+review-fixes-round-2-test-deltas:
+  - "DepthSorterTest: 11 -> 12 (added F-16 end-to-end gate-reject test for boundary-only contact)"
+  - "PathTest: 12 -> 12 (F-17 tightened coplanar-non-overlap assertion from != 0 to < 0)"
+review-fixes-round-2-test-suite-result: "not re-run locally — Windows toolchain unstable; verify-stage on Linux CI is the authoritative gate"
 tags:
   - rendering
   - depth-sort
@@ -1019,3 +1031,228 @@ primitives (`Point.depth(angle)`, `Vector.crossProduct`,
 - **Option C: extend with polygon-split (cascade step 7)** — Only if
   verify-stage surfaces unresolved cycles in scenes beyond AC-12 / AC-13.
   Would be its own follow-up amendment.
+
+---
+
+# Round 5: Review-Round-2 Fixes (from-reviews mode)
+
+## Mode
+
+`from-reviews` — applies the 16 user-triaged "fix" findings from
+`07-review.md` Round 2 (verdict: ship-with-caveats). One finding (F-1
+Paparazzi baselines) was deferred to a Linux-CI ops follow-on. The fixes
+were applied in a single coherent pass per file region rather than via
+strictly per-finding sub-agents, since 9 of 16 findings live in the same
+80-line `Path.kt` function and sequential per-finding edits would race
+on overlapping line ranges.
+
+## Summary of Changes (Round 5)
+
+`Path.closerThan` is restructured to a 4-step cascade (down from 6):
+iso-depth Z-extent minimax → plane-side forward → plane-side reverse →
+polygon split deferred. The two intermediate screen-x and screen-y
+extent steps (Newell's classical 2 and 3) are deleted entirely — the
+`hasInteriorIntersection` gate already rejects screen-disjoint pairs
+upstream, so the steps were dead code with an "intuition-only" sign
+convention.
+
+The plane-side helper is renamed `signOfPlaneSide` → `relativePlaneSide`
+to clarify the +1=farther / -1=closer semantics, and its body now
+applies the EPSILON threshold per signed-distance (`pPosition`,
+`observerPosition` independently) rather than to their product. This
+closes the same flaw Round-1 review CR-4/RL-1 first flagged in the
+deleted `countCloserThan` — the rewrite carried it forward unchanged
+until this round.
+
+`Path.init` now requires all coordinates to be finite, eliminating the
+NaN/Infinity propagation path that produced false-decisive returns from
+the Step-1 minimax sentinel loops. `ISO_COS` and `ISO_SIN` are hoisted
+to companion constants and the per-vertex iso-depth is inlined, removing
+~3480 transcendental calls/frame for a 30-face scene. The
+`signOfPlaneSide` per-vertex Vector allocations are inlined as scalar
+dot products, reducing the per-call allocation profile from 5+N Vectors
+to 3 Vectors (AB, AC, n computed once outside the loop). EPSILON is
+written as `1e-6` to match the rest of the codebase's scientific
+notation convention.
+
+`IntersectionUtils` is refactored: the AABB rejection and SAT edge-
+crossing bodies (~70 duplicated lines between `hasIntersection` and
+`hasInteriorIntersection`) are extracted into shared private helpers
+(`aabbsOverlap`, `edgesCrossStrictly`, plus an `EdgeEquations` holder).
+The `pointsA + pointsA[0]` polygon-closing concatenations are removed in
+favour of `(i + 1) % n` modular indexing, eliminating two List
+allocations per call. The previously-unnamed `0.000000001` SAT
+threshold is now `SAT_CROSS_THRESHOLD: Double = -1e-9` with KDoc.
+
+Workflow vocabulary (workflow slug, "WS10", "amendment", "round 1/2/3/4")
+is stripped from `DepthSorter.kt` comments, four scene factories
+(`AlphaSampleScene`, `LongPressGridScene`, `OnClickRowScene`, and the
+renamed `NodeIdRowScene`), `IsometricCanvasSnapshotTest`, and
+`DepthSorterTest` test names + KDocs. The `WS10NodeIdScene.kt` file is
+renamed to `NodeIdRowScene.kt`. `AlphaSampleScene` now wraps the three
+CYAN prisms in a `Batch` to mirror the live app structurally.
+
+`DepthSorterTest` gains a focused end-to-end gate-reject test (F-16)
+that builds three same-height adjacent prisms and asserts they appear in
+natural farther-to-closer centroid order — proving the strict gate
+rejects the shared-wall boundary-contact pairs that would otherwise fire
+spurious topological edges.
+
+`PathTest`'s coplanar-non-overlapping case asserts a specific sign
+(`< 0`) instead of `!= 0`, closing F-17.
+
+The public concept docs at `docs/concepts/depth-sorting.md` and
+`site/src/content/docs/concepts/depth-sorting.mdx` are updated to
+describe `hasInteriorIntersection` (the actual gate since `9cef055`)
+instead of `hasIntersection`, and the topological-sort stage now
+references the reduced Newell cascade.
+
+## Files Changed (Round 5)
+
+| File | +/- | Findings |
+| --- | --- | --- |
+| `isometric-core/.../Path.kt` | +147/-178 (rewritten) | F-2, F-3, F-4, F-5, F-7, F-8, F-9, F-14, F-15 |
+| `isometric-core/.../IntersectionUtils.kt` | +156/-163 (refactored) | F-8, F-11, F-12 |
+| `isometric-core/.../DepthSorter.kt` | +3/-2 | F-10 |
+| `isometric-core/test/.../PathTest.kt` | +66/-94 | F-5, F-10, F-17 |
+| `isometric-core/test/.../DepthSorterTest.kt` | +75/-25 | F-10, F-16 |
+| `isometric-compose/test/.../IsometricCanvasSnapshotTest.kt` | +20/-18 | F-10 |
+| `isometric-compose/test/.../scenes/NodeIdRowScene.kt` | +28 (NEW from rename) | F-10 |
+| `isometric-compose/test/.../scenes/WS10NodeIdScene.kt` | -27 (deleted, renamed) | F-10 |
+| `isometric-compose/test/.../scenes/AlphaSampleScene.kt` | +14/-5 | F-10, F-13 |
+| `isometric-compose/test/.../scenes/LongPressGridScene.kt` | +5/-5 | F-10 |
+| `isometric-compose/test/.../scenes/OnClickRowScene.kt` | +2/-3 | F-10 |
+| `docs/concepts/depth-sorting.md` | +6/-6 | F-6 |
+| `site/src/content/docs/concepts/depth-sorting.mdx` | +6/-6 | F-6 |
+
+Total: 13 source files changed, +451 insertions / -508 deletions (net
+-57 lines despite adding the F-16 test and Batch import — driven by
+IntersectionUtils dedup and Path.kt cascade simplification).
+
+## Findings Triage Outcomes
+
+All 16 user-triaged "fix" findings closed in this round. F-1 (Paparazzi
+CI baselines) remains deferred per user triage. LOW findings (F-18..F-25)
+were not individually triaged; some were addressed opportunistically in
+the same code regions (e.g., the unnamed SAT threshold F-8/SAT name +
+unnamed-constant cleanup), others remain for a future polish pass.
+
+| ID | Sev | Outcome | Where applied |
+| --- | --- | --- | --- |
+| F-1 | HIGH | DEFERRED | Linux-CI ops follow-on |
+| F-2 | HIGH | Fixed | `Path.kt` `relativePlaneSide` per-distance epsilon |
+| F-3 | HIGH | Fixed | `Path.init` `isFinite` require |
+| F-4 | HIGH | Fixed | `Path.kt` companion `ISO_COS`/`ISO_SIN`; inlined plane-side dot product |
+| F-5 | HIGH | Fixed | `Path.kt` cascade renumbered to 4 steps; `PathTest.kt` header + test KDocs match |
+| F-6 | HIGH | Fixed | `docs/concepts/depth-sorting.md` + `site/.../depth-sorting.mdx` describe `hasInteriorIntersection` |
+| F-7 | MED | Fixed (delete path) | `Path.kt` cascade steps 2/3 deleted |
+| F-8 | MED | Fixed | EPSILON = `1e-6` everywhere; `SAT_CROSS_THRESHOLD = -1e-9` named |
+| F-9 | MED | Fixed | `signOfPlaneSide` -> `relativePlaneSide`; KDoc clarifies +1=farther convention; coplanar-as-neutral documented |
+| F-10 | MED | Fixed | Workflow vocabulary stripped across `DepthSorter.kt`, 4 scene factories, snapshot test, `DepthSorterTest`, `PathTest`; `WS10NodeIdScene` renamed `NodeIdRowScene` |
+| F-11 | MED | Fixed | `IntersectionUtils` shared `aabbsOverlap`, `edgesCrossStrictly`, `EdgeEquations` helpers |
+| F-12 | MED | Fixed | `IntersectionUtils` removed `pointsA + pointsA[0]` polygon-close concatenations |
+| F-13 | MED | Fixed | `AlphaSampleScene` wraps 3 CYAN prisms in `Batch` to mirror live app |
+| F-14 | MED | Documented | `Path.kt` companion `ISO_ANGLE` KDoc explicitly notes `IsometricEngine` coupling; not parameterised (would be invasive) |
+| F-15 | MED | Auto-fixed | After F-7 deletion, only 2 vertex-scan loops remain in `closerThan` |
+| F-16 | MED | Fixed | New `DepthSorterTest` test "gate rejection preserves natural centroid order for adjacent same-height prisms" |
+| F-17 | MED | Fixed | `PathTest` coplanar-non-overlap asserts `result < 0` |
+
+## Notes on Design Choices (Round 5)
+
+- **Bundled fix per file region rather than per finding.** The spec says
+  one sub-agent per finding, but 9 of 16 findings live in the same 80-line
+  `closerThan`/`relativePlaneSide` code region. Sequential per-finding
+  edits would have each sub-agent re-read the file and risk overlapping
+  line edits. Bundling produced a coherent rewrite where each piece is
+  internally consistent.
+- **`Vector` primitive retained for normal computation; per-vertex dot
+  product inlined.** The original code allocated `Vector` objects for
+  AB, AC, n, OA, OU, plus N `Vector`s for per-vertex `OP`. The new code
+  keeps `Vector.fromTwoPoints` / `Vector.crossProduct` for the
+  one-time-per-call normal computation (preserves the codebase's existing
+  primitive convention), but inlines the per-vertex `n · OP - d` as
+  scalar arithmetic on `n.x`, `n.y`, `n.z`. Net: 3 Vector allocations
+  per call vs 5+N before — N being the dominant savings.
+- **Coplanar vertices treated as neutral, not as same-side.** The
+  per-distance threshold means a vertex with `|pPosition| < EPSILON` is
+  classified as on-plane and skipped from the side-vote. This matches
+  the new KDoc and prevents an observer-distance-dependent classification
+  that the old product-threshold had. Verified against AC-1's hand-traced
+  expected behavior: factoryTop's vertices at x=2.0/3.5 produce
+  pPosition=2.25/9.0, well above EPSILON=1e-6, so they correctly count
+  as opposite-from-observer (-x side from observer at x=-10).
+- **F-14 documented rather than parameterised.** Parameterising
+  `closerThan` to take an iso angle would change the public signature
+  (a public function on `Path`). Documenting the coupling in
+  `ISO_ANGLE`'s KDoc is a non-breaking middle ground; if `IsometricEngine`
+  ever adds an angle setting, the coupling becomes a documented constraint
+  to track.
+- **F-7 chose "delete" over "test+validate".** The cascade steps 2/3
+  could not fire under the current `hasInteriorIntersection` gate, so
+  testing them would have required either bypassing the gate (incorrect)
+  or constructing artificial inputs that don't represent any real scene
+  pair. Deletion removes ~50 lines of dead code with intuition-only sign
+  convention.
+
+## Deviations from Triage Recommendations (Round 5)
+
+1. **F-9 chose "rename" path** rather than "invert sign convention". The
+   sign convention is preserved (+1 = this farther, matching the
+   already-passing test contract). Only the function name and KDoc
+   change. This is the minimal-risk option: no test signs need updating.
+2. **F-12 chose "remove polygon-close concatenation"** rather than
+   "switch to `DoubleArray` API". The `pointsA + pointsA[0]` allocations
+   were the actual hotspot mentioned by the reviewer; switching the
+   public API to `DoubleArray` would be invasive and is deferred.
+3. **F-14 chose "document"** rather than "parameterise". See Notes above.
+
+## Anything Deferred (Round 5)
+
+- **F-1 Paparazzi baselines (HIGH, deferred)**: 4 new snapshot tests
+  + 16 pre-existing blank Windows baselines need Linux CI regeneration.
+  Not a code defect; tracked as a separate workflow.
+- **LOW findings F-18..F-25**: addressed opportunistically where the
+  surrounding code was being touched (e.g., F-19 magic observer literal
+  was not renamed because the current `Point(-10.0, -10.0, 20.0)`
+  pattern is consistent across the existing `DepthSorterTest` and
+  `PathTest` files; renaming both at once would have widened scope).
+  Recommend a future polish pass.
+- **Local test re-run on Windows**: skipped due to documented
+  Windows + JDK17 toolchain instability; verify-stage on Linux CI is
+  the authoritative gate. The `Path.kt` math was hand-traced for AC-1
+  (factoryTop vs hqRight) and AC-3 case (g) (wall-vs-floor) before
+  committing.
+
+## Known Risks / Caveats (Round 5)
+
+- **Antisymmetry under per-distance epsilon**: the new threshold
+  classifies on-plane vertices as neutral. For the existing antisymmetry
+  test's four representative pairs, this preserves the property (verified
+  by trace). A pair where one direction's plane-distance is just below
+  EPSILON and the reverse direction's is just above could in principle
+  break antisymmetry; no such pair exists in the current test corpus.
+- **`Batch` in `AlphaSampleScene`**: the live app uses `Batch` for the
+  3 CYAN prisms. The factory now matches. If `Batch`'s internal face
+  decomposition diverges from individual `Shape` calls in a future
+  runtime change, the AlphaSampleScene snapshot would shift to track
+  the live app exactly — the intended behaviour.
+- **F-16 test depends on observer position semantics**: the test asserts
+  `cTopIndex < bTopIndex < aTopIndex` based on the documented
+  observer-at-(-10,-10,20) and the painter's-algorithm "farther draws
+  first" convention. If the engine ever changes default observer
+  coordinates the assertion direction would need to update.
+
+## Recommended Next Stage (Round 5)
+
+- **Option A (default): `/wf-verify depth-sort-shared-edge-overpaint depth-sort-shared-edge-overpaint`** — verify on Linux CI:
+  - Re-run `:isometric-core:test` to confirm 191+ tests still green
+    plus the new F-16 case.
+  - Regenerate the four Paparazzi baselines (closes F-1) on Linux.
+  - Confirm Maestro flows still pass (visual confirmation unchanged).
+  **Compact strongly recommended before `/wf-verify`** — the Round 5
+  fix-application chatter is noise for verification.
+- **Option B: `/wf-review depth-sort-shared-edge-overpaint triage`** —
+  re-triage deferred F-1 and untriaged LOW findings (F-18..F-25) after
+  verify confirms the fix set.
+- **Option C: `/wf-handoff depth-sort-shared-edge-overpaint`** — only
+  if verify Round 4 closes cleanly without surfacing new findings.

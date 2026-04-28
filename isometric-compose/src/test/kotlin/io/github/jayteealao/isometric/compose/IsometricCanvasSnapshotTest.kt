@@ -14,8 +14,8 @@ import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
 import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
+import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
 import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
-import io.github.jayteealao.isometric.compose.scenes.WS10NodeIdScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import org.junit.Rule
@@ -307,29 +307,30 @@ class IsometricCanvasSnapshotTest {
     }
 
     // ----------------------------------------------------------------------
-    // depth-sort regression baselines (workflow `depth-sort-shared-edge-overpaint`).
+    // depth-sort regression baselines.
     //
-    // These snapshots replace the single `nodeIdSharedEdge` baseline with
-    // four scene-specific captures covering both bug classes:
+    // Four scene-specific captures pinning the depth-sort algorithm against
+    // two bug classes that occur in the InteractionSamples:
     //
-    //   1. Row-layout shared-edge case (WS10 NodeIdSample). The original-scope
-    //      fix in commit 3e811aa addressed this; pinned here for regression.
-    //   2. Row-layout with height change (OnClickSample with one shape selected).
-    //   3. 3x3 grid layout (LongPressSample default state). The amendment-1
-    //      fix added IntersectionUtils.hasInteriorIntersection to gate edge
-    //      insertion in DepthSorter; this snapshot is the primary regression
-    //      marker for the over-aggressive-edge case.
-    //   4. Mixed-geometry alpha sample (AlphaSample). Same regression class
-    //      as (3), different geometry mix.
+    //   1. Row-layout shared-edge case (NodeIdSample): the canonical
+    //      shared-edge ordering bug at the boundary between adjacent
+    //      different-height prisms.
+    //   2. Row-layout with one shape elevated (OnClickSample): tests dynamic
+    //      height-change adjacency.
+    //   3. 3x3 grid (LongPressSample): primary marker for the
+    //      over-aggressive-edge regression that the screen-overlap gate
+    //      (`IntersectionUtils.hasInteriorIntersection`) prevents.
+    //   4. Mixed geometry (AlphaSample): same regression class as (3) with
+    //      a heterogenous shape mix (prism + cylinder + pyramid + small prisms).
     // ----------------------------------------------------------------------
 
     @Test
     fun nodeIdRowScene() {
-        // 4 buildings in a row at varying heights — the WS10 NodeIdSample case.
+        // 4 buildings in a row at varying heights — the NodeIdSample case.
         paparazzi.snapshot {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
-                    WS10NodeIdScene()
+                    NodeIdRowScene()
                 }
             }
         }
@@ -349,9 +350,10 @@ class IsometricCanvasSnapshotTest {
 
     @Test
     fun longPressGridScene() {
-        // 3x3 grid default state — primary regression marker for amendment-1.
-        // Pre-fix: back-right cube renders with only its top face visible.
-        // Post-fix: all cubes render with all expected faces.
+        // 3x3 grid default state — primary marker for the over-aggressive-edge
+        // regression. Pre-screen-overlap-gate: back-right cube renders with
+        // only its top face visible. With the gate: all cubes render with all
+        // expected faces.
         paparazzi.snapshot {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {

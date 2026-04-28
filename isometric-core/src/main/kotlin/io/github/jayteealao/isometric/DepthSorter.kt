@@ -136,8 +136,8 @@ internal object DepthSorter {
         // in screen-space cannot paint over each other regardless of closerThan's
         // verdict, so adding a draw-order edge for them produces spurious
         // dependencies. Pairs that pass the gate then go through Path.closerThan's
-        // Newell Z->X->Y minimax cascade for the actual depth verdict.
-        // See workflow `depth-sort-shared-edge-overpaint` for the full diagnosis.
+        // reduced Newell cascade (Z-extent minimax + plane-side test) for the
+        // actual depth verdict.
         val intersects = IntersectionUtils.hasInteriorIntersection(
             itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
             itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }

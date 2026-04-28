@@ -158,16 +158,15 @@ class DepthSorterTest {
     }
 
     @Test
-    fun `WS10 NodeIdSample four buildings render in correct front-to-back order`() {
-        // Reproduces the WS10 NodeIdSample geometry that surfaced the
+    fun `NodeIdSample four buildings render in correct front-to-back order`() {
+        // Reproduces the NodeIdSample geometry that originally exposed the
         // shared-edge overpaint bug: four buildings of varying heights placed
         // along the X axis. The bug manifested as factory's top face painting
         // over hq's right wall at their adjacent screen-space boundary.
         //
-        // After the countCloserThan fix, DepthSorter must add an edge between
-        // hq_right and factory_top such that factory_top is drawn first
-        // (lower index in the command list) and hq_right is drawn after
-        // (higher index, on top).
+        // DepthSorter must add an edge between hq_right and factory_top such
+        // that factory_top is drawn first (lower index in the command list)
+        // and hq_right is drawn after (higher index, on top).
         val engine = IsometricEngine()
         engine.add(Prism(Point(0.0, 1.0, 0.1), 1.5, 1.5, 3.0), IsoColor.BLUE)    // hq
         engine.add(Prism(Point(2.0, 1.0, 0.1), 1.5, 1.5, 2.0), IsoColor.ORANGE)  // factory
@@ -275,25 +274,22 @@ class DepthSorterTest {
     }
 
     @Test
-    fun `WS10 LongPress 3x3 grid back-right cube vertical faces are not drawn first`() {
-        // Reproduces the LongPressSample 3x3 grid geometry that surfaced the
-        // over-aggressive-edge regression after the original 3e811aa fix.
+    fun `LongPress 3x3 grid back-right cube vertical faces are not drawn first`() {
+        // Reproduces the LongPressSample 3x3 grid geometry — the canonical
+        // over-aggressive-edge regression case.
         //
-        // The permissive countCloserThan threshold legitimately fires "winning
-        // votes" for face pairs whose 2D iso-projected polygons don't actually
-        // overlap (e.g., back-right cube's front face vs middle-right cube's
-        // top face: separated by a 0.6-unit gap in world y, but the predicate
-        // returns 1 anyway because all four mid-right-top vertices are on the
-        // observer side of back-right-front's plane). Each spurious vote adds
-        // a topological edge in DepthSorter.checkDepthDependency. With the
-        // hasIntersection gate too lenient about boundary touches, these
-        // edges fire and push back-right's vertical faces to output positions
-        // 0-2, where they get painted over.
+        // Without a strict screen-overlap gate, the depth comparator can fire
+        // "winning votes" for face pairs whose 2D iso-projected polygons
+        // share only a boundary edge (e.g., back-right cube's front face vs
+        // middle-right cube's top face). Each spurious vote adds a topological
+        // edge in DepthSorter.checkDepthDependency, and the cumulative effect
+        // pushes back-right's vertical faces to output positions 0-2, where
+        // later faces paint over them.
         //
-        // After hasInteriorIntersection lands as the gate, only face pairs
-        // with non-trivial interior overlap in 2D screen projection produce
-        // edges, so back-right's vertical faces sit at reasonable output
-        // positions (≥ 3) and survive the painter's traversal.
+        // With IntersectionUtils.hasInteriorIntersection as the gate, only
+        // face pairs with non-trivial interior overlap in 2D screen projection
+        // produce edges, so back-right's vertical faces sit at reasonable
+        // output positions (≥ 3) and survive the painter's traversal.
         val engine = IsometricEngine()
         // Ground platform.
         engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)
@@ -343,29 +339,23 @@ class DepthSorterTest {
     }
 
     @Test
-    fun `WS10 LongPress full scene back-right cube vertical faces draw after ground top`() {
+    fun `LongPress full scene back-right cube vertical faces draw after ground top`() {
         // Reproduces the LongPressSample full scene including the ground
-        // platform. The previous AC-9 test (without the ground) confirmed the
-        // amendment-1 screen-overlap gate kept back-right's vertical faces out
-        // of output positions 0-2, but the live LongPress sample still showed
-        // back-right rendering as only its top face. Round-3's directed
-        // investigation traced the residual failure to a third mechanism: for
-        // the (back-right vertical wall, ground top) face pair,
-        // hasInteriorIntersection correctly admits the pair, but
-        // Path.closerThan returns 0 because each polygon straddles the other's
-        // plane on its respective observer-axis (both countCloserThan
-        // directions return 1 under the permissive threshold, cancelling to
-        // 0). With no edge added, Kahn falls back to depth-descending centroid
-        // pre-sort which puts the wall (centroid depth ~7.2) BEFORE the
-        // ground top (centroid depth ~4.9), and the painter then paints
-        // ground over wall.
+        // platform. Tests the wall-vs-floor symmetric-straddle case: for the
+        // (back-right vertical wall, ground top) face pair,
+        // hasInteriorIntersection correctly admits the pair, but a
+        // vote-and-subtract comparator would return 0 because each polygon
+        // straddles the other's plane on its respective observer-axis (both
+        // directions counted equally, cancelling). With no edge added, Kahn
+        // falls back to depth-descending centroid pre-sort which puts the
+        // wall (centroid depth ~7.2) BEFORE the ground top (centroid depth
+        // ~4.9), and the painter then paints ground over wall.
         //
-        // After Newell's Z->X->Y minimax cascade lands, the Z-extent step
-        // returns non-zero immediately for wall-vs-floor pairs (wall.zMax = 1.1,
-        // ground.zMax = 0.1: extents disjoint with epsilon), an edge is added,
-        // and the topological sort puts the ground top before the back-right
-        // vertical faces. This integration test guards against regression of
-        // the cmpPath=0 wall-vs-floor symmetric-straddle class.
+        // Under the strict reduced-Newell cascade in Path.closerThan, the
+        // Z-extent step returns non-zero immediately for wall-vs-floor pairs
+        // (wall.zMax = 1.1, ground.zMax = 0.1: extents disjoint with epsilon),
+        // an edge is added, and the topological sort puts the ground top
+        // before the back-right vertical faces.
         val engine = IsometricEngine()
         engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)  // ground
         for (i in 0 until 9) {
@@ -422,19 +412,16 @@ class DepthSorterTest {
     }
 
     @Test
-    fun `WS10 Alpha full scene each CYAN prism vertical faces draw after ground top`() {
+    fun `Alpha full scene each CYAN prism vertical faces draw after ground top`() {
         // Reproduces the AlphaSample full scene: a ground platform plus three
-        // CYAN prisms in a row at increasing heights. The same wall-vs-floor
-        // cmpPath=0 mechanism that breaks LongPress also affects this scene —
-        // each CYAN prism's front and left vertical faces vs the ground top
-        // are symmetric-straddle pairs whose vote-and-subtract comparator
-        // returns 0, leaving Kahn's centroid pre-sort to put walls before
-        // ground top and the painter to overwrite them.
+        // CYAN prisms in a row at increasing heights. Same wall-vs-floor
+        // symmetric-straddle case as the LongPress test, applied to the
+        // row-layout with mixed heights.
         //
-        // After Newell adoption, Z-extent minimax decides each pair: prism
-        // wall z spans [0.1, 0.1+h] vs ground top z=0.1 — the wall's z-extent
-        // strictly exceeds the ground's at the top, so the cascade returns
-        // non-zero and the topological sort orders ground-before-wall.
+        // Z-extent minimax decides each pair: prism wall z spans [0.1, 0.1+h]
+        // vs ground top z=0.1 — the wall's z-extent strictly exceeds the
+        // ground's at the top, so the cascade returns non-zero and the
+        // topological sort orders ground-before-wall.
         val engine = IsometricEngine()
         engine.add(Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)  // ground
         val prismSpecs = listOf(
@@ -490,5 +477,58 @@ class DepthSorterTest {
                     "(idx=$groundTopIndex)"
             )
         }
+    }
+
+    @Test
+    fun `gate rejection preserves natural centroid order for adjacent same-height prisms`() {
+        // End-to-end check that IntersectionUtils.hasInteriorIntersection's
+        // boundary-only-contact reject path (the AC-10 shared-edge /
+        // shared-vertex cases) propagates correctly through the full
+        // DepthSorter pipeline.
+        //
+        // Three same-height unit cubes in a row, each abutting the next at a
+        // shared wall plane in 3D. Their iso-projected vertical faces touch
+        // the neighbour cube's face at exactly one iso-line each — boundary
+        // contact, no interior overlap. With a lenient gate, the comparator
+        // would be invoked for these pairs and could fire spurious draw-order
+        // edges that override the natural farther-to-closer centroid sort.
+        // The strict gate rejects these pairs, leaving the topological sort
+        // empty for them and Kahn pre-sort handling order via centroid depth.
+        //
+        // Assertion: the three top faces appear in farther-to-closer order
+        // (cube C farthest in x, draws first; cube A closest, draws last).
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.BLUE)   // A: x in [0,1]
+        engine.add(Prism(Point(1.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.GREEN)  // B: x in [1,2]
+        engine.add(Prism(Point(2.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)    // C: x in [2,3]
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        fun topIndexAtX(xMin: Double, xMax: Double): Int =
+            scene.commands.indexOfFirst { cmd ->
+                val pts = cmd.originalPath.points
+                pts.size == 4 &&
+                    pts.all { kotlin.math.abs(it.z - 1.0) < 1e-9 } &&
+                    pts.all { it.x in (xMin - 1e-9)..(xMax + 1e-9) }
+            }
+
+        val aTopIndex = topIndexAtX(0.0, 1.0)
+        val bTopIndex = topIndexAtX(1.0, 2.0)
+        val cTopIndex = topIndexAtX(2.0, 3.0)
+
+        assertTrue(aTopIndex >= 0, "cube A top face must appear in scene commands")
+        assertTrue(bTopIndex >= 0, "cube B top face must appear in scene commands")
+        assertTrue(cTopIndex >= 0, "cube C top face must appear in scene commands")
+
+        // Observer at (-10,-10,20): higher x = farther. Painter's algorithm
+        // draws farther first (lower command index), closer last (higher).
+        // So C (farthest) < B < A (closest) in command order.
+        assertTrue(
+            cTopIndex < bTopIndex && bTopIndex < aTopIndex,
+            "adjacent same-height prisms must draw in farther-to-closer order " +
+                "(C=$cTopIndex, B=$bTopIndex, A=$aTopIndex); shared-wall boundary " +
+                "contact must not fire spurious topological edges that override " +
+                "the natural centroid sort"
+        )
     }
 }

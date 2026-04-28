@@ -16,9 +16,8 @@ import io.github.jayteealao.isometric.shapes.Prism
  * bumps from 1.0 to 2.0 and its color becomes [IsoColor.YELLOW] — replicating
  * the OnClickSample's tap-to-select state.
  *
- * The original-scope WS10 fix in commit `3e811aa` resolved depth-sort for
- * this row layout; this factory pins the regression-free render so any future
- * algorithm change can re-verify it.
+ * Pins the regression-free render of the row-layout shared-edge case so future
+ * depth-sort algorithm changes can re-verify it visually.
  *
  * Geometry kept in sync with `app/.../InteractionSamplesActivity.kt` ::
  * `OnClickSample`. If that sample's positions or dimensions change, update

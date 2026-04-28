@@ -5,6 +5,7 @@ package io.github.jayteealao.isometric.compose.scenes
 import androidx.compose.runtime.Composable
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.compose.runtime.Batch
 import io.github.jayteealao.isometric.compose.runtime.IsometricScope
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.shapes.Cylinder
@@ -22,6 +23,13 @@ import io.github.jayteealao.isometric.shapes.Pyramid
  * the over-aggressive-edge case where some prism pairs share boundary edges
  * in iso-projected screen space.
  *
+ * Structurally mirrors the live sample: the row of three CYAN prisms is
+ * wrapped in a [Batch] to match how `AlphaSample` groups them. The depth
+ * sort sees identical face decomposition either way (a Batch lowers to one
+ * SceneItem per shape internally), but keeping the structure parallel means
+ * future changes to Batch face decomposition affect the snapshot in lockstep
+ * with the live sample.
+ *
  * Geometry kept in sync with `app/.../InteractionSamplesActivity.kt` ::
  * `AlphaSample`. If the sample's geometry changes, update here to match.
  */
@@ -34,7 +42,12 @@ fun IsometricScope.AlphaSampleScene() {
         color = IsoColor.RED
     )
     Shape(geometry = Pyramid(Point(0.0, 3.0, 0.1)), color = IsoColor.GREEN)
-    Shape(geometry = Prism(Point(3.5, 3.0, 0.1), 0.6, 0.6, 0.8), color = IsoColor.CYAN)
-    Shape(geometry = Prism(Point(4.3, 3.0, 0.1), 0.6, 0.6, 1.2), color = IsoColor.CYAN)
-    Shape(geometry = Prism(Point(5.1, 3.0, 0.1), 0.6, 0.6, 1.6), color = IsoColor.CYAN)
+    Batch(
+        shapes = listOf(
+            Prism(position = Point(3.5, 3.0, 0.1), width = 0.6, depth = 0.6, height = 0.8),
+            Prism(position = Point(4.3, 3.0, 0.1), width = 0.6, depth = 0.6, height = 1.2),
+            Prism(position = Point(5.1, 3.0, 0.1), width = 0.6, depth = 0.6, height = 1.6)
+        ),
+        color = IsoColor.CYAN
+    )
 }
