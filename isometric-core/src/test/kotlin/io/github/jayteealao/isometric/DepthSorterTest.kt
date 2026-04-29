@@ -93,6 +93,70 @@ class DepthSorterTest {
     }
 
     @Test
+    fun `TileGrid default draws vertical walls before adjacent top faces`() {
+        val engine = IsometricEngine()
+        for (row in 0 until 6) {
+            for (col in 0 until 6) {
+                engine.add(
+                    Prism(Point(col.toDouble(), row.toDouble(), 0.0), 1.0, 1.0, 1.0),
+                    IsoColor.BLUE
+                )
+            }
+        }
+
+        val faces = classifyCommands(engine.projectScene(800, 600, RenderOptions.Default))
+        val tops = faces.filter { it.face == "TOP" }
+        val walls = faces.filter { it.face != "TOP" && it.face != "BOTTOM" }
+
+        assertEquals(36, tops.size, "all 36 tile tops must appear in the default TileGrid command stream")
+
+        var checkedPairs = 0
+        for (wall in walls) {
+            for (top in tops) {
+                if (nearlyEqual(wall.maxZ, top.minZ) &&
+                    shareAtLeastTwoVertices(wall.command.originalPath, top.command.originalPath)
+                ) {
+                    checkedPairs++
+                    assertTrue(
+                        wall.index < top.index,
+                        "wall ${wall.face} at command ${wall.index} must draw before adjacent TOP at " +
+                            "command ${top.index}; otherwise the wall can paint over the flat grid surface"
+                    )
+                }
+            }
+        }
+        assertTrue(checkedPairs > 0, "expected at least one TileGrid wall/top shared-edge pair")
+    }
+
+    @Test
+    fun `TileGrid default does not expose internal left-edge front walls`() {
+        val engine = IsometricEngine()
+        for (row in 0 until 6) {
+            for (col in 0 until 6) {
+                engine.add(
+                    Prism(Point(col.toDouble(), row.toDouble(), 0.0), 1.0, 1.0, 1.0),
+                    IsoColor.BLUE
+                )
+            }
+        }
+
+        val faces = classifyCommands(engine.projectScene(800, 600, RenderOptions.Default))
+        for (row in 1 until 6) {
+            val internalFrontWall = faces.single {
+                it.face == "FRONT" && it.hasBounds(0.0, 1.0, row.toDouble(), row.toDouble())
+            }
+            val coveringLeftWall = faces.single {
+                it.face == "LEFT" && it.hasBounds(0.0, 0.0, (row - 1).toDouble(), row.toDouble())
+            }
+            assertTrue(
+                internalFrontWall.index < coveringLeftWall.index,
+                "internal left-edge FRONT wall at y=$row must draw before the covering LEFT wall; " +
+                    "otherwise TileGrid exposes an open side face on the nearest boxes"
+            )
+        }
+    }
+
+    @Test
     fun `diagnostic - Stack tower default render face order and overlap check`() {
         // Reproduces StackExample sub-scene 1: 4 stacked prisms at world (1,1,0..3).
         // Under default RenderOptions (culling on), enumerate every face that
@@ -179,6 +243,38 @@ class DepthSorterTest {
                 "RED(3)_FRONT (idx=$prism3Front) must draw after YELLOW(2)_TOP (idx=$prism2Top)"
             )
         }
+    }
+
+    @Test
+    fun `Stack tower default draws upper walls after lower top faces`() {
+        val engine = IsometricEngine()
+        for (n in 0 until 4) {
+            engine.add(
+                Prism(Point(1.0, 1.0, n.toDouble()), 1.0, 1.0, 1.0),
+                IsoColor.BLUE
+            )
+        }
+
+        val faces = classifyCommands(engine.projectScene(800, 600, RenderOptions.Default))
+        val tops = faces.filter { it.face == "TOP" }
+        val walls = faces.filter { it.face != "TOP" && it.face != "BOTTOM" }
+
+        var checkedPairs = 0
+        for (wall in walls) {
+            for (top in tops) {
+                if (nearlyEqual(wall.minZ, top.minZ) &&
+                    shareAtLeastTwoVertices(wall.command.originalPath, top.command.originalPath)
+                ) {
+                    checkedPairs++
+                    assertTrue(
+                        top.index < wall.index,
+                        "upper wall ${wall.face} at command ${wall.index} must draw after lower TOP at " +
+                            "command ${top.index}; otherwise the lower floor can cover the upper wall"
+                    )
+                }
+            }
+        }
+        assertTrue(checkedPairs > 0, "expected at least one Stack upper-wall/lower-top shared-edge pair")
     }
 
     @Test
@@ -783,5 +879,85 @@ class DepthSorterTest {
                 "contact must not fire spurious topological edges that override " +
                 "the natural centroid sort"
         )
+    }
+
+    private data class ClassifiedCommand(
+        val index: Int,
+        val command: RenderCommand,
+        val face: String,
+        val minX: Double,
+        val maxX: Double,
+        val minY: Double,
+        val maxY: Double,
+        val minZ: Double,
+        val maxZ: Double
+    )
+
+    private fun classifyCommands(scene: PreparedScene): List<ClassifiedCommand> {
+        return scene.commands.mapIndexed { index, command ->
+            val path = command.originalPath
+            var minX = Double.POSITIVE_INFINITY
+            var maxX = Double.NEGATIVE_INFINITY
+            var minY = Double.POSITIVE_INFINITY
+            var maxY = Double.NEGATIVE_INFINITY
+            var minZ = Double.POSITIVE_INFINITY
+            var maxZ = Double.NEGATIVE_INFINITY
+            for (point in path.points) {
+                if (point.x < minX) minX = point.x
+                if (point.x > maxX) maxX = point.x
+                if (point.y < minY) minY = point.y
+                if (point.y > maxY) maxY = point.y
+                if (point.z < minZ) minZ = point.z
+                if (point.z > maxZ) maxZ = point.z
+            }
+            ClassifiedCommand(index, command, faceType(path), minX, maxX, minY, maxY, minZ, maxZ)
+        }
+    }
+
+    private fun ClassifiedCommand.hasBounds(minX: Double, maxX: Double, minY: Double, maxY: Double): Boolean {
+        return nearlyEqual(this.minX, minX) &&
+            nearlyEqual(this.maxX, maxX) &&
+            nearlyEqual(this.minY, minY) &&
+            nearlyEqual(this.maxY, maxY)
+    }
+
+    private fun faceType(path: Path): String {
+        val pts = path.points
+        val ax = pts[1].x - pts[0].x
+        val ay = pts[1].y - pts[0].y
+        val az = pts[1].z - pts[0].z
+        val bx = pts[2].x - pts[0].x
+        val by = pts[2].y - pts[0].y
+        val bz = pts[2].z - pts[0].z
+        val nx = ay * bz - az * by
+        val ny = az * bx - ax * bz
+        val nz = ax * by - ay * bx
+        return when {
+            kotlin.math.abs(nz) > 0.5 -> if (nz > 0) "TOP" else "BOTTOM"
+            kotlin.math.abs(ny) > 0.5 -> if (ny > 0) "BACK" else "FRONT"
+            else -> if (nx > 0) "RIGHT" else "LEFT"
+        }
+    }
+
+    private fun shareAtLeastTwoVertices(pathA: Path, pathB: Path): Boolean {
+        var matches = 0
+        for (a in pathA.points) {
+            for (b in pathB.points) {
+                if (samePoint(a, b)) {
+                    matches++
+                    if (matches >= 2) return true
+                    break
+                }
+            }
+        }
+        return false
+    }
+
+    private fun samePoint(a: Point, b: Point): Boolean {
+        return nearlyEqual(a.x, b.x) && nearlyEqual(a.y, b.y) && nearlyEqual(a.z, b.z)
+    }
+
+    private fun nearlyEqual(a: Double, b: Double): Boolean {
+        return kotlin.math.abs(a - b) <= 1e-6
     }
 }

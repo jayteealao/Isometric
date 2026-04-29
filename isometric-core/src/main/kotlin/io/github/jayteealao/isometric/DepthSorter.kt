@@ -45,12 +45,12 @@ internal object DepthSorter {
             for (packed in candidatePairs) {
                 val i = (packed ushr 32).toInt()
                 val j = (packed and 0xFFFFFFFFL).toInt()
-                checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer)
+                checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options)
             }
         } else {
             for (i in 0 until length) {
                 for (j in 0 until i) {
-                    checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer)
+                    checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options)
                 }
             }
         }
@@ -127,34 +127,120 @@ internal object DepthSorter {
         i: Int,
         j: Int,
         drawBefore: List<MutableList<Int>>,
-        observer: Point
+        observer: Point,
+        options: RenderOptions
     ) {
         // Check if 2D projections share a non-trivial INTERIOR overlap.
         //
-        // hasInteriorIntersection (rather than the lenient hasIntersection) gates
-        // edge insertion: face pairs that only touch at a shared edge or vertex
-        // in screen-space cannot paint over each other regardless of closerThan's
-        // verdict, so adding a draw-order edge for them produces spurious
-        // dependencies. Pairs that pass the gate then go through Path.closerThan's
-        // reduced Newell cascade (Z-extent minimax + plane-side test) for the
-        // actual depth verdict.
+        // hasInteriorIntersection (rather than the lenient hasIntersection)
+        // gates general edge insertion. Pairs that pass the gate go through
+        // Path.closerThan's reduced Newell cascade for the depth verdict.
+        // Boundary-only pairs remain rejected except on the culled render path
+        // for exact 3D shared edges that still need deterministic paint order
+        // in stacked and tiled prism scenes.
         val intersects = IntersectionUtils.hasInteriorIntersection(
             itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
             itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
         )
-        if (intersects) {
-            // Use 3D depth comparison
-            val cmpPath = itemA.item.path.closerThan(itemB.item.path, observer)
-            if (cmpPath < 0) {
-                drawBefore[i].add(j)
-            } else if (cmpPath > 0) {
-                drawBefore[j].add(i)
-            }
-            // When cmpPath == 0 (coplanar or ambiguous), intentionally add no edge.
-            // Adding edges for these pairs disrupts correct top-face vs side-face
-            // ordering in tile grids. Kahn's algorithm handles the resulting
-            // zero-in-degree nodes in index order, which is deterministic enough.
+        val sharedEdgeOrder = if (options.enableBackfaceCulling) {
+            sharedHorizontalVerticalEdgeOrder(itemA.item.path, itemB.item.path)
+        } else {
+            0
         }
+        val cmpPath = when {
+            sharedEdgeOrder != 0 -> sharedEdgeOrder
+            intersects -> itemA.item.path.closerThan(itemB.item.path, observer)
+            else -> 0
+        }
+        if (cmpPath < 0) {
+            drawBefore[i].add(j)
+        } else if (cmpPath > 0) {
+            drawBefore[j].add(i)
+        } else {
+            // When cmpPath == 0 (coplanar or ambiguous), intentionally add no edge.
+            // Kahn's algorithm handles the resulting zero-in-degree nodes in
+            // deterministic depth-pre-sort order.
+        }
+    }
+
+    /**
+     * Orders axis-aligned vertical walls against horizontal faces when they share
+     * a real 3D edge.
+     *
+     * The strict interior-overlap gate is still the right default for general
+     * topological dependency generation, but stacked prisms and flat grids need
+     * deterministic ordering at physical wall/top shared edges: walls below a
+     * horizontal face draw before that face, and walls above a horizontal face
+     * draw after it.
+     */
+    private fun sharedHorizontalVerticalEdgeOrder(pathA: Path, pathB: Path): Int {
+        val horizontalA = horizontalZ(pathA)
+        val horizontalB = horizontalZ(pathB)
+        val verticalA = verticalZRange(pathA)
+        val verticalB = verticalZRange(pathB)
+
+        if (horizontalA != null && verticalB != null && shareAtLeastTwoVertices(pathA, pathB)) {
+            return horizontalVsVerticalOrder(horizontalA, verticalB)
+        }
+        if (horizontalB != null && verticalA != null && shareAtLeastTwoVertices(pathA, pathB)) {
+            return -horizontalVsVerticalOrder(horizontalB, verticalA)
+        }
+        return 0
+    }
+
+    private fun horizontalVsVerticalOrder(horizontalZ: Double, wallZRange: Range): Int {
+        return when {
+            nearlyEqual(wallZRange.min, horizontalZ) && wallZRange.max > horizontalZ + EDGE_EPSILON -> {
+                1 // horizontal face is below the wall, so it draws before the wall.
+            }
+            nearlyEqual(wallZRange.max, horizontalZ) && wallZRange.min < horizontalZ - EDGE_EPSILON -> {
+                -1 // horizontal face is above the wall, so it draws after the wall.
+            }
+            else -> 0
+        }
+    }
+
+    private fun horizontalZ(path: Path): Double? {
+        val z = path.points[0].z
+        return if (path.points.all { nearlyEqual(it.z, z) }) z else null
+    }
+
+    private fun verticalZRange(path: Path): Range? {
+        val x = path.points[0].x
+        val y = path.points[0].y
+        val verticalPlane = path.points.all { nearlyEqual(it.x, x) } ||
+            path.points.all { nearlyEqual(it.y, y) }
+        if (!verticalPlane) return null
+
+        var minZ = Double.POSITIVE_INFINITY
+        var maxZ = Double.NEGATIVE_INFINITY
+        for (point in path.points) {
+            if (point.z < minZ) minZ = point.z
+            if (point.z > maxZ) maxZ = point.z
+        }
+        return if (maxZ > minZ + EDGE_EPSILON) Range(minZ, maxZ) else null
+    }
+
+    private fun shareAtLeastTwoVertices(pathA: Path, pathB: Path): Boolean {
+        var matches = 0
+        for (a in pathA.points) {
+            for (b in pathB.points) {
+                if (samePoint(a, b)) {
+                    matches++
+                    if (matches >= 2) return true
+                    break
+                }
+            }
+        }
+        return false
+    }
+
+    private fun samePoint(a: Point, b: Point): Boolean {
+        return nearlyEqual(a.x, b.x) && nearlyEqual(a.y, b.y) && nearlyEqual(a.z, b.z)
+    }
+
+    private fun nearlyEqual(a: Double, b: Double): Boolean {
+        return kotlin.math.abs(a - b) <= EDGE_EPSILON
     }
 
     /**
@@ -236,4 +322,11 @@ internal object DepthSorter {
         val maxX: Double,
         val maxY: Double
     )
+
+    private data class Range(
+        val min: Double,
+        val max: Double
+    )
+
+    private const val EDGE_EPSILON: Double = 1e-6
 }
