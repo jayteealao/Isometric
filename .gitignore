@@ -50,3 +50,7 @@ build-logic/**/*
 .kotlin/errors/*
 plugins/**/*
 .ai/**/*
+docs/internal/research/WEBGPU_PERFORMANCE_OPTIMIZATIONS.md
+zlog*
+app/src/main/assets/textures/ground_color.jpg
+app/src/main/assets/textures/paving_color.jpg
