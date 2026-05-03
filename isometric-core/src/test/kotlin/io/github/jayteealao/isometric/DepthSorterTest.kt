@@ -129,7 +129,7 @@ class DepthSorterTest {
     }
 
     @Test
-    fun `TileGrid default does not expose internal left-edge front walls`() {
+    fun `TileGrid default culls exact shared interior faces`() {
         val engine = IsometricEngine()
         for (row in 0 until 6) {
             for (col in 0 until 6) {
@@ -141,19 +141,40 @@ class DepthSorterTest {
         }
 
         val faces = classifyCommands(engine.projectScene(800, 600, RenderOptions.Default))
-        for (row in 1 until 6) {
-            val internalFrontWall = faces.single {
-                it.face == "FRONT" && it.hasBounds(0.0, 1.0, row.toDouble(), row.toDouble())
+        val tops = faces.filter { it.face == "TOP" }
+        val frontWalls = faces.filter { it.face == "FRONT" }
+        val leftWalls = faces.filter { it.face == "LEFT" }
+
+        assertEquals(48, faces.size, "6x6 TileGrid default render should keep only exterior slab faces")
+        assertEquals(36, tops.size, "all tile tops remain visible")
+        assertEquals(6, frontWalls.size, "only the exterior front wall strip remains")
+        assertEquals(6, leftWalls.size, "only the exterior left wall strip remains")
+        assertTrue(frontWalls.all { nearlyEqual(it.minY, 0.0) && nearlyEqual(it.maxY, 0.0) })
+        assertTrue(leftWalls.all { nearlyEqual(it.minX, 0.0) && nearlyEqual(it.maxX, 0.0) })
+    }
+
+    @Test
+    fun `TileGrid sample insertion order culls shared interior walls`() {
+        val engine = IsometricEngine()
+        for (col in 0 until 6) {
+            for (row in 0 until 6) {
+                engine.add(
+                    Prism(Point(col.toDouble(), row.toDouble(), 0.0), 1.0, 1.0, 1.0),
+                    IsoColor.BLUE
+                )
             }
-            val coveringLeftWall = faces.single {
-                it.face == "LEFT" && it.hasBounds(0.0, 0.0, (row - 1).toDouble(), row.toDouble())
-            }
-            assertTrue(
-                internalFrontWall.index < coveringLeftWall.index,
-                "internal left-edge FRONT wall at y=$row must draw before the covering LEFT wall; " +
-                    "otherwise TileGrid exposes an open side face on the nearest boxes"
-            )
         }
+
+        val faces = classifyCommands(engine.projectScene(800, 600, RenderOptions.Default))
+        assertEquals(48, faces.size, "TileGrid sample order should not leave internal faces for sorting to hide")
+        assertTrue(
+            faces.none { it.face == "FRONT" && it.minY > 0.0 },
+            "internal front walls must be culled before sorting; otherwise they can look like missing side faces"
+        )
+        assertTrue(
+            faces.none { it.face == "LEFT" && it.minX > 0.0 },
+            "internal left walls must be culled before sorting"
+        )
     }
 
     @Test
