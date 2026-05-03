@@ -80,15 +80,21 @@ object IntersectionUtils {
 
         if (edgesCrossStrictly(pointsA, edgesA, pointsB, edgesB)) return true
 
-        // Boundary fallback: any vertex inside the other polygon (including
-        // boundary band) returns true.
+        // Boundary-inclusive fallback: a vertex strictly inside OR within
+        // [EDGE_BAND] of any boundary edge of the other polygon counts as overlap.
+        // This keeps shared-edge / shared-vertex pairs intersecting per the public
+        // contract documented above.
         for (i in pointsA.indices) {
             val p = pointsA[i]
-            if (isPointInPoly(pointsB, p.x, p.y)) return true
+            if (isPointInPoly(pointsB, p.x, p.y) ||
+                isPointCloseToPoly(pointsB, p.x, p.y, EDGE_BAND)
+            ) return true
         }
         for (i in pointsB.indices) {
             val p = pointsB[i]
-            if (isPointInPoly(pointsA, p.x, p.y)) return true
+            if (isPointInPoly(pointsA, p.x, p.y) ||
+                isPointCloseToPoly(pointsA, p.x, p.y, EDGE_BAND)
+            ) return true
         }
         return false
     }
