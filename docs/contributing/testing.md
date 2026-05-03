@@ -35,7 +35,6 @@ The core module has unit tests covering all fundamental types:
 | `PointTest` | Point arithmetic, translation, rotation, scaling, depth calculation |
 | `Point2DTest` | 2D point operations |
 | `VectorTest` | Vector operations, dot product, cross product, normalization |
-| `PathTest` | Path construction, transforms, `closerThan` depth comparison, reversal |
 | `ShapeTest` | Shape construction, transforms, extrusion, `orderedPaths` |
 | `CircleTest` | Circle path generation with configurable vertex count |
 | `IsometricEngineTest` | Engine construction, `add`/`clear`, `projectScene`, hit testing |
@@ -44,6 +43,9 @@ The core module has unit tests covering all fundamental types:
 | `TileGridConfigTest` | Default values, `tileSize` validation, elevation lambda storage, `equals`/`hashCode` (elevation excluded), `toString` |
 | `TileCoordinateExtensionsTest` | `Point.toTileCoordinate` with positive/negative/boundary coords, floor-not-truncation, `screenToTile` round-trip |
 | `StackAxisTest` | All three enum values, `unitPoint()` unit vectors, one-non-zero-component invariant |
+| `DepthSorterTest` | Painter-algorithm draw order for stacked, tile-grid, and shared-edge scenes; topological-edge insertion via `IntersectionUtils.hasInteriorIntersection`; integration tests for `LongPressGridScene`, `OnClickRowScene`, `AlphaSampleScene`, `NodeIdRowScene` |
+| `IntersectionUtilsTest` | `hasIntersection` (boundary-lenient) and `hasInteriorIntersection` (strict-interior) coverage including shared-edge, shared-vertex, and disjoint cases |
+| `PathTest` | Path construction, transforms, Newell Z→X→Y minimax cascade for `closerThan`, coplanar overlap and non-overlap branches, reversal |
 
 Pre-WS9 test files are located under:
 
@@ -67,6 +69,24 @@ The compose module also has instrumented tests that run on a device or emulator:
 ```bash
 ./gradlew :isometric-compose:connectedAndroidTest
 ```
+
+## Test Scene Factories
+
+Scene factories are reusable helpers under `isometric-compose/src/test/kotlin/.../scenes/`
+that build the same geometry the user-facing sample apps render. They let unit tests
+and snapshot baselines exercise the live sample shapes without spinning up a full
+Compose runtime.
+
+| Factory | Mirrors | Used by |
+|---------|---------|---------|
+| `OnClickRowScene` | `OnClickSample` row of three prisms | `DepthSorterTest`, snapshot baselines |
+| `LongPressGridScene` | `LongPressSample` 3×3 grid | `DepthSorterTest`, snapshot baselines |
+| `AlphaSampleScene` | `AlphaSample` mixed transparent/opaque scene | `DepthSorterTest`, snapshot baselines |
+| `NodeIdRowScene` | `NodeIdSample` factory + headquarters pair | `DepthSorterTest`, snapshot baselines |
+
+Each factory returns a `List<RenderCommand>` produced by running the live composable
+under `IsometricEngine.projectScene()`, so changes to the sample geometry stay in
+sync with their regression tests automatically.
 
 ## Screenshot Generation
 

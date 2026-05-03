@@ -33,6 +33,7 @@ export default defineConfig({
 						{ label: 'Tile Grid', slug: 'guides/tile-grid' },
 						{ label: 'Animation', slug: 'guides/animation' },
 						{ label: 'Gestures', slug: 'guides/gestures' },
+						{ label: 'Per-Node Interactions', slug: 'guides/interactions' },
 						{ label: 'Theming & Colors', slug: 'guides/theming' },
 						{ label: 'Camera & Viewport', slug: 'guides/camera' },
 						{ label: 'Custom Shapes', slug: 'guides/custom-shapes' },
