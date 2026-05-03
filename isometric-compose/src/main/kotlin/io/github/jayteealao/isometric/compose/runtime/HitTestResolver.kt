@@ -152,8 +152,10 @@ internal class HitTestResolver(
     private fun buildNodeIdMap(root: IsometricNode): Map<String, IsometricNode> {
         val map = mutableMapOf<String, IsometricNode>()
         fun visit(node: IsometricNode) {
-            val existing = map.put(node.nodeId, node)
-            if (existing != null && node.explicitNodeId != null) {
+            val existing = map.putIfAbsent(node.nodeId, node)
+            if (existing != null &&
+                (node.explicitNodeId != null || existing.explicitNodeId != null)
+            ) {
                 error(
                     "Duplicate nodeId '${node.nodeId}' detected. " +
                     "nodeId values must be unique within a scene."
