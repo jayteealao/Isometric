@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric
 
 import kotlin.math.PI
+import kotlin.math.roundToLong
 
 /**
  * Core isometric rendering engine.
@@ -43,6 +44,29 @@ import kotlin.math.PI
  *
  * Faces are sorted back-to-front using [Point.depth]: `x + y - 2 * z`.
  * Higher depth values are farther from the viewer and drawn first.
+ *
+ * ### Two-stage culling
+ *
+ * Culling runs in two passes for different geometric cases:
+ *
+ * 1. **Pre-projection** ([cullSharedInteriorFaces]) — removes pairs of vertical
+ *    walls that occupy the same 3D coordinates with opposing normals (e.g. the
+ *    shared wall between two adjacent tiles). Both partners are physically
+ *    interior to the composite shape; neither should paint.
+ * 2. **Post-projection** (in [projectAndCull] via [IsometricProjection.cullPath])
+ *    — applies standard back-face culling using 2D vertex winding in screen
+ *    space, removing any single face that turns away from the camera.
+ *
+ * Stage (1) catches the case where stage (2) would only remove one partner of a
+ * coincident pair, leaving the other to spuriously paint over real visible faces.
+ *
+ * @param angle The isometric projection angle in radians. Default `PI / 6` (30°).
+ * @param scale Pixels per world unit. Default `70.0`. Must be positive and finite.
+ * @param colorDifference Per-face brightness modulation strength applied during
+ *   lighting. `0.0` disables shading and renders every face in its raw colour;
+ *   higher values increase contrast between faces with different normals. Must be
+ *   non-negative and finite. Default `0.20`.
+ * @param lightColor Tint blended into face colours during lighting. Default white.
  */
 class IsometricEngine @JvmOverloads constructor(
     angle: Double = PI / 6,  // 30 degrees
@@ -53,6 +77,15 @@ class IsometricEngine @JvmOverloads constructor(
     companion object {
         /** Default light direction used when none is specified. */
         @JvmField val DEFAULT_LIGHT_DIRECTION: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION
+
+        /**
+         * Tolerance in world units for treating two coordinates as identical.
+         * Used by face-coincidence detection (quantization, normal comparison)
+         * to absorb floating-point drift across composed transforms. Must match
+         * the equivalent constant in [DepthSorter] so the two stages agree on
+         * what "same edge / same vertex" means.
+         */
+        private const val SHARED_FACE_EPSILON: Double = 1e-6
     }
 
     /**
@@ -99,6 +132,10 @@ class IsometricEngine @JvmOverloads constructor(
     private val sceneGraph = SceneGraph()
     private var projection = IsometricProjection(angle, scale, colorDifference, lightColor)
 
+    /**
+     * Rebuilds the internal [IsometricProjection] after a mutable parameter change
+     * and bumps [projectionVersion] so any downstream caches invalidate.
+     */
     private fun rebuildProjection() {
         projection = IsometricProjection(this.angle, this.scale, colorDifference, lightColor)
         projectionVersion++
@@ -191,17 +228,28 @@ class IsometricEngine @JvmOverloads constructor(
         lightDirection: Vector
     ): PreparedScene {
         val normalizedLight = lightDirection.normalize()
+        // World origin maps to horizontally-centred, anchored 90% down the viewport.
+        // This gives ~10% headroom below the floor for sub-zero geometry while keeping
+        // most positive-Z content (which projects upward on screen) inside the canvas.
         val originX = width / 2.0
         val originY = height * 0.9
 
+        val sourceItems = if (renderOptions.enableBackfaceCulling) {
+            cullSharedInteriorFaces(sceneGraph.items)
+        } else {
+            sceneGraph.items
+        }
+
         // Transform all items to 2D screen space, applying culling and lighting
-        val transformedItems = sceneGraph.items.mapNotNull { item ->
+        val transformedItems = sourceItems.mapNotNull { item ->
             projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
         }
 
-        // Sort by depth if enabled
+        // Sort by depth if enabled. Threading the engine's projection angle into
+        // DepthSorter keeps Path.closerThan's Z-extent step in sync with this
+        // engine instance's actual projection, instead of a baked 30° default.
         val sortedItems = if (renderOptions.enableDepthSorting) {
-            DepthSorter.sort(transformedItems, renderOptions)
+            DepthSorter.sort(transformedItems, renderOptions, this.angle)
         } else {
             transformedItems
         }
@@ -239,6 +287,18 @@ class IsometricEngine @JvmOverloads constructor(
         touchRadius: Double
     ): RenderCommand? = HitTester.findItemAt(preparedScene, x, y, order, touchRadius)
 
+    /**
+     * Projects a single scene item to screen space and applies per-item culling.
+     *
+     * Returns `null` when the item should be skipped entirely:
+     * - **Back-face cull**: the projected polygon's screen-space vertex winding
+     *   indicates the face turns away from the camera.
+     * - **Bounds cull**: the projected polygon falls completely outside the
+     *   viewport rectangle.
+     *
+     * Otherwise produces a [DepthSorter.TransformedItem] containing the projected
+     * 2D points and the lit colour, ready for depth sorting.
+     */
     private fun projectAndCull(
         item: SceneGraph.SceneItem,
         originX: Double,
@@ -263,4 +323,180 @@ class IsometricEngine @JvmOverloads constructor(
         val litColor = projection.transformColor(item.path, item.baseColor, normalizedLight)
         return DepthSorter.TransformedItem(item, screenPoints, litColor)
     }
+
+    /**
+     * Removes pairs of vertical faces that occupy the same 3D coordinates with
+     * opposing normals — i.e. shared interior walls of a composite shape.
+     *
+     * When two prisms or tiles are placed adjacent in 3D (a tile grid, a row of
+     * stacked prisms, etc.), each side's wall coincides with the neighbour's
+     * wall. Both walls are physically interior to the composite shape and
+     * neither should be drawn.
+     *
+     * Why this is needed in addition to standard back-face culling:
+     * - Back-face culling tests **one face at a time** in screen space using 2D
+     *   vertex winding. From an isometric viewing angle, exactly one wall of a
+     *   coincident vertical pair faces the camera and exactly one faces away —
+     *   so back-face culling removes the back-facing partner but leaves the
+     *   front-facing partner.
+     * - The surviving partner has nothing physically behind it (its space is
+     *   filled by the neighbour) but the depth-sort graph doesn't know that, so
+     *   the surviving wall can be ordered to paint over genuinely visible
+     *   faces. The classic symptom is a wall colour bleeding across an
+     *   adjacent face's surface.
+     *
+     * Restricted to **vertical** faces (normal in the XY plane) because that is
+     * the case back-face culling fails to fully resolve. Horizontal coincident
+     * pairs (e.g. the TOP of one prism vs. the BOTTOM of a stacked prism) are
+     * already handled correctly: the BOTTOM normal points down, is back-facing
+     * from above, and is removed by single-face back-face culling.
+     *
+     * Restricted to **opposing normals** (dot product strictly negative) so the
+     * pass does not collapse genuine same-direction overlaps such as a
+     * decorative panel layered on an exterior wall.
+     */
+    private fun cullSharedInteriorFaces(items: List<SceneGraph.SceneItem>): List<SceneGraph.SceneItem> {
+        if (items.size < 2) return items
+
+        // Bucket items by the canonicalized vertex set of their face. Two faces
+        // are candidate partners only if they live in the same bucket — i.e.
+        // share an identical (modulo winding) vertex list in 3D.
+        val groups = linkedMapOf<FaceKey, MutableList<Int>>()
+        for (index in items.indices) {
+            val key = faceKey(items[index].path)
+            groups.getOrPut(key) { mutableListOf() }.add(index)
+        }
+
+        val culled = BooleanArray(items.size)
+        for (indices in groups.values) {
+            if (indices.size < 2) continue
+            for (a in 0 until indices.lastIndex) {
+                for (b in a + 1 until indices.size) {
+                    val indexA = indices[a]
+                    val indexB = indices[b]
+                    if (isVerticalFace(items[indexA].path) &&
+                        isVerticalFace(items[indexB].path) &&
+                        oppositeNormals(items[indexA].path, items[indexB].path)
+                    ) {
+                        culled[indexA] = true
+                        culled[indexB] = true
+                    }
+                }
+            }
+        }
+
+        return items.filterIndexed { index, _ -> !culled[index] }
+    }
+
+    /**
+     * Builds a canonical identity key for a face's vertex set, independent of
+     * winding order or the choice of starting vertex.
+     *
+     * Two faces with vertices `[P, Q, R, S]` and `[R, S, P, Q]` (or any rotation
+     * or reversal) produce the same key, so they group together for
+     * coincidence detection. Coordinates are quantized to absorb
+     * floating-point drift (see [quantize]).
+     */
+    private fun faceKey(path: Path): FaceKey {
+        return FaceKey(
+            path.points.map { point ->
+                QuantizedPoint(
+                    quantize(point.x),
+                    quantize(point.y),
+                    quantize(point.z)
+                )
+            }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
+        )
+    }
+
+    /**
+     * Returns `true` when two faces' normals point in strictly opposite
+     * directions (dot product `< -SHARED_FACE_EPSILON`).
+     *
+     * Degenerate (zero-length) normals — possible for collinear or duplicate
+     * vertices — are rejected as not-opposite to avoid culling pairs whose
+     * orientation cannot be determined.
+     */
+    private fun oppositeNormals(pathA: Path, pathB: Path): Boolean {
+        val normalA = faceNormal(pathA)
+        val normalB = faceNormal(pathB)
+        val magnitudeA = normalA.x * normalA.x + normalA.y * normalA.y + normalA.z * normalA.z
+        val magnitudeB = normalB.x * normalB.x + normalB.y * normalB.y + normalB.z * normalB.z
+        if (magnitudeA <= SHARED_FACE_EPSILON || magnitudeB <= SHARED_FACE_EPSILON) return false
+
+        val dot = normalA.x * normalB.x + normalA.y * normalB.y + normalA.z * normalB.z
+        return dot < -SHARED_FACE_EPSILON
+    }
+
+    /**
+     * Returns `true` when a face's normal lies in the XY plane (no Z component
+     * within tolerance) — i.e. the face is a wall, not a top or bottom.
+     */
+    private fun isVerticalFace(path: Path): Boolean {
+        val normal = faceNormal(path)
+        return kotlin.math.abs(normal.z) <= SHARED_FACE_EPSILON
+    }
+
+    /**
+     * Computes the unnormalized face normal as the cross product of two edges
+     * fanning from the first vertex: `(p1 - p0) × (p2 - p0)`.
+     *
+     * The result is **not** unit-length — callers that need direction-only
+     * comparisons (sign of dot product, sign of Z component) can use it
+     * directly; callers that need true magnitudes must normalize.
+     */
+    private fun faceNormal(path: Path): FaceNormal {
+        val a = path.points[0]
+        val b = path.points[1]
+        val c = path.points[2]
+        val ux = b.x - a.x
+        val uy = b.y - a.y
+        val uz = b.z - a.z
+        val vx = c.x - a.x
+        val vy = c.y - a.y
+        val vz = c.z - a.z
+        return FaceNormal(
+            x = uy * vz - uz * vy,
+            y = uz * vx - ux * vz,
+            z = ux * vy - uy * vx
+        )
+    }
+
+    /**
+     * Maps a continuous world-coordinate to an integer bucket of width
+     * [SHARED_FACE_EPSILON]. Values that differ by less than the epsilon round
+     * to the same bucket and therefore hash equal in [FaceKey].
+     */
+    private fun quantize(value: Double): Long {
+        return (value / SHARED_FACE_EPSILON).roundToLong()
+    }
+
+    /**
+     * Identity key for grouping faces that share an identical 3D vertex set,
+     * independent of winding order. The point list is sorted into a canonical
+     * order so any two faces with the same geometry produce equal keys.
+     */
+    private data class FaceKey(val points: List<QuantizedPoint>)
+
+    /**
+     * 3D point with each coordinate quantized into integer buckets of width
+     * [SHARED_FACE_EPSILON]. Used as a stable equality key for face vertices,
+     * absorbing the floating-point drift that a raw `Point` would expose.
+     */
+    private data class QuantizedPoint(
+        val x: Long,
+        val y: Long,
+        val z: Long
+    )
+
+    /**
+     * Unnormalized face normal vector. Magnitude is the parallelogram area of
+     * the two edges crossed to compute it; only direction is used by callers.
+     */
+    private data class FaceNormal(
+        val x: Double,
+        val y: Double,
+        val z: Double
+    )
+
 }

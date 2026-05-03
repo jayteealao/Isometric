@@ -31,12 +31,17 @@ annotation class IsometricComposable
  *
  * @param geometry The 3D [io.github.jayteealao.isometric.Shape] to render (e.g., [io.github.jayteealao.isometric.shapes.Prism])
  * @param color The color of the shape (defaults to [LocalDefaultColor])
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the shape is visible
+ * @param onClick Callback invoked when this shape is tapped
+ * @param onLongClick Callback invoked when this shape is long-pressed
+ * @param testTag Optional tag for testing and diagnostics
+ * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Group
  * @see Path
  * @see Batch
@@ -46,18 +51,24 @@ annotation class IsometricComposable
 fun IsometricScope.Shape(
     geometry: Shape,
     color: IsoColor = LocalDefaultColor.current,
+    alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
     rotationOrigin: Point? = null,
     scaleOrigin: Point? = null,
-    visible: Boolean = true
+    visible: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null
 ) {
     ReusableComposeNode<ShapeNode, IsometricApplier>(
         factory = { ShapeNode(geometry, color) },
         update = {
             set(geometry) { this.shape = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {
                 require(it.isFinite()) { "rotation must be finite, got $it" }
@@ -72,6 +83,10 @@ fun IsometricScope.Shape(
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -86,6 +101,8 @@ fun IsometricScope.Shape(
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the group and its children are visible
  * @param renderOptions Optional per-subtree render options override (null inherits from parent)
+ * @param testTag Optional tag for testing and diagnostics
+ * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @param content The child nodes
  * @see Shape
  * @see Path
@@ -101,6 +118,8 @@ fun IsometricScope.Group(
     scaleOrigin: Point? = null,
     visible: Boolean = true,
     renderOptions: RenderOptions? = null,
+    testTag: String? = null,
+    nodeId: String? = null,
     content: @Composable IsometricScope.() -> Unit
 ) {
     ReusableComposeNode<GroupNode, IsometricApplier>(
@@ -121,6 +140,8 @@ fun IsometricScope.Group(
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
             set(renderOptions) { this.renderOptions = it; markDirty() }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         },
         content = {
             IsometricScopeImpl.content()
@@ -133,12 +154,17 @@ fun IsometricScope.Group(
  *
  * @param path The 2D path to render
  * @param color The color of the path (defaults to LocalDefaultColor)
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the path is visible
+ * @param onClick Callback invoked when this path is tapped
+ * @param onLongClick Callback invoked when this path is long-pressed
+ * @param testTag Optional tag for testing and diagnostics
+ * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Shape
  * @see Group
  * @see Batch
@@ -148,18 +174,24 @@ fun IsometricScope.Group(
 fun IsometricScope.Path(
     path: Path,
     color: IsoColor = LocalDefaultColor.current,
+    alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
     rotationOrigin: Point? = null,
     scaleOrigin: Point? = null,
-    visible: Boolean = true
+    visible: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null
 ) {
     ReusableComposeNode<PathNode, IsometricApplier>(
         factory = { PathNode(path, color) },
         update = {
             set(path) { this.path = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {
                 require(it.isFinite()) { "rotation must be finite, got $it" }
@@ -174,6 +206,10 @@ fun IsometricScope.Path(
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -183,12 +219,17 @@ fun IsometricScope.Path(
  *
  * @param shapes List of shapes to render
  * @param color The color for all shapes (defaults to LocalDefaultColor)
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque)
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the batch is visible
+ * @param onClick Callback invoked when this batch is tapped
+ * @param onLongClick Callback invoked when this batch is long-pressed
+ * @param testTag Optional tag for testing and diagnostics
+ * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Shape
  * @see Group
  * @see Path
@@ -198,18 +239,24 @@ fun IsometricScope.Path(
 fun IsometricScope.Batch(
     shapes: List<Shape>,
     color: IsoColor = LocalDefaultColor.current,
+    alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
     rotationOrigin: Point? = null,
     scaleOrigin: Point? = null,
-    visible: Boolean = true
+    visible: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null
 ) {
     ReusableComposeNode<BatchNode, IsometricApplier>(
         factory = { BatchNode(shapes, color) },
         update = {
             set(shapes) { this.shapes = it; markDirty() }
             set(color) { this.color = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {
                 require(it.isFinite()) { "rotation must be finite, got $it" }
@@ -224,6 +271,10 @@ fun IsometricScope.Batch(
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -314,6 +365,8 @@ fun <T> IsometricScope.ForEach(
  * })
  * ```
  *
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque).
+ *   Applied by scaling the alpha of each [RenderCommand] returned by [render].
  * @param position Local position offset
  * @param rotation Local rotation around Z axis
  * @param scale Local scale factor
@@ -321,11 +374,16 @@ fun <T> IsometricScope.ForEach(
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the node is visible
  * @param renderOptions Optional per-node render options override
+ * @param onClick Callback invoked when this node is tapped
+ * @param onLongClick Callback invoked when this node is long-pressed
+ * @param testTag Optional tag for testing and diagnostics
+ * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @param render Function producing render commands from the accumulated context and node ID
  */
 @IsometricComposable
 @Composable
 fun IsometricScope.CustomNode(
+    alpha: Float = 1f,
     position: Point = Point(0.0, 0.0, 0.0),
     rotation: Double = 0.0,
     scale: Double = 1.0,
@@ -333,12 +391,17 @@ fun IsometricScope.CustomNode(
     scaleOrigin: Point? = null,
     visible: Boolean = true,
     renderOptions: RenderOptions? = null,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    testTag: String? = null,
+    nodeId: String? = null,
     render: (context: RenderContext, nodeId: String) -> List<RenderCommand>
 ) {
     ReusableComposeNode<CustomRenderNode, IsometricApplier>(
         factory = { CustomRenderNode(render) },
         update = {
             set(render) { this.renderFunction = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
             set(position) { this.position = it; markDirty() }
             set(rotation) {
                 require(it.isFinite()) { "rotation must be finite, got $it" }
@@ -354,6 +417,10 @@ fun IsometricScope.CustomNode(
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
             set(renderOptions) { this.renderOptions = it; markDirty() }
+            set(onClick) { this.onClick = it }
+            set(onLongClick) { this.onLongClick = it }
+            set(testTag) { this.testTag = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }

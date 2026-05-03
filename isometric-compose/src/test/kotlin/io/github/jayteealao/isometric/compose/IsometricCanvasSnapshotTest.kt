@@ -12,6 +12,10 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
+import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
+import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
+import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
+import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import org.junit.Rule
@@ -297,6 +301,75 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(680.dp, 440.dp)) {
                 IsometricScene {
                     Shape(geometry = Stairs(Point(1.0, 1.0, 1.0), 10), color = LIGHT_GREEN)
+                }
+            }
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // depth-sort regression baselines.
+    //
+    // Four scene-specific captures pinning the depth-sort algorithm against
+    // two bug classes that occur in the InteractionSamples:
+    //
+    //   1. Row-layout shared-edge case (NodeIdSample): the canonical
+    //      shared-edge ordering bug at the boundary between adjacent
+    //      different-height prisms.
+    //   2. Row-layout with one shape elevated (OnClickSample): tests dynamic
+    //      height-change adjacency.
+    //   3. 3x3 grid (LongPressSample): primary marker for the
+    //      over-aggressive-edge regression that the screen-overlap gate
+    //      (`IntersectionUtils.hasInteriorIntersection`) prevents.
+    //   4. Mixed geometry (AlphaSample): same regression class as (3) with
+    //      a heterogenous shape mix (prism + cylinder + pyramid + small prisms).
+    // ----------------------------------------------------------------------
+
+    @Test
+    fun nodeIdRowScene() {
+        // 4 buildings in a row at varying heights — the NodeIdSample case.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    NodeIdRowScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun onClickRowScene() {
+        // 5 unit cubes in a row with the 4th selected (height=2, yellow).
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    OnClickRowScene(selectedIndex = 3)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun longPressGridScene() {
+        // 3x3 grid default state — primary marker for the over-aggressive-edge
+        // regression. Pre-screen-overlap-gate: back-right cube renders with
+        // only its top face visible. With the gate: all cubes render with all
+        // expected faces.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    LongPressGridScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun alphaSampleScene() {
+        // Mixed geometry: prism + cylinder + pyramid + 3 small prisms in a row.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    AlphaSampleScene()
                 }
             }
         }

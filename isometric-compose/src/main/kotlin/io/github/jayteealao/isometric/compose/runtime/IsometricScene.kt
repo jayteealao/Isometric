@@ -17,8 +17,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.SceneProjector
+
+/** Duration in milliseconds before a press is considered a long press. */
+private const val LONG_PRESS_TIMEOUT_MS = 500L
 
 /**
  * Snapshot of the actual runtime flag configuration applied to the renderer.
@@ -260,26 +268,31 @@ fun IsometricScene(
         }
     }
 
-    // Keep fresh references for the pointer-input coroutine, which is keyed on
-    // gesturesActive and would otherwise capture stale values.
+    // Keep fresh references for the pointer-input coroutine, which is keyed
+    // on Unit (never restarts) and would otherwise capture stale values.
     val currentRenderContext by rememberUpdatedState(renderContext)
     val currentCanvasWidth by rememberUpdatedState(canvasWidth)
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
 
-    // Render to canvas with gesture handling.
-    // Pointer input is installed when gestures are explicitly enabled OR when a
-    // CameraState is provided (for default drag-to-pan behavior).
-    val gesturesActive = config.gestures.enabled || config.cameraState != null || tileGestureHub.hasHandlers
+    // Pointer input is always installed so per-node onClick / onLongClick
+    // callbacks fire even when no scene-level GestureConfig is supplied.
+    // Downstream hit-test and dispatch are no-ops when nothing is registered.
     Canvas(
         modifier = modifier
             .then(
-                if (gesturesActive) {
-                    Modifier.pointerInput(gesturesActive) {
+                Modifier.pointerInput(Unit) {
+                        // Capture coroutine scope for long-press detection.
+                        // pointerInput's lambda is a suspend PointerInputScope.() -> Unit,
+                        // so we wrap with coroutineScope to get a scope for launching.
+                        coroutineScope {
+                        val longPressScope: CoroutineScope = this
                         awaitPointerEventScope {
                             var isDragging = false
+                            var longPressFired = false
                             var dragStartPos: Offset? = null
+                            var longPressJob: Job? = null
 
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -289,6 +302,46 @@ fun IsometricScene(
                                         val position = event.changes.first().position
                                         dragStartPos = position
                                         isDragging = false
+                                        longPressFired = false
+
+                                        // Start long-press detection coroutine
+                                        longPressJob?.cancel()
+                                        longPressJob = longPressScope.launch {
+                                            delay(LONG_PRESS_TIMEOUT_MS)
+                                            val pressPos = dragStartPos ?: return@launch
+
+                                            // Inverse-transform for camera-aware hit testing
+                                            val camera = currentCameraState
+                                            val hitX: Double
+                                            val hitY: Double
+                                            if (camera != null) {
+                                                val cx = currentCanvasWidth / 2.0
+                                                val cy = currentCanvasHeight / 2.0
+                                                hitX = (pressPos.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+                                                hitY = (pressPos.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+                                            } else {
+                                                hitX = pressPos.x.toDouble()
+                                                hitY = pressPos.y.toDouble()
+                                            }
+
+                                            val hitNode = renderer.hitTest(
+                                                rootNode = rootNode,
+                                                x = hitX,
+                                                y = hitY,
+                                                context = currentRenderContext,
+                                                width = currentCanvasWidth,
+                                                height = currentCanvasHeight
+                                            )
+                                            val onLongClick = hitNode?.onLongClick
+                                            if (onLongClick != null) {
+                                                onLongClick.invoke()
+                                                // Suppress the trailing tap only after a real
+                                                // long-click dispatched. A slow tap on empty
+                                                // space or on a node without onLongClick must
+                                                // still fall through to onTap / onClick.
+                                                longPressFired = true
+                                            }
+                                        }
                                     }
 
                                     PointerEventType.Move -> {
@@ -301,6 +354,7 @@ fun IsometricScene(
                                             // If moved more than threshold, it's a drag
                                             if (!isDragging && delta.getDistance() > currentGestures.dragThreshold) {
                                                 isDragging = true
+                                                longPressJob?.cancel()
                                                 currentGestures.onDragStart?.invoke(
                                                     DragEvent(start.x.toDouble(), start.y.toDouble())
                                                 )
@@ -322,9 +376,13 @@ fun IsometricScene(
                                     }
 
                                     PointerEventType.Release -> {
+                                        longPressJob?.cancel()
                                         val position = event.changes.first().position
 
-                                        if (isDragging) {
+                                        if (longPressFired) {
+                                            // Long-press already dispatched on the press path;
+                                            // do not fire onTap or onDragEnd.
+                                        } else if (isDragging) {
                                             currentGestures.onDragEnd?.invoke()
                                         } else {
                                             // S8: Inverse-transform pointer coordinates when camera
@@ -358,6 +416,9 @@ fun IsometricScene(
                                                 )
                                             )
 
+                                            // Dispatch per-node onClick after scene-level onTap
+                                            hitNode?.onClick?.invoke()
+
                                             // Route to any registered TileGrid tap handlers.
                                             // Uses hitX/hitY (camera-corrected) so screenToTile
                                             // receives engine-space coordinates, matching the
@@ -375,15 +436,14 @@ fun IsometricScene(
                                         }
 
                                         isDragging = false
+                                        longPressFired = false
                                         dragStartPos = null
                                     }
                                 }
                             }
                         }
+                        } // coroutineScope
                     }
-                } else {
-                    Modifier
-                }
             )
     ) {
         // Read sceneVersion to subscribe to node tree changes.
