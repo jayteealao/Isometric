@@ -86,7 +86,7 @@ fun IsometricScope.Shape(
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
             set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -141,7 +141,7 @@ fun IsometricScope.Group(
             set(visible) { this.isVisible = it; markDirty() }
             set(renderOptions) { this.renderOptions = it; markDirty() }
             set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         },
         content = {
             IsometricScopeImpl.content()
@@ -209,7 +209,7 @@ fun IsometricScope.Path(
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
             set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -274,7 +274,7 @@ fun IsometricScope.Batch(
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
             set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
@@ -420,7 +420,7 @@ fun IsometricScope.CustomNode(
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
             set(testTag) { this.testTag = it }
-            set(nodeId) { this.explicitNodeId = it }
+            set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
     )
 }
