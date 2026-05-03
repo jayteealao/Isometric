@@ -11,6 +11,7 @@ public final class io/github/jayteealao/isometric/HitOrder : java/lang/Enum {
 
 public final class io/github/jayteealao/isometric/IntersectionUtils {
 	public static final field INSTANCE Lio/github/jayteealao/isometric/IntersectionUtils;
+	public final fun hasInteriorIntersection (Ljava/util/List;Ljava/util/List;)Z
 	public final fun hasIntersection (Ljava/util/List;Ljava/util/List;)Z
 	public final fun isPointCloseToPoly (Ljava/util/List;DDD)Z
 	public final fun isPointInPoly (Ljava/util/List;DD)Z
@@ -55,6 +56,7 @@ public final class io/github/jayteealao/isometric/IsoColor {
 	public final fun lighten (DLio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/IsoColor;
 	public final fun toRGBA ()[I
 	public fun toString ()Ljava/lang/String;
+	public final fun withAlpha (F)Lio/github/jayteealao/isometric/IsoColor;
 }
 
 public final class io/github/jayteealao/isometric/IsoColor$Companion {
