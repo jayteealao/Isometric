@@ -155,6 +155,7 @@ open class Path(
      * @param observer eye position used to orient the plane-side tests.
      * @param projectionAngle iso projection angle in radians; defaults to 30°.
      */
+    @JvmOverloads
     fun closerThan(pathA: Path, observer: Point, projectionAngle: Double = PI / 6.0): Int {
         // Step 1: iso-depth (Z) extent minimax.
         // Inlined depth = x*isoCos + y*isoSin - 2*z to avoid recomputing cos/sin
