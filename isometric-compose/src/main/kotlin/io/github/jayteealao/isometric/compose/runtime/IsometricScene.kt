@@ -290,6 +290,7 @@ fun IsometricScene(
                         val longPressScope: CoroutineScope = this
                         awaitPointerEventScope {
                             var isDragging = false
+                            var longPressFired = false
                             var dragStartPos: Offset? = null
                             var longPressJob: Job? = null
 
@@ -301,6 +302,7 @@ fun IsometricScene(
                                         val position = event.changes.first().position
                                         dragStartPos = position
                                         isDragging = false
+                                        longPressFired = false
 
                                         // Start long-press detection coroutine
                                         longPressJob?.cancel()
@@ -332,8 +334,9 @@ fun IsometricScene(
                                             )
                                             hitNode?.onLongClick?.invoke()
 
-                                            // Suppress tap on release after long press fires
-                                            isDragging = true
+                                            // Mark long-press as fired so Release suppresses
+                                            // tap dispatch without falsely entering drag-end.
+                                            longPressFired = true
                                         }
                                     }
 
@@ -372,7 +375,10 @@ fun IsometricScene(
                                         longPressJob?.cancel()
                                         val position = event.changes.first().position
 
-                                        if (isDragging) {
+                                        if (longPressFired) {
+                                            // Long-press already dispatched on the press path;
+                                            // do not fire onTap or onDragEnd.
+                                        } else if (isDragging) {
                                             currentGestures.onDragEnd?.invoke()
                                         } else {
                                             // S8: Inverse-transform pointer coordinates when camera
@@ -426,6 +432,7 @@ fun IsometricScene(
                                         }
 
                                         isDragging = false
+                                        longPressFired = false
                                         dragStartPos = null
                                     }
                                 }
