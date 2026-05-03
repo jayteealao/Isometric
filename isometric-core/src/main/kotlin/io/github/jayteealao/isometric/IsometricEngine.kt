@@ -245,9 +245,11 @@ class IsometricEngine @JvmOverloads constructor(
             projectAndCull(item, originX, originY, renderOptions, normalizedLight, width, height)
         }
 
-        // Sort by depth if enabled
+        // Sort by depth if enabled. Threading the engine's projection angle into
+        // DepthSorter keeps Path.closerThan's Z-extent step in sync with this
+        // engine instance's actual projection, instead of a baked 30° default.
         val sortedItems = if (renderOptions.enableDepthSorting) {
-            DepthSorter.sort(transformedItems, renderOptions)
+            DepthSorter.sort(transformedItems, renderOptions, this.angle)
         } else {
             transformedItems
         }
