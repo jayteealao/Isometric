@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric
 
+import kotlin.math.PI
 import kotlin.math.floor
 
 /**
@@ -22,8 +23,16 @@ internal object DepthSorter {
      * The baseline path checks every prior item pair. When broad-phase sorting is enabled,
      * spatial bucketing prunes candidate-pair generation; polygon intersection, depth
      * comparison, and topological-sort behavior stay unchanged.
+     *
+     * @param projectionAngle iso projection angle (radians). Threaded into the depth
+     * pre-sort and into [Path.closerThan]'s Z-extent step so non-default engine angles
+     * produce correct ordering. Defaults to 30° to match [IsometricEngine]'s default.
      */
-    fun sort(items: List<TransformedItem>, options: RenderOptions): List<TransformedItem> {
+    fun sort(
+        items: List<TransformedItem>,
+        options: RenderOptions,
+        projectionAngle: Double = PI / 6.0
+    ): List<TransformedItem> {
         // Pre-sort by depth descending so that faces farther from the viewer get
         // lower indices. When Kahn's algorithm has multiple zero-in-degree nodes,
         // it picks the lowest index first — this ensures a back-to-front default
@@ -31,7 +40,7 @@ internal object DepthSorter {
         // shared-edge face pairs that closerThan() cannot resolve (returns 0)
         // would fall back to insertion order, causing side faces of later prisms
         // to paint over top faces of earlier prisms.
-        val depthSorted = items.sortedByDescending { it.item.path.depth }
+        val depthSorted = items.sortedByDescending { it.item.path.depth(projectionAngle) }
 
         val sortedItems = mutableListOf<TransformedItem>()
         val observer = Point(-10.0, -10.0, 20.0)
@@ -45,12 +54,12 @@ internal object DepthSorter {
             for (packed in candidatePairs) {
                 val i = (packed ushr 32).toInt()
                 val j = (packed and 0xFFFFFFFFL).toInt()
-                checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options)
+                checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options, projectionAngle)
             }
         } else {
             for (i in 0 until length) {
                 for (j in 0 until i) {
-                    checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options)
+                    checkDepthDependency(depthSorted[i], depthSorted[j], i, j, drawBefore, observer, options, projectionAngle)
                 }
             }
         }
@@ -128,7 +137,8 @@ internal object DepthSorter {
         j: Int,
         drawBefore: List<MutableList<Int>>,
         observer: Point,
-        options: RenderOptions
+        options: RenderOptions,
+        projectionAngle: Double
     ) {
         // Check if 2D projections share a non-trivial INTERIOR overlap.
         //
@@ -149,7 +159,7 @@ internal object DepthSorter {
         }
         val cmpPath = when {
             sharedEdgeOrder != 0 -> sharedEdgeOrder
-            intersects -> itemA.item.path.closerThan(itemB.item.path, observer)
+            intersects -> itemA.item.path.closerThan(itemB.item.path, observer, projectionAngle)
             else -> 0
         }
         if (cmpPath < 0) {

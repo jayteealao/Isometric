@@ -95,7 +95,8 @@ public final class io/github/jayteealao/isometric/IsometricEngine$Companion {
 public class io/github/jayteealao/isometric/Path {
 	public fun <init> (Ljava/util/List;)V
 	public fun <init> ([Lio/github/jayteealao/isometric/Point;)V
-	public final fun closerThan (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Point;)I
+	public final fun closerThan (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Point;D)I
+	public static synthetic fun closerThan$default (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/Point;DILjava/lang/Object;)I
 	public final fun depth (D)D
 	public final fun getDepth ()D
 	public final fun getPoints ()Ljava/util/List;

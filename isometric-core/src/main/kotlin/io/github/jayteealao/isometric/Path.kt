@@ -116,8 +116,9 @@ open class Path(
      * definitive call:
      *
      * 1. **Iso-depth (Z) extent**: if the two polygons' iso-depth (the iso-projection
-     *    proxy `x*cos(ISO_ANGLE) + y*sin(ISO_ANGLE) - 2*z`) extents are strictly
-     *    disjoint, the one with the smaller depth range is unambiguously closer.
+     *    proxy `x*cos(projectionAngle) + y*sin(projectionAngle) - 2*z`) extents are
+     *    strictly disjoint, the one with the smaller depth range is unambiguously
+     *    closer.
      * 2. **Plane-side forward**: if all of `this`'s vertices lie on the same side of
      *    [pathA]'s plane as [observer], `this` is closer; if all on the opposite
      *    side, `this` is farther; mixed or coplanar -> fall through.
@@ -144,31 +145,33 @@ open class Path(
      * terminates with a definitive sign or continues; only mixed-straddle pairs that
      * pass every step without decision return 0.
      *
-     * **Coupling to [IsometricEngine] projection angle**: step 1 uses [ISO_ANGLE]
-     * (30°) which matches [IsometricEngine]'s default isometric projection. If a
-     * future configurable engine projects at a different angle the cascade would
-     * silently produce wrong results at step 1; today this is a single source of
-     * truth and changing the engine angle without updating [ISO_ANGLE] is a known
-     * coupling.
+     * **[projectionAngle] threading**: step 1's iso-depth proxy uses
+     * `cos(projectionAngle) * x + sin(projectionAngle) * y - 2 * z`. Callers in the
+     * depth-sort pipeline pass the active [IsometricEngine.angle] so non-default
+     * projections produce correct first-stage ordering. The default `PI / 6` (30°)
+     * matches [IsometricEngine]'s default and keeps unit tests source-compatible.
      *
      * @param pathA the polygon to compare against.
      * @param observer eye position used to orient the plane-side tests.
+     * @param projectionAngle iso projection angle in radians; defaults to 30°.
      */
-    fun closerThan(pathA: Path, observer: Point): Int {
+    fun closerThan(pathA: Path, observer: Point, projectionAngle: Double = PI / 6.0): Int {
         // Step 1: iso-depth (Z) extent minimax.
-        // Inlined depth = x*ISO_COS + y*ISO_SIN - 2*z to avoid recomputing
-        // cos/sin per vertex; LARGER value = farther from observer.
+        // Inlined depth = x*isoCos + y*isoSin - 2*z to avoid recomputing cos/sin
+        // per vertex; LARGER value = farther from observer.
+        val isoCos = cos(projectionAngle)
+        val isoSin = sin(projectionAngle)
         var selfDepthMin = Double.POSITIVE_INFINITY
         var selfDepthMax = Double.NEGATIVE_INFINITY
         for (p in points) {
-            val d = p.x * ISO_COS + p.y * ISO_SIN - 2.0 * p.z
+            val d = p.x * isoCos + p.y * isoSin - 2.0 * p.z
             if (d < selfDepthMin) selfDepthMin = d
             if (d > selfDepthMax) selfDepthMax = d
         }
         var aDepthMin = Double.POSITIVE_INFINITY
         var aDepthMax = Double.NEGATIVE_INFINITY
         for (p in pathA.points) {
-            val d = p.x * ISO_COS + p.y * ISO_SIN - 2.0 * p.z
+            val d = p.x * isoCos + p.y * isoSin - 2.0 * p.z
             if (d < aDepthMin) aDepthMin = d
             if (d > aDepthMax) aDepthMax = d
         }
@@ -245,25 +248,6 @@ open class Path(
     }
 
     private companion object {
-        /**
-         * Iso projection angle used by the cascade's Z-extent step; matches the
-         * 30° default that [IsometricEngine] applies in its projection. Changing the
-         * engine's projection angle without updating this constant would silently
-         * desync step 1 of the cascade.
-         */
-        private const val ISO_ANGLE: Double = PI / 6.0
-
-        /**
-         * cos(ISO_ANGLE), pre-computed once at class init to avoid per-vertex
-         * trigonometric evaluation in the depth-sort hot loop. Equals cos(30°).
-         */
-        private val ISO_COS: Double = cos(ISO_ANGLE)
-
-        /**
-         * sin(ISO_ANGLE), pre-computed once. Equals sin(30°) = 0.5.
-         */
-        private val ISO_SIN: Double = sin(ISO_ANGLE)
-
         /**
          * Numerical tolerance for "coplanar" / "extents touch", applied per
          * signed-distance to keep behaviour observer-distance-invariant. Matches the
