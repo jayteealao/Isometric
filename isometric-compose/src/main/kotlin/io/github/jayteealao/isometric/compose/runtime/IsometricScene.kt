@@ -332,11 +332,15 @@ fun IsometricScene(
                                                 width = currentCanvasWidth,
                                                 height = currentCanvasHeight
                                             )
-                                            hitNode?.onLongClick?.invoke()
-
-                                            // Mark long-press as fired so Release suppresses
-                                            // tap dispatch without falsely entering drag-end.
-                                            longPressFired = true
+                                            val onLongClick = hitNode?.onLongClick
+                                            if (onLongClick != null) {
+                                                onLongClick.invoke()
+                                                // Suppress the trailing tap only after a real
+                                                // long-click dispatched. A slow tap on empty
+                                                // space or on a node without onLongClick must
+                                                // still fall through to onTap / onClick.
+                                                longPressFired = true
+                                            }
                                         }
                                     }
 
