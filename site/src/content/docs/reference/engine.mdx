@@ -109,6 +109,13 @@ fun findItemAt(
 ): RenderCommand?
 ```
 
+`HitOrder` selects which face wins when several overlap at the tap point:
+
+- `HitOrder.FRONT_TO_BACK` (default) — returns the front-most hit, i.e. the face nearest the viewer (drawn on top). This is what you usually want for selection.
+- `HitOrder.BACK_TO_FRONT` — returns the back-most hit.
+
+`touchRadius` widens the test by a pixel radius for forgiving taps (`0.0` = exact point-in-polygon).
+
 ## Tile Coordinate Helpers
 
 Extension functions that bridge continuous 3D world coordinates and the discrete tile grid
@@ -149,9 +156,6 @@ automatically. For terrain where **elevation varies per tile**, use `screenToWor
 call `Point.toTileCoordinate` after determining the correct layer, or use `screenToTile` via
 `AdvancedSceneConfig` as shown in [Tile Grid — Tap Accuracy with Elevation](/guides/tile-grid/#tap-accuracy-with-elevation).
 :::
-
-For terrain where elevation varies per tile, use `screenToWorld` directly and call
-`Point.toTileCoordinate` after determining the correct layer.
 
 ### Point.toTileCoordinate
 

@@ -16,13 +16,13 @@ Run the full core test suite:
 Run a specific test class:
 
 ```bash
-./gradlew :isometric-core:test --tests "io.fabianterhorst.isometric.IsoColorTest"
+./gradlew :isometric-core:test --tests "io.github.jayteealao.isometric.IsoColorTest"
 ```
 
 Run a single test method:
 
 ```bash
-./gradlew :isometric-core:test --tests "io.fabianterhorst.isometric.IsoColorTest.testFromHexString"
+./gradlew :isometric-core:test --tests "io.github.jayteealao.isometric.IsoColorTest.testFromHexString"
 ```
 
 ## Test Classes
@@ -47,13 +47,7 @@ The core module has unit tests covering all fundamental types:
 | `IntersectionUtilsTest` | `hasIntersection` (boundary-lenient) and `hasInteriorIntersection` (strict-interior) coverage including shared-edge, shared-vertex, and disjoint cases |
 | `PathTest` | Path construction, transforms, Newell Z→X→Y minimax cascade for `closerThan`, coplanar overlap and non-overlap branches, reversal |
 
-Pre-WS9 test files are located under:
-
-```
-isometric-core/src/test/kotlin/io/fabianterhorst/isometric/
-```
-
-WS9 and later test files use the updated package:
+All test files live under the library's package:
 
 ```
 isometric-core/src/test/kotlin/io/github/jayteealao/isometric/
@@ -95,7 +89,7 @@ sync with their regression tests automatically.
 ### Running the Generator
 
 ```bash
-./gradlew :isometric-core:test --tests "io.fabianterhorst.isometric.DocScreenshotGenerator"
+./gradlew :isometric-core:test --tests "io.github.jayteealao.isometric.DocScreenshotGenerator"
 ```
 
 Generated images are written to `docs/assets/screenshots/`. After generating, copy them to the docs site:
@@ -117,13 +111,13 @@ This approach avoids any Android or Compose dependency, keeping screenshot gener
 Place test files in the same package structure as the source:
 
 ```
-isometric-core/src/test/kotlin/io/fabianterhorst/isometric/
+isometric-core/src/test/kotlin/io/github/jayteealao/isometric/
 ```
 
 For shape-specific tests:
 
 ```
-isometric-core/src/test/kotlin/io/fabianterhorst/isometric/shapes/
+isometric-core/src/test/kotlin/io/github/jayteealao/isometric/shapes/
 ```
 
 ### Naming Conventions
@@ -134,9 +128,9 @@ isometric-core/src/test/kotlin/io/fabianterhorst/isometric/shapes/
 ### Example Test
 
 ```kotlin
-package io.fabianterhorst.isometric.shapes
+package io.github.jayteealao.isometric.shapes
 
-import io.fabianterhorst.isometric.Point
+import io.github.jayteealao.isometric.Point
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

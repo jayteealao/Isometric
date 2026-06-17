@@ -56,9 +56,41 @@ Extends SceneConfig with additional fields:
 Sealed class with three variants:
 
 - **FillOnly** — shapes rendered without edges
-- **Stroke(width: Float = 1f, color: IsoColor)** — edges only, no fill
-- **FillAndStroke(width: Float = 1f, color: IsoColor)** — filled shapes with edges (default)
+- **Stroke(width: Float = 1f, color: IsoColor = DefaultStrokeColor)** — edges only, no fill
+- **FillAndStroke(width: Float = 1f, color: IsoColor = DefaultStrokeColor)** — filled shapes with edges (default)
 
-`DefaultStrokeColor`: near-transparent black `IsoColor(0, 0, 0, 25)`
+`width` must be positive. `DefaultStrokeColor` is near-transparent black,
+`IsoColor(0.0, 0.0, 0.0, 25.0)` (~10% opacity).
+
+### GestureConfig
+
+Scene-level gesture handlers, passed via `SceneConfig.gestures`. Any callback left `null` is
+ignored; `enabled` is `true` when at least one is set. The default is `GestureConfig.Disabled`,
+a shared no-op instance.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| onTap | ((TapEvent) -> Unit)? | null | Tap handler. `TapEvent` carries screen `x`/`y` and the hit `node` (nullable). |
+| onDrag | ((DragEvent) -> Unit)? | null | Fires continuously during a drag with the current `DragEvent`. |
+| onDragStart | ((DragEvent) -> Unit)? | null | Fires once when a drag is first recognized. |
+| onDragEnd | (() -> Unit)? | null | Fires once when the drag finishes. |
+| dragThreshold | Float | 8f | Pixels the pointer must move before a drag is recognized. Must be non-negative. |
+
+`GestureConfig` has no long-press callback — long-press is a per-node prop (`onLongClick`).
+See [Per-Node Interactions](../guides/interactions.md).
+
+### CameraState
+
+Mutable pan/zoom state, passed via `SceneConfig.cameraState`. All properties are Compose
+snapshot state, so mutations trigger recomposition.
+
+| Member | Type | Default | Description |
+|---|---|---|---|
+| panX | Double | 0.0 | Horizontal pan offset in pixels. Must be finite. |
+| panY | Double | 0.0 | Vertical pan offset in pixels. Must be finite. |
+| zoom | Double | 1.0 | Zoom factor. Must be positive and finite. |
+| pan(deltaX, deltaY) | method | — | Pans by a delta. |
+| zoomBy(factor) | method | — | Multiplies `zoom` by a positive factor. |
+| reset() | method | — | Resets pan to 0 and zoom to 1. |
 
 For guidance on when to use `AdvancedSceneConfig` vs `SceneConfig`, see the [Advanced Config guide](../guides/advanced-config.md).

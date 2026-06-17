@@ -18,7 +18,7 @@ Isometric exposes six public `CompositionLocal` values that control default rend
 | `LocalColorPalette` | `ColorPalette` | `ColorPalette()` | Named semantic colors (`primary`, `secondary`, `accent`, etc.) |
 | `LocalIsometricEngine` | `IsometricEngine` | Error if not inside a scene | Access to the projection engine for coordinate conversion |
 
-`LocalBenchmarkHooks` also exists but is internal and defaults to `null`. It is used exclusively by the benchmark harness and should not be overridden in application code.
+`LocalBenchmarkHooks` also exists: it is public API (a `RenderBenchmarkHooks?` defaulting to `null`) but reserved for the benchmark harness, where it instruments frame timing. It should not be overridden in application code.
 
 ## Overriding Defaults
 

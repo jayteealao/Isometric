@@ -51,7 +51,7 @@ fun TowerDemo() {
 }
 ```
 
-Because `Tower` is a `@Composable` extension on `IsometricScope`, it composes naturally inside `IsometricScene` and can be mixed with other shapes and groups.
+Because `Tower` is a `@Composable` extension on `IsometricScope`, it composes naturally inside `IsometricScene` and can be mixed with other shapes and groups. A `Group` itself accepts `testTag` and `nodeId` (but not `onClick`/`onLongClick`/`alpha` — apply those to its children).
 
 ## CustomNode with RenderCommands
 
@@ -97,6 +97,10 @@ Key points:
 - Set `ownerNodeId = nodeId` so hit testing can identify which `CustomNode` was tapped.
 - The `points` field is left empty because `projectScene` produces new commands with projected 2D points.
 
+`CustomNode` also accepts the per-node interaction props (`alpha`, `onClick`, `onLongClick`,
+`testTag`, `nodeId`). Because the example already sets `ownerNodeId = nodeId`, adding
+`onClick = { ... }` makes the custom ground tappable without any scene-level handler.
+
 ## Batch for Bulk Rendering
 
 `Batch` renders many shapes with shared color and transforms, producing fewer Compose nodes than individual `Shape` calls. Use it for grids, particle systems, or any large collection of same-colored geometry.
@@ -121,7 +125,7 @@ fun BatchGrid() {
 }
 ```
 
-This creates a single `BatchNode` with 100 shapes instead of 100 individual `ShapeNode` instances, reducing composition overhead.
+This creates a single `BatchNode` with 100 shapes instead of 100 individual `ShapeNode` instances, reducing composition overhead. A `Batch` is one node, so per-node props apply to the whole batch: `alpha` fades every shape together, and `onClick`/`onLongClick` fire for a tap on any shape in the batch.
 
 > **Tip**
 >

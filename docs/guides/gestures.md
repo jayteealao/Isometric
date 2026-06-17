@@ -27,6 +27,15 @@ IsometricScene(
 }
 ```
 
+> **Tip**
+>
+`GestureConfig.onTap` is a **scene-level** handler: it fires for every tap and hit-tests
+the node for you. If you only need to know when a *specific* shape is tapped, attach an
+`onClick` directly to that node instead &mdash; no `GestureConfig` is required, because the
+scene always installs its pointer-input handler. See
+[Per-Node Interactions](interactions.md). When both are present, the scene-level
+`onTap` runs first, then the node's `onClick`.
+
 ### TapEvent
 
 | Property | Type | Description |

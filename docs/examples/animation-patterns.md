@@ -129,6 +129,35 @@ fun PulsingScale() {
 
 Setting `scaleOrigin` to the center of the prism makes it pulse uniformly in all directions rather than scaling from one corner.
 
+## Fading Pulse
+
+A prism whose opacity oscillates via the per-node `alpha` prop.
+
+```kotlin
+@Composable
+fun FadingPulse() {
+    var time by remember { mutableDoubleStateOf(0.0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { time += 0.03 }
+        }
+    }
+
+    IsometricScene {
+        val alpha = (0.5 + sin(time) * 0.5).toFloat().coerceIn(0.05f, 1f)
+        Shape(
+            geometry = Prism(Point.ORIGIN, 2.0, 2.0, 2.0),
+            color = IsoColor(0, 200, 100),
+            alpha = alpha
+        )
+    }
+}
+```
+
+`alpha` is a per-node opacity multiplier in `0f..1f`. A sub-1 alpha allocates a new color each
+frame, so prefer animating a single node (or a small group) rather than hundreds at once.
+
 ## Orbiting Shapes
 
 Three small cubes orbit a central shape using `cos`/`sin` to compute their positions.

@@ -39,11 +39,27 @@ Thank you for your interest in contributing!
 ./gradlew :app:installDebug
 ```
 
+## API Compatibility
+
+The public API of `isometric-core`, `isometric-compose`, and `isometric-android-view` is tracked
+with the binary-compatibility validator. CI runs `apiCheck` on every PR, so verify it locally:
+
+```bash
+./gradlew apiCheck
+```
+
+If you intentionally changed the public API, regenerate the committed `.api` dumps and include
+them in your commit:
+
+```bash
+./gradlew apiDump
+```
+
 ## Submitting Changes
 
 1. Create a branch from `master` (or the current development branch).
 2. Make your changes.
-3. Ensure all tests pass.
+3. Ensure tests and `./gradlew apiCheck` pass.
 4. Submit a pull request with a clear description of what changed and why.
 
 ## Code Style

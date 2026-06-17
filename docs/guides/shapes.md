@@ -40,6 +40,23 @@ Shape(
 - **scale** — uniform scale factor
 - **visible** — toggle rendering without removing the node from the tree
 
+`Shape` also carries the per-node interaction and identity props — **alpha** (opacity
+multiplier in `0f..1f`), **onClick**, **onLongClick**, **testTag**, and **nodeId** — plus
+**rotationOrigin**/**scaleOrigin** to set the pivot for rotation and scaling:
+
+```kotlin
+Shape(
+    geometry = Prism(Point.ORIGIN),
+    color = IsoColor.BLUE,
+    alpha = 0.6f,
+    onClick = { /* handle a tap on this shape */ },
+    nodeId = "hero-prism"
+)
+```
+
+See [Per-Node Interactions](interactions.md) and the
+[Composables Reference](../reference/composables.md#shape) for the complete parameter list.
+
 ## Transform Operations
 
 All transforms return a new `Shape` instance (shapes are immutable).

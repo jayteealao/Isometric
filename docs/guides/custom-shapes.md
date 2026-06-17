@@ -13,7 +13,7 @@ The `Path` composable renders a 2D polygon face positioned in 3D space. Use it f
 
 ```kotlin
 Path(
-    path = io.fabianterhorst.isometric.Path(
+    path = io.github.jayteealao.isometric.Path(
         Point(0.0, 0.0, 1.0),
         Point(2.0, 0.0, 1.0),
         Point(2.0, 2.0, 1.0)
@@ -27,7 +27,7 @@ Path(
 The `Path` class name collides with `kotlin.io.path.Path`. Use an import alias to avoid ambiguity:
 
 ```kotlin
-import io.fabianterhorst.isometric.Path as IsoPath
+import io.github.jayteealao.isometric.Path as IsoPath
 ```
 
 ## 2. Shape.extrude
@@ -35,7 +35,7 @@ import io.fabianterhorst.isometric.Path as IsoPath
 `Shape.extrude` takes a 2D `Path` and lifts it along the Z axis to produce a 3D solid. This is the easiest way to create non-rectangular geometry.
 
 ```kotlin
-val trianglePath = io.fabianterhorst.isometric.Path(
+val trianglePath = io.github.jayteealao.isometric.Path(
     Point(0.0, 0.0, 0.0),
     Point(2.0, 0.0, 0.0),
     Point(2.0, 2.0, 0.0)
@@ -57,7 +57,7 @@ CustomNode(
     position = Point(0.0, 0.0, 0.0),
     render = { context, nodeId ->
         // Create a triangular face in 3D space
-        val trianglePath = io.fabianterhorst.isometric.Path(
+        val trianglePath = io.github.jayteealao.isometric.Path(
             Point(0.0, 0.0, 0.0),
             Point(2.0, 0.0, 0.0),
             Point(1.0, 1.0, 1.0)
@@ -69,10 +69,9 @@ CustomNode(
         listOf(
             RenderCommand(
                 commandId = nodeId,
-                points = transformed.points.map { pt ->
-                    // Project 3D → 2D (simplified; real projection happens in engine)
-                    Point2D(pt.x, pt.y)
-                },
+                // Leave points empty — engine.projectScene() fills in the projected
+                // 2D points from originalPath during rendering. Don't pre-project here.
+                points = emptyList(),
                 color = IsoColor.RED,
                 originalPath = transformed,
                 originalShape = null,
@@ -82,6 +81,11 @@ CustomNode(
     }
 )
 ```
+
+`CustomNode` also accepts the per-node interaction props (`alpha`, `onClick`, `onLongClick`,
+`testTag`, `nodeId`). For `onClick`/`onLongClick` to fire, set `ownerNodeId = nodeId` on the
+`RenderCommand`s you emit (as above) so hit testing can map a tapped face back to the node —
+then you no longer need a scene-level `onTap` plus a manual node lookup.
 
 Use `CustomNode` when you need to:
 
