@@ -61,6 +61,10 @@ Root (GroupNode)
   +-- PathNode (a flat face)
 ```
 
+Every node except `GroupNode` also carries the per-node interaction state defined on the
+`IsometricNode` base — `alpha`, `onClick`, `onLongClick`, `testTag`, and `nodeId`. See
+[Per-Node Interactions](../guides/interactions.md).
+
 ## Dirty Tracking
 
 When a node's properties change (for example, a `ShapeNode`'s color or position), the node calls `markDirty()`. This propagates up the tree to the root:
@@ -68,7 +72,7 @@ When a node's properties change (for example, a `ShapeNode`'s color or position)
 1. The changed node marks itself dirty.
 2. Each ancestor up to the root is marked dirty.
 3. The root's `onDirty` callback fires.
-4. `sceneVersion` increments.
+4. `IsometricScene` bumps an internal scene-version state that the `Canvas` lambda reads.
 5. The canvas is invalidated, triggering a redraw.
 
 On the next frame, only the dirty subtree is re-traversed. Clean subtrees are skipped entirely. This is why animating one shape in a 200-shape scene is cheap -- 199 nodes are untouched.
@@ -130,9 +134,9 @@ See [Advanced Patterns](../examples/advanced-patterns.md) for worked examples of
 
 `RenderContext` accumulates transforms as the engine traverses the node tree. When a `ShapeNode` sits inside a rotated `GroupNode`, the context carries the group's rotation so the shape inherits it.
 
-The context provides four methods:
+The context provides these transform methods:
 
-- **`withTransform(transform)`** -- pushes a transform onto the stack and returns a new context
+- **`withTransform(position, rotation, scale, rotationOrigin, scaleOrigin)`** -- returns a new context with the given local transform composed onto the accumulated stack
 - **`applyTransformsToShape(shape)`** -- applies all accumulated transforms to a `Shape`
 - **`applyTransformsToPath(path)`** -- applies all accumulated transforms to a `Path`
 - **`applyTransformsToPoint(point)`** -- applies all accumulated transforms to a single `Point`

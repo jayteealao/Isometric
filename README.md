@@ -49,28 +49,28 @@ fun MyIsometricScene() {
 
 The shape uses the scene default color. Pass `color = IsoColor(r, g, b)` when you want an explicit override.
 
-See the [Quick Start guide](site/src/content/docs/getting-started/quickstart.mdx) for a complete walkthrough.
+See the [Quick Start guide](docs/getting-started/quickstart.md) for a complete walkthrough.
 
 ## Documentation
 
-- [**Quick Start**](site/src/content/docs/getting-started/quickstart.mdx) — Build your first scene in 5 minutes
-- [**Coordinate System**](site/src/content/docs/getting-started/coordinate-system.mdx) — How 3D world space maps to 2D screen space
-- [**Shapes Guide**](site/src/content/docs/guides/shapes.mdx) — Built-in shapes, transforms, and custom geometry
-- [**Animation**](site/src/content/docs/guides/animation.mdx) — vsync-aligned animation with `withFrameNanos`
-- [**Gestures**](site/src/content/docs/guides/gestures.mdx) — Tap and drag with spatial hit testing
-- [**Per-Node Interactions**](site/src/content/docs/guides/interactions.mdx) — Per-node `alpha`, `onClick`, `onLongClick`, `testTag`, and `nodeId`
-- [**Tile Grid**](site/src/content/docs/guides/tile-grid.mdx) — Render and interact with isometric tile grids
-- [**Stack**](site/src/content/docs/guides/stack.mdx) — Arrange shapes along a world axis
-- [**Camera**](site/src/content/docs/guides/camera.mdx) — Pan and zoom with `CameraState`
-- [**Theming & Colors**](site/src/content/docs/guides/theming.mdx) — `IsoColor`, palettes, lighting, stroke styles
-- [**Custom Shapes**](site/src/content/docs/guides/custom-shapes.mdx) — `Path`, `Shape.extrude`, and `CustomNode`
-- [**Performance**](site/src/content/docs/guides/performance.mdx) — Caching, native canvas, spatial indexing
-- [**Compose Interop**](site/src/content/docs/guides/compose-interop.mdx) — Layout, state sharing, Material theming, navigation
-- [**Advanced Configuration**](site/src/content/docs/guides/advanced-config.mdx) — Lifecycle hooks, custom engines, escape hatches
-- [**Scene Graph**](site/src/content/docs/concepts/scene-graph.mdx) — Architecture, node types, and dirty tracking
-- [**Depth Sorting**](site/src/content/docs/concepts/depth-sorting.mdx) — How isometric draw order works
-- [**Rendering Pipeline**](site/src/content/docs/concepts/rendering-pipeline.mdx) — From recomposition to pixels
-- [**Migration Guide**](site/src/content/docs/migration/view-to-compose.mdx) — Migrating from the View API to Compose
+- [**Quick Start**](docs/getting-started/quickstart.md) — Build your first scene in 5 minutes
+- [**Coordinate System**](docs/getting-started/coordinate-system.md) — How 3D world space maps to 2D screen space
+- [**Shapes Guide**](docs/guides/shapes.md) — Built-in shapes, transforms, and custom geometry
+- [**Animation**](docs/guides/animation.md) — vsync-aligned animation with `withFrameNanos`
+- [**Gestures**](docs/guides/gestures.md) — Tap and drag with spatial hit testing
+- [**Per-Node Interactions**](docs/guides/interactions.md) — Per-node `alpha`, `onClick`, `onLongClick`, `testTag`, and `nodeId`
+- [**Tile Grid**](docs/guides/tile-grid.md) — Render and interact with isometric tile grids
+- [**Stack**](docs/guides/stack.md) — Arrange shapes along a world axis
+- [**Camera**](docs/guides/camera.md) — Pan and zoom with `CameraState`
+- [**Theming & Colors**](docs/guides/theming.md) — `IsoColor`, palettes, lighting, stroke styles
+- [**Custom Shapes**](docs/guides/custom-shapes.md) — `Path`, `Shape.extrude`, and `CustomNode`
+- [**Performance**](docs/guides/performance.md) — Caching, native canvas, spatial indexing
+- [**Compose Interop**](docs/guides/compose-interop.md) — Layout, state sharing, Material theming, navigation
+- [**Advanced Configuration**](docs/guides/advanced-config.md) — Lifecycle hooks, custom engines, escape hatches
+- [**Scene Graph**](docs/concepts/scene-graph.md) — Architecture, node types, and dirty tracking
+- [**Depth Sorting**](docs/concepts/depth-sorting.md) — How isometric draw order works
+- [**Rendering Pipeline**](docs/concepts/rendering-pipeline.md) — From recomposition to pixels
+- [**Migration Guide**](docs/migration/view-to-compose.md) — Migrating from the View API to Compose
 
 ## Requirements
 

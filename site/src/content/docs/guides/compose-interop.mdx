@@ -120,18 +120,20 @@ State changes in the slider recompose the scene content. Tap events in the scene
 
 ## Engine Access Outside the Scene
 
-`LocalIsometricEngine` is only available **inside** the `IsometricScene` content block. To use the engine from a sibling composable (e.g. a coordinate readout panel), use the `onEngineReady` callback:
+`LocalIsometricEngine` is only available **inside** the `IsometricScene` content block. To use the engine from a sibling composable (e.g. a coordinate readout panel), use the `onEngineReady` callback. The callback hands you a `SceneProjector`; the projection helpers `worldToScreen` and `screenToWorld` are defined on the concrete `IsometricEngine`, so cast to it when you need them:
 
 ```kotlin
 @Composable
 fun SceneWithInfoPanel() {
-    var engine by remember { mutableStateOf<SceneProjector?>(null) }
+    // worldToScreen / screenToWorld live on IsometricEngine, not on the
+    // SceneProjector interface — capture the concrete engine type.
+    var engine by remember { mutableStateOf<IsometricEngine?>(null) }
 
     Row {
         IsometricScene(
             modifier = Modifier.weight(1f).fillMaxHeight(),
             config = AdvancedSceneConfig(
-                onEngineReady = { engine = it }
+                onEngineReady = { engine = it as? IsometricEngine }
             )
         ) {
             Shape(geometry = Prism(Point.ORIGIN))
@@ -152,7 +154,7 @@ fun SceneWithInfoPanel() {
 
 ## Touch Coordination with Scrollables
 
-`IsometricScene` installs a `pointerInput` handler when gestures are enabled or a `CameraState` is provided. This handler **consumes** drag events once the drag threshold is exceeded. In practice:
+`IsometricScene` **always** installs a `pointerInput` handler — it powers per-node `onClick`/`onLongClick` as well as scene-level gestures and camera panning. This handler **consumes** drag events once the drag threshold is exceeded. In practice:
 
 - **Taps** do not interfere with parent scrollables — they are consumed only on release.
 - **Drags** inside the scene are consumed by the scene's gesture handler. The parent `LazyColumn` or `verticalScroll` will not scroll while dragging inside the scene.

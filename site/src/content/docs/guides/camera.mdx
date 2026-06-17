@@ -52,20 +52,40 @@ Restores the camera to its initial state (`panX = 0`, `panY = 0`, `zoom = 1`):
 camera.reset()
 ```
 
-## Drag-to-Pan Example
+## Drag-to-Pan
 
-Connect `CameraState` to pointer input for interactive panning:
+Providing a `CameraState` is all you need for drag-to-pan: when `cameraState` is set and no
+`GestureConfig.onDrag` is supplied, the scene's built-in pointer handler pans the camera on drag.
 
 ```kotlin
 val camera = remember { CameraState() }
 
 IsometricScene(
-    modifier = Modifier.pointerInput(Unit) {
-        detectDragGestures { _, dragAmount ->
-            camera.pan(dragAmount.x.toDouble(), dragAmount.y.toDouble())
-        }
-    },
-    config = SceneConfig(cameraState = camera)
+    modifier = Modifier.fillMaxSize(),
+    config = SceneConfig(cameraState = camera)   // built-in drag-to-pan
+) {
+    Shape(geometry = Prism(Point.ORIGIN))
+}
+```
+
+:::caution
+Don't also attach an external `Modifier.pointerInput { detectDragGestures { ... } }` that calls
+`camera.pan(...)`. The scene already installs its own pointer handler, so a second one pans twice
+per drag. To customize panning, supply `GestureConfig.onDrag` instead and call `camera.pan(...)`
+there — that replaces the built-in behavior rather than competing with it.
+:::
+
+```kotlin
+val camera = remember { CameraState() }
+
+val gestures = remember {
+    GestureConfig(
+        onDrag = { event -> camera.pan(event.x / camera.zoom, event.y / camera.zoom) }
+    )
+}
+
+IsometricScene(
+    config = SceneConfig(cameraState = camera, gestures = gestures)
 ) {
     Shape(geometry = Prism(Point.ORIGIN))
 }

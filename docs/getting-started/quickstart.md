@@ -33,7 +33,7 @@ Isometric uses `IsoColor` for colors, not `androidx.compose.ui.graphics.Color`. 
 
 ## Step 3: Add More Shapes
 
-A `Prism` accepts a position and optional width, length, and height parameters. Stack several shapes to build up a scene:
+A `Prism` accepts a position and optional width, depth, and height parameters. Stack several shapes to build up a scene:
 
 ```kotlin
 @Composable
@@ -102,6 +102,28 @@ fun InteractiveScene() {
 }
 ```
 
+> **Tip**
+>
+For a single shape, attaching `onClick` directly is simpler than a scene-level handler — no
+`GestureConfig` and no hit-test lookup:
+
+```kotlin
+@Composable
+fun InteractiveShape() {
+    var selected by remember { mutableStateOf(false) }
+    IsometricScene {
+        Shape(
+            geometry = Prism(Point.ORIGIN, 2.0, 2.0, 1.0),
+            color = if (selected) IsoColor.RED else IsoColor.BLUE,
+            onClick = { selected = !selected }
+        )
+    }
+}
+```
+
+Use scene-level `onTap` for background taps or raw coordinates; use per-node `onClick` when you
+just need "this shape was tapped." See [Per-Node Interactions](../guides/interactions.md).
+
 ## Next Steps
 
 Now that you have a working scene, explore further:
@@ -109,3 +131,4 @@ Now that you have a working scene, explore further:
 - **[Coordinate System](coordinate-system.md)** — understand how isometric coordinates map to the screen.
 - **[Shapes](../guides/shapes.md)** — learn about all available geometries: Prism, Pyramid, Cylinder, Octahedron, Stairs, and Knot.
 - **[Animation](../guides/animation.md)** — bring your scenes to life with animated transforms and transitions.
+- **[Per-Node Interactions](../guides/interactions.md)** — attach `onClick`, `onLongClick`, `alpha`, and stable `nodeId`s to individual shapes.

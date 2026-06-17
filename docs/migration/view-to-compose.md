@@ -73,17 +73,19 @@ isometricView.setClickListener { renderCommand ->
 }
 ```
 
-After:
+After — the closest analog is a per-node `onClick` directly on the shape:
 
 ```kotlin
-IsometricScene(
-    config = SceneConfig(
-        gestures = GestureConfig(
-            onTap = { event -> /* event.node is the tapped shape */ }
-        )
-    )
-) { ... }
+Shape(
+    geometry = Prism(Point.ORIGIN),
+    onClick = { /* this shape was tapped */ }
+)
 ```
+
+For background taps or raw screen coordinates, use a scene-level `GestureConfig.onTap` instead
+(its `event.node` is the hit shape, or `null` for empty space). The Compose API also adds
+capabilities the View API lacked: per-node `onLongClick`, `alpha`, `testTag`, and a stable
+`nodeId`. See [Per-Node Interactions](../guides/interactions.md).
 
 ### Key Differences Summary
 
@@ -93,7 +95,10 @@ IsometricScene(
 | Adding shapes | view.add(shape, color) | Shape(geometry, color) composable |
 | Transforms | shape.translate/rotate/scale | Shape params + Group hierarchy |
 | State updates | Imperative: view.clear() + re-add | Declarative: recomposition |
-| Click handling | setClickListener | GestureConfig.onTap |
+| Click handling | setClickListener | Per-node onClick (or GestureConfig.onTap) |
+| Long-press | — (not available) | Per-node onLongClick |
+| Opacity | — (not available) | Per-node alpha |
+| Test / identity tags | — (not available) | Per-node testTag / nodeId |
 | Color type | Color | IsoColor |
 | Animation | Manual invalidation | withFrameNanos + recomposition |
 

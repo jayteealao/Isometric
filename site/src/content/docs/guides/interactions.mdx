@@ -16,7 +16,13 @@ attaching behavior and identity to individual nodes inside a scene:
 
 These props live on the node itself, not on a separate gesture configuration. Using
 them does **not** require a `GestureConfig` on the enclosing `IsometricScene` &mdash;
-the pointer-input modifier is installed automatically as soon as any node opts in.
+the scene always installs its pointer-input handler, so per-node callbacks fire even
+when no `GestureConfig` is supplied. (When nothing is registered, hit-testing and
+dispatch are simply no-ops.)
+
+`Group` is the exception: it accepts only `testTag` and `nodeId`. A group has no faces
+of its own to render or hit-test, so `alpha`, `onClick`, and `onLongClick` do not apply
+to it &mdash; put those on the child `Shape`/`Path`/`Batch`/`CustomNode` nodes instead.
 
 ## Alpha
 
@@ -72,9 +78,12 @@ fun TapToColorChange() {
 }
 ```
 
-Long-press fires once after the platform long-press timeout. The press is cancelled
-if the pointer moves beyond the gesture system's threshold or the press is released
-early.
+Long-press fires once after the long-press timeout (500&nbsp;ms). The press is cancelled
+if the pointer moves beyond the gesture system's drag threshold before the timeout. When
+a long-press *does* fire on a node, the trailing tap is suppressed &mdash; on release
+neither that node's `onClick` nor the scene-level `onTap` runs. Suppression only happens
+when the hit node has an `onLongClick`; a slow press on empty space, or on a node without
+`onLongClick`, still falls through to `onClick`/`onTap` as a normal tap.
 
 ```kotlin
 @Composable
@@ -95,8 +104,8 @@ fun LockableTile() {
 ### Combining with scene-level GestureConfig
 
 Per-node handlers and `GestureConfig.onTap` coexist. When a tap lands on a node with
-`onClick`, both fire &mdash; the per-node handler first, then the scene handler with
-the same hit-tested node attached to the `TapEvent`.
+`onClick`, both fire &mdash; the scene-level `onTap` runs **first** (with the hit-tested
+node attached to the `TapEvent`), then the node's own `onClick`.
 
 ```kotlin
 IsometricScene(
@@ -111,7 +120,7 @@ IsometricScene(
 ) {
     Shape(
         geometry = Prism(Point.ORIGIN),
-        onClick = { println("Per-node tap fired first") }
+        onClick = { println("Per-node onClick fires after the scene handler") }
     )
 }
 ```
@@ -123,6 +132,34 @@ Use one or the other for clarity unless you genuinely need both layers.
 `Batch` is one node, not many. A batched group of shapes shares a single
 `onClick`/`onLongClick`; tapping any shape in the batch fires the same handler. If
 you need per-shape handlers, render the shapes individually rather than batched.
+
+### Per-node handlers on CustomNode
+
+`CustomNode` carries the same five props. For its `onClick`/`onLongClick` to fire, the
+`RenderCommand`s your `render` lambda returns must set `ownerNodeId = nodeId` (the id is
+passed into the lambda) so hit testing can map a tapped face back to the node:
+
+```kotlin
+CustomNode(
+    onClick = { println("custom geometry tapped") },
+    render = { context, nodeId ->
+        val face = context.applyTransformsToPath(myPath)
+        listOf(
+            RenderCommand(
+                commandId = nodeId,
+                points = emptyList(),
+                color = IsoColor.BLUE,
+                originalPath = face,
+                originalShape = null,
+                ownerNodeId = nodeId  // required for the per-node onClick to resolve
+            )
+        )
+    }
+)
+```
+
+With `ownerNodeId` wired, you no longer need a scene-level `onTap` plus a manual node
+lookup &mdash; the per-node callback dispatches directly.
 
 ## testTag
 

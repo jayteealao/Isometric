@@ -15,16 +15,18 @@ The library sorts automatically by default (`enableDepthSorting = true`), so sha
 
 ## The Depth Formula
 
-Each face's depth is computed from the mean position of its vertices:
+Each face's depth is the mean depth of its vertices. At the default 30° projection angle this reduces to:
 
 ```
 depth = x + y - 2 * z
 ```
 
-- **Higher x or y** pushes the face closer to the viewer (drawn on top).
-- **Higher z** pushes the face further from the viewer (drawn behind).
+**Higher depth means farther from the viewer**, so higher-depth faces are painted first and end up behind:
 
-This formula follows directly from the isometric projection geometry. A shape at ground level in the foreground (high x, high y, low z) has a large depth value and is drawn last, appearing on top. See [Coordinate System](../getting-started/coordinate-system.md) for the full projection math.
+- **Higher x or y** *increases* depth → farther away, drawn behind.
+- **Higher z** *decreases* depth (the `-2z` term) → closer to the viewer, drawn on top.
+
+For non-default angles the metric generalizes to `x * cos(angle) + y * sin(angle) - 2 * z`. The engine threads its configured projection angle through the sort, so a scene rendered at a non-30° angle still orders correctly. See [Coordinate System](../getting-started/coordinate-system.md) for the full projection math.
 
 ## The Sorting Pipeline
 
@@ -32,7 +34,7 @@ Sorting happens in four stages, each progressively more precise:
 
 ### Stage 1: Compute Per-Face Depth
 
-Every face in the scene gets a depth value from the formula above, calculated from the mean of its vertex positions. This gives a single scalar per face for initial ordering.
+Every face gets a depth value from the formula above — the mean of its vertices' depths, computed with the engine's configured projection angle. Faces are pre-sorted back-to-front by this scalar, which also fixes the draw order for any pair the later stages cannot decide.
 
 ### Stage 2: Broad Phase (Spatial Grid)
 
@@ -47,6 +49,8 @@ For each pair of candidate faces within the same cell, `IntersectionUtils.hasInt
 ### Stage 4: Topological Sort
 
 The remaining interior-overlapping pairs are analyzed by `Path.closerThan` (a reduced Newell cascade — iso-depth extent minimax followed by plane-side tests) to determine which face is "in front of" the other. These relationships form a directed acyclic graph (DAG). A topological sort of this DAG produces the final draw order.
+
+When back-face culling is enabled, a deterministic pre-pass first orders pairs that share a real 3D edge between a horizontal face and a vertical wall — walls below a horizontal face draw before it, walls above draw after. This keeps stacked prisms and tile grids stable at their shared edges, where `closerThan` alone would report "ambiguous."
 
 ```
 All faces

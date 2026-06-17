@@ -21,19 +21,33 @@ per-node interaction and identity:
 `Group` accepts only `testTag` and `nodeId` &mdash; for opacity or click handling on a
 group, apply those props to the contained `Shape`/`Path`/`Batch` nodes individually.
 
-Per-node `onClick`/`onLongClick` install a `pointerInput` modifier on `IsometricScene`
-automatically, so no `GestureConfig` is required for these handlers to fire. See the
+`IsometricScene` always installs its `pointerInput` handler, so per-node `onClick`/`onLongClick`
+fire without any `GestureConfig`. When a tap hits a node, the scene-level `onTap` (if any) runs
+first, then the node's `onClick`. See the
 [Per-Node Interactions guide](../guides/interactions.md) for full examples.
 
 ### IsometricScene
 
-Entry point composable. Two overloads:
+Entry point composable. Two overloads, selected by the static type of `config`:
+
+**`IsometricScene(modifier, config: SceneConfig = SceneConfig(), content)`** — standard usage.
 
 | Param | Type | Default | Description |
 |---|---|---|---|
 | modifier | Modifier | Modifier | Standard Compose modifier |
 | config | SceneConfig | SceneConfig() | Scene configuration |
-| content | IsometricScope.() -> Unit | — | Scene content |
+| content | @Composable IsometricScope.() -> Unit | — | Scene content |
+
+**`IsometricScene(modifier, config: AdvancedSceneConfig, content)`** — advanced usage exposing
+engine injection, renderer flags, and lifecycle hooks. See
+[Scene Config reference](scene-config.md) and the
+[Advanced Configuration guide](../guides/advanced-config.md).
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| modifier | Modifier | Modifier | Standard Compose modifier |
+| config | AdvancedSceneConfig | — | Required. Advanced scene configuration |
+| content | @Composable IsometricScope.() -> Unit | — | Scene content |
 
 ### Shape
 
@@ -53,6 +67,12 @@ Entry point composable. Two overloads:
 | testTag | String? | null | Optional tag for testing and diagnostics. Does not affect rendering or hit testing. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
 
+> **Note**
+>
+`scale` must be positive and finite and `rotation` must be finite, or assignment throws
+`IllegalArgumentException`. This validation applies to `Shape`, `Group`, `Path`, `Batch`, and
+`CustomNode`.
+
 ### Group
 
 | Param | Type | Default | Description |
@@ -66,7 +86,7 @@ Entry point composable. Two overloads:
 | renderOptions | RenderOptions? | null | Override render options for this subtree |
 | testTag | String? | null | Optional tag for testing and diagnostics. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
-| content | IsometricScope.() -> Unit | — | Child shapes and groups |
+| content | @Composable IsometricScope.() -> Unit | — | Child shapes and groups |
 
 Transforms accumulate through the hierarchy. A shape inside a rotated group inherits the group's rotation.
 
@@ -137,7 +157,7 @@ Batch(
 | Param | Type | Description |
 |---|---|---|
 | condition | Boolean | When false, children are removed from the scene graph |
-| content | IsometricScope.() -> Unit | Content to conditionally render |
+| content | @Composable IsometricScope.() -> Unit | Content to conditionally render |
 
 ```kotlin
 var showRoof by remember { mutableStateOf(true) }
@@ -153,7 +173,7 @@ If(showRoof) {
 |---|---|---|
 | items | List\<T\> | Items to iterate |
 | key | ((T) -> Any)? | Optional key function for stable identity |
-| content | IsometricScope.(T) -> Unit | Content for each item |
+| content | @Composable IsometricScope.(T) -> Unit | Content for each item |
 
 ```kotlin
 ForEach(items = buildings, key = { it.id }) { building ->
@@ -163,11 +183,40 @@ ForEach(items = buildings, key = { it.id }) { building ->
 
 ### CustomNode
 
-Escape hatch for custom rendering. Takes a `render` lambda that returns `List<RenderCommand>`.
+Escape hatch for custom rendering. The `render` lambda receives the accumulated
+`RenderContext` and the node's `nodeId`, and returns the `RenderCommand`s to draw.
 
-`CustomNode` accepts the full set of per-node interaction props (`alpha`, `onClick`,
-`onLongClick`, `testTag`, `nodeId`). The `alpha` multiplier is applied to every
-`RenderCommand` your lambda emits.
+| Param | Type | Default | Description |
+|---|---|---|---|
+| alpha | Float | 1f | Opacity multiplier in 0..1. Applied to every `RenderCommand` the lambda emits. |
+| position | Point | Point(0,0,0) | Position offset |
+| rotation | Double | 0.0 | Rotation angle in radians |
+| scale | Double | 1.0 | Uniform scale factor |
+| rotationOrigin | Point? | null | Center of rotation |
+| scaleOrigin | Point? | null | Center of scale |
+| visible | Boolean | true | Visibility toggle |
+| renderOptions | RenderOptions? | null | Per-node render options override (null inherits from parent) |
+| onClick | (() -> Unit)? | null | Tap handler. Requires the emitted commands to set `ownerNodeId = nodeId` so hit testing can resolve the tap. |
+| onLongClick | (() -> Unit)? | null | Long-press handler. Same `ownerNodeId` requirement as `onClick`. |
+| testTag | String? | null | Optional tag for testing and diagnostics. |
+| nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
+| render | (context: RenderContext, nodeId: String) -> List\<RenderCommand\> | — | Required. Produces the node's render commands. |
+
+```kotlin
+CustomNode(render = { context, nodeId ->
+    val face = context.applyTransformsToPath(myPath)
+    listOf(
+        RenderCommand(
+            commandId = nodeId,
+            points = emptyList(),          // engine.projectScene() fills projected points
+            color = IsoColor.BLUE,
+            originalPath = face,
+            originalShape = null,
+            ownerNodeId = nodeId
+        )
+    )
+})
+```
 
 ### TileGrid
 

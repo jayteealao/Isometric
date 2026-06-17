@@ -21,6 +21,24 @@ fun SimpleCube() {
 }
 ```
 
+### Clickable Cube
+
+A cube that toggles color when tapped, using a per-node `onClick` — no `GestureConfig` needed.
+
+```kotlin
+@Composable
+fun ClickableCube() {
+    var on by remember { mutableStateOf(false) }
+    IsometricScene {
+        Shape(
+            geometry = Prism(Point.ORIGIN, 2.0, 2.0, 2.0),
+            color = if (on) IsoColor.ORANGE else IsoColor(33, 150, 243),
+            onClick = { on = !on }
+        )
+    }
+}
+```
+
 ### Building with Platform
 
 A building on a flat platform with a pyramid roof.

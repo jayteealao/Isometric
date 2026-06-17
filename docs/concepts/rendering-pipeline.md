@@ -40,15 +40,14 @@ When no state has changed, the entire left branch is skipped. The cached `Prepar
 
 ## Cache Invalidation
 
-Three independent conditions must all be clean for a cache hit. If any one changes, the scene re-projects:
+Four independent conditions must all be clean for a cache hit. If any one changes, the scene re-projects:
 
 | Condition | What changed | How it is detected |
 |-----------|-------------|-------------------|
-| Dirty tree flag | A node's content changed (color, position, geometry) | `markDirty()` propagates to root, increments `sceneVersion` |
+| Dirty tree flag | A node's content changed (color, position, geometry) | `markDirty()` propagates to root, incrementing an internal scene-version counter the `Canvas` observes |
 | Projection version | Engine angle or scale changed | `projectionVersion` on `SceneProjector` increments |
 | Viewport dimensions | Canvas width or height changed (e.g., device rotation) | Width/height compared against cached `PreparedScene` dimensions |
-
-Additionally, `frameVersion` (set on `AdvancedSceneConfig`) acts as an external cache key. Incrementing it forces re-projection even when the other three conditions are clean.
+| Frame version | `frameVersion` bumped on `AdvancedSceneConfig` | External cache key — incrementing forces re-projection even when the tree is clean |
 
 ```kotlin
 // All three must match for a cache hit:
@@ -72,7 +71,7 @@ val cacheValid = !tree.isDirty
 | `originalShape` | `Shape?` | The parent shape, if this face came from a multi-face shape |
 | `ownerNodeId` | `String?` | The node that produced this command (used for hit testing) |
 
-A `Prism` produces six faces (six `RenderCommand` objects). After backface culling, typically three are visible. After bounds checking, commands for off-screen faces are discarded.
+A `Prism` produces six faces (six `RenderCommand` objects). Culling runs in two passes: a pre-projection pass removes shared interior walls between adjacent shapes (e.g. the touching walls of two abutting tiles), then standard screen-space back-face culling drops faces that turn away from the camera — typically leaving three visible. After bounds checking, commands for off-screen faces are discarded.
 
 ```kotlin
 // Intercept render commands via onPreparedSceneReady

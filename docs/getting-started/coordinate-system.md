@@ -27,12 +27,12 @@ The library converts a 3D point `(x, y, z)` to 2D screen coordinates `(screenX, 
 
 ```
 screenX = originX + x · scale · cos(angle) + y · scale · cos(π - angle)
-screenY = originY - x · scale · sin(angle) - y · scale · sin(angle) - z · scale
+screenY = originY - x · scale · sin(angle) - y · scale · sin(π - angle) - z · scale
 ```
 
 Where:
 
-- `originX, originY` is the projection origin on screen (center-bottom of the viewport by default).
+- `originX, originY` is the projection origin on screen (horizontally centered, 90% of the way down the viewport by default).
 - `scale` is the number of pixels per world unit (default: **70**).
 - `angle` is the isometric angle (default: **π/6**).
 
@@ -50,7 +50,7 @@ screenY = originY - (x + y) · scale · sin(angle) - z · scale
 
 ## Origin Placement
 
-The projection origin maps to the **center-bottom** of the viewport. This means `Point(0, 0, 0)` appears at the horizontal center of the canvas, near the bottom. Shapes with positive Z values rise upward from there.
+The projection origin is **horizontally centered and anchored 90% of the way down** the viewport (`originX = width / 2`, `originY = height × 0.9`). This means `Point(0, 0, 0)` appears at the horizontal center of the canvas, near — but not at — the bottom. The remaining ~10% of headroom below the origin leaves room for geometry with negative Z. Shapes with positive Z values rise upward from there.
 
 ## Scale
 
@@ -58,16 +58,20 @@ The default scale is **70 pixels per world unit**. A `Prism` with width 1.0 occu
 
 ## Depth Sorting
 
-Isometric scenes have no true perspective, so the library must decide which shapes to draw on top of others. It uses the following depth formula:
+Isometric scenes have no true perspective, so the library must decide which faces to draw on top of others. It sorts faces back-to-front using a depth metric. At the default 30° angle this reduces to:
 
 ```
 depth = x + y - 2 · z
 ```
 
-- **Higher x or y** values push a shape closer to the viewer (drawn on top).
-- **Higher z** values push a shape further from the viewer (drawn behind).
+**Higher depth means farther from the viewer**, so higher-depth faces are painted *first* and end up behind:
 
-This means a shape sitting at ground level in the foreground will correctly overlap a taller shape behind it. The library sorts all shapes by depth automatically before rendering.
+- **Higher x or y** *increases* depth → the face is farther away and drawn behind.
+- **Higher z** *decreases* depth (the `−2 · z` term) → the face is closer to the viewer and drawn on top.
+
+So raising a shape's Z lifts it above lower geometry, while pushing it out along +X or +Y sends it into the background. The library applies this sort automatically before rendering.
+
+For non-default projection angles the metric generalizes to `x · cos(angle) + y · sin(angle) − 2 · z`, and the engine threads its configured angle through the sort so ordering stays correct. See [Depth Sorting](../concepts/depth-sorting.md) for the full algorithm.
 
 ## Point.ORIGIN
 
