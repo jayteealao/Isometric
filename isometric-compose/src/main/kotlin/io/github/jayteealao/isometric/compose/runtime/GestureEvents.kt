@@ -15,12 +15,38 @@ data class TapEvent(
 )
 
 /**
+ * A per-event pointer translation dispatched during a drag.
+ *
+ * Carries the change in pointer position since the previous drag event — a movement
+ * vector, not an absolute coordinate. Camera autopan accumulates these deltas, so the
+ * [DragEvent.delta] of each `onDrag` event is exactly what callers sum to track total
+ * drag travel.
+ *
+ * @param dx Horizontal change in pointer position since the previous drag event, in pixels.
+ * @param dy Vertical change in pointer position since the previous drag event, in pixels.
+ */
+data class DragDelta(
+    val dx: Double,
+    val dy: Double
+)
+
+/**
  * Describes a drag interaction within an isometric scene.
  *
- * @param x Current horizontal screen coordinate of the pointer, in pixels.
- * @param y Current vertical screen coordinate of the pointer, in pixels.
+ * [x] and [y] are the **absolute** screen position of the pointer: the drag-start
+ * position when delivered to `onDragStart`, and the live pointer position when
+ * delivered to `onDrag`. The per-event movement is carried separately by [delta],
+ * so the two never have to share one pair of fields with conflicting meanings.
+ *
+ * @param x Absolute horizontal screen coordinate of the pointer, in pixels.
+ * @param y Absolute vertical screen coordinate of the pointer, in pixels.
+ * @param delta Per-event pointer translation, in pixels — the movement since the
+ *   previous drag event. Non-`null` in `onDrag`; `null` in `onDragStart`, where no
+ *   movement has happened yet. Accumulate these to track total drag travel; this is
+ *   the value camera autopan sums.
  */
 data class DragEvent(
     val x: Double,
-    val y: Double
+    val y: Double,
+    val delta: DragDelta? = null
 )

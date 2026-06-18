@@ -11,10 +11,13 @@ import androidx.compose.runtime.Stable
  *
  * @param onTap Called when the user taps the scene. The [TapEvent] includes screen
  *   coordinates and, when hit testing is active, the tapped [IsometricNode].
- * @param onDrag Called continuously as the user drags across the scene, providing
- *   the current [DragEvent] with screen coordinates.
- * @param onDragStart Called once when a drag gesture is first recognised, providing
- *   the initial [DragEvent] with screen coordinates.
+ * @param onDrag Called continuously as the user drags across the scene. The
+ *   [DragEvent.x]/[DragEvent.y] carry the live absolute pointer position, while
+ *   [DragEvent.delta] carries the per-event movement since the previous drag event —
+ *   accumulate the deltas to track total travel (this is what camera autopan sums).
+ * @param onDragStart Called once when a drag gesture is first recognised. The
+ *   [DragEvent.x]/[DragEvent.y] carry the absolute drag-start position; [DragEvent.delta]
+ *   is `null` because no movement has happened yet.
  * @param onDragEnd Called once when the drag gesture finishes (finger lifted).
  * @param dragThreshold Minimum distance in pixels the pointer must move before a
  *   drag is recognised. Must be non-negative. Defaults to `8f`.

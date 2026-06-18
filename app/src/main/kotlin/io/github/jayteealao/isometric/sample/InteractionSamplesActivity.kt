@@ -69,6 +69,11 @@ fun InteractionSamplesScreen() {
                 onClick = { selectedSample = 4 },
                 text = { Text("Combined") }
             )
+            Tab(
+                selected = selectedSample == 5,
+                onClick = { selectedSample = 5 },
+                text = { Text("Drag Lifecycle") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -78,6 +83,7 @@ fun InteractionSamplesScreen() {
                 2 -> AlphaSample()
                 3 -> NodeIdSample()
                 4 -> CombinedSample()
+                5 -> DragLifecycleSample()
             }
         }
     }
@@ -525,3 +531,103 @@ private data class CitySlot(
     val height: Double,
     val position: Point
 )
+
+// ---------------------------------------------------------------------------
+// Sample 6: Drag lifecycle — onDragStart / onDrag / onDragEnd
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates the full drag lifecycle with a non-default [GestureConfig.dragThreshold].
+ * Dragging past 32px fires onDragStart once, then onDrag repeatedly, then onDragEnd once.
+ *
+ * The status card makes the [DragEvent] field contract visible: `x`/`y` are the absolute
+ * pointer position (the drag-start position, captured in onDragStart), while `delta` is the
+ * per-event movement that callers accumulate — the same value camera autopan sums. Reading
+ * the absolute start from `x`/`y` and the running total from `delta` is the hero use case.
+ */
+@Composable
+fun DragLifecycleSample() {
+    var lastEvent by remember { mutableStateOf("(idle — drag the scene)") }
+    var startX by remember { mutableStateOf(0.0) }
+    var startY by remember { mutableStateOf(0.0) }
+    var accumulatedDx by remember { mutableStateOf(0.0) }
+    var accumulatedDy by remember { mutableStateOf(0.0) }
+    var dragEvents by remember { mutableStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Last event: $lastEvent")
+                Text(
+                    "Drag start (absolute x/y): " +
+                        "(${"%.0f".format(startX)}, ${"%.0f".format(startY)})",
+                    style = MaterialTheme.typography.caption
+                )
+                Text(
+                    "Accumulated delta: " +
+                        "(${"%.0f".format(accumulatedDx)}, ${"%.0f".format(accumulatedDy)}) " +
+                        "over $dragEvents events",
+                    style = MaterialTheme.typography.caption
+                )
+                Text(
+                    "Threshold 32px · x/y are absolute, delta is per-event movement",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(
+                gestures = GestureConfig(
+                    dragThreshold = 32f,
+                    onDragStart = { event ->
+                        lastEvent = "DRAG_START"
+                        startX = event.x
+                        startY = event.y
+                        accumulatedDx = 0.0
+                        accumulatedDy = 0.0
+                        dragEvents = 0
+                    },
+                    onDrag = { event ->
+                        lastEvent = "DRAG"
+                        // delta is non-null in onDrag; accumulate it to track total travel.
+                        event.delta?.let { d ->
+                            accumulatedDx += d.dx
+                            accumulatedDy += d.dy
+                            dragEvents++
+                        }
+                    },
+                    onDragEnd = {
+                        lastEvent = "DRAG_END"
+                    }
+                )
+            )
+        ) {
+            // Floor slab + two contrasting prisms — mirrored by the
+            // isometric-compose test fixture `DragLifecycleScene`.
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            Shape(
+                geometry = Prism(
+                    position = Point(1.0, 1.0, 0.1),
+                    width = 1.5, depth = 1.5, height = 1.5
+                ),
+                color = IsoColor.BLUE
+            )
+            Shape(
+                geometry = Prism(
+                    position = Point(4.0, 2.0, 0.1),
+                    width = 1.5, depth = 1.5, height = 2.5
+                ),
+                color = IsoColor.ORANGE
+            )
+        }
+    }
+}
