@@ -356,18 +356,24 @@ fun IsometricScene(
                                                 isDragging = true
                                                 longPressJob?.cancel()
                                                 currentGestures.onDragStart?.invoke(
-                                                    DragEvent(start.x.toDouble(), start.y.toDouble())
+                                                    // Absolute drag-start position; no movement yet, so delta is null.
+                                                    DragEvent(start.x.toDouble(), start.y.toDouble(), delta = null)
                                                 )
                                             }
 
                                             if (isDragging) {
-                                                val dragEvent = DragEvent(delta.x.toDouble(), delta.y.toDouble())
+                                                // x/y = live absolute pointer position; delta = per-event movement.
+                                                val dragEvent = DragEvent(
+                                                    x = position.x.toDouble(),
+                                                    y = position.y.toDouble(),
+                                                    delta = DragDelta(delta.x.toDouble(), delta.y.toDouble())
+                                                )
                                                 val onDrag = currentGestures.onDrag
                                                 if (onDrag != null) {
                                                     onDrag.invoke(dragEvent)
                                                 } else {
-                                                    // C2: Default drag→pan when cameraState is active
-                                                    currentCameraState?.pan(dragEvent.x, dragEvent.y)
+                                                    // C2: Default drag→pan accumulates the per-event delta when cameraState is active
+                                                    dragEvent.delta?.let { currentCameraState?.pan(it.dx, it.dy) }
                                                 }
                                                 dragStartPos = position
                                                 event.changes.forEach { it.consume() }

@@ -13,6 +13,7 @@ import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
 import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
+import io.github.jayteealao.isometric.compose.scenes.DragLifecycleScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
 import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
 import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
@@ -370,6 +371,18 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
                     AlphaSampleScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun dragLifecycleScene() {
+        // Floor slab + two contrasting prisms — the DragLifecycleSample geometry.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    DragLifecycleScene()
                 }
             }
         }
