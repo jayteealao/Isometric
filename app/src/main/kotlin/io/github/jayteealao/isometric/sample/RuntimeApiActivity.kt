@@ -279,11 +279,17 @@ fun AnimationSample() {
 
 /**
  * Sample 4: Interactive with gesture handling (runtime API version)
+ *
+ * Panning is wired through the built-in [CameraState] drag-to-pan: handing a [CameraState] to
+ * [SceneConfig.cameraState] is all the call site needs — when no explicit `onDrag` is supplied,
+ * the scene's default drag handler pans the camera. This replaces the previous hand-rolled
+ * `Group(position = …)` workaround, which the docs call out as unnecessary. The shapes now sit
+ * at their static positions and the camera moves the viewport instead of the geometry.
  */
 @Composable
 fun RuntimeInteractiveSample() {
     var tappedNode by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableStateOf(Point(0.0, 0.0, 0.0)) }
+    val cameraState = remember { CameraState() }
 
     Column(modifier = Modifier.fillMaxSize()) {
         if (tappedNode != null) {
@@ -307,33 +313,26 @@ fun RuntimeInteractiveSample() {
                 gestures = GestureConfig(
                     onTap = { event ->
                         tappedNode = event.node?.let { "Node ${it.nodeId}" } ?: "Background"
-                    },
-                    onDrag = { event ->
-                        dragOffset = Point(
-                            dragOffset.x + event.x / 50.0,
-                            dragOffset.y - event.y / 50.0,
-                            dragOffset.z
-                        )
                     }
-                )
+                    // No onDrag: the built-in default drag handler pans cameraState.
+                ),
+                cameraState = cameraState
             )
         ) {
-            Group(position = dragOffset) {
-                Shape(
-                    geometry = Prism(position = Point(0.0, 0.0, 0.0)),
-                    color = IsoColor(33.0, 150.0, 243.0)
-                )
+            Shape(
+                geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                color = IsoColor(33.0, 150.0, 243.0)
+            )
 
-                Shape(
-                    geometry = Pyramid(position = Point(2.0, 0.0, 0.0)),
-                    color = IsoColor(255.0, 100.0, 0.0)
-                )
+            Shape(
+                geometry = Pyramid(position = Point(2.0, 0.0, 0.0)),
+                color = IsoColor(255.0, 100.0, 0.0)
+            )
 
-                Shape(
-                    geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
-                    color = IsoColor(0.0, 200.0, 100.0)
-                )
-            }
+            Shape(
+                geometry = Cylinder(position = Point(-2.0, 0.0, 0.0), radius = 0.5, height = 2.0, vertices = 20),
+                color = IsoColor(0.0, 200.0, 100.0)
+            )
         }
     }
 }

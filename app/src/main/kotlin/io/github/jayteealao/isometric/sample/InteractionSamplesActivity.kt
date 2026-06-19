@@ -3,10 +3,15 @@ package io.github.jayteealao.isometric.sample
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.Point
@@ -94,6 +99,21 @@ fun InteractionSamplesScreen() {
                 onClick = { selectedSample = 9 },
                 text = { Text("Per-node") }
             )
+            Tab(
+                selected = selectedSample == 10,
+                onClick = { selectedSample = 10 },
+                text = { Text("Camera") }
+            )
+            Tab(
+                selected = selectedSample == 11,
+                onClick = { selectedSample = 11 },
+                text = { Text("Pinch") }
+            )
+            Tab(
+                selected = selectedSample == 12,
+                onClick = { selectedSample = 12 },
+                text = { Text("Hover") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -108,6 +128,9 @@ fun InteractionSamplesScreen() {
                 7 -> LongPressConfigSample()
                 8 -> DoubleTapSample()
                 9 -> PerNodeCallbackSample()
+                10 -> CameraControlSample()
+                11 -> PinchZoomRecipeSample()
+                12 -> HoverRecipeSample()
             }
         }
     }
@@ -950,6 +973,188 @@ fun PerNodeCallbackSample() {
                         )
                     )
                 }
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 11: Camera control — built-in pan / zoom / reset
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates the built-in [CameraState] end-to-end. Handing a [CameraState] to
+ * [SceneConfig.cameraState] enables drag-to-pan with no `onDrag` of your own: the scene's
+ * default drag handler pans the camera. The buttons drive [CameraState.zoomBy] and
+ * [CameraState.reset] programmatically, and the status card reflects the live `panX` / `panY` /
+ * `zoom` — all three are Compose snapshot state, so the card recomposes as the camera moves.
+ */
+@Composable
+fun CameraControlSample() {
+    val cameraState = remember { CameraState() }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Drag to pan · zoom / reset with the buttons")
+                Text(
+                    "pan = (${"%.0f".format(cameraState.panX)}, " +
+                        "${"%.0f".format(cameraState.panY)}) · " +
+                        "zoom = ${"%.2f".format(cameraState.zoom)}",
+                    style = MaterialTheme.typography.caption
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(onClick = { cameraState.zoomBy(1.2) }) { Text("Zoom In") }
+                    Button(onClick = { cameraState.zoomBy(1.0 / 1.2) }) { Text("Zoom Out") }
+                    Button(onClick = { cameraState.reset() }) { Text("Reset") }
+                }
+            }
+        }
+
+        // Drag-to-pan fires automatically because cameraState is set and no onDrag is supplied.
+        // Geometry mirrors the `CameraControlScene` test fixture.
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(cameraState = cameraState)
+        ) {
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            Shape(
+                geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                color = IsoColor(33.0, 150.0, 243.0)
+            )
+            Shape(
+                geometry = Pyramid(position = Point(2.0, 0.0, 0.0)),
+                color = IsoColor(255.0, 100.0, 0.0)
+            )
+            Shape(
+                geometry = Cylinder(
+                    position = Point(-2.0, 0.0, 0.0),
+                    radius = 0.5, height = 2.0, vertices = 20
+                ),
+                color = IsoColor(0.0, 200.0, 100.0)
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 12: Pinch-to-zoom recipe (no new API)
+// ---------------------------------------------------------------------------
+
+/**
+ * A no-new-API **recipe**: pinch-to-zoom built from Compose primitives wired to
+ * [CameraState.zoomBy]. The recipe is a `Modifier.pointerInput(Unit) { detectTransformGestures … }`
+ * chained on the scene's modifier — deliberately a *separate* pointer-input node from the scene's
+ * own tap/drag detector. Stacking `detectTransformGestures` in the same `pointerInput` lambda as
+ * another detector would dead-code all but the first; keeping it separate lets the scale gesture
+ * and the built-in drag-to-pan coexist. (`zoom` from `detectTransformGestures` is the per-gesture
+ * scale ratio, always positive, so it's a valid [CameraState.zoomBy] factor.)
+ */
+@Composable
+fun PinchZoomRecipeSample() {
+    val cameraState = remember { CameraState() }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Pinch to zoom · zoom = ${"%.2f".format(cameraState.zoom)}")
+                Text(
+                    "Recipe: detectTransformGestures in its own pointerInput → cameraState.zoomBy",
+                    style = MaterialTheme.typography.caption
+                )
+                Button(
+                    onClick = { cameraState.reset() },
+                    modifier = Modifier.padding(top = 8.dp)
+                ) { Text("Reset") }
+            }
+        }
+
+        // The pinch detector lives in a SEPARATE pointerInput from the scene's internal
+        // tap/drag handler — this modifier is applied before the scene chains its own.
+        // Geometry mirrors the `PinchZoomRecipeScene` test fixture.
+        IsometricScene(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, _, zoomFactor, _ ->
+                        cameraState.zoomBy(zoomFactor.toDouble())
+                    }
+                },
+            config = SceneConfig(cameraState = cameraState)
+        ) {
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 6.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            Shape(
+                geometry = Prism(position = Point(1.0, 1.0, 0.0)),
+                color = IsoColor.BLUE
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 13: Hover recipe (mouse / stylus only)
+// ---------------------------------------------------------------------------
+
+/**
+ * A no-new-API **recipe**: a hover affordance from [Modifier.hoverable] +
+ * [collectIsHoveredAsState]. Moving a mouse or stylus over the scene tints the target prism and
+ * flips the status card; the scene reads only `isHovered`.
+ *
+ * Hover fires **only** for mouse / stylus — a touchscreen finger never generates hover events, so
+ * this tab shows nothing under touch input. That platform limitation (and how to verify it) is the
+ * one manual-verification path in this sample set; the full accuracy note lives in the docs.
+ */
+@Composable
+fun HoverRecipeSample() {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Hover state: ${if (isHovered) "ENTERED" else "EXITED"}")
+                Text(
+                    "Hover fires only for mouse / stylus — not for touchscreen input.",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        // hoverable reports Enter/Exit for mouse/stylus pointers over the scene.
+        // Geometry mirrors the `HoverRecipeScene` test fixture (the not-hovered baseline).
+        IsometricScene(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .hoverable(interactionSource)
+        ) {
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 6.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            Shape(
+                geometry = Prism(position = Point(1.0, 1.0, 0.1)),
+                color = if (isHovered) IsoColor.YELLOW else IsoColor.ORANGE
             )
         }
     }

@@ -13,14 +13,17 @@ import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
 import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
+import io.github.jayteealao.isometric.compose.scenes.CameraControlScene
 import io.github.jayteealao.isometric.compose.scenes.DoubleTapScene
 import io.github.jayteealao.isometric.compose.scenes.DragLifecycleScene
 import io.github.jayteealao.isometric.compose.scenes.DragNodeScene
+import io.github.jayteealao.isometric.compose.scenes.HoverRecipeScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressConfigScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
 import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
 import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
 import io.github.jayteealao.isometric.compose.scenes.PerNodeCallbackScene
+import io.github.jayteealao.isometric.compose.scenes.PinchZoomRecipeScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import org.junit.Rule
@@ -438,6 +441,45 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
                     PerNodeCallbackScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun cameraControlScene() {
+        // Ground slab + prism/pyramid/cylinder — the CameraControlSample geometry, default
+        // camera (pan = 0, zoom = 1). Pan/zoom/reset have no static footprint; this pins the render.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    CameraControlScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun pinchZoomRecipeScene() {
+        // Ground slab + one landmark prism — the PinchZoomRecipeSample geometry, un-zoomed
+        // baseline. The pinch → zoomBy mapping is a gesture with no static footprint.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    PinchZoomRecipeScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun hoverRecipeScene() {
+        // Ground slab + orange target prism — the HoverRecipeSample geometry, not-hovered
+        // baseline. Hover tint fires only for mouse/stylus, so this captures the un-hovered render.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    HoverRecipeScene()
                 }
             }
         }
