@@ -17,10 +17,12 @@ import io.github.jayteealao.isometric.compose.scenes.CameraControlScene
 import io.github.jayteealao.isometric.compose.scenes.DoubleTapScene
 import io.github.jayteealao.isometric.compose.scenes.DragLifecycleScene
 import io.github.jayteealao.isometric.compose.scenes.DragNodeScene
+import io.github.jayteealao.isometric.compose.scenes.ElevatedTileScene
 import io.github.jayteealao.isometric.compose.scenes.HoverRecipeScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressConfigScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
 import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
+import io.github.jayteealao.isometric.compose.scenes.OccludedPickScene
 import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
 import io.github.jayteealao.isometric.compose.scenes.PerNodeCallbackScene
 import io.github.jayteealao.isometric.compose.scenes.PinchZoomRecipeScene
@@ -480,6 +482,32 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
                     HoverRecipeScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun occludedPickScene() {
+        // Two overlapping prisms — the OccludedPickSample geometry. Pins the occlusion render so a
+        // regression in depth-sort or culling that broke the front/back overlap would change pixels.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    OccludedPickScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun elevatedTileScene() {
+        // Ground plane + a tile raised to z=2 — the ElevatedTileSample geometry. Pins the elevated
+        // render so a projection change that shifted the raised tile would be caught.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    ElevatedTileScene()
                 }
             }
         }

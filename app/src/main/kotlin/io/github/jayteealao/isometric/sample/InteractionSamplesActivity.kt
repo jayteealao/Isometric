@@ -13,9 +13,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import io.github.jayteealao.isometric.HitOrder
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.compose.runtime.*
+import io.github.jayteealao.isometric.screenToTile
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import kotlin.math.sin
@@ -114,6 +118,21 @@ fun InteractionSamplesScreen() {
                 onClick = { selectedSample = 12 },
                 text = { Text("Hover") }
             )
+            Tab(
+                selected = selectedSample == 13,
+                onClick = { selectedSample = 13 },
+                text = { Text("Back-To-Front") }
+            )
+            Tab(
+                selected = selectedSample == 14,
+                onClick = { selectedSample = 14 },
+                text = { Text("Hit Query") }
+            )
+            Tab(
+                selected = selectedSample == 15,
+                onClick = { selectedSample = 15 },
+                text = { Text("Elevated Tile") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -131,6 +150,9 @@ fun InteractionSamplesScreen() {
                 10 -> CameraControlSample()
                 11 -> PinchZoomRecipeSample()
                 12 -> HoverRecipeSample()
+                13 -> OccludedPickSample()
+                14 -> ImperativeHitQuerySample()
+                15 -> ElevatedTileSample()
             }
         }
     }
@@ -1155,6 +1177,230 @@ fun HoverRecipeSample() {
             Shape(
                 geometry = Prism(position = Point(1.0, 1.0, 0.1)),
                 color = if (isHovered) IsoColor.YELLOW else IsoColor.ORANGE
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 14: Back-to-front hit ordering (findItemAt + HitOrder)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates the [HitOrder] escape hatch on overlapping geometry. Two prisms overlap on screen;
+ * tapping the overlap resolves *two* hits from the same tap: the scene's default `onTap` gives the
+ * near prism (`FRONT_TO_BACK`), and a follow-up [IsometricEngine.findItemAt] with `BACK_TO_FRONT`
+ * reaches the occluded prism beneath it.
+ *
+ * The `BACK_TO_FRONT` order is not reachable through `onHitTestReady` (its delivered function is
+ * always `FRONT_TO_BACK`), so the demo captures the [PreparedScene] via
+ * [AdvancedSceneConfig.onPreparedSceneReady] and queries the supplied [AdvancedSceneConfig.engine]
+ * directly. Geometry mirrors the `OccludedPickScene` test fixture.
+ */
+@Composable
+fun OccludedPickSample() {
+    val engine = remember { IsometricEngine() }
+    var prepared by remember { mutableStateOf<PreparedScene?>(null) }
+    var topHit by remember { mutableStateOf("(none)") }
+    var bottomHit by remember { mutableStateOf("(none)") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Tap where the two prisms overlap")
+                Text(
+                    "FRONT_TO_BACK (top): $topHit · BACK_TO_FRONT (bottom): $bottomHit",
+                    style = MaterialTheme.typography.caption
+                )
+                Text(
+                    "One tap, two orders: the default picks the near prism; BACK_TO_FRONT reaches " +
+                        "the one occluded beneath it.",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = AdvancedSceneConfig(
+                engine = engine,
+                onPreparedSceneReady = { prepared = it },
+                gestures = GestureConfig(
+                    onTap = { event ->
+                        topHit = event.node?.nodeId ?: "(miss)"
+                        bottomHit = prepared?.let { scene ->
+                            engine.findItemAt(scene, event.x, event.y, HitOrder.BACK_TO_FRONT, 8.0)
+                                ?.ownerNodeId ?: "(miss)"
+                        } ?: "(scene not ready)"
+                    }
+                )
+            )
+        ) {
+            // Geometry mirrors the `OccludedPickScene` test fixture (front-tile / back-tile).
+            Shape(
+                geometry = Prism(Point(0.0, 0.0, 0.0), 2.0, 2.0, 2.0),
+                color = IsoColor.BLUE,
+                nodeId = "front-tile"
+            )
+            Shape(
+                geometry = Prism(Point(0.5, 0.5, 0.0), 1.0, 1.0, 1.0),
+                color = IsoColor.RED,
+                nodeId = "back-tile"
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 15: Imperative hit query (onHitTestReady)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates [AdvancedSceneConfig.onHitTestReady]. The scene hands the caller a
+ * `(x, y) -> IsometricNode?` function; this tab keeps it and lets you query any screen coordinate
+ * from a text field + button — proving the hatch resolves hits *outside* any gesture.
+ */
+@Composable
+fun ImperativeHitQuerySample() {
+    var hitFn by remember { mutableStateOf<((Double, Double) -> IsometricNode?)?>(null) }
+    var queryX by remember { mutableStateOf("400") }
+    var queryY by remember { mutableStateOf("300") }
+    var result by remember { mutableStateOf("(run a query)") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Query a coordinate — no tap required · result: $result")
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = queryX,
+                        onValueChange = { queryX = it },
+                        label = { Text("x") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = queryY,
+                        onValueChange = { queryY = it },
+                        label = { Text("y") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = {
+                            val x = queryX.toDoubleOrNull()
+                            val y = queryY.toDoubleOrNull()
+                            result = when {
+                                x == null || y == null -> "enter numbers"
+                                hitFn == null -> "(scene not ready)"
+                                else -> hitFn!!.invoke(x, y)?.nodeId ?: "(miss)"
+                            }
+                        }
+                    ) { Text("Query") }
+                }
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = AdvancedSceneConfig(
+                onHitTestReady = { fn -> hitFn = fn }
+            )
+        ) {
+            Shape(
+                geometry = Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1),
+                color = IsoColor.LIGHT_GRAY,
+                nodeId = "ground"
+            )
+            Shape(
+                geometry = Prism(Point(1.0, 1.0, 0.1), 1.5, 1.5, 1.5),
+                color = IsoColor.BLUE,
+                nodeId = "tile-blue"
+            )
+            Shape(
+                geometry = Prism(Point(4.0, 1.0, 0.1), 1.5, 1.5, 2.5),
+                color = IsoColor.ORANGE,
+                nodeId = "tile-orange"
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 16: Elevated-tile coordinate mapping (screenToTile at elevation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates [screenToTile] on an elevated tile. Tapping the raised orange tile maps the tap back
+ * to its grid cell only when the inverse projection intersects the tile's surface z-plane
+ * (`elevation = 2.0`); the same tap at `elevation = 0.0` lands on a different ground cell. The two
+ * rows make the elevation parameter's effect visible side by side.
+ *
+ * Viewport dimensions come from [AdvancedSceneConfig.onFlagsReady]; the supplied
+ * [AdvancedSceneConfig.engine] is the same instance `screenToTile` is called on, so the projection
+ * matches the rendered scene. Geometry mirrors the `ElevatedTileScene` test fixture.
+ */
+@Composable
+fun ElevatedTileSample() {
+    val engine = remember { IsometricEngine() }
+    var canvasW by remember { mutableStateOf(0) }
+    var canvasH by remember { mutableStateOf(0) }
+    var tappedNode by remember { mutableStateOf("(none)") }
+    var tileAtSurface by remember { mutableStateOf("(tap the orange tile)") }
+    var tileAtGround by remember { mutableStateOf("(tap the orange tile)") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Tap the raised orange tile · node: $tappedNode")
+                Text(
+                    "screenToTile(elevation = 2.0): $tileAtSurface",
+                    style = MaterialTheme.typography.caption
+                )
+                Text(
+                    "screenToTile(elevation = 0.0): $tileAtGround — the ground-plane answer differs.",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = AdvancedSceneConfig(
+                engine = engine,
+                onFlagsReady = { flags ->
+                    canvasW = flags.canvasWidth
+                    canvasH = flags.canvasHeight
+                },
+                gestures = GestureConfig(
+                    onTap = { event ->
+                        tappedNode = event.node?.nodeId ?: "(background)"
+                        if (canvasW > 0 && canvasH > 0) {
+                            tileAtSurface = engine.screenToTile(
+                                event.x, event.y, canvasW, canvasH, elevation = 2.0
+                            ).toString()
+                            tileAtGround = engine.screenToTile(
+                                event.x, event.y, canvasW, canvasH, elevation = 0.0
+                            ).toString()
+                        }
+                    }
+                )
+            )
+        ) {
+            // Geometry mirrors the `ElevatedTileScene` test fixture.
+            Shape(
+                geometry = Prism(Point(-1.0, -1.0, 0.0), 8.0, 8.0, 0.1),
+                color = IsoColor.LIGHT_GRAY
+            )
+            Shape(
+                geometry = Prism(Point(2.0, 2.0, 2.0), 1.0, 1.0, 0.5),
+                color = IsoColor.ORANGE,
+                nodeId = "elevated-tile"
             )
         }
     }
