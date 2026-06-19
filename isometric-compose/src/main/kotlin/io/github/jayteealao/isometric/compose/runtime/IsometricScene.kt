@@ -75,7 +75,8 @@ fun IsometricScene(
             strokeStyle = config.strokeStyle,
             gestures = config.gestures,
             useNativeCanvas = config.useNativeCanvas,
-            cameraState = config.cameraState
+            cameraState = config.cameraState,
+            nodeDragState = config.nodeDragState
         ),
         content = content
     )
@@ -275,6 +276,7 @@ fun IsometricScene(
     val currentCanvasHeight by rememberUpdatedState(canvasHeight)
     val currentGestures by rememberUpdatedState(config.gestures)
     val currentCameraState by rememberUpdatedState(config.cameraState)
+    val currentNodeDragState by rememberUpdatedState(config.nodeDragState)
 
     // Pointer input is always installed so per-node onClick / onLongClick
     // callbacks fire even when no scene-level GestureConfig is supplied.
@@ -293,6 +295,10 @@ fun IsometricScene(
                             var longPressFired = false
                             var dragStartPos: Offset? = null
                             var longPressJob: Job? = null
+                            // Non-null only while a drag is moving a selected node (the
+                            // drag-a-node affordance). When set, this gesture owns the node
+                            // and the camera-pan / onDrag lifecycle path is suppressed.
+                            var draggedNode: IsometricNode? = null
 
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -355,25 +361,63 @@ fun IsometricScene(
                                             if (!isDragging && delta.getDistance() > currentGestures.dragThreshold) {
                                                 isDragging = true
                                                 longPressJob?.cancel()
-                                                currentGestures.onDragStart?.invoke(
-                                                    // Absolute drag-start position; no movement yet, so delta is null.
-                                                    DragEvent(start.x.toDouble(), start.y.toDouble(), delta = null)
+
+                                                // Drag-a-node: if a node is selected and this
+                                                // drag began on it, the gesture moves that node
+                                                // instead of panning. Empty-space and other-node
+                                                // drags leave draggedNode null and pan as before.
+                                                draggedNode = resolveDraggedNode(
+                                                    nodeDragState = currentNodeDragState,
+                                                    pressPos = start,
+                                                    camera = currentCameraState,
+                                                    renderer = renderer,
+                                                    rootNode = rootNode,
+                                                    context = currentRenderContext,
+                                                    width = currentCanvasWidth,
+                                                    height = currentCanvasHeight
                                                 )
+
+                                                // onDragStart belongs to the camera/custom-drag
+                                                // surface; a node drag owns the gesture, so only
+                                                // fire onDragStart when no node is being moved.
+                                                if (draggedNode == null) {
+                                                    currentGestures.onDragStart?.invoke(
+                                                        // Absolute drag-start position; no movement yet, so delta is null.
+                                                        DragEvent(start.x.toDouble(), start.y.toDouble(), delta = null)
+                                                    )
+                                                }
                                             }
 
                                             if (isDragging) {
-                                                // x/y = live absolute pointer position; delta = per-event movement.
-                                                val dragEvent = DragEvent(
-                                                    x = position.x.toDouble(),
-                                                    y = position.y.toDouble(),
-                                                    delta = DragDelta(delta.x.toDouble(), delta.y.toDouble())
-                                                )
-                                                val onDrag = currentGestures.onDrag
-                                                if (onDrag != null) {
-                                                    onDrag.invoke(dragEvent)
+                                                val movingNode = draggedNode
+                                                val activeDragState = currentNodeDragState
+                                                if (movingNode != null && activeDragState != null) {
+                                                    // Move only the selected node: convert the
+                                                    // screen delta to engine space (÷ zoom),
+                                                    // clamp to the drag bounds, redraw, and let
+                                                    // the consume() below keep the pan branch off.
+                                                    val zoom = currentCameraState?.zoom ?: 1.0
+                                                    movingNode.position = activeDragState.draggedPosition(
+                                                        current = movingNode.position,
+                                                        screenDx = delta.x.toDouble(),
+                                                        screenDy = delta.y.toDouble(),
+                                                        zoom = zoom
+                                                    )
+                                                    movingNode.markDirty()
                                                 } else {
-                                                    // C2: Default drag→pan accumulates the per-event delta when cameraState is active
-                                                    dragEvent.delta?.let { currentCameraState?.pan(it.dx, it.dy) }
+                                                    // x/y = live absolute pointer position; delta = per-event movement.
+                                                    val dragEvent = DragEvent(
+                                                        x = position.x.toDouble(),
+                                                        y = position.y.toDouble(),
+                                                        delta = DragDelta(delta.x.toDouble(), delta.y.toDouble())
+                                                    )
+                                                    val onDrag = currentGestures.onDrag
+                                                    if (onDrag != null) {
+                                                        onDrag.invoke(dragEvent)
+                                                    } else {
+                                                        // C2: Default drag→pan accumulates the per-event delta when cameraState is active
+                                                        dragEvent.delta?.let { currentCameraState?.pan(it.dx, it.dy) }
+                                                    }
                                                 }
                                                 dragStartPos = position
                                                 event.changes.forEach { it.consume() }
@@ -389,7 +433,12 @@ fun IsometricScene(
                                             // Long-press already dispatched on the press path;
                                             // do not fire onTap or onDragEnd.
                                         } else if (isDragging) {
-                                            currentGestures.onDragEnd?.invoke()
+                                            // onDragEnd pairs with onDragStart on the camera/
+                                            // custom-drag path; a node drag owns the gesture and
+                                            // fires neither.
+                                            if (draggedNode == null) {
+                                                currentGestures.onDragEnd?.invoke()
+                                            }
                                         } else {
                                             // S8: Inverse-transform pointer coordinates when camera
                                             // is active, so hit testing uses engine-space coords.
@@ -422,6 +471,11 @@ fun IsometricScene(
                                                 )
                                             )
 
+                                            // Drag-a-node selection: a tap on a node selects it;
+                                            // a tap on empty space (hitNode == null) clears the
+                                            // selection. Single-selection by construction.
+                                            currentNodeDragState?.select(hitNode?.nodeId)
+
                                             // Dispatch per-node onClick after scene-level onTap
                                             hitNode?.onClick?.invoke()
 
@@ -444,6 +498,7 @@ fun IsometricScene(
                                         isDragging = false
                                         longPressFired = false
                                         dragStartPos = null
+                                        draggedNode = null
                                     }
                                 }
                             }
@@ -508,6 +563,48 @@ fun IsometricScene(
             config.onAfterDraw?.invoke(this)
         }
     }
+}
+
+/**
+ * Resolve which node a starting drag should move, or `null` to fall through to the default
+ * camera-pan path.
+ *
+ * A node is returned only when [nodeDragState] has a selection AND the press landed on that
+ * exact selected node — so dragging the selected node moves it, while dragging empty space
+ * (or any other node) still pans the camera. The press position is camera-corrected before
+ * hit testing, matching the tap path.
+ */
+private fun resolveDraggedNode(
+    nodeDragState: NodeDragState?,
+    pressPos: Offset,
+    camera: CameraState?,
+    renderer: IsometricRenderer,
+    rootNode: GroupNode,
+    context: RenderContext,
+    width: Int,
+    height: Int
+): IsometricNode? {
+    val selectedId = nodeDragState?.selectedNodeId ?: return null
+    val hitX: Double
+    val hitY: Double
+    if (camera != null) {
+        val cx = width / 2.0
+        val cy = height / 2.0
+        hitX = (pressPos.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+        hitY = (pressPos.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+    } else {
+        hitX = pressPos.x.toDouble()
+        hitY = pressPos.y.toDouble()
+    }
+    val hitNode = renderer.hitTest(
+        rootNode = rootNode,
+        x = hitX,
+        y = hitY,
+        context = context,
+        width = width,
+        height = height
+    )
+    return if (hitNode != null && hitNode.nodeId == selectedId) hitNode else null
 }
 
 /**

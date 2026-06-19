@@ -10,8 +10,8 @@ public final class io/github/jayteealao/isometric/compose/RenderExtensionsKt {
 public final class io/github/jayteealao/isometric/compose/runtime/AdvancedSceneConfig : io/github/jayteealao/isometric/compose/runtime/SceneConfig {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;Lio/github/jayteealao/isometric/SceneProjector;ZZDZJLkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEnablePathCaching ()Z
 	public final fun getEnableSpatialIndex ()Z
@@ -253,6 +253,42 @@ public final class io/github/jayteealao/isometric/compose/runtime/IsometricScene
 public abstract interface class io/github/jayteealao/isometric/compose/runtime/IsometricScope {
 }
 
+public final class io/github/jayteealao/isometric/compose/runtime/NodeDragBounds {
+	public static final field $stable I
+	public static final field Companion Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds$Companion;
+	public static final field DEFAULT_EXTENT D
+	public fun <init> ()V
+	public fun <init> (DDDD)V
+	public synthetic fun <init> (DDDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;DDDDILjava/lang/Object;)Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMaxX ()D
+	public final fun getMaxY ()D
+	public final fun getMinX ()D
+	public final fun getMinY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/NodeDragBounds$Companion {
+	public final fun getDefault ()Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/NodeDragState {
+	public static final field $stable I
+	public final fun getBounds ()Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;
+	public final fun getSelectedNodeId ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/compose/runtime/NodeDragStateKt {
+	public static final fun rememberNodeDragState (Lio/github/jayteealao/isometric/compose/runtime/NodeDragBounds;Landroidx/compose/runtime/Composer;II)Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;
+}
+
 public final class io/github/jayteealao/isometric/compose/runtime/PathNode : io/github/jayteealao/isometric/compose/runtime/IsometricNode {
 	public static final field $stable I
 	public fun <init> (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;)V
@@ -329,14 +365,15 @@ public final class io/github/jayteealao/isometric/compose/runtime/RuntimeFlagSna
 public class io/github/jayteealao/isometric/compose/runtime/SceneConfig {
 	public static final field $stable I
 	public fun <init> ()V
-	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;)V
-	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;)V
+	public synthetic fun <init> (Lio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;ZLio/github/jayteealao/isometric/compose/runtime/CameraState;Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCameraState ()Lio/github/jayteealao/isometric/compose/runtime/CameraState;
 	public final fun getColorPalette ()Lio/github/jayteealao/isometric/compose/runtime/ColorPalette;
 	public final fun getDefaultColor ()Lio/github/jayteealao/isometric/IsoColor;
 	public final fun getGestures ()Lio/github/jayteealao/isometric/compose/runtime/GestureConfig;
 	public final fun getLightDirection ()Lio/github/jayteealao/isometric/Vector;
+	public final fun getNodeDragState ()Lio/github/jayteealao/isometric/compose/runtime/NodeDragState;
 	public final fun getRenderOptions ()Lio/github/jayteealao/isometric/RenderOptions;
 	public final fun getStrokeStyle ()Lio/github/jayteealao/isometric/compose/runtime/StrokeStyle;
 	public final fun getUseNativeCanvas ()Z
