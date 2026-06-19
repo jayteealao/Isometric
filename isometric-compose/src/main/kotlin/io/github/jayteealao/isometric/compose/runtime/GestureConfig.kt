@@ -21,6 +21,10 @@ import androidx.compose.runtime.Stable
  * @param onDragEnd Called once when the drag gesture finishes (finger lifted).
  * @param dragThreshold Minimum distance in pixels the pointer must move before a
  *   drag is recognised. Must be non-negative. Defaults to `8f`.
+ * @param longPressTimeoutMs How long, in milliseconds, the pointer must be held still
+ *   before a press becomes a long press (firing a node's `onLongClick`). Must be
+ *   positive. Defaults to `500L`, matching the platform `ViewConfiguration` long-press
+ *   timeout, so unconfigured scenes behave exactly as before.
  */
 @Stable
 class GestureConfig(
@@ -28,10 +32,12 @@ class GestureConfig(
     val onDrag: ((DragEvent) -> Unit)? = null,
     val onDragStart: ((DragEvent) -> Unit)? = null,
     val onDragEnd: (() -> Unit)? = null,
-    val dragThreshold: Float = 8f
+    val dragThreshold: Float = 8f,
+    val longPressTimeoutMs: Long = 500L
 ) {
     init {
         require(dragThreshold >= 0f) { "dragThreshold must be non-negative, got $dragThreshold" }
+        require(longPressTimeoutMs > 0L) { "longPressTimeoutMs must be positive, got $longPressTimeoutMs" }
     }
 
     /** `true` when at least one gesture callback is registered. */
@@ -49,7 +55,8 @@ class GestureConfig(
             onDrag == other.onDrag &&
             onDragStart == other.onDragStart &&
             onDragEnd == other.onDragEnd &&
-            dragThreshold == other.dragThreshold
+            dragThreshold == other.dragThreshold &&
+            longPressTimeoutMs == other.longPressTimeoutMs
 
     override fun hashCode(): Int {
         var result = onTap?.hashCode() ?: 0
@@ -57,8 +64,10 @@ class GestureConfig(
         result = 31 * result + (onDragStart?.hashCode() ?: 0)
         result = 31 * result + (onDragEnd?.hashCode() ?: 0)
         result = 31 * result + dragThreshold.hashCode()
+        result = 31 * result + longPressTimeoutMs.hashCode()
         return result
     }
 
-    override fun toString(): String = "GestureConfig(enabled=$enabled, dragThreshold=$dragThreshold)"
+    override fun toString(): String =
+        "GestureConfig(enabled=$enabled, dragThreshold=$dragThreshold, longPressTimeoutMs=$longPressTimeoutMs)"
 }

@@ -40,6 +40,7 @@ annotation class IsometricComposable
  * @param visible Whether the shape is visible
  * @param onClick Callback invoked when this shape is tapped
  * @param onLongClick Callback invoked when this shape is long-pressed
+ * @param onDoubleClick Callback invoked when this shape is double-tapped
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Group
@@ -60,6 +61,7 @@ fun IsometricScope.Shape(
     visible: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onDoubleClick: (() -> Unit)? = null,
     testTag: String? = null,
     nodeId: String? = null
 ) {
@@ -85,6 +87,7 @@ fun IsometricScope.Shape(
             set(visible) { this.isVisible = it; markDirty() }
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
+            set(onDoubleClick) { this.onDoubleClick = it }
             set(testTag) { this.testTag = it }
             set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
@@ -163,6 +166,7 @@ fun IsometricScope.Group(
  * @param visible Whether the path is visible
  * @param onClick Callback invoked when this path is tapped
  * @param onLongClick Callback invoked when this path is long-pressed
+ * @param onDoubleClick Callback invoked when this path is double-tapped
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Shape
@@ -183,6 +187,7 @@ fun IsometricScope.Path(
     visible: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onDoubleClick: (() -> Unit)? = null,
     testTag: String? = null,
     nodeId: String? = null
 ) {
@@ -208,6 +213,7 @@ fun IsometricScope.Path(
             set(visible) { this.isVisible = it; markDirty() }
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
+            set(onDoubleClick) { this.onDoubleClick = it }
             set(testTag) { this.testTag = it }
             set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
@@ -228,6 +234,7 @@ fun IsometricScope.Path(
  * @param visible Whether the batch is visible
  * @param onClick Callback invoked when this batch is tapped
  * @param onLongClick Callback invoked when this batch is long-pressed
+ * @param onDoubleClick Callback invoked when this batch is double-tapped
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @see Shape
@@ -248,6 +255,7 @@ fun IsometricScope.Batch(
     visible: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onDoubleClick: (() -> Unit)? = null,
     testTag: String? = null,
     nodeId: String? = null
 ) {
@@ -273,6 +281,7 @@ fun IsometricScope.Batch(
             set(visible) { this.isVisible = it; markDirty() }
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
+            set(onDoubleClick) { this.onDoubleClick = it }
             set(testTag) { this.testTag = it }
             set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
@@ -376,6 +385,7 @@ fun <T> IsometricScope.ForEach(
  * @param renderOptions Optional per-node render options override
  * @param onClick Callback invoked when this node is tapped
  * @param onLongClick Callback invoked when this node is long-pressed
+ * @param onDoubleClick Callback invoked when this node is double-tapped
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
  * @param render Function producing render commands from the accumulated context and node ID
@@ -393,6 +403,7 @@ fun IsometricScope.CustomNode(
     renderOptions: RenderOptions? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    onDoubleClick: (() -> Unit)? = null,
     testTag: String? = null,
     nodeId: String? = null,
     render: (context: RenderContext, nodeId: String) -> List<RenderCommand>
@@ -419,6 +430,7 @@ fun IsometricScope.CustomNode(
             set(renderOptions) { this.renderOptions = it; markDirty() }
             set(onClick) { this.onClick = it }
             set(onLongClick) { this.onLongClick = it }
+            set(onDoubleClick) { this.onDoubleClick = it }
             set(testTag) { this.testTag = it }
             set(nodeId) { this.explicitNodeId = it; markDirty() }
         }
