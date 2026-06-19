@@ -26,6 +26,10 @@ import io.github.jayteealao.isometric.Vector
  *   instead of the Compose draw scope. May improve performance on some devices.
  * @param cameraState Optional [CameraState] for pan/zoom control. When `null`, the scene
  *   uses a fixed viewport. Equality is checked by reference identity.
+ * @param nodeDragState Optional [NodeDragState] enabling the single-node drag affordance:
+ *   the scene then selects the tapped node and drags the selected node on its own, leaving
+ *   empty-space drags to pan the camera. When `null`, no node selection or node drag occurs.
+ *   Create one with [rememberNodeDragState]. Equality is checked by reference identity.
  */
 @Immutable
 open class SceneConfig(
@@ -36,7 +40,8 @@ open class SceneConfig(
     val strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
     val gestures: GestureConfig = GestureConfig.Disabled,
     val useNativeCanvas: Boolean = false,
-    val cameraState: CameraState? = null
+    val cameraState: CameraState? = null,
+    val nodeDragState: NodeDragState? = null
 ) {
     override fun equals(other: Any?): Boolean =
         other != null &&
@@ -49,7 +54,8 @@ open class SceneConfig(
             strokeStyle == other.strokeStyle &&
             gestures == other.gestures &&
             useNativeCanvas == other.useNativeCanvas &&
-            cameraState === other.cameraState
+            cameraState === other.cameraState &&
+            nodeDragState === other.nodeDragState
 
     override fun hashCode(): Int {
         var result = renderOptions.hashCode()
@@ -60,9 +66,10 @@ open class SceneConfig(
         result = 31 * result + gestures.hashCode()
         result = 31 * result + useNativeCanvas.hashCode()
         result = 31 * result + (cameraState?.let { System.identityHashCode(it) } ?: 0)
+        result = 31 * result + (nodeDragState?.let { System.identityHashCode(it) } ?: 0)
         return result
     }
 
     override fun toString(): String =
-        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas, cameraState=$cameraState)"
+        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas, cameraState=$cameraState, nodeDragState=$nodeDragState)"
 }

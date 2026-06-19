@@ -25,6 +25,7 @@ import io.github.jayteealao.isometric.Vector
  * @param gestures Tap and drag interaction configuration.
  * @param useNativeCanvas When `true`, renders to the platform's native canvas.
  * @param cameraState Optional pan/zoom camera state.
+ * @param nodeDragState Optional single-node drag affordance state (see [SceneConfig.nodeDragState]).
  * @param engine The [SceneProjector] implementation used for world-to-screen projection.
  *   Defaults to [IsometricEngine].
  * @param enablePathCaching When `true`, caches computed paths between frames to reduce
@@ -63,6 +64,7 @@ class AdvancedSceneConfig(
     gestures: GestureConfig = GestureConfig.Disabled,
     useNativeCanvas: Boolean = false,
     cameraState: CameraState? = null,
+    nodeDragState: NodeDragState? = null,
     val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
@@ -85,7 +87,8 @@ class AdvancedSceneConfig(
     strokeStyle = strokeStyle,
     gestures = gestures,
     useNativeCanvas = useNativeCanvas,
-    cameraState = cameraState
+    cameraState = cameraState,
+    nodeDragState = nodeDragState
 ) {
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {

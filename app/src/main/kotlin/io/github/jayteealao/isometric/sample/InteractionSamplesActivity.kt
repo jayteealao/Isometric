@@ -74,6 +74,11 @@ fun InteractionSamplesScreen() {
                 onClick = { selectedSample = 5 },
                 text = { Text("Drag Lifecycle") }
             )
+            Tab(
+                selected = selectedSample == 6,
+                onClick = { selectedSample = 6 },
+                text = { Text("Drag Node") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -84,6 +89,7 @@ fun InteractionSamplesScreen() {
                 3 -> NodeIdSample()
                 4 -> CombinedSample()
                 5 -> DragLifecycleSample()
+                6 -> DragNodeSample()
             }
         }
     }
@@ -628,6 +634,86 @@ fun DragLifecycleSample() {
                 ),
                 color = IsoColor.ORANGE
             )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 7: Drag a node — the hero scenario
+// ---------------------------------------------------------------------------
+
+/**
+ * The single-node drag hero: tap a prism to select it, then drag it to move only that
+ * prism. Dragging empty space pans the camera; tapping empty space deselects.
+ *
+ * The whole interaction is wired by the library: handing a [rememberNodeDragState] to
+ * [SceneConfig.nodeDragState] is all the call site needs — the scene selects the tapped
+ * node, drags the selected node, clamps it to the configured [NodeDragBounds], and leaves
+ * background drags to the camera. The sample only reads [NodeDragState.selectedNodeId] to
+ * tint the selected prism.
+ */
+@Composable
+fun DragNodeSample() {
+    val dragState = rememberNodeDragState(
+        bounds = NodeDragBounds(minX = -4.0, maxX = 4.0, minY = -4.0, maxY = 4.0)
+    )
+    val cameraState = remember { CameraState() }
+    val selectedId = dragState.selectedNodeId
+
+    // Stable id → base position; the selected prism is highlighted. Mirrored by the
+    // isometric-compose test fixture `DragNodeScene`.
+    val prisms = remember {
+        listOf(
+            "node-center" to Point(3.0, 2.0, 0.1),
+            "node-n" to Point(3.0, 0.0, 0.1),
+            "node-s" to Point(3.0, 4.0, 0.1),
+            "node-w" to Point(1.0, 2.0, 0.1),
+            "node-e" to Point(5.0, 2.0, 0.1),
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Selected: ${selectedId ?: "(none — tap a prism)"}")
+                Text(
+                    "Tap a prism to select, then drag it to move only that prism. " +
+                        "Drag empty space to pan; tap empty space to deselect.",
+                    style = MaterialTheme.typography.caption
+                )
+                Text(
+                    "Drag is clamped to ±4 engine units, so a node can't be lost off-scene.",
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(
+                cameraState = cameraState,
+                nodeDragState = dragState
+            )
+        ) {
+            // Ground slab.
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            // Five draggable prisms in a cross; the selected one is highlighted.
+            // No `position` argument: the geometry carries each prism's home, leaving the
+            // node-position transform free for the library's drag to mutate.
+            prisms.forEach { (id, pos) ->
+                Shape(
+                    geometry = Prism(position = pos, width = 1.0, depth = 1.0, height = 1.0),
+                    color = if (id == selectedId) IsoColor.YELLOW else IsoColor.BLUE,
+                    nodeId = id
+                )
+            }
         }
     }
 }
