@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
@@ -24,9 +25,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.SceneProjector
-
-/** Duration in milliseconds before a press is considered a long press. */
-private const val LONG_PRESS_TIMEOUT_MS = 500L
 
 /**
  * Snapshot of the actual runtime flag configuration applied to the renderer.
@@ -313,7 +311,10 @@ fun IsometricScene(
                                         // Start long-press detection coroutine
                                         longPressJob?.cancel()
                                         longPressJob = longPressScope.launch {
-                                            delay(LONG_PRESS_TIMEOUT_MS)
+                                            // Configurable via GestureConfig.longPressTimeoutMs
+                                            // (default 500ms). Read here so the value captured is
+                                            // the one current at press time, not a stale snapshot.
+                                            delay(currentGestures.longPressTimeoutMs)
                                             val pressPos = dragStartPos ?: return@launch
 
                                             // Inverse-transform for camera-aware hit testing
@@ -505,6 +506,42 @@ fun IsometricScene(
                         }
                         } // coroutineScope
                     }
+            )
+            .then(
+                // Double-tap detection lives in its own pointerInput block, independent of
+                // the hand-rolled tap/long-press/drag loop above. Stacking gesture detectors
+                // in a single block would dead-code all but the first; separate blocks run
+                // independently, so single-tap (onClick) dispatch and long-press timing in the
+                // loop above are unchanged.
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onDoubleTap = { offset ->
+                            // Camera-correct the tap point exactly like the tap / long-press
+                            // paths, then dispatch the hit node's onDoubleClick (if any).
+                            val camera = currentCameraState
+                            val hitX: Double
+                            val hitY: Double
+                            if (camera != null) {
+                                val cx = currentCanvasWidth / 2.0
+                                val cy = currentCanvasHeight / 2.0
+                                hitX = (offset.x.toDouble() - cx - camera.panX) / camera.zoom + cx
+                                hitY = (offset.y.toDouble() - cy - camera.panY) / camera.zoom + cy
+                            } else {
+                                hitX = offset.x.toDouble()
+                                hitY = offset.y.toDouble()
+                            }
+                            val hitNode = renderer.hitTest(
+                                rootNode = rootNode,
+                                x = hitX,
+                                y = hitY,
+                                context = currentRenderContext,
+                                width = currentCanvasWidth,
+                                height = currentCanvasHeight
+                            )
+                            hitNode?.onDoubleClick?.invoke()
+                        }
+                    )
+                }
             )
     ) {
         // Read sceneVersion to subscribe to node tree changes.

@@ -135,6 +135,12 @@ abstract class IsometricNode {
     var onLongClick: (() -> Unit)? = null
 
     /**
+     * Callback invoked when this node is double-tapped.
+     * Dispatched by [IsometricScene] after double-tap detection and hit-test resolution.
+     */
+    var onDoubleClick: (() -> Unit)? = null
+
+    /**
      * Optional tag for testing and diagnostics.
      * Does not affect rendering or hit testing.
      */

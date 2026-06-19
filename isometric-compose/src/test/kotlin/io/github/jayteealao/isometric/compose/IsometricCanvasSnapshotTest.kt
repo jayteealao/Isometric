@@ -13,11 +13,14 @@ import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.Path as IsoPath
 import io.github.jayteealao.isometric.compose.runtime.Group
 import io.github.jayteealao.isometric.compose.scenes.AlphaSampleScene
+import io.github.jayteealao.isometric.compose.scenes.DoubleTapScene
 import io.github.jayteealao.isometric.compose.scenes.DragLifecycleScene
 import io.github.jayteealao.isometric.compose.scenes.DragNodeScene
+import io.github.jayteealao.isometric.compose.scenes.LongPressConfigScene
 import io.github.jayteealao.isometric.compose.scenes.LongPressGridScene
 import io.github.jayteealao.isometric.compose.scenes.NodeIdRowScene
 import io.github.jayteealao.isometric.compose.scenes.OnClickRowScene
+import io.github.jayteealao.isometric.compose.scenes.PerNodeCallbackScene
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 import org.junit.Rule
@@ -397,6 +400,44 @@ class IsometricCanvasSnapshotTest {
             Box(modifier = Modifier.size(800.dp, 600.dp)) {
                 IsometricScene {
                     DragNodeScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun longPressConfigScene() {
+        // Ground + single blue hold-target prism — the LongPressConfigSample geometry.
+        // The configurable long-press timeout has no visual footprint; this pins the render.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    LongPressConfigScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun doubleTapScene() {
+        // Ground + single orange target prism — the DoubleTapSample geometry.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    DoubleTapScene()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun perNodeCallbackScene() {
+        // Path tile + Batch prisms + CustomNode tile — the PerNodeCallbackSample geometry,
+        // exercising all three hittable node types in one render.
+        paparazzi.snapshot {
+            Box(modifier = Modifier.size(800.dp, 600.dp)) {
+                IsometricScene {
+                    PerNodeCallbackScene()
                 }
             }
         }

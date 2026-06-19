@@ -79,6 +79,21 @@ fun InteractionSamplesScreen() {
                 onClick = { selectedSample = 6 },
                 text = { Text("Drag Node") }
             )
+            Tab(
+                selected = selectedSample == 7,
+                onClick = { selectedSample = 7 },
+                text = { Text("LP Config") }
+            )
+            Tab(
+                selected = selectedSample == 8,
+                onClick = { selectedSample = 8 },
+                text = { Text("Double-tap") }
+            )
+            Tab(
+                selected = selectedSample == 9,
+                onClick = { selectedSample = 9 },
+                text = { Text("Per-node") }
+            )
         }
 
         Box(modifier = Modifier.weight(1f)) {
@@ -90,6 +105,9 @@ fun InteractionSamplesScreen() {
                 4 -> CombinedSample()
                 5 -> DragLifecycleSample()
                 6 -> DragNodeSample()
+                7 -> LongPressConfigSample()
+                8 -> DoubleTapSample()
+                9 -> PerNodeCallbackSample()
             }
         }
     }
@@ -714,6 +732,225 @@ fun DragNodeSample() {
                     nodeId = id
                 )
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 8: Configurable long-press timeout
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates [GestureConfig.longPressTimeoutMs]. Pick a timeout (200 / 500 / 1000 ms),
+ * then press and hold the prism: with 200ms it fires almost immediately, with 1000ms you
+ * must hold noticeably longer before `onLongClick` fires. The default (500ms) matches the
+ * platform long-press timeout.
+ */
+@Composable
+fun LongPressConfigSample() {
+    var timeoutMs by remember { mutableStateOf(500L) }
+    var fireCount by remember { mutableStateOf(0) }
+    var status by remember { mutableStateOf("Pick a timeout, then press and hold the prism") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(status)
+                Text(
+                    "Long-press timeout: ${timeoutMs}ms · fired $fireCount time(s)",
+                    style = MaterialTheme.typography.caption
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(200L, 500L, 1000L).forEach { ms ->
+                        Button(
+                            onClick = {
+                                timeoutMs = ms
+                                fireCount = 0
+                                status = "Timeout set to ${ms}ms — press and hold the prism"
+                            },
+                            enabled = timeoutMs != ms
+                        ) {
+                            Text("${ms}ms")
+                        }
+                    }
+                }
+            }
+        }
+
+        IsometricScene(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            config = SceneConfig(
+                gestures = GestureConfig(longPressTimeoutMs = timeoutMs)
+            )
+        ) {
+            // Ground
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            // Hold target
+            Shape(
+                geometry = Prism(
+                    position = Point(2.0, 2.0, 0.1),
+                    width = 2.0, depth = 2.0, height = 1.5
+                ),
+                color = IsoColor.BLUE,
+                nodeId = "lp-target",
+                onLongClick = {
+                    fireCount++
+                    status = "onLongClick fired (timeout was ${timeoutMs}ms)"
+                }
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 9: Double-tap vs. single tap
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates per-node `onDoubleClick`. Double-tap a prism to increment its double-tap
+ * count; a single tap increments the single-tap count. The two counters make the
+ * disambiguation between the two gestures visible.
+ */
+@Composable
+fun DoubleTapSample() {
+    var singleTaps by remember { mutableStateOf(0) }
+    var doubleTaps by remember { mutableStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Single taps: $singleTaps · Double taps: $doubleTaps")
+                Text(
+                    "Double-tap the prism to count a double tap; a single tap counts a single.",
+                    style = MaterialTheme.typography.caption
+                )
+            }
+        }
+
+        IsometricScene(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Ground
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 6.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+            // Tap target with both callbacks
+            Shape(
+                geometry = Prism(
+                    position = Point(2.0, 2.0, 0.1),
+                    width = 2.0, depth = 2.0, height = 1.5
+                ),
+                color = IsoColor.ORANGE,
+                nodeId = "dt-target",
+                onClick = { singleTaps++ },
+                onDoubleClick = { doubleTaps++ }
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sample 10: Per-node callbacks across node types
+// ---------------------------------------------------------------------------
+
+/**
+ * Demonstrates that `onClick` / `onLongClick` / `onDoubleClick` fire uniformly across the
+ * hittable node types — a [Path], a [Batch], and a [CustomNode]. The status bar shows the
+ * last callback that fired and which node type produced it.
+ */
+@Composable
+fun PerNodeCallbackSample() {
+    var lastFired by remember { mutableStateOf("Tap / long-press / double-tap a node") }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Card(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Last: $lastFired")
+                Text(
+                    "Path · Batch · CustomNode — each fires onClick / onLongClick / onDoubleClick.",
+                    style = MaterialTheme.typography.caption
+                )
+            }
+        }
+
+        IsometricScene(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Ground
+            Shape(
+                geometry = Prism(
+                    position = Point(-1.0, -1.0, 0.0),
+                    width = 8.0, depth = 8.0, height = 0.1
+                ),
+                color = IsoColor.LIGHT_GRAY
+            )
+
+            // Path node — a closed quad tile.
+            Path(
+                path = io.github.jayteealao.isometric.Path(
+                    listOf(
+                        Point(0.0, 0.0, 0.4),
+                        Point(2.0, 0.0, 0.4),
+                        Point(2.0, 2.0, 0.4),
+                        Point(0.0, 2.0, 0.4)
+                    )
+                ),
+                color = IsoColor.GREEN,
+                nodeId = "node-path",
+                onClick = { lastFired = "onClick · Path" },
+                onLongClick = { lastFired = "onLongClick · Path" },
+                onDoubleClick = { lastFired = "onDoubleClick · Path" }
+            )
+
+            // Batch node — two prisms sharing one color.
+            Batch(
+                shapes = listOf(
+                    Prism(position = Point(4.0, 0.0, 0.1), width = 1.0, depth = 1.0, height = 1.0),
+                    Prism(position = Point(4.0, 1.5, 0.1), width = 1.0, depth = 1.0, height = 1.5)
+                ),
+                color = IsoColor.PURPLE,
+                nodeId = "node-batch",
+                onClick = { lastFired = "onClick · Batch" },
+                onLongClick = { lastFired = "onLongClick · Batch" },
+                onDoubleClick = { lastFired = "onDoubleClick · Batch" }
+            )
+
+            // CustomNode — a user-rendered quad (the escape hatch).
+            CustomNode(
+                nodeId = "node-custom",
+                onClick = { lastFired = "onClick · CustomNode" },
+                onLongClick = { lastFired = "onLongClick · CustomNode" },
+                onDoubleClick = { lastFired = "onDoubleClick · CustomNode" },
+                render = { context, nodeId ->
+                    val quad = io.github.jayteealao.isometric.Path(
+                        listOf(
+                            Point(0.0, 4.0, 0.4),
+                            Point(2.0, 4.0, 0.4),
+                            Point(2.0, 6.0, 0.4),
+                            Point(0.0, 6.0, 0.4)
+                        )
+                    )
+                    listOf(
+                        io.github.jayteealao.isometric.RenderCommand(
+                            commandId = nodeId,
+                            points = emptyList(),
+                            color = IsoColor.CYAN,
+                            originalPath = context.applyTransformsToPath(quad),
+                            originalShape = null,
+                            ownerNodeId = nodeId
+                        )
+                    )
+                }
+            )
         }
     }
 }
