@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -958,6 +959,71 @@ class DepthSorterTest {
             kotlin.math.abs(ny) > 0.5 -> if (ny > 0) "BACK" else "FRONT"
             else -> if (nx > 0) "RIGHT" else "LEFT"
         }
+    }
+
+    @Ignore(
+        "Known coplanar-embed overpaint: a prism whose base z is coplanar with a thin ground " +
+            "slab loses its vertical side faces (the slab top depth-sorts in front and paints over " +
+            "them). DepthSorter is not changed in this slice — this pins the TARGET face order for a " +
+            "tracked follow-up that hardens the sorter; its DoD is to remove @Ignore and make this green."
+    )
+    @Test
+    fun `z=0 prism on coplanar slab keeps its vertical side faces`() {
+        // The defect the probe confirmed live (Camera / Pinch sample tabs): a unit prism whose
+        // BASE is coplanar with the thin ground slab's base (both at z=0.0) renders flat. The slab
+        // spans z=[0, 0.1], so the prism's lower 0.1 is embedded in the slab volume and the slab's
+        // large top face is ordered in front of the prism's small vertical walls, painting over
+        // them — only the prism top (free above z=0.1) survives.
+        //
+        // Contrast with `LongPress full scene back-right cube vertical faces draw after ground top`:
+        // there the prisms sit at z=0.1 (base ABOVE the slab top), the Z-extent cascade returns
+        // non-zero immediately, and walls correctly draw after the ground top. Here base z=0.0
+        // makes wall.minZ == slab.minZ, the wall-vs-floor pair falls through to the ambiguous
+        // comparator, and the natural back-to-front order is lost. This is the deferred bug.
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(-1.0, -1.0, 0.0), 6.0, 6.0, 0.1), IsoColor.LIGHT_GRAY)  // slab z=[0,0.1]
+        engine.add(Prism(Point(1.0, 1.0, 0.0)), IsoColor.BLUE)                          // unit cube, base z=0.0
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        // Slab top face: all four vertices at z≈0.1, x spans the full -1.0..5.0 footprint.
+        val slabTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.z - 0.1) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - (-1.0)) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 5.0) < 1e-9 }
+        }
+        // Blue cube front face: the y=1.0 plane (four vertices at y=1.0, x in [1,2]).
+        val cubeFrontIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.y - 1.0) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 1.0) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.x - 2.0) < 1e-9 }
+        }
+        // Blue cube left face: the x=1.0 plane (four vertices at x=1.0, y in [1,2]).
+        val cubeLeftIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.size == 4 &&
+                pts.all { kotlin.math.abs(it.x - 1.0) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 1.0) < 1e-9 } &&
+                pts.any { kotlin.math.abs(it.y - 2.0) < 1e-9 }
+        }
+
+        assertTrue(slabTopIndex >= 0, "slab top face must appear in scene commands")
+        assertTrue(cubeFrontIndex >= 0, "blue cube front face must appear in scene commands")
+        assertTrue(cubeLeftIndex >= 0, "blue cube left face must appear in scene commands")
+        assertTrue(
+            cubeFrontIndex > slabTopIndex,
+            "z=0 cube front face (idx=$cubeFrontIndex) must draw AFTER slab top (idx=$slabTopIndex); " +
+                "otherwise the slab paints over the wall and the prism collapses to a flat diamond"
+        )
+        assertTrue(
+            cubeLeftIndex > slabTopIndex,
+            "z=0 cube left face (idx=$cubeLeftIndex) must draw AFTER slab top (idx=$slabTopIndex); " +
+                "otherwise the slab paints over the wall and the prism collapses to a flat diamond"
+        )
     }
 
     private fun shareAtLeastTwoVertices(pathA: Path, pathB: Path): Boolean {
