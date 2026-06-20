@@ -23,5 +23,7 @@ import io.github.jayteealao.isometric.shapes.Prism
 @Composable
 fun IsometricScope.PinchZoomRecipeScene() {
     Shape(geometry = Prism(Point(-1.0, -1.0, 0.0), 6.0, 6.0, 0.1), color = IsoColor.LIGHT_GRAY)
-    Shape(geometry = Prism(Point(1.0, 1.0, 0.0)), color = IsoColor.BLUE)
+    // Seated on the slab top (z=0.1), not its base (z=0.0): a base coplanar with the slab
+    // lets the slab's top face overpaint the prism's side walls, collapsing it to a flat diamond.
+    Shape(geometry = Prism(Point(1.0, 1.0, 0.1)), color = IsoColor.BLUE)
 }

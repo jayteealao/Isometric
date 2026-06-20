@@ -24,7 +24,9 @@ import io.github.jayteealao.isometric.shapes.Pyramid
 @Composable
 fun IsometricScope.CameraControlScene() {
     Shape(geometry = Prism(Point(-1.0, -1.0, 0.0), 8.0, 6.0, 0.1), color = IsoColor.LIGHT_GRAY)
-    Shape(geometry = Prism(Point(0.0, 0.0, 0.0)), color = IsoColor(33.0, 150.0, 243.0))
+    // Seated on the slab top (z=0.1), not its base (z=0.0): a base coplanar with the slab
+    // lets the slab's top face overpaint the prism's side walls, collapsing it to a flat diamond.
+    Shape(geometry = Prism(Point(0.0, 0.0, 0.1)), color = IsoColor(33.0, 150.0, 243.0))
     Shape(geometry = Pyramid(Point(2.0, 0.0, 0.0)), color = IsoColor(255.0, 100.0, 0.0))
     Shape(geometry = Cylinder(Point(-2.0, 0.0, 0.0), 0.5, 2.0, 20), color = IsoColor(0.0, 200.0, 100.0))
 }

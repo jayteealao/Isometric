@@ -1050,7 +1050,9 @@ fun CameraControlSample() {
                 color = IsoColor.LIGHT_GRAY
             )
             Shape(
-                geometry = Prism(position = Point(0.0, 0.0, 0.0)),
+                // Seated on the slab top (z=0.1), not its base (z=0.0): a coplanar base
+                // lets the slab's top face overpaint the prism walls, flattening it to a diamond.
+                geometry = Prism(position = Point(0.0, 0.0, 0.1)),
                 color = IsoColor(33.0, 150.0, 243.0)
             )
             Shape(
@@ -1122,7 +1124,9 @@ fun PinchZoomRecipeSample() {
                 color = IsoColor.LIGHT_GRAY
             )
             Shape(
-                geometry = Prism(position = Point(1.0, 1.0, 0.0)),
+                // Seated on the slab top (z=0.1), not its base (z=0.0): a coplanar base
+                // lets the slab's top face overpaint the prism walls, flattening it to a diamond.
+                geometry = Prism(position = Point(1.0, 1.0, 0.1)),
                 color = IsoColor.BLUE
             )
         }
