@@ -5,12 +5,13 @@ sidebar:
   order: 6
 ---
 
-`Shape`, `Path`, `Batch`, and `CustomNode` each accept five optional properties for
+`Shape`, `Path`, `Batch`, and `CustomNode` each accept six optional properties for
 attaching behavior and identity to individual nodes inside a scene:
 
 - `alpha` &mdash; opacity multiplier
 - `onClick` &mdash; tap handler
 - `onLongClick` &mdash; long-press handler
+- `onDoubleClick` &mdash; double-tap handler
 - `testTag` &mdash; tag for tests and diagnostics
 - `nodeId` &mdash; caller-supplied stable identifier
 
@@ -78,7 +79,9 @@ fun TapToColorChange() {
 }
 ```
 
-Long-press fires once after the long-press timeout (500&nbsp;ms). The press is cancelled
+Long-press fires once after the long-press timeout (default 500&nbsp;ms, configurable per scene via
+`GestureConfig.longPressTimeoutMs` &mdash; see [Configurable long-press timeout](#configurable-long-press-timeout)
+below). The press is cancelled
 if the pointer moves beyond the gesture system's drag threshold before the timeout. When
 a long-press *does* fire on a node, the trailing tap is suppressed &mdash; on release
 neither that node's `onClick` nor the scene-level `onTap` runs. Suppression only happens
@@ -160,6 +163,58 @@ CustomNode(
 
 With `ownerNodeId` wired, you no longer need a scene-level `onTap` plus a manual node
 lookup &mdash; the per-node callback dispatches directly.
+
+## onDoubleClick
+
+`onDoubleClick` fires when this node is double-tapped within the system double-tap window. A single
+tap still routes to `onClick` &mdash; the two are independent, and the gesture system disambiguates a
+single tap from the first half of a double tap for you.
+
+```kotlin
+// Source: InteractionSamplesActivity.kt — DoubleTapSample
+IsometricScene(modifier = Modifier.weight(1f).fillMaxWidth()) {
+    Shape(
+        geometry = Prism(position = Point(2.0, 2.0, 0.1), width = 2.0, depth = 2.0, height = 1.5),
+        color = IsoColor.ORANGE,
+        nodeId = "dt-target",
+        onClick = { singleTaps++ },
+        onDoubleClick = { doubleTaps++ }
+    )
+}
+```
+
+Like `onClick` and `onLongClick`, `onDoubleClick` is available on `Path`, `Batch`, and `CustomNode`
+as well as `Shape` &mdash; the sample app's per-node tab fires all three callbacks across every
+hittable node type.
+
+## Configurable long-press timeout
+
+The long-press timeout defaults to 500&nbsp;ms (matching the platform `ViewConfiguration`) and is
+configurable per scene through `GestureConfig.longPressTimeoutMs`. Set it once on the scene's
+`GestureConfig`; every node's `onLongClick` then fires at that timeout.
+
+```kotlin
+// Source: InteractionSamplesActivity.kt — LongPressConfigSample
+IsometricScene(
+    modifier = Modifier.weight(1f).fillMaxWidth(),
+    config = SceneConfig(
+        gestures = GestureConfig(longPressTimeoutMs = timeoutMs)
+    )
+) {
+    Shape(
+        geometry = Prism(position = Point(2.0, 2.0, 0.1), width = 2.0, depth = 2.0, height = 1.5),
+        color = IsoColor.BLUE,
+        nodeId = "lp-target",
+        onLongClick = {
+            fireCount++
+            status = "onLongClick fired (timeout was ${timeoutMs}ms)"
+        }
+    )
+}
+```
+
+`longPressTimeoutMs` must be positive. It is a scene-level setting on `GestureConfig`, not a per-node
+prop &mdash; see the [Scene Configuration reference](/reference/scene-config/#gestureconfig).
 
 ## testTag
 

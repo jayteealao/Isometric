@@ -18,11 +18,12 @@ Isometric is a Kotlin library for rendering interactive isometric (2.5D) scenes 
 - **Hierarchical transforms** — position, rotation, and scale accumulate through groups
 - **Per-node dirty tracking** — only changed subtrees re-render
 - **Built-in animation** — vsync-aligned via `withFrameNanos`
-- **Gesture handling** — tap and drag with spatial-indexed hit testing
-- **Per-node interactions** — `alpha`, `onClick`, `onLongClick`, `testTag`, and caller-supplied `nodeId` props on every renderable composable
+- **Gesture handling** — tap, drag lifecycle, and a built-in tap-to-select-then-drag node affordance, all with spatial-indexed hit testing
+- **Per-node interactions** — `alpha`, `onClick`, `onLongClick`, `onDoubleClick`, configurable long-press timeout, `testTag`, and caller-supplied `nodeId` props on every renderable composable
+- **Hit-testing escape hatches** — `findItemAt` with `HitOrder`, imperative `onHitTestReady` queries, and `screenToTile` for elevated terrain
 - **Tile grid** — `TileGrid` composable for isometric tile maps with automatic tap-to-tile routing
 - **Stack layout** — `Stack` composable for 1D arrangement along any world axis (X, Y, or Z)
-- **Camera control** — pan and zoom with `CameraState`
+- **Camera control** — drag-to-pan, pinch-to-zoom, and reset with `CameraState`
 - **6 built-in shapes** — Prism, Pyramid, Cylinder, Octahedron, Stairs, Knot
 - **Custom shapes** — extrude paths or implement `CustomNode` for full control
 
@@ -58,7 +59,9 @@ See the [Quick Start guide](docs/getting-started/quickstart.md) for a complete w
 - [**Shapes Guide**](docs/guides/shapes.md) — Built-in shapes, transforms, and custom geometry
 - [**Animation**](docs/guides/animation.md) — vsync-aligned animation with `withFrameNanos`
 - [**Gestures**](docs/guides/gestures.md) — Tap and drag with spatial hit testing
-- [**Per-Node Interactions**](docs/guides/interactions.md) — Per-node `alpha`, `onClick`, `onLongClick`, `testTag`, and `nodeId`
+- [**Per-Node Interactions**](docs/guides/interactions.md) — Per-node `alpha`, `onClick`, `onLongClick`, `onDoubleClick`, `testTag`, and `nodeId`
+- [**Drag & Camera**](docs/guides/drag-and-camera.md) — Drag-to-pan, pinch-to-zoom, the drag lifecycle, and the drag-a-node hero
+- [**Hit-Testing Escape Hatches**](docs/guides/hit-testing-escape-hatches.md) — `findItemAt`, `HitOrder`, `onHitTestReady`, and `screenToTile`
 - [**Tile Grid**](docs/guides/tile-grid.md) — Render and interact with isometric tile grids
 - [**Stack**](docs/guides/stack.md) — Arrange shapes along a world axis
 - [**Camera**](docs/guides/camera.md) — Pan and zoom with `CameraState`

@@ -7,14 +7,15 @@ sidebar:
 
 ## Per-Node Interaction Props
 
-`Shape`, `Path`, `Batch`, and `CustomNode` all accept five optional properties for
+`Shape`, `Path`, `Batch`, and `CustomNode` all accept six optional properties for
 per-node interaction and identity:
 
 | Prop | Type | Default | Behavior |
 |---|---|---|---|
 | `alpha` | `Float` | `1f` | Opacity multiplier in 0..1 range. Multiplied against the node's color alpha channel at render time. Throws `IllegalArgumentException` if outside 0..1. |
 | `onClick` | `(() -> Unit)?` | `null` | Tap handler. Fires once after hit-test resolution if the tap lands on this node. Independent of any scene-level `GestureConfig.onTap`. |
-| `onLongClick` | `(() -> Unit)?` | `null` | Long-press handler. Fires after the long-press timeout if the press lands on this node. |
+| `onLongClick` | `(() -> Unit)?` | `null` | Long-press handler. Fires after the long-press timeout if the press lands on this node. The timeout is configurable per scene via `GestureConfig.longPressTimeoutMs` (default `500L`). |
+| `onDoubleClick` | `(() -> Unit)?` | `null` | Double-tap handler. Fires on the second tap within the system double-tap window. A single tap still routes to `onClick`. |
 | `testTag` | `String?` | `null` | Tag for test/diagnostic identification. Does not affect rendering or hit testing. |
 | `nodeId` | `String?` | `null` | Caller-supplied stable identifier. When provided, must be non-blank and unique within the scene. Falls back to an auto-generated id when omitted. |
 
@@ -64,6 +65,7 @@ engine injection, renderer flags, and lifecycle hooks. See
 | visible | Boolean | true | Visibility toggle |
 | onClick | (() -> Unit)? | null | Tap handler. Fires when this node is hit-tested under a tap gesture. |
 | onLongClick | (() -> Unit)? | null | Long-press handler. Fires after the long-press timeout when this node is hit-tested. |
+| onDoubleClick | (() -> Unit)? | null | Double-tap handler. Fires on the second tap within the system double-tap window; a single tap still routes to `onClick`. |
 | testTag | String? | null | Optional tag for testing and diagnostics. Does not affect rendering or hit testing. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
 
@@ -110,6 +112,7 @@ Renders a 2D polygon face positioned in 3D space. Used for flat surfaces like fl
 | visible | Boolean | true | Visibility toggle |
 | onClick | (() -> Unit)? | null | Tap handler. Fires when this face is hit-tested under a tap gesture. |
 | onLongClick | (() -> Unit)? | null | Long-press handler. |
+| onDoubleClick | (() -> Unit)? | null | Double-tap handler. Fires on the second tap within the system double-tap window. |
 | testTag | String? | null | Optional tag for testing and diagnostics. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
 
@@ -137,6 +140,7 @@ Takes `shapes: List<Shape>` instead of single geometry. Efficient for rendering 
 | visible | Boolean | true | Visibility toggle |
 | onClick | (() -> Unit)? | null | Tap handler. Fires when **any** shape in the batch is hit-tested. The batch is one node — individual shapes are not separately addressable. |
 | onLongClick | (() -> Unit)? | null | Long-press handler. Same single-node semantics as `onClick`. |
+| onDoubleClick | (() -> Unit)? | null | Double-tap handler. Same single-node semantics as `onClick`. |
 | testTag | String? | null | Optional tag for testing and diagnostics. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
 
@@ -198,6 +202,7 @@ Escape hatch for custom rendering. The `render` lambda receives the accumulated
 | renderOptions | RenderOptions? | null | Per-node render options override (null inherits from parent) |
 | onClick | (() -> Unit)? | null | Tap handler. Requires the emitted commands to set `ownerNodeId = nodeId` so hit testing can resolve the tap. |
 | onLongClick | (() -> Unit)? | null | Long-press handler. Same `ownerNodeId` requirement as `onClick`. |
+| onDoubleClick | (() -> Unit)? | null | Double-tap handler. Same `ownerNodeId` requirement as `onClick`. |
 | testTag | String? | null | Optional tag for testing and diagnostics. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
 | render | (context: RenderContext, nodeId: String) -> List\<RenderCommand\> | — | Required. Produces the node's render commands. |

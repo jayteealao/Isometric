@@ -71,13 +71,15 @@ a shared no-op instance.
 | Param | Type | Default | Description |
 |---|---|---|---|
 | onTap | ((TapEvent) -> Unit)? | null | Tap handler. `TapEvent` carries screen `x`/`y` and the hit `node` (nullable). |
-| onDrag | ((DragEvent) -> Unit)? | null | Fires continuously during a drag with the current `DragEvent`. |
-| onDragStart | ((DragEvent) -> Unit)? | null | Fires once when a drag is first recognized. |
+| onDrag | ((DragEvent) -> Unit)? | null | Fires continuously during a drag. The `DragEvent` carries the live absolute pointer position in `x`/`y` and the per-event movement in `delta` (`delta.dx`/`delta.dy`); accumulate `delta` to track travel. |
+| onDragStart | ((DragEvent) -> Unit)? | null | Fires once when a drag is first recognized. The `DragEvent` carries the absolute start position in `x`/`y`; `delta` is `null`. |
 | onDragEnd | (() -> Unit)? | null | Fires once when the drag finishes. |
 | dragThreshold | Float | 8f | Pixels the pointer must move before a drag is recognized. Must be non-negative. |
+| longPressTimeoutMs | Long | 500L | Milliseconds a press must be held before a node's `onLongClick` fires. Must be positive. Default matches the platform `ViewConfiguration`. |
 
-`GestureConfig` has no long-press callback — long-press is a per-node prop (`onLongClick`).
-See [Per-Node Interactions](../guides/interactions.md).
+`GestureConfig` has no long-press callback — long-press is a per-node prop (`onLongClick`), but its
+timeout is configured here via `longPressTimeoutMs`. Double-tap is likewise a per-node prop
+(`onDoubleClick`). See [Per-Node Interactions](../guides/interactions.md).
 
 ### CameraState
 
