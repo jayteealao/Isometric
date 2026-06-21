@@ -278,7 +278,8 @@ For custom drag handling, scale by inverse zoom for a consistent feel:
 ```kotlin
 val gestures = remember {
     GestureConfig(
-        onDrag = { event -> camera.pan(event.x / camera.zoom, event.y / camera.zoom) }
+        // onDrag carries a per-event delta; accumulate it (scaled by zoom) onto the camera.
+        onDrag = { event -> event.delta?.let { camera.pan(it.dx / camera.zoom, it.dy / camera.zoom) } }
     )
 }
 ```
