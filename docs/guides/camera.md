@@ -25,6 +25,11 @@ IsometricScene(
 val camera = remember { CameraState(panX = 100.0, panY = -50.0, zoom = 1.5) }
 ```
 
+> **Tip**
+>
+For runnable recipes — built-in drag-to-pan, pinch-to-zoom, `reset()`, the full drag lifecycle, and
+the tap-to-select-then-drag hero — see the [Drag & Camera how-to](drag-and-camera.md).
+
 ## Methods
 
 ### pan(deltaX, deltaY)
@@ -80,7 +85,8 @@ val camera = remember { CameraState() }
 
 val gestures = remember {
     GestureConfig(
-        onDrag = { event -> camera.pan(event.x / camera.zoom, event.y / camera.zoom) }
+        // onDrag carries a per-event delta; accumulate it (scaled by zoom) onto the camera.
+        onDrag = { event -> event.delta?.let { camera.pan(it.dx / camera.zoom, it.dy / camera.zoom) } }
     )
 }
 
