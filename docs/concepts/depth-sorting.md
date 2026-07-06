@@ -26,7 +26,7 @@ depth = x + y - 2 * z
 - **Higher x or y** *increases* depth → farther away, drawn behind.
 - **Higher z** *decreases* depth (the `-2z` term) → closer to the viewer, drawn on top.
 
-For non-default angles the metric generalizes to `x * cos(angle) + y * sin(angle) - 2 * z`. The engine threads its configured projection angle through the sort, so a scene rendered at a non-30° angle still orders correctly. See [Coordinate System](../getting-started/coordinate-system.md) for the full projection math.
+For non-default angles the metric generalizes to `(x + y) * sin(angle) - 2 * z`. At the default 30°, `sin(30°) = 0.5`, so this reduces to `(x+y) * 0.5 - 2z`, which has the same sort ordering as the simpler `x+y-2z`. The engine threads its configured projection angle through the sort, so a scene rendered at a non-30° angle still orders correctly. See [Coordinate System](../getting-started/coordinate-system.md) for the full projection math.
 
 ## The Sorting Pipeline
 
@@ -110,7 +110,7 @@ Two flags control the sorting pipeline. For full tuning guidance including when 
 
 ### enableDepthSorting = false
 
-Disables sorting entirely. Faces are drawn in insertion order (the order composables appear in the tree). This is useful for:
+Disables sorting entirely. Faces paint in the order you declare them in the composable tree — identical to insertion order in the scene graph. This is useful for:
 
 - Flat 2D overlays where you control the order manually
 - Scenes where you know the insertion order is already correct

@@ -62,7 +62,16 @@ class RenderContext(
     }
 
     /**
-     * Create a new context with additional transforms
+     * Create a new context with additional transforms applied on top of the accumulated state.
+     *
+     * @param position Offset to apply in local coordinate space.
+     * @param rotation Rotation angle in radians, accumulated with any parent rotation.
+     * @param scale Uniform scale factor, accumulated multiplicatively with any parent scale.
+     * @param rotationOrigin Pivot point for this node's rotation, in parent coordinate space.
+     *   If null, this node rotates around its accumulated position — the parent's rotationOrigin
+     *   is **not** inherited (each node's rotation origin is independent). Callers that want the
+     *   parent's origin must read and copy it explicitly.
+     * @param scaleOrigin Pivot point for scaling. If null, inherits the parent's scaleOrigin.
      */
     fun withTransform(
         position: Point = Point(0.0, 0.0, 0.0),

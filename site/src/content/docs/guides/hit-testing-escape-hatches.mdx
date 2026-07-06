@@ -111,6 +111,17 @@ For a flat z = 0 grid, prefer `TileGrid`'s `onTileClick` — it does the screen-
 you. Drop to `screenToTile` only when elevation matters. See
 [Tile Grid](/guides/tile-grid/) for the high-level routing.
 
+:::note
+`TileGrid`'s built-in `onTileClick` works with the standard `IsometricEngine` projector. With a
+custom `SceneProjector` (via `AdvancedSceneConfig.engine`), tap dispatch is skipped because tile
+coordinate mapping depends on the engine's projection geometry and cannot be generalized across
+arbitrary projectors.
+
+If you supply a custom `SceneProjector`, you must also **override `projectionVersion`** (it is
+`abstract`) and increment it whenever your projection parameters change. Failing to do so leaves
+the scene cache stale and changes are not reflected on screen.
+:::
+
 ## Adjusting the Touch Radius
 
 Scene hit-testing is **forgiving**: an internal 8 px radius means a tap *near* a shape still

@@ -11,8 +11,8 @@ Isometric rendering maps three-dimensional coordinates onto a flat two-dimension
 
 In isometric space, every position is described by three axes:
 
-- **X** — runs to the right and down on screen.
-- **Y** — runs to the left and down on screen.
+- **X** — runs right-and-up on screen (+x moves right and upward).
+- **Y** — runs left-and-up on screen (+y moves left and upward).
 - **Z** — runs straight up on screen.
 
 All positions are specified as world-space `Double` values, not pixels. The library converts world coordinates to screen pixels during rendering.
@@ -71,7 +71,7 @@ depth = x + y - 2 · z
 
 So raising a shape's Z lifts it above lower geometry, while pushing it out along +X or +Y sends it into the background. The library applies this sort automatically before rendering.
 
-For non-default projection angles the metric generalizes to `x · cos(angle) + y · sin(angle) − 2 · z`, and the engine threads its configured angle through the sort so ordering stays correct. See [Depth Sorting](/concepts/depth-sorting/) for the full algorithm.
+For non-default projection angles the metric generalizes to `(x + y) · sin(angle) − 2 · z`. At the default 30°, `sin(30°) = 0.5`, so this reduces to `(x+y) · 0.5 − 2z`, which has the same sort ordering as the simpler `x+y−2z`. The engine threads its configured angle through the sort so ordering stays correct at any angle. See [Depth Sorting](/concepts/depth-sorting/) for the full algorithm.
 
 ## Point.ORIGIN
 
@@ -110,8 +110,8 @@ tile at `TileCoordinate(3, 5)` with `tileSize = 1.0` occupies the world-space re
 
 `TileCoordinate` axis directions follow the world axes:
 
-- **x** — increases right-and-down on screen (same as world X).
-- **y** — increases left-and-down on screen (same as world Y).
+- **x** — increases right-and-up on screen (same as world X).
+- **y** — increases left-and-up on screen (same as world Y).
 
 `TileCoordinate.ORIGIN` is the tile at (0, 0) — the grid's world origin corner.
 

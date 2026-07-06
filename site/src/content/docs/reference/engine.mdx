@@ -25,7 +25,9 @@ class IsometricEngine(
 | `colorDifference` | `Double` | `0.20` | Strength of directional lighting on faces. Higher values produce more contrast between lit and shadowed faces. Must be non-negative. |
 | `lightColor` | `IsoColor` | `IsoColor.WHITE` | The color of the light source. Tint this to simulate warm or cool lighting. |
 
-Both `angle` and `scale` are mutable properties. Changing them at runtime rebuilds the internal projection matrix and increments `projectionVersion`.
+Both `angle` and `scale` are mutable properties. Changing them at runtime rebuilds the internal projection matrix and increments `projectionVersion`. If the scene is rendered via `IsometricScene`, the cache detects this change on the next draw and rebuilds automatically.
+
+The depth formula used for painter's-algorithm sorting is `x + y - 2 * z` at the default 30° angle. At non-default angles the formula generalizes to `(x + y) * sin(angle) - 2 * z`; at 30°, `sin(30°) = 0.5`, so this reduces to `(x+y) * 0.5 - 2z` — the same sort ordering as the simpler form. The engine threads its actual projection angle through the sort automatically.
 
 ## Key Methods
 

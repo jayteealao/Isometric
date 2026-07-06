@@ -119,7 +119,9 @@ IsometricScene(
 
 > **Note**
 >
-`onDrag` receives a **per-event delta**, not an absolute position — accumulate the deltas. See
+`onDrag` receives a **per-event delta**, not an absolute position — accumulate the deltas to track
+total travel. The `delta` field carries movement in **screen pixels**, not world units; the library
+converts screen deltas to world coordinates internally when moving nodes. See
 [Gestures](gestures.md#why-ondrag-is-a-delta-not-a-position) for the rationale.
 
 ## Tap-to-Select Then Drag (the Hero)
