@@ -266,9 +266,20 @@ class IsometricEngineProjectionTest {
             "projectionVersion should be strictly increasing: $v1, $v2, $v3")
     }
 
+    /**
+     * AC-19 — Custom SceneProjector version contract is impossible to miss.
+     *
+     * `projectionVersion` is `abstract` on `SceneProjector`, so any implementor that
+     * omits it will not compile. This test provides the minimal correct override
+     * (constant 0L for an immutable projector) and asserts the declared value is
+     * returned. The build itself is the proof: removing the `override val projectionVersion`
+     * line below causes a compile error.
+     */
     @Test
-    fun `SceneProjector default projectionVersion is zero`() {
+    fun `AC-19 SceneProjector implementors must declare projectionVersion — compile enforced`() {
         val projector = object : SceneProjector {
+            // Required: projectionVersion is abstract. Immutable projectors declare 0L.
+            override val projectionVersion: Long = 0L
             override fun add(shape: Shape, color: IsoColor) {}
             override fun add(path: Path, color: IsoColor, originalShape: Shape?, id: String?, ownerNodeId: String?) {}
             override fun clear() {}

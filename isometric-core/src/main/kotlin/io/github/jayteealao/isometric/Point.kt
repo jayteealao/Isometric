@@ -49,12 +49,16 @@ class Point @JvmOverloads constructor(
         }
 
         /**
-         * Squared distance between a point and a line segment (faster, avoids sqrt).
+         * Squared distance between a point and a line segment, in full 3D (faster, avoids sqrt).
+         *
+         * Operates on all three coordinates (x, y, z). The closest point on the segment is
+         * computed by projecting [p] onto the infinite line through [v]–[w] using the full 3D
+         * dot product, then clamping the interpolation parameter to [0, 1].
          *
          * @param p The query point.
          * @param v The start of the line segment.
          * @param w The end of the line segment.
-         * @return The squared Euclidean distance from [p] to the closest point on segment [v]-[w].
+         * @return The squared 3D Euclidean distance from [p] to the closest point on segment [v]-[w].
          */
         fun distanceToSegmentSquared(p: Point, v: Point, w: Point): Double {
             val l2 = distance2(v, w)

@@ -7,7 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Point
+import io.github.jayteealao.isometric.Point2D
 
 /**
  * The engine-space box a dragged node is confined to.
@@ -98,21 +100,47 @@ class NodeDragState internal constructor(
     /**
      * The node's new position after one screen-space drag step.
      *
-     * Converts the screen delta to engine space by dividing by [zoom] — a linear v1
-     * approximation; exact isometric un-projection can follow later — adds it to [current],
-     * and clamps the result to [bounds]. Z is preserved. A pure function with no reference
-     * to the live selection: the scene's drag handler and the device-free tests both call
-     * it, so the move math has a single home.
+     * Converts the screen delta to a world-space displacement by routing it through the
+     * full isometric inverse projection: the camera zoom is divided out first to get an
+     * engine-space delta, then [IsometricEngine.screenToWorld] inverts the projection on
+     * the node's z-plane. The resulting world delta is added to [current] and clamped
+     * to [bounds]. Z is preserved.
+     *
+     * A pure function with no reference to the live selection: the scene's drag handler
+     * and the device-free tests both call it, so the move math has a single home.
+     *
+     * @param current The node's current world position.
+     * @param screenDx Screen-space x drag delta in pixels.
+     * @param screenDy Screen-space y drag delta in pixels.
+     * @param engine The scene's projection engine, used for inverse projection.
+     * @param viewportWidth Canvas width in pixels.
+     * @param viewportHeight Canvas height in pixels.
+     * @param camera Active camera state for zoom correction, or null when no camera is applied.
      */
     internal fun draggedPosition(
         current: Point,
         screenDx: Double,
         screenDy: Double,
-        zoom: Double
+        engine: IsometricEngine,
+        viewportWidth: Int,
+        viewportHeight: Int,
+        camera: CameraState?
     ): Point {
-        val safeZoom = if (zoom.isFinite() && zoom > 0.0) zoom else 1.0
-        val nx = (current.x + screenDx / safeZoom).coerceIn(bounds.minX, bounds.maxX)
-        val ny = (current.y + screenDy / safeZoom).coerceIn(bounds.minY, bounds.maxY)
+        val safeZoom = camera?.zoom?.takeIf { it.isFinite() && it > 0.0 } ?: 1.0
+        // Convert screen delta to engine-space delta by removing camera zoom.
+        val engineDx = screenDx / safeZoom
+        val engineDy = screenDy / safeZoom
+        // Invert the full isometric projection: compute the world-space displacement that
+        // corresponds to an (engineDx, engineDy) movement in engine (canvas) space.
+        // Reference point (0, 0) and displaced point (engineDx, engineDy) in engine coords;
+        // the difference of their world-space counterparts is the world delta.
+        // Both use z=current.z so the node stays on its own z-plane during dragging.
+        val worldOrigin = engine.screenToWorld(Point2D(0.0, 0.0), viewportWidth, viewportHeight, current.z)
+        val worldTarget = engine.screenToWorld(Point2D(engineDx, engineDy), viewportWidth, viewportHeight, current.z)
+        val worldDx = worldTarget.x - worldOrigin.x
+        val worldDy = worldTarget.y - worldOrigin.y
+        val nx = (current.x + worldDx).coerceIn(bounds.minX, bounds.maxX)
+        val ny = (current.y + worldDy).coerceIn(bounds.minY, bounds.maxY)
         return Point(nx, ny, current.z)
     }
 }

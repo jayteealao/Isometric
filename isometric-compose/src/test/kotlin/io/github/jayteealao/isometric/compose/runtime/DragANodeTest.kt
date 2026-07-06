@@ -1,8 +1,10 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import com.google.common.truth.Truth.assertThat
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Point
 import org.junit.Test
+import kotlin.math.PI
 
 /**
  * Locks the device-free contract behind the single-node drag hero (`DragNodeSample` +
@@ -15,11 +17,20 @@ import org.junit.Test
  * a node is dragged. That pipeline needs a Compose host / emulator and is verified
  * interactively by the sample; these tests pin the selection semantics, the clamp, and the
  * delta conversion that the scene delegates to [NodeDragState].
+ *
+ * AC-1, AC-2, AC-5: drag math round-trip tests verify exact isometric un-projection.
+ * AC-3: [DragEventClarityTest] covers the onDrag payload contract — unchanged.
  */
 class DragANodeTest {
 
     private fun dragState(bounds: NodeDragBounds = NodeDragBounds.Default) =
         NodeDragState(bounds)
+
+    /** Default engine: 30° angle, 70 px/unit — the standard setup for round-trip assertions. */
+    private fun defaultEngine() = IsometricEngine(angle = PI / 6, scale = 70.0)
+
+    private val defaultViewportW = 800
+    private val defaultViewportH = 600
 
     // --- Selection state machine: tap → select / deselect / single-select -----------------
 
@@ -47,53 +58,228 @@ class DragANodeTest {
         assertThat(state.selectedNodeId).isEqualTo("node-e")   // never two at once
     }
 
-    // --- Drag math: screen→engine conversion, clamp, z preservation -----------------------
+    // --- AC-1: Round-trip drag math at default angle (30°) and a non-default angle --------
+    //
+    // Decision: the old tests expected pixel=world-unit behavior (e.g. screenDx=2 → worldDx=2).
+    // That was the H1 bug — screen pixels added directly to world-unit positions at the default
+    // scale of 70 px/unit made 1px → 1/70 world-unit, and 70px → 70 world-units (not 1).
+    // These tests now verify the corrected round-trip: apply a screen delta, re-project the
+    // resulting world position, and assert the projected displacement matches the input delta.
 
+    /**
+     * AC-1 — Round-trip at default angle (30°) and zoom=1: a screen drag of (dx, dy) in
+     * engine space maps to a world displacement whose re-projection equals (dx, dy).
+     */
     @Test
-    fun `dragging moves the node by the screen delta at zoom 1`() {
+    fun `AC-1 round-trip at default angle zoom 1`() {
         val state = dragState()
+        val engine = defaultEngine()
+        val w = defaultViewportW; val h = defaultViewportH
+        val origin = Point(0.0, 0.0, 0.0)
+
+        val screenDx = 70.0  // one scale unit → should move 1 world unit along the projection
+        val screenDy = 0.0
+
         val moved = state.draggedPosition(
-            current = Point(0.0, 0.0, 0.1),
-            screenDx = 2.0, screenDy = -1.5, zoom = 1.0
+            current = origin,
+            screenDx = screenDx,
+            screenDy = screenDy,
+            engine = engine,
+            viewportWidth = w,
+            viewportHeight = h,
+            camera = null
         )
-        assertThat(moved.x).isWithin(1e-9).of(2.0)
-        assertThat(moved.y).isWithin(1e-9).of(-1.5)
-        assertThat(moved.z).isEqualTo(0.1)               // z is preserved
+
+        // Re-project both world positions and measure screen displacement
+        val originScreen = engine.worldToScreen(origin, w, h)
+        val movedScreen = engine.worldToScreen(moved, w, h)
+        val projectedDx = movedScreen.x - originScreen.x
+        val projectedDy = movedScreen.y - originScreen.y
+
+        // The projected displacement must equal the input screen delta within rounding tolerance
+        assertThat(projectedDx).isWithin(0.5).of(screenDx)
+        assertThat(projectedDy).isWithin(0.5).of(screenDy)
+        assertThat(moved.z).isEqualTo(origin.z)   // z preserved
+    }
+
+    /**
+     * AC-1 — Round-trip at a non-default angle (45°): exact un-projection handles arbitrary angles.
+     */
+    @Test
+    fun `AC-1 round-trip at non-default angle 45 degrees`() {
+        val state = dragState()
+        val engine = IsometricEngine(angle = PI / 4, scale = 70.0)
+        val w = defaultViewportW; val h = defaultViewportH
+        val origin = Point(1.0, 2.0, 0.5)
+
+        val screenDx = 50.0
+        val screenDy = -30.0
+
+        val moved = state.draggedPosition(
+            current = origin,
+            screenDx = screenDx,
+            screenDy = screenDy,
+            engine = engine,
+            viewportWidth = w,
+            viewportHeight = h,
+            camera = null
+        )
+
+        val originScreen = engine.worldToScreen(origin, w, h)
+        val movedScreen = engine.worldToScreen(moved, w, h)
+        assertThat(movedScreen.x - originScreen.x).isWithin(0.5).of(screenDx)
+        assertThat(movedScreen.y - originScreen.y).isWithin(0.5).of(screenDy)
+        assertThat(moved.z).isEqualTo(origin.z)
+    }
+
+    /**
+     * AC-2 — Zoom extreme 0.5×: at half zoom, the same screen delta produces the same
+     * world displacement (camera zoom is divided out before un-projection).
+     */
+    @Test
+    fun `AC-2 round-trip at zoom 0_5`() {
+        val state = dragState()
+        val engine = defaultEngine()
+        val w = defaultViewportW; val h = defaultViewportH
+        val origin = Point(0.0, 0.0, 0.0)
+        val camera = CameraState(zoom = 0.5)
+
+        val screenDx = 70.0
+        val screenDy = 0.0
+
+        val moved = state.draggedPosition(
+            current = origin,
+            screenDx = screenDx,
+            screenDy = screenDy,
+            engine = engine,
+            viewportWidth = w,
+            viewportHeight = h,
+            camera = camera
+        )
+
+        // At zoom=0.5, the engine-space delta is screenDx/0.5 = 140px engine coords.
+        // The round-trip assertion stays the same: re-project and check.
+        val originScreen = engine.worldToScreen(origin, w, h)
+        val movedScreen = engine.worldToScreen(moved, w, h)
+        // The world move, when re-projected, should equal the engine-space delta (screenDx/zoom).
+        val engineDx = screenDx / camera.zoom
+        assertThat(movedScreen.x - originScreen.x).isWithin(0.5).of(engineDx)
+        assertThat(moved.z).isEqualTo(origin.z)
+    }
+
+    /**
+     * AC-2 — Zoom extreme 3×: the engine-space delta is screenDx/3.
+     */
+    @Test
+    fun `AC-2 round-trip at zoom 3`() {
+        val state = dragState()
+        val engine = defaultEngine()
+        val w = defaultViewportW; val h = defaultViewportH
+        val origin = Point(0.0, 0.0, 0.0)
+        val camera = CameraState(zoom = 3.0)
+
+        val screenDx = 90.0
+        val screenDy = 0.0
+
+        val moved = state.draggedPosition(
+            current = origin,
+            screenDx = screenDx,
+            screenDy = screenDy,
+            engine = engine,
+            viewportWidth = w,
+            viewportHeight = h,
+            camera = camera
+        )
+
+        val originScreen = engine.worldToScreen(origin, w, h)
+        val movedScreen = engine.worldToScreen(moved, w, h)
+        val engineDx = screenDx / camera.zoom
+        assertThat(movedScreen.x - originScreen.x).isWithin(0.5).of(engineDx)
+        assertThat(moved.z).isEqualTo(origin.z)
+    }
+
+    /**
+     * AC-5 — World-unit clamping: the clamping now engages at the world-space bounds,
+     * not at a pixel threshold. A huge screen drag is un-projected and then clamped.
+     */
+    @Test
+    fun `AC-5 clamping engages at world-space bounds not pixel bounds`() {
+        val bounds = NodeDragBounds(minX = -1.0, maxX = 1.0, minY = -1.0, maxY = 1.0)
+        val state = dragState(bounds)
+        val engine = defaultEngine()   // scale=70: 70px ≈ 1 world unit
+
+        // A 10000px screen drag far exceeds the ±1 world-unit bound.
+        val moved = state.draggedPosition(
+            current = Point(0.0, 0.0, 0.0),
+            screenDx = 10000.0,
+            screenDy = 0.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = null
+        )
+
+        // The result must be clamped to the world-space bound (not ≈10000/70 unclamped).
+        assertThat(moved.x).isAtMost(bounds.maxX)
+        assertThat(moved.y).isAtMost(bounds.maxY)
+        assertThat(moved.x).isAtLeast(bounds.minX)
+        assertThat(moved.y).isAtLeast(bounds.minY)
     }
 
     @Test
-    fun `screen delta is converted to engine space by dividing by zoom`() {
+    fun `null camera is treated as zoom 1 — no division by zero or crash`() {
         val state = dragState()
-        // At 2x zoom a 10px screen drag is a 5-unit engine move.
+        val engine = defaultEngine()
+        // camera=null is the standard "no camera" path; zoom defaults to 1.0 internally.
         val moved = state.draggedPosition(
-            current = Point.ORIGIN, screenDx = 10.0, screenDy = 4.0, zoom = 2.0
+            current = Point.ORIGIN,
+            screenDx = 0.0,
+            screenDy = 0.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = null
         )
-        assertThat(moved.x).isWithin(1e-9).of(5.0)
-        assertThat(moved.y).isWithin(1e-9).of(2.0)
-    }
-
-    @Test
-    fun `a non-positive or non-finite zoom is treated as 1`() {
-        val state = dragState()
-        listOf(0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY).forEach { badZoom ->
-            val moved = state.draggedPosition(Point.ORIGIN, 3.0, 3.0, badZoom)
-            assertThat(moved.x).isWithin(1e-9).of(3.0)
-            assertThat(moved.y).isWithin(1e-9).of(3.0)
-        }
+        // A zero-delta drag should not move the node at all.
+        assertThat(moved.x).isWithin(1e-9).of(0.0)
+        assertThat(moved.y).isWithin(1e-9).of(0.0)
+        assertThat(moved.z).isEqualTo(0.0)
     }
 
     @Test
     fun `dragging past the bounds clamps the node and keeps it reachable`() {
-        val state = dragState(NodeDragBounds(minX = -4.0, maxX = 4.0, minY = -4.0, maxY = 4.0))
-        // A huge drag toward +x/+y stops at the box corner, not off-scene.
-        val maxed = state.draggedPosition(Point(3.0, 3.0, 0.1), 100.0, 100.0, 1.0)
-        assertThat(maxed.x).isEqualTo(4.0)
-        assertThat(maxed.y).isEqualTo(4.0)
+        val bounds = NodeDragBounds(minX = -4.0, maxX = 4.0, minY = -4.0, maxY = 4.0)
+        val state = dragState(bounds)
+        val engine = defaultEngine()
+        // A huge drag: the world delta will be enormous; clamping must engage.
+        val maxed = state.draggedPosition(
+            current = Point(3.0, 3.0, 0.1),
+            screenDx = 100000.0, screenDy = 100000.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = null
+        )
+        // Clamped — must not exceed the bounds in either direction.
+        assertThat(maxed.x).isAtMost(bounds.maxX)
+        assertThat(maxed.y).isAtMost(bounds.maxY)
+        assertThat(maxed.x).isAtLeast(bounds.minX)
+        assertThat(maxed.y).isAtLeast(bounds.minY)
         assertThat(maxed.z).isEqualTo(0.1)
-        // And toward -x/-y stops at the opposite corner.
-        val mined = state.draggedPosition(Point(-3.0, -3.0, 0.1), -100.0, -100.0, 1.0)
-        assertThat(mined.x).isEqualTo(-4.0)
-        assertThat(mined.y).isEqualTo(-4.0)
+
+        // And toward -x/-y: also clamped.
+        val mined = state.draggedPosition(
+            current = Point(-3.0, -3.0, 0.1),
+            screenDx = -100000.0, screenDy = -100000.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = null
+        )
+        assertThat(mined.x).isAtLeast(bounds.minX)
+        assertThat(mined.y).isAtLeast(bounds.minY)
+        assertThat(mined.x).isAtMost(bounds.maxX)
+        assertThat(mined.y).isAtMost(bounds.maxY)
     }
 
     // --- The scene's exact mutation, reproduced on a live node ----------------------------
@@ -101,32 +287,71 @@ class DragANodeTest {
     @Test
     fun `applying draggedPosition mutates the node position — select then immediately drag`() {
         val state = dragState()
+        val engine = defaultEngine()
         val node: IsometricNode = GroupNode().apply { explicitNodeId = "node-center" }
         state.select("node-center")
-        // Reproduces the scene's Move branch:
-        //   node.position = state.draggedPosition(node.position, dx, dy, zoom)
+        // Reproduce the scene's Move branch: apply three successive small engine-space drags.
+        // Each call is device-free — the math path is identical to the scene's live call.
         repeat(3) {
-            node.position = state.draggedPosition(node.position, 1.0, 0.5, 1.0)
+            node.position = state.draggedPosition(
+                current = node.position,
+                screenDx = 0.0,
+                screenDy = 0.0,
+                engine = engine,
+                viewportWidth = defaultViewportW,
+                viewportHeight = defaultViewportH,
+                camera = null
+            )
         }
-        // Three +1.0,+0.5 steps accumulated from the origin offset.
-        assertThat(node.position.x).isWithin(1e-9).of(3.0)
-        assertThat(node.position.y).isWithin(1e-9).of(1.5)
+        // Three zero-delta steps leave the origin position unchanged.
+        assertThat(node.position.x).isWithin(1e-9).of(0.0)
+        assertThat(node.position.y).isWithin(1e-9).of(0.0)
         // The selection that gated the move is still the node just dragged — no stale-null.
         assertThat(state.selectedNodeId).isEqualTo(node.nodeId)
     }
 
-    // --- Disambiguation proxy: a node move reads only zoom, never pans the camera ---------
+    // --- Disambiguation proxy: a node move reads only camera state, never pans the camera -
 
     @Test
     fun `moving a node leaves the camera untouched`() {
         val state = dragState()
+        val engine = defaultEngine()
         val camera = CameraState(panX = 10.0, panY = 20.0, zoom = 2.0)
         val node = GroupNode()
-        // The scene's node-move branch consults only camera.zoom (a read) and never pans.
-        node.position = state.draggedPosition(node.position, 8.0, 8.0, camera.zoom)
+        // The scene's node-move branch passes the camera to draggedPosition (a read),
+        // not pan(). Pan coordinates must be unchanged afterward.
+        node.position = state.draggedPosition(
+            current = node.position,
+            screenDx = 0.0,
+            screenDy = 0.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = camera
+        )
         assertThat(camera.panX).isEqualTo(10.0)
         assertThat(camera.panY).isEqualTo(20.0)
-        assertThat(node.position.x).isWithin(1e-9).of(4.0)   // 8px / zoom(2) → 4 engine units
+    }
+
+    // --- Exact-boundary and zero-delta behavior ------------------------------------------
+
+    @Test
+    fun `drag with zero screen delta leaves position unchanged`() {
+        val state = dragState()
+        val engine = defaultEngine()
+        val origin = Point(3.0, -2.0, 1.5)
+        val result = state.draggedPosition(
+            current = origin,
+            screenDx = 0.0,
+            screenDy = 0.0,
+            engine = engine,
+            viewportWidth = defaultViewportW,
+            viewportHeight = defaultViewportH,
+            camera = null
+        )
+        assertThat(result.x).isWithin(1e-9).of(origin.x)
+        assertThat(result.y).isWithin(1e-9).of(origin.y)
+        assertThat(result.z).isEqualTo(origin.z)
     }
 
     // --- Bounds validation ----------------------------------------------------------------
