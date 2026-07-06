@@ -17,9 +17,17 @@ interface SceneProjector {
      * Monotonically increasing version counter for internal state changes.
      * Incremented when mutable parameters (e.g., angle, scale) change,
      * signaling caches that projected output may be stale.
-     * Default implementation returns 0 (immutable projector).
+     *
+     * **Contract:** Implementors MUST override this property. A projector whose
+     * parameters never change should return a constant (e.g., `0L`); a projector
+     * with mutable parameters MUST increment this value on each change so that
+     * downstream caches detect staleness. Returning a stale constant when parameters
+     * change causes silent cache misses — the projection appears frozen.
+     *
+     * This property is `abstract` so that implementors cannot silently inherit a
+     * constant zero and accidentally suppress cache invalidation.
      */
-    val projectionVersion: Long get() = 0L
+    val projectionVersion: Long
 
     /**
      * Add a shape to the scene graph.

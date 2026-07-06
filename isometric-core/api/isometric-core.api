@@ -244,7 +244,6 @@ public final class io/github/jayteealao/isometric/SceneProjector$Companion {
 public final class io/github/jayteealao/isometric/SceneProjector$DefaultImpls {
 	public static synthetic fun add$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;Lio/github/jayteealao/isometric/Shape;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public static synthetic fun findItemAt$default (Lio/github/jayteealao/isometric/SceneProjector;Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;DILjava/lang/Object;)Lio/github/jayteealao/isometric/RenderCommand;
-	public static fun getProjectionVersion (Lio/github/jayteealao/isometric/SceneProjector;)J
 	public static synthetic fun projectScene$default (Lio/github/jayteealao/isometric/SceneProjector;IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;ILjava/lang/Object;)Lio/github/jayteealao/isometric/PreparedScene;
 }
 

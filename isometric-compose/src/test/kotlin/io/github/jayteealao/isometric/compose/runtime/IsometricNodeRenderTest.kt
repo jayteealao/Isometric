@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import io.github.jayteealao.isometric.IsoColor
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
@@ -143,5 +144,99 @@ class IsometricNodeRenderTest {
         group.updateChildrenSnapshot()
         val commands = group.collectCommands(baseContext())
         assertTrue("Empty group should produce no commands", commands.isEmpty())
+    }
+
+    // --- AC-18: Engine parameter mutation detected by SceneCache -------------------
+    //
+    // The compose-layer redraw on an idle scene (no dirty nodes) requires a polling
+    // bridge in IsometricScene.kt that detects projectionVersion changes and increments
+    // sceneVersion. This test proves the CACHE side of that contract: SceneCache.needsUpdate
+    // returns true after engine.scale changes, regardless of node dirtiness.
+
+    @Test
+    fun `AC-18 SceneCache detects engine scale mutation via projectionVersion`() {
+        val engine = IsometricEngine()
+        val cache = SceneCache(engine, enablePathCaching = false)
+        val rootNode = GroupNode()
+        rootNode.updateChildrenSnapshot()
+        val context = baseContext()
+
+        // Prime the cache: one rebuild to establish a baseline projectionVersion.
+        cache.rebuild(rootNode, context, 800, 600, onRenderError = null)
+        rootNode.markClean()
+
+        // Mutate the engine scale — this bumps projectionVersion inside IsometricEngine.
+        engine.scale = 100.0
+
+        // SceneCache.needsUpdate must detect the projectionVersion change.
+        assertTrue(
+            "needsUpdate must return true after engine.scale mutation",
+            cache.needsUpdate(rootNode, context, 800, 600)
+        )
+    }
+
+    @Test
+    fun `AC-18 SceneCache detects engine angle mutation via projectionVersion`() {
+        val engine = IsometricEngine()
+        val cache = SceneCache(engine, enablePathCaching = false)
+        val rootNode = GroupNode()
+        rootNode.updateChildrenSnapshot()
+        val context = baseContext()
+
+        cache.rebuild(rootNode, context, 800, 600, onRenderError = null)
+        rootNode.markClean()
+
+        // Mutate angle — also bumps projectionVersion
+        engine.angle = kotlin.math.PI / 4
+
+        assertTrue(
+            "needsUpdate must return true after engine.angle mutation",
+            cache.needsUpdate(rootNode, context, 800, 600)
+        )
+    }
+
+    // --- IsometricNode.alpha: validation and render propagation ----------------------
+
+    @Test
+    fun alphaSetterRejectsNegativeValue() {
+        val node = ShapeNode(shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0), color = IsoColor.BLUE)
+        var threw = false
+        try {
+            node.alpha = -0.1f
+        } catch (e: IllegalArgumentException) {
+            threw = true
+        }
+        assertTrue("Setting alpha = -0.1f must throw IllegalArgumentException", threw)
+    }
+
+    @Test
+    fun alphaSetterRejectsValueAboveOne() {
+        val node = ShapeNode(shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0), color = IsoColor.BLUE)
+        var threw = false
+        try {
+            node.alpha = 1.5f
+        } catch (e: IllegalArgumentException) {
+            threw = true
+        }
+        assertTrue("Setting alpha = 1.5f must throw IllegalArgumentException", threw)
+    }
+
+    @Test
+    fun alphaHalfScalesCommandColorAlphaBelowOriginal() {
+        // ShapeNode with fully-opaque color (a = 255).
+        val node = ShapeNode(
+            shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+            color = IsoColor(200.0, 100.0, 50.0, 255.0)
+        )
+        node.alpha = 0.5f
+        val commands = node.collectCommands(baseContext())
+        assertTrue("Prism must produce at least one render command", commands.isNotEmpty())
+        // Every command's color alpha must be strictly below the original 255.
+        for (cmd in commands) {
+            assertTrue(
+                "Command color alpha ${cmd.color.a} must be < 255 when node.alpha = 0.5",
+                cmd.color.a < 255.0
+            )
+        }
     }
 }

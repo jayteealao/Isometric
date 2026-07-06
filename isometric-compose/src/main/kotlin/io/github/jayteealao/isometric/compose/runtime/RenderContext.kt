@@ -102,6 +102,12 @@ class RenderContext(
         // Accumulate scale
         val newScale = accumulatedScale * scale
 
+        // L6: rotationOrigin does NOT inherit from parent. A child with null rotationOrigin
+        // rotates around its own accumulated position (handled in applyTransformsToShape/Path/Point),
+        // not around whatever pivot the parent happened to use. Inheritance was surprising:
+        // a parent's explicit rotation pivot silently bled into all descendants that did not
+        // set their own, producing incorrect rotation centers. Call sites that want the
+        // parent's origin must read and copy it explicitly.
         return RenderContext(
             width = width,
             height = height,
@@ -110,7 +116,7 @@ class RenderContext(
             accumulatedPosition = newPosition,
             accumulatedRotation = newRotation,
             accumulatedScale = newScale,
-            rotationOrigin = rotationOrigin ?: this.rotationOrigin,
+            rotationOrigin = rotationOrigin,
             scaleOrigin = scaleOrigin ?: this.scaleOrigin
         )
     }

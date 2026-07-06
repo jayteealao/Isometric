@@ -1,6 +1,6 @@
 package io.github.jayteealao.isometric.compose.runtime
 
-import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import io.github.jayteealao.isometric.IsoColor
 import io.github.jayteealao.isometric.SceneProjector.Companion.DEFAULT_LIGHT_DIRECTION
 import io.github.jayteealao.isometric.RenderOptions
@@ -10,8 +10,14 @@ import io.github.jayteealao.isometric.Vector
  * Core configuration for an isometric scene.
  *
  * Bundles rendering, lighting, color, stroke, gesture, and camera settings into a
- * single immutable value that drives [IsometricScene] behaviour. Extend with
+ * single stable value that drives [IsometricScene] behaviour. Extend with
  * [AdvancedSceneConfig] when hook callbacks or engine-level tuning are needed.
+ *
+ * Annotated `@Stable` (not `@Immutable`) because [cameraState] and [nodeDragState]
+ * are mutable observable holders compared by reference identity: their internal state
+ * can change between recompositions, which disqualifies the stricter `@Immutable`
+ * contract. `@Stable` requires only that `equals` is well-defined and stable, which
+ * this class satisfies via the custom `equals` override below.
  *
  * @param renderOptions Controls rendering behaviour such as sorting and face culling.
  * @param lightDirection Normalized direction vector for the scene's light source, used
@@ -31,7 +37,7 @@ import io.github.jayteealao.isometric.Vector
  *   empty-space drags to pan the camera. When `null`, no node selection or node drag occurs.
  *   Create one with [rememberNodeDragState]. Equality is checked by reference identity.
  */
-@Immutable
+@Stable
 open class SceneConfig(
     val renderOptions: RenderOptions = RenderOptions.Default,
     val lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
@@ -43,6 +49,20 @@ open class SceneConfig(
     val cameraState: CameraState? = null,
     val nodeDragState: NodeDragState? = null
 ) {
+    /**
+     * Binary-compatible secondary constructor preserving the pre-nodeDragState descriptor.
+     * Delegates with `nodeDragState = null`.
+     */
+    constructor(
+        renderOptions: RenderOptions = RenderOptions.Default,
+        lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
+        defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
+        colorPalette: ColorPalette = ColorPalette(),
+        strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
+        gestures: GestureConfig = GestureConfig.Disabled,
+        useNativeCanvas: Boolean = false,
+        cameraState: CameraState? = null
+    ) : this(renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures, useNativeCanvas, cameraState, null)
     override fun equals(other: Any?): Boolean =
         other != null &&
             other.javaClass == javaClass &&
