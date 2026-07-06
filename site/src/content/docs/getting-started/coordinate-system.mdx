@@ -71,7 +71,7 @@ depth = x + y - 2 · z
 
 So raising a shape's Z lifts it above lower geometry, while pushing it out along +X or +Y sends it into the background. The library applies this sort automatically before rendering.
 
-For non-default projection angles the metric generalizes to `(x + y) · sin(angle) − 2 · z`. At the default 30°, `sin(30°) = 0.5`, so this reduces to `(x+y) · 0.5 − 2z`, which has the same sort ordering as the simpler `x+y−2z`. The engine threads its configured angle through the sort so ordering stays correct at any angle. See [Depth Sorting](/concepts/depth-sorting/) for the full algorithm.
+The general formula is `x + y - z / sin(angle)`. At the default 30°, `sin(30°) = 0.5`, so `z / sin(30°) = 2z` and the formula reduces exactly to `x+y−2z`. The engine threads its configured angle through the sort so ordering stays correct at any angle. See [Depth Sorting](/concepts/depth-sorting/) for the full algorithm.
 
 ## Point.ORIGIN
 

@@ -42,9 +42,9 @@ import kotlin.math.roundToLong
  *
  * ### Depth sorting
  *
- * Faces are sorted back-to-front using [Point.depth]: `x + y - 2 * z` at the default 30° angle.
- * At non-default angles the formula generalizes to `(x+y)·sin(α) − 2z`; at 30° this reduces
- * to `(x+y)·0.5 − 2z`, which has the same sort ordering as `x+y−2z`.
+ * Faces are sorted back-to-front using [Point.depth]: `x + y - z / sin(α)`.
+ * At the default 30° angle, `sin(30°) = 0.5`, so `z / sin(30°) = 2z` and the formula
+ * reduces exactly to the legacy `x+y−2z` (zero snapshot churn at the default angle).
  * Higher depth values are farther from the viewer and drawn first.
  *
  * ### Two-stage culling
@@ -96,7 +96,7 @@ class IsometricEngine @JvmOverloads constructor(
      */
     var angle: Double = angle
         set(value) {
-            require(value.isFinite()) { "angle must be finite, got $value" }
+            require(value.isFinite() && value > 0.0) { "angle must be finite and positive, got $value" }
             field = value
             rebuildProjection()
         }
@@ -113,7 +113,7 @@ class IsometricEngine @JvmOverloads constructor(
         }
 
     init {
-        require(angle.isFinite()) { "angle must be finite, got $angle" }
+        require(angle.isFinite() && angle > 0.0) { "angle must be finite and positive, got $angle" }
         require(scale.isFinite() && scale > 0.0) { "scale must be positive and finite, got $scale" }
         require(colorDifference.isFinite() && colorDifference >= 0.0) {
             "colorDifference must be non-negative and finite, got $colorDifference"
