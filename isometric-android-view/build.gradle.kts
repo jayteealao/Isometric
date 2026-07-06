@@ -8,6 +8,12 @@ version = "1.2.0-alpha.01"
 
 android {
     namespace = "io.github.jayteealao.isometric.view"
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 mavenPublishing {
@@ -26,4 +32,5 @@ mavenPublishing {
 dependencies {
     api(project(":isometric-core"))
     implementation(libs.annotation)
+    testImplementation(libs.robolectric)
 }

@@ -10,6 +10,7 @@ binary-compat = "0.17.0"
 maven-publish = "0.30.0"
 spotless = "6.25.0"
 annotation = "1.5.0"
+robolectric = "4.12.2"
 truth = "1.1.3"
 appcompat = "1.5.1"
 activity = "1.6.1"
@@ -32,6 +33,7 @@ compose-material3 = { module = "androidx.compose.material3:material3", version.r
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
 annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }

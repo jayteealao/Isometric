@@ -1,13 +1,15 @@
 public final class io/github/jayteealao/isometric/view/AndroidCanvasRenderer {
 	public static final field INSTANCE Lio/github/jayteealao/isometric/view/AndroidCanvasRenderer;
-	public final fun renderIsometric (Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/PreparedScene;)V
+	public final fun renderIsometric (Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/view/StrokeStyle;)V
+	public static synthetic fun renderIsometric$default (Lio/github/jayteealao/isometric/view/AndroidCanvasRenderer;Landroid/graphics/Canvas;Lio/github/jayteealao/isometric/PreparedScene;Lio/github/jayteealao/isometric/view/StrokeStyle;ILjava/lang/Object;)V
 }
 
 public final class io/github/jayteealao/isometric/view/IsometricView : android/view/View {
 	public fun <init> (Landroid/content/Context;)V
 	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
 	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;I)V
-	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;ILio/github/jayteealao/isometric/SceneProjector;)V
+	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;ILio/github/jayteealao/isometric/SceneProjector;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;)V
 	public final fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public final fun clear ()V
@@ -18,10 +20,56 @@ public final class io/github/jayteealao/isometric/view/IsometricView : android/v
 	public final fun setCull (Z)V
 	public final fun setHitOrder (Lio/github/jayteealao/isometric/HitOrder;)V
 	public final fun setSort (Z)V
+	public final fun setStrokeStyle (Lio/github/jayteealao/isometric/view/StrokeStyle;)V
 	public final fun setTouchRadius (D)V
 }
 
 public abstract interface class io/github/jayteealao/isometric/view/IsometricView$OnItemClickListener {
 	public abstract fun onClick (Lio/github/jayteealao/isometric/RenderCommand;)V
+}
+
+public abstract class io/github/jayteealao/isometric/view/StrokeStyle {
+	public static final field Companion Lio/github/jayteealao/isometric/view/StrokeStyle$Companion;
+}
+
+public final class io/github/jayteealao/isometric/view/StrokeStyle$Companion {
+	public final fun getDefaultStrokeColor ()Lio/github/jayteealao/isometric/IsoColor;
+}
+
+public final class io/github/jayteealao/isometric/view/StrokeStyle$FillAndStroke : io/github/jayteealao/isometric/view/StrokeStyle {
+	public fun <init> ()V
+	public fun <init> (FLio/github/jayteealao/isometric/IsoColor;)V
+	public synthetic fun <init> (FLio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component2 ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun copy (FLio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/view/StrokeStyle$FillAndStroke;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/view/StrokeStyle$FillAndStroke;FLio/github/jayteealao/isometric/IsoColor;ILjava/lang/Object;)Lio/github/jayteealao/isometric/view/StrokeStyle$FillAndStroke;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getWidth ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/view/StrokeStyle$FillOnly : io/github/jayteealao/isometric/view/StrokeStyle {
+	public static final field INSTANCE Lio/github/jayteealao/isometric/view/StrokeStyle$FillOnly;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/jayteealao/isometric/view/StrokeStyle$Stroke : io/github/jayteealao/isometric/view/StrokeStyle {
+	public fun <init> ()V
+	public fun <init> (FLio/github/jayteealao/isometric/IsoColor;)V
+	public synthetic fun <init> (FLio/github/jayteealao/isometric/IsoColor;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component2 ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun copy (FLio/github/jayteealao/isometric/IsoColor;)Lio/github/jayteealao/isometric/view/StrokeStyle$Stroke;
+	public static synthetic fun copy$default (Lio/github/jayteealao/isometric/view/StrokeStyle$Stroke;FLio/github/jayteealao/isometric/IsoColor;ILjava/lang/Object;)Lio/github/jayteealao/isometric/view/StrokeStyle$Stroke;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColor ()Lio/github/jayteealao/isometric/IsoColor;
+	public final fun getWidth ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
