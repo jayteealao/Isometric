@@ -1,7 +1,7 @@
 package io.github.jayteealao.isometric
 
-import kotlin.math.PI
 import kotlin.math.floor
+import kotlin.math.sin
 
 /**
  * Intersection-based depth sorting with optional broad-phase acceleration.
@@ -26,12 +26,13 @@ internal object DepthSorter {
      *
      * @param projectionAngle iso projection angle (radians). Threaded into the depth
      * pre-sort and into [Path.closerThan]'s Z-extent step so non-default engine angles
-     * produce correct ordering. Defaults to 30° to match [IsometricEngine]'s default.
+     * produce correct ordering. Required — callers must pass the engine's active angle
+     * explicitly so this internal API never silently diverges from the engine.
      */
     fun sort(
         items: List<TransformedItem>,
         options: RenderOptions,
-        projectionAngle: Double = PI / 6.0
+        projectionAngle: Double
     ): List<TransformedItem> {
         // Pre-sort by depth descending so that faces farther from the viewer get
         // lower indices. When Kahn's algorithm has multiple zero-in-degree nodes,
@@ -43,7 +44,15 @@ internal object DepthSorter {
         val depthSorted = items.sortedByDescending { it.item.path.depth(projectionAngle) }
 
         val sortedItems = mutableListOf<TransformedItem>()
-        val observer = Point(-10.0, -10.0, 20.0)
+        // Observer at camera-at-infinity in the viewer's direction. The view
+        // direction in 3D world space is: large positive z (up), small negative x/y
+        // (backward in the projection plane). Scaling the direction to K=1e6 places
+        // the observer far enough that no real geometry falls beyond it, eliminating
+        // the failure mode of the hardcoded Point(-10,-10,20) where tall (z>20) or
+        // translated (x/y<−10) geometry would land on the wrong side of the observer.
+        val sinA = sin(projectionAngle)
+        val K = 1e6
+        val observer = Point(-sinA * K, -sinA * K, K)
         val length = depthSorted.size
 
         // Build dependency graph: drawBefore[i] = list of items that must be drawn before item i
@@ -149,8 +158,8 @@ internal object DepthSorter {
         // for exact 3D shared edges that still need deterministic paint order
         // in stacked and tiled prism scenes.
         val intersects = IntersectionUtils.hasInteriorIntersection(
-            itemA.transformedPoints.map { Point(it.x, it.y, 0.0) },
-            itemB.transformedPoints.map { Point(it.x, it.y, 0.0) }
+            itemA.transformedPoints,
+            itemB.transformedPoints
         )
         val sharedEdgeOrder = if (options.enableBackfaceCulling) {
             sharedHorizontalVerticalEdgeOrder(itemA.item.path, itemB.item.path)

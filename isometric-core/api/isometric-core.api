@@ -12,6 +12,7 @@ public final class io/github/jayteealao/isometric/HitOrder : java/lang/Enum {
 public final class io/github/jayteealao/isometric/IntersectionUtils {
 	public static final field INSTANCE Lio/github/jayteealao/isometric/IntersectionUtils;
 	public final fun hasInteriorIntersection (Ljava/util/List;Ljava/util/List;)Z
+	public final fun hasInteriorIntersectionPoint2D (Ljava/util/List;Ljava/util/List;)Z
 	public final fun hasIntersection (Ljava/util/List;Ljava/util/List;)Z
 	public final fun isPointCloseToPoly (Ljava/util/List;DDD)Z
 	public final fun isPointInPoly (Ljava/util/List;DD)Z

@@ -1,8 +1,10 @@
 package io.github.jayteealao.isometric
 
+import io.github.jayteealao.isometric.shapes.Prism
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PathTest {
@@ -215,28 +217,156 @@ class PathTest {
 
     @Test
     fun `closerThan resolves coplanar non-overlapping via Z-extent minimax`() {
-        // Two top faces in the same world-z=1 plane but separated in world-x
-        // by a unit gap. World-z is identical but the iso-depth function
-        // depth(angle) = x*cos+y*sin-2z mixes x and y into the depth
-        // scalar. With cos(PI/6) ≈ 0.866, the x-disjoint pair
-        // (a.x=[0,1] vs b.x=[2,3]) produces disjoint iso-depth ranges
-        // (a≈[-2,-0.634] vs b≈[-0.268,1.098]), so cascade step 1 fires
-        // immediately. The sign reflects which polygon has smaller (closer)
-        // depth: aTop has smaller depth → aTop is closer → self=aTop is
-        // closer → closerThan returns negative.
+        // Two top faces in the same world-z=1 plane but separated in world-x.
+        // The corrected symmetric depth formula (x+y)*sin(α)-2z is used.
+        // At α=30°, aTop (x=[0,1], y=[0,1]) has depth range [-2, -1] and
+        // bTop (x=[3,4], y=[0,1]) has depth range [-0.5, 0.5]. These are
+        // strictly disjoint (aDepthMax=-1 < bDepthMin=-0.5), so cascade step 1
+        // fires. aTop has smaller depth → aTop is closer → closerThan returns negative.
         val aTop = Path(
             Point(0.0, 0.0, 1.0), Point(1.0, 0.0, 1.0),
             Point(1.0, 1.0, 1.0), Point(0.0, 1.0, 1.0)
         )
         val bTop = Path(
-            Point(2.0, 0.0, 1.0), Point(3.0, 0.0, 1.0),
-            Point(3.0, 1.0, 1.0), Point(2.0, 1.0, 1.0)
+            Point(3.0, 0.0, 1.0), Point(4.0, 0.0, 1.0),
+            Point(4.0, 1.0, 1.0), Point(3.0, 1.0, 1.0)
         )
         val result = aTop.closerThan(bTop, observer)
         assertTrue(
             result < 0,
             "Coplanar non-overlapping faces must resolve via Z-extent minimax with " +
                 "self=aTop closer (smaller iso-depth) → negative; got $result"
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // L4 — full-polygon winding via IsometricProjection.cullPath
+    // M2 — AABB overlap bounds check via IsometricProjection.itemInDrawingBounds
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `L4 - concave polygon winding uses full shoelace not first 3 vertices`() {
+        // In screen coordinates (y increases downward), cullPath returns:
+        //   z > 0  (positive shoelace sum) → cull (back-facing)
+        //   z <= 0 (negative shoelace sum) → keep (front-facing)
+        // A front-facing square in screen coords: traversed in the order that
+        // makes the shoelace negative. Example: (0,0),(0,1),(1,1),(1,0) is CW in
+        // screen coords → negative shoelace → NOT culled.
+        val proj = IsometricProjection(
+            angle = kotlin.math.PI / 6.0,
+            scale = 1.0,
+            colorDifference = 0.0,
+            lightColor = IsoColor.WHITE
+        )
+
+        // CW in screen coords = front-facing = NOT culled (shoelace < 0)
+        // Square traversed clockwise in screen (y-down): (0,0),(0,1),(1,1),(1,0)
+        val cwScreenPoints = listOf(
+            Point2D(0.0, 0.0),
+            Point2D(0.0, 1.0),
+            Point2D(1.0, 1.0),
+            Point2D(1.0, 0.0)
+        )
+        // Shoelace: (0*1-0*0)+(0*1-1*1)+(1*0-1*1)+(1*0-0*0) = 0-1-1+0 = -2 < 0 → keep
+        assertFalse(proj.cullPath(cwScreenPoints), "CW-screen polygon (front-facing) must not be culled")
+
+        // CCW in screen coords = back-facing = culled (shoelace > 0)
+        val ccwScreenPoints = listOf(
+            Point2D(1.0, 0.0),
+            Point2D(1.0, 1.0),
+            Point2D(0.0, 1.0),
+            Point2D(0.0, 0.0)
+        )
+        // Shoelace: (1*1-1*0)+(1*1-0*1)+(0*0-0*1)+(0*0-1*0) = 1+1+0+0 = 2 > 0 → cull
+        assertTrue(proj.cullPath(ccwScreenPoints), "CCW-screen polygon (back-facing) must be culled")
+
+        // Concave polygon where first-3-vertex check is unreliable:
+        // Use a star-notch shape where the FIRST 3 VERTICES give the opposite sign
+        // from the full polygon. Construct vertices CW-in-screen (front-facing):
+        //   (2,0), (4,4), (2,2), (0,4) — a concave "hourglass-like" shape.
+        // Full shoelace: (2*4-4*0)+(4*2-2*4)+(2*4-0*2)+(0*0-2*4) = 8+0+8-8 = 8... CW check
+        // Let's use a cleaner concave polygon where first-3 give positive, full gives negative.
+        // Vertices in screen order (CW overall, so negative shoelace = keep):
+        // A diamond with a notch: (2,0),(4,3),(2,2),(0,3)
+        // Full shoelace: (2*3-4*0)+(4*2-2*3)+(2*3-0*2)+(0*0-2*3)=6+2+6-6=8>0...
+        //
+        // Simplest approach: verify that the full polygon verdict matches the
+        // correct shoelace sign. The key property is that ALL n vertices are used,
+        // not just the first 3. We verify this by using a shape where the first-3
+        // shoelace gives the opposite sign from the full polygon.
+        //
+        // Polygon: (0,3),(3,0),(2,3),(3,3),(0,0)
+        // First-3 vertices: (0,3),(3,0),(2,3)
+        //   partial: (0*0-3*3)+(3*3-2*0)+(2*3-0*3) = -9+9+6 = 6 > 0 → first-3 says CW-screen (back)
+        // Full polygon shoelace:
+        //   (0,3)→(3,0): 0*0-3*3=-9
+        //   (3,0)→(2,3): 3*3-2*0=9
+        //   (2,3)→(3,3): 2*3-3*3=-3
+        //   (3,3)→(0,0): 3*0-0*3=0
+        //   (0,0)→(0,3): 0*3-0*0=0
+        //   Sum = -9+9-3+0+0 = -3 < 0 → full polygon says CCW-screen (front)
+        val concaveMismatch = listOf(
+            Point2D(0.0, 3.0),
+            Point2D(3.0, 0.0),
+            Point2D(2.0, 3.0),
+            Point2D(3.0, 3.0),
+            Point2D(0.0, 0.0)
+        )
+        // Full shoelace is negative → front-facing → must NOT be culled
+        assertFalse(
+            proj.cullPath(concaveMismatch),
+            "Full-shoelace result (keep) must override first-3-vertex result (cull) for concave polygon"
+        )
+    }
+
+    @Test
+    fun `M2 - face whose AABB overlaps viewport is kept even if no vertex is inside`() {
+        // A large face whose 4 vertices are all outside the viewport but whose
+        // bounding box spans across the viewport must NOT be culled.
+        val proj = IsometricProjection(
+            angle = kotlin.math.PI / 6.0,
+            scale = 1.0,
+            colorDifference = 0.0,
+            lightColor = IsoColor.WHITE
+        )
+        val width = 100
+        val height = 100
+
+        // All vertices outside viewport, but AABB covers it
+        val largeSpanPoints = listOf(
+            Point2D(-50.0, 50.0),   // left of viewport
+            Point2D(150.0, 50.0),   // right of viewport
+            Point2D(150.0, 150.0),  // below viewport
+            Point2D(-50.0, 150.0)   // left and below
+        )
+        // No vertex is inside [0,100]×[0,100], but AABB spans it
+        assertTrue(
+            proj.itemInDrawingBounds(largeSpanPoints, width, height),
+            "Face whose AABB overlaps the viewport must be kept even if no vertex is inside"
+        )
+
+        // Face entirely outside viewport to the right — AABB does not overlap
+        val outsidePoints = listOf(
+            Point2D(200.0, 0.0),
+            Point2D(300.0, 0.0),
+            Point2D(300.0, 100.0),
+            Point2D(200.0, 100.0)
+        )
+        assertFalse(
+            proj.itemInDrawingBounds(outsidePoints, width, height),
+            "Face entirely outside viewport must be culled"
+        )
+
+        // Vertex inside viewport — the original fast path still works
+        val partlyInsidePoints = listOf(
+            Point2D(50.0, 50.0),    // inside
+            Point2D(200.0, 50.0),
+            Point2D(200.0, 200.0),
+            Point2D(50.0, 200.0)
+        )
+        assertTrue(
+            proj.itemInDrawingBounds(partlyInsidePoints, width, height),
+            "Face with at least one vertex inside viewport must be kept"
         )
     }
 

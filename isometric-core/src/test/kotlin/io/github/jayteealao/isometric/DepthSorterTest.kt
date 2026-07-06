@@ -903,6 +903,183 @@ class DepthSorterTest {
         )
     }
 
+    // -----------------------------------------------------------------------
+    // New tests for depth-correctness fixes
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `mirror symmetry depth sweep - reflected scene has consistent sort order`() {
+        // For each projection angle α, build a scene of 3 prisms, reflect it
+        // across x↔y, sort both at angle α. The sorted command-ID sequence of
+        // the reflected scene must equal the sequence of the original with IDs
+        // reflected. This proves the depth formula is x/y symmetric.
+        for (alpha in listOf(kotlin.math.PI / 6.0, kotlin.math.PI / 4.0, kotlin.math.PI / 3.0)) {
+            val original = IsometricEngine(angle = alpha)
+            original.add(Prism(Point(0.0, 1.0, 0.0), 1.0, 1.0, 1.0), IsoColor.BLUE)
+            original.add(Prism(Point(2.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+            original.add(Prism(Point(1.0, 2.0, 0.0), 1.0, 1.0, 2.0), IsoColor.GREEN)
+
+            // Reflected: swap x and y for every prism position
+            val reflected = IsometricEngine(angle = alpha)
+            reflected.add(Prism(Point(1.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.BLUE)
+            reflected.add(Prism(Point(0.0, 2.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+            reflected.add(Prism(Point(2.0, 1.0, 0.0), 1.0, 1.0, 2.0), IsoColor.GREEN)
+
+            val origScene = original.projectScene(800, 600, RenderOptions.NoCulling)
+            val refScene = reflected.projectScene(800, 600, RenderOptions.NoCulling)
+
+            // Extract color (BLUE/RED/GREEN) from commands as a proxy for shape identity
+            fun colorSequence(scene: PreparedScene): List<String> =
+                scene.commands.map { cmd ->
+                    when (cmd.color) {
+                        IsoColor.BLUE -> "BLUE"
+                        IsoColor.RED -> "RED"
+                        IsoColor.GREEN -> "GREEN"
+                        else -> "OTHER"
+                    }
+                }
+
+            val origSeq = colorSequence(origScene)
+            val refSeq = colorSequence(refScene)
+
+            // Both scenes have the same number of commands
+            assertEquals(
+                origSeq.size, refSeq.size,
+                "Mirror-symmetric scenes must have equal command counts at alpha=$alpha"
+            )
+            // The reflected scene must sort in the same order as the original
+            // (x↔y reflection does not change depth ordering when the formula is symmetric)
+            assertEquals(
+                origSeq, refSeq,
+                "Mirror-symmetric scenes must produce identical sort order at alpha=$alpha. " +
+                    "Original: $origSeq, Reflected: $refSeq"
+            )
+        }
+    }
+
+    @Test
+    fun `tall scene sorts correctly - high-z face is closer to viewer than low-z face`() {
+        // M1 regression: with a finite observer at z=20, a horizontal face at z=25
+        // puts the observer on the WRONG SIDE of that face's plane in plane-side tests,
+        // potentially causing the face to be classified incorrectly relative to lower faces.
+        // With a far-field observer at large positive z, the plane-side test is always
+        // evaluated from the correct (viewer's) side.
+        //
+        // In isometric projection: higher z = higher on screen = CLOSER to the viewer.
+        // Painter's algorithm: closer faces draw AFTER (higher command index).
+        // The tall prism's BOTTOM face (z=0) is farthest, the top face (z=25) is nearest.
+        val engine = IsometricEngine()
+        // Tall prism: faces span z=0..25
+        engine.add(Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 25.0), IsoColor.BLUE)
+        // Separate prism at the same z=0 footprint but far in x (no 3D overlap)
+        engine.add(Prism(Point(5.0, 5.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+
+        val scene = engine.projectScene(1200, 900, RenderOptions.NoCulling)
+        // Top face of the tall prism at z=25 — closest to viewer, must draw LAST
+        val tallTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.all { kotlin.math.abs(it.z - 25.0) < 1e-9 } && pts.size == 4
+        }
+        // Bottom face of the tall prism at z=0 — farthest, must draw FIRST
+        val tallBottomIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.all { kotlin.math.abs(it.z) < 1e-9 } &&
+                pts.all { it.x in (-0.001)..(1.001) } && pts.size == 4
+        }
+        assertTrue(tallTopIndex >= 0, "tall prism top face (z=25) must appear in scene commands")
+        assertTrue(tallBottomIndex >= 0, "tall prism bottom face (z=0) must appear in scene commands")
+        // Bottom is farthest (drawn first), top is nearest (drawn last)
+        // depth(PI/6) bottom = 0.5+0.5-0/0.5=1; top = 0.5+0.5-25/0.5=-49
+        // Pre-sort: descending by depth → bottom (1) sorts before top (-49) ✓
+        assertTrue(
+            tallBottomIndex < tallTopIndex,
+            "tall prism bottom face (z=0, idx=$tallBottomIndex) must draw before top face " +
+                "(z=25, idx=$tallTopIndex); higher-z faces are closer to viewer in isometric"
+        )
+    }
+
+    @Test
+    fun `negatively translated scene sorts correctly`() {
+        // M1 regression: the finite observer at (-10,-10,20) was inside the bounding
+        // volume of scenes translated far negative in x/y, causing incorrect
+        // plane-side verdicts. With a far-field observer the results are stable.
+        //
+        // In isometric depth: depth = x+y-z/sin(α). Larger = farther from viewer.
+        // BLUE at (-5,-5,0): top centroid depth ≈ (-4.5)+(-4.5)-2 = -11 (closer to viewer)
+        // RED at (-15,-15,0): top centroid depth ≈ (-14.5)+(-14.5)-2 = -31 (even closer!)
+        // Painter's algo: BLUE (farther by depth, lower absolute depth) draws first.
+        // The key invariant: two non-overlapping prisms must produce a stable sort
+        // regardless of where they are translated in world space.
+        val engine = IsometricEngine()
+        engine.add(Prism(Point(-5.0, -5.0, 0.0), 1.0, 1.0, 1.0), IsoColor.BLUE)
+        engine.add(Prism(Point(-15.0, -15.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoCulling)
+
+        val blueTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.all { kotlin.math.abs(it.z - 1.0) < 1e-9 } &&
+                pts.all { it.x in (-5.001)..(-3.999) } && pts.size == 4
+        }
+        val redTopIndex = scene.commands.indexOfFirst { cmd ->
+            val pts = cmd.originalPath.points
+            pts.all { kotlin.math.abs(it.z - 1.0) < 1e-9 } &&
+                pts.all { it.x in (-15.001)..(-13.999) } && pts.size == 4
+        }
+        assertTrue(blueTopIndex >= 0, "blue prism top face must appear")
+        assertTrue(redTopIndex >= 0, "red prism top face must appear")
+        // BLUE has higher depth (less negative = farther) → draws first (lower index)
+        // RED has lower depth (more negative = closer) → draws last (higher index)
+        assertTrue(
+            blueTopIndex < redTopIndex,
+            "blue prism at (-5,-5) is farther (depth≈-11, idx=$blueTopIndex) and must draw " +
+                "before red prism at (-15,-15) (depth≈-31, idx=$redTopIndex)"
+        )
+    }
+
+    @Test
+    fun `NoDepthSorting yields insertion order`() {
+        // AC-14: with depth sorting disabled, faces must appear in insertion order.
+        // L3 is confirmed resolved: SceneGraph.add never pre-sorted by depth.
+        // The insertion order from SceneGraph is preserved as-is when NoDepthSorting is used.
+        val engine = IsometricEngine()
+        // Add 3 prisms in a deliberate order; with NoDepthSorting they must appear in
+        // the same face-group order (all faces of prism 1, then prism 2, then prism 3)
+        engine.add(Prism(Point(0.0, 0.0, 0.0), 1.0, 1.0, 1.0), IsoColor.BLUE)
+        engine.add(Prism(Point(3.0, 3.0, 0.0), 1.0, 1.0, 1.0), IsoColor.RED)
+        engine.add(Prism(Point(1.5, 1.5, 0.0), 1.0, 1.0, 1.0), IsoColor.GREEN)
+
+        val scene = engine.projectScene(800, 600, RenderOptions.NoDepthSorting)
+
+        // Without depth sorting, faces appear in insertion order: BLUE block first,
+        // RED block next, GREEN block last. Each block has 6 faces.
+        assertTrue(scene.commands.size >= 3, "must have at least 3 commands")
+
+        // Identify which prism each command belongs to by its centroid
+        fun prismOf(cmd: RenderCommand): String {
+            val cx = cmd.originalPath.points.sumOf { it.x } / cmd.originalPath.points.size
+            val cy = cmd.originalPath.points.sumOf { it.y } / cmd.originalPath.points.size
+            return when {
+                cx in (-0.1)..(1.1) && cy in (-0.1)..(1.1) -> "BLUE"
+                cx in (2.9)..(4.1) && cy in (2.9)..(4.1) -> "RED"
+                cx in (1.4)..(2.6) && cy in (1.4)..(2.6) -> "GREEN"
+                else -> "UNKNOWN"
+            }
+        }
+
+        val prismSeq = scene.commands.map { prismOf(it) }
+        // All BLUE faces must precede all RED faces, which must precede all GREEN faces
+        val firstRed = prismSeq.indexOfFirst { it == "RED" }
+        val firstGreen = prismSeq.indexOfFirst { it == "GREEN" }
+        val lastBlue = prismSeq.indexOfLast { it == "BLUE" }
+        val lastRed = prismSeq.indexOfLast { it == "RED" }
+
+        assertTrue(lastBlue < firstRed,
+            "All BLUE faces must come before any RED face in insertion order; seq=$prismSeq")
+        assertTrue(lastRed < firstGreen,
+            "All RED faces must come before any GREEN face in insertion order; seq=$prismSeq")
+    }
+
     private data class ClassifiedCommand(
         val index: Int,
         val command: RenderCommand,
@@ -965,7 +1142,9 @@ class DepthSorterTest {
         "Known coplanar-embed overpaint: a prism whose base z is coplanar with a thin ground " +
             "slab loses its vertical side faces (the slab top depth-sorts in front and paints over " +
             "them). DepthSorter is not changed in this slice — this pins the TARGET face order for a " +
-            "tracked follow-up that hardens the sorter; its DoD is to remove @Ignore and make this green."
+            "tracked follow-up that hardens the sorter; its DoD is to remove @Ignore and make this green. " +
+            "Tracked as a follow-up depth-sort hardening slice in docs/internal/plans/; " +
+            "search for 'coplanar-embed' to locate the owning plan entry."
     )
     @Test
     fun `z=0 prism on coplanar slab keeps its vertical side faces`() {

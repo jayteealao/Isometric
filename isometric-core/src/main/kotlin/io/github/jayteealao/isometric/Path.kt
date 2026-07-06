@@ -1,7 +1,6 @@
 package io.github.jayteealao.isometric
 
 import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
 
 /**
@@ -106,9 +105,11 @@ open class Path(
      * first (farther one) and which last (closer one) for correct painter's-algorithm
      * rendering, looking from [observer]:
      *
-     * - **negative** — `this` is closer than [pathA] (so `this` paints AFTER [pathA]).
-     * - **positive** — `this` is farther than [pathA] (so `this` paints BEFORE [pathA]).
-     * - **zero** — genuine ambiguity Newell cannot resolve without polygon splitting.
+     * Sign | Meaning
+     * -----|----------------------------------------
+     *  -1  | this is closer  → this paints AFTER pathA
+     *   0  | ambiguous (falls through to the cascade)
+     *  +1  | this is farther → this paints BEFORE pathA
      *
      * Implements a reduced form of Newell, Newell, and Sancha's classical Z->X->Y
      * minimax cascade (Newell, M. E., Newell, R. G., Sancha, T. L., 1972, "A solution
@@ -116,9 +117,8 @@ open class Path(
      * definitive call:
      *
      * 1. **Iso-depth (Z) extent**: if the two polygons' iso-depth (the iso-projection
-     *    proxy `x*cos(projectionAngle) + y*sin(projectionAngle) - 2*z`) extents are
-     *    strictly disjoint, the one with the smaller depth range is unambiguously
-     *    closer.
+     *    proxy `x + y - z/sin(projectionAngle)`) extents are strictly disjoint,
+     *    the one with the smaller depth range is unambiguously closer.
      * 2. **Plane-side forward**: if all of `this`'s vertices lie on the same side of
      *    [pathA]'s plane as [observer], `this` is closer; if all on the opposite
      *    side, `this` is farther; mixed or coplanar -> fall through.
@@ -146,10 +146,13 @@ open class Path(
      * pass every step without decision return 0.
      *
      * **[projectionAngle] threading**: step 1's iso-depth proxy uses
-     * `cos(projectionAngle) * x + sin(projectionAngle) * y - 2 * z`. Callers in the
-     * depth-sort pipeline pass the active [IsometricEngine.angle] so non-default
-     * projections produce correct first-stage ordering. The default `PI / 6` (30°)
-     * matches [IsometricEngine]'s default and keeps unit tests source-compatible.
+     * `x + y - z / sin(projectionAngle)`. This formula weighs x and y
+     * symmetrically and reduces exactly to the legacy `x + y - 2z` formula at the
+     * default 30° angle, fixing the asymmetry of the old `x*cos(α)+y*sin(α)-2z`
+     * form. Callers in the depth-sort pipeline pass the active [IsometricEngine.angle]
+     * so non-default projections produce correct first-stage ordering. The default
+     * `PI / 6` (30°) matches [IsometricEngine]'s default and keeps unit tests
+     * source-compatible.
      *
      * @param pathA the polygon to compare against.
      * @param observer eye position used to orient the plane-side tests.
@@ -158,21 +161,21 @@ open class Path(
     @JvmOverloads
     fun closerThan(pathA: Path, observer: Point, projectionAngle: Double = PI / 6.0): Int {
         // Step 1: iso-depth (Z) extent minimax.
-        // Inlined depth = x*isoCos + y*isoSin - 2*z to avoid recomputing cos/sin
-        // per vertex; LARGER value = farther from observer.
-        val isoCos = cos(projectionAngle)
+        // Inlined depth = x + y - z/isoSin (angle-aware, x/y symmetric,
+        // equals legacy x+y-2z at the default 30° angle).
+        // LARGER value = farther from observer.
         val isoSin = sin(projectionAngle)
         var selfDepthMin = Double.POSITIVE_INFINITY
         var selfDepthMax = Double.NEGATIVE_INFINITY
         for (p in points) {
-            val d = p.x * isoCos + p.y * isoSin - 2.0 * p.z
+            val d = p.x + p.y - p.z / isoSin
             if (d < selfDepthMin) selfDepthMin = d
             if (d > selfDepthMax) selfDepthMax = d
         }
         var aDepthMin = Double.POSITIVE_INFINITY
         var aDepthMax = Double.NEGATIVE_INFINITY
         for (p in pathA.points) {
-            val d = p.x * isoCos + p.y * isoSin - 2.0 * p.z
+            val d = p.x + p.y - p.z / isoSin
             if (d < aDepthMin) aDepthMin = d
             if (d > aDepthMax) aDepthMax = d
         }
