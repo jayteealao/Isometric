@@ -60,11 +60,11 @@ class Point @JvmOverloads constructor(
             val l2 = distance2(v, w)
             if (l2 == 0.0) return distance2(p, v)
 
-            val t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2
+            val t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y) + (p.z - v.z) * (w.z - v.z)) / l2
             if (t < 0) return distance2(p, v)
             if (t > 1) return distance2(p, w)
 
-            return distance2(p, Point(v.x + t * (w.x - v.x), v.y + t * (w.y - v.y)))
+            return distance2(p, Point(v.x + t * (w.x - v.x), v.y + t * (w.y - v.y), v.z + t * (w.z - v.z)))
         }
 
         /**
@@ -212,15 +212,20 @@ class Point @JvmOverloads constructor(
 
     /**
      * The depth of a point in the isometric plane for an arbitrary engine angle.
-     * The formula weights x/y by cos/sin of the projection angle and z by a
-     * factor that preserves correct depth ordering for the given viewing angle.
+     *
+     * Formula: `x + y - z / sin(angle)`
+     *
+     * Derived from the screenY formula: `screenY = -(x+y)*sin(α) - z`.
+     * Multiplying by -1/sin(α) gives the depth proxy: `(x+y) - z/sin(α)`.
+     * This is symmetric in x and y (both contribute equally) and reduces exactly
+     * to the legacy `x + y - 2z` formula at the default α=30° (sin(30°)=0.5,
+     * so z/sin(30°)=2z). Zero snapshot churn at the default angle.
      *
      * @param angle The isometric projection angle in radians (e.g., PI / 6 for 30°)
      */
     fun depth(angle: Double): Double {
-        val cosA = cos(angle)
         val sinA = sin(angle)
-        return x * cosA + y * sinA - 2 * z
+        return x + y - z / sinA
     }
 
     override fun equals(other: Any?): Boolean =

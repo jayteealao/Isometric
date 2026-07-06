@@ -56,6 +56,19 @@ class Pyramid @JvmOverloads constructor(
             paths.add(face2)
             paths.add(face2.rotateZ(center, PI))
 
+            /* Base quadrilateral. Winding order produces a downward-facing normal
+             * (negative Z), which is back-face culled from the standard isometric
+             * view above. For a grounded pyramid this means the base is interior and
+             * correctly hidden; for a floating pyramid with culling disabled the base
+             * renders as expected. */
+            val base = Path(
+                position,
+                Point(position.x, position.y + depth, position.z),
+                Point(position.x + width, position.y + depth, position.z),
+                Point(position.x + width, position.y, position.z)
+            )
+            paths.add(base)
+
             return paths
         }
     }

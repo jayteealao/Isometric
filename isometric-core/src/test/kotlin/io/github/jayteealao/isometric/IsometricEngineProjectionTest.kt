@@ -13,22 +13,22 @@ class IsometricEngineProjectionTest {
     // --- Step 3: Parameterized depth ---
 
     @Test
-    fun `depth parameterized uses cos and sin of angle`() {
-        // depth(angle) = x*cos(angle) + y*sin(angle) - 2*z
+    fun `depth parameterized uses symmetric x+y formula`() {
+        // depth(angle) = x + y - z/sin(angle)
+        // For Point(1,0,0) at PI/4: 1+0-0/sin(PI/4) = 1.0
         val point = Point(1.0, 0.0, 0.0)
-        assertEquals(cos(PI / 4), point.depth(PI / 4), 0.0001)
+        assertEquals(1.0, point.depth(PI / 4), 0.0001)
     }
 
     @Test
-    fun `depth parameterized at PI div 6 uses correct trig`() {
-        // The no-arg depth() uses the simplified formula x + y - 2z,
-        // while depth(PI/6) uses cos(30°)*x + sin(30°)*y - 2z.
-        // They produce different values but preserve relative ordering.
+    fun `depth parameterized at PI div 6 equals simplified formula`() {
+        // The no-arg depth() = x + y - 2z and depth(PI/6) = x + y - z/sin(30°) = x + y - 2z.
+        // At α=30°, they are exactly equal (sin(30°)=0.5, so z/0.5=2z).
         val point = Point(1.0, 1.0, 0.0)
-        val parameterized = point.depth(PI / 6) // cos(30°) + sin(30°) ≈ 1.366
+        val parameterized = point.depth(PI / 6) // 1 + 1 - 0/0.5 = 2.0
         val simplified = point.depth()           // 1 + 1 = 2.0
-        assertTrue(parameterized < simplified,
-            "Parameterized depth should differ from simplified formula")
+        assertEquals(simplified, parameterized, 0.0001,
+            "depth(PI/6) must equal depth() at the default angle")
     }
 
     @Test

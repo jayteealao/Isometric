@@ -85,33 +85,57 @@ internal class IsometricProjection(
     }
 
     /**
-     * Back-face culling test.
+     * Back-face culling test using the full shoelace formula over all vertices.
+     *
      * Returns true if the path should be culled (is facing away from the viewer).
+     * The sign of the signed area (shoelace sum) determines winding direction:
+     * positive sum = counter-clockwise = facing the camera = keep.
+     *
+     * Using the full polygon instead of the first 3 vertices gives correct winding
+     * for concave polygons whose first 3 vertices do not represent the overall shape.
      */
     fun cullPath(transformedPoints: List<Point2D>): Boolean {
         if (transformedPoints.size < 3) return false
 
-        val a = transformedPoints[0].x * transformedPoints[1].y
-        val b = transformedPoints[1].x * transformedPoints[2].y
-        val c = transformedPoints[2].x * transformedPoints[0].y
-
-        val d = transformedPoints[1].x * transformedPoints[0].y
-        val e = transformedPoints[2].x * transformedPoints[1].y
-        val f = transformedPoints[0].x * transformedPoints[2].y
-
-        val z = a + b + c - d - e - f
+        var z = 0.0
+        val n = transformedPoints.size
+        for (i in 0 until n) {
+            val j = (i + 1) % n
+            z += transformedPoints[i].x * transformedPoints[j].y
+            z -= transformedPoints[j].x * transformedPoints[i].y
+        }
         return z > 0
     }
 
     /**
-     * Check if any point of the item is within the drawing bounds.
+     * Check if the item overlaps the drawing bounds.
+     *
+     * Returns true if any vertex is inside the viewport OR if the face's axis-aligned
+     * bounding box overlaps the viewport rectangle [0, width] × [0, height].
+     *
+     * The AABB overlap check is necessary for large faces whose vertices are all outside
+     * the viewport but whose face spans over it (e.g. a large floor plane). A vertex-only
+     * test would incorrectly cull such faces.
      */
     fun itemInDrawingBounds(transformedPoints: List<Point2D>, width: Int, height: Int): Boolean {
+        // Fast path: any vertex inside viewport
         for (point in transformedPoints) {
             if (point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height) {
                 return true
             }
         }
-        return false
+        // Slow path: compute face AABB and test overlap with viewport
+        var minX = Double.POSITIVE_INFINITY
+        var maxX = Double.NEGATIVE_INFINITY
+        var minY = Double.POSITIVE_INFINITY
+        var maxY = Double.NEGATIVE_INFINITY
+        for (point in transformedPoints) {
+            if (point.x < minX) minX = point.x
+            if (point.x > maxX) maxX = point.x
+            if (point.y < minY) minY = point.y
+            if (point.y > maxY) maxY = point.y
+        }
+        // AABB overlaps viewport iff neither rectangle is entirely to the right/below/left/above the other
+        return maxX >= 0 && minX <= width && maxY >= 0 && minY <= height
     }
 }
