@@ -8,9 +8,12 @@ import kotlin.math.sqrt
  * A point in 3D isometric space.
  *
  * The coordinate system is:
- * - [x]: right-and-down on screen (increases toward bottom-right)
- * - [y]: left-and-down on screen (increases toward bottom-left)
- * - [z]: straight up on screen (increases upward)
+ * - [x]: right-and-up on screen — increases screenX, decreases screenY
+ *        (projection: screenX += x·scale·cos(α); screenY −= x·scale·sin(α))
+ * - [y]: left-and-up on screen — decreases screenX, decreases screenY
+ *        (projection: screenX −= y·scale·cos(α); screenY −= y·scale·sin(α))
+ * - [z]: straight up on screen — decreases screenY
+ *        (projection: screenY −= z·scale)
  *
  * @see depth for painter's algorithm sorting
  */

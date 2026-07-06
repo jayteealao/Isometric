@@ -25,12 +25,12 @@ import kotlin.math.roundToLong
  *         / \
  *        /   \
  *       y     x
- *  (left-down) (right-down)
+ *  (left-up) (right-up)
  * ```
  *
- * - **x-axis**: points right-and-down on screen
- * - **y-axis**: points left-and-down on screen
- * - **z-axis**: points straight up on screen
+ * - **x-axis**: points right-and-up on screen (+x increases screenX, decreases screenY)
+ * - **y-axis**: points left-and-up on screen (+y decreases screenX, decreases screenY)
+ * - **z-axis**: points straight up on screen (+z decreases screenY)
  *
  * ### Projection formulas
  *
@@ -42,7 +42,9 @@ import kotlin.math.roundToLong
  *
  * ### Depth sorting
  *
- * Faces are sorted back-to-front using [Point.depth]: `x + y - 2 * z`.
+ * Faces are sorted back-to-front using [Point.depth]: `x + y - 2 * z` at the default 30° angle.
+ * At non-default angles the formula generalizes to `(x+y)·sin(α) − 2z`; at 30° this reduces
+ * to `(x+y)·0.5 − 2z`, which has the same sort ordering as `x+y−2z`.
  * Higher depth values are farther from the viewer and drawn first.
  *
  * ### Two-stage culling
@@ -446,6 +448,7 @@ class IsometricEngine @JvmOverloads constructor(
      * directly; callers that need true magnitudes must normalize.
      */
     private fun faceNormal(path: Path): FaceNormal {
+        if (path.points.size < 3) return FaceNormal(0.0, 0.0, 0.0)
         val a = path.points[0]
         val b = path.points[1]
         val c = path.points[2]

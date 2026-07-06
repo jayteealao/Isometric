@@ -43,7 +43,7 @@ class Vector(
         return sqrt(x * x + y * y + z * z)
     }
 
-    /** Returns a unit vector in the same direction. Throws if magnitude is zero. */
+    /** Returns a unit vector in the same direction. Returns a zero vector if the magnitude is zero. */
     fun normalize(): Vector {
         val mag = magnitude()
         if (mag == 0.0) {

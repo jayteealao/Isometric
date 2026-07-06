@@ -52,12 +52,11 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.5.1")
     implementation("androidx.activity:activity-ktx:1.6.1")
 
-    // Compose (aligned with isometric-compose module)
-    val composeVersion = "1.5.0"
-    implementation("androidx.compose.ui:ui:$composeVersion")
-    implementation("androidx.compose.material:material:$composeVersion")
-    implementation("androidx.compose.ui:ui-tooling-preview:$composeVersion")
-    implementation("androidx.activity:activity-compose:1.6.1")
+    // Compose (pulled from version catalog — see gradle/libs.versions.toml)
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.activity.compose)
 
-    debugImplementation("androidx.compose.ui:ui-tooling:$composeVersion")
+    debugImplementation(libs.compose.ui.tooling)
 }

@@ -7,6 +7,11 @@ sidebar:
 
 ### SceneConfig
 
+`SceneConfig` is `@Stable` (not `@Immutable`): Compose tracks equality correctly, but mutable
+properties inside — like the engine's `angle` and `scale` — can change after construction. Compose
+will not recompose automatically on engine mutations; use `AdvancedSceneConfig.engine.projectionVersion`
+as a change signal when you need to react to engine parameter changes.
+
 | Param | Type | Default | Description |
 |---|---|---|---|
 | renderOptions | RenderOptions | RenderOptions.Default | Depth sorting, culling, bounds checking |
@@ -33,6 +38,12 @@ Presets: `RenderOptions.Default`, `RenderOptions.NoDepthSorting`, `RenderOptions
 ### AdvancedSceneConfig
 
 Extends SceneConfig with additional fields:
+
+> **Note**
+>
+**Custom `SceneProjector` implementors must override `projectionVersion`** (it is `abstract`).
+Increment this value whenever your projection parameters change so the scene cache detects the
+change and rebuilds. Failing to do so leaves the cache stale and changes are not reflected on screen.
 
 | Param | Type | Default | Description |
 |---|---|---|---|
