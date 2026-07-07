@@ -7,8 +7,8 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T16:40:52Z"
-selected-slice: "docs-and-changelog"
+updated-at: "2026-07-07T18:47:51Z"
+selected-slice: "snapshot-sweep-gate"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-review
-next-invocation: "/wf review full-codebase-audit-fixes shape-geometry"
+next-command: wf-verify
+next-invocation: "/wf verify full-codebase-audit-fixes snapshot-sweep-gate"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -94,6 +94,8 @@ workflow-files:
   - 05-implement-shape-geometry.md
   - 06-verify-shape-geometry.md
   - 05-implement-docs-and-changelog.md
+  - 06-verify-docs-and-changelog.md
+  - 05-implement-snapshot-sweep-gate.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -115,14 +117,19 @@ runtime-evidence-deferrals:
   - slice: shape-geometry
     reason: "AC-B1-visual and AC-B2-visual (golden re-record + human diff inspection) — pre-registered PO deferral per 'snapshots once at sweep end' decision (po-answers.md Round 3). Geometric unit tests (vertex span, winding, bounding box) prove correctness; visual surface is deterministic from correct geometry. Rungs tried: (1) OctahedronGeometryTest vertex-span and winding assertions (6 tests pass); (2) KnotGeometryTest position carry-through (5 tests pass); (3) ./gradlew :isometric-compose:test BUILD SUCCESSFUL (local goldens auto-updated as untracked). Cleared by snapshot-sweep-gate slice's recordPaparazziDebug + inspection pass."
     deferred-at: "2026-07-07T16:17:07Z"
-    cleared-by: null
+    cleared-by: "2026-07-07T18:47:51Z"
     repeat-of: null
+  - slice: docs-and-changelog
+    reason: "All 5 user-observable ACs (rendered-page screenshot format) — prose accuracy of interactions.mdx, scene-config.mdx, CHANGELOG.md, gestures.mdx, shapes.mdx, and composables.mdx verified by source read-through against landed code. Rungs tried: (1) Source file read-through for all five mdx files and CHANGELOG.md — all content confirmed correct against IsometricScene.kt:309-320, SceneConfig.kt:50, isometric-compose.api:120, IsometricComposables.kt:132, Point.kt:150-199; (2) sync-docs.js ran clean (Synced 33 files); (3) Astro dev server not available (no display). Residual: rendered-page visual presentation format only — prose accuracy is confirmed by source read-through. Plan pre-accepted: constraint-resolution: po-accepted on all five ACs in 04-plan-docs-and-changelog.md. Cleared by human read-through at review stage."
+    deferred-at: "2026-07-07T16:49:09Z"
+    cleared-by: null
+    repeat-of: compose-contracts
 progress:
   intake: complete
   shape: complete
   slice: complete
   plan: complete
-  implement: in-progress
+  implement: complete
   verify: in-progress
   review: not-started
   handoff: not-started

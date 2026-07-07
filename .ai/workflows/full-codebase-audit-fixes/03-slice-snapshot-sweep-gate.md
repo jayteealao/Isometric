@@ -3,7 +3,7 @@ schema: sdlc/v1
 type: slice
 slug: full-codebase-audit-fixes
 slice-slug: snapshot-sweep-gate
-status: defined
+status: complete
 stage-number: 3
 created-at: "2026-07-07T11:54:55Z"
 updated-at: "2026-07-07T11:54:55Z"
