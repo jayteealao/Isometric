@@ -129,4 +129,18 @@ class DragEventClarityTest {
         val config = GestureConfig(dragThreshold = 32f)
         assertThat(config.dragThreshold).isEqualTo(32f)
     }
+
+    // --- GestureConfig.dragThreshold validation ---------------------------------------
+
+    @Test
+    fun `gesture config rejects negative drag threshold`() {
+        val result = runCatching { GestureConfig(dragThreshold = -1f) }
+        assertThat(result.exceptionOrNull()).isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `gesture config allows zero drag threshold`() {
+        val config = GestureConfig(dragThreshold = 0f)
+        assertThat(config.dragThreshold).isEqualTo(0f)
+    }
 }

@@ -25,8 +25,8 @@ refs:
     - 04-plan-docs-and-changelog.md
     - 04-plan-snapshot-sweep-gate.md
   implement: 05-implement-compose-contracts.md
-next-command: wf-implement
-next-invocation: "/wf implement full-codebase-audit-fixes compose-contracts"
+next-command: wf-verify
+next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
 ---
 
 # Plan: Compose Contracts

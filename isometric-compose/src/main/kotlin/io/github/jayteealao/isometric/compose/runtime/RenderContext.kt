@@ -25,7 +25,10 @@ class RenderContext(
     private val accumulatedRotation: Double = 0.0,
     private val accumulatedScale: Double = 1.0,
     private val rotationOrigin: Point? = null,
-    private val scaleOrigin: Point? = null
+    private val scaleOrigin: Point? = null,
+
+    // Accumulated opacity from ancestor GroupNodes
+    private val accumulatedAlpha: Float = 1f
 ) {
     fun copy(
         width: Int = this.width,
@@ -41,7 +44,38 @@ class RenderContext(
         accumulatedRotation = accumulatedRotation,
         accumulatedScale = accumulatedScale,
         rotationOrigin = rotationOrigin,
-        scaleOrigin = scaleOrigin
+        scaleOrigin = scaleOrigin,
+        accumulatedAlpha = accumulatedAlpha
+    )
+
+    /**
+     * The effective opacity accumulated from all ancestor [GroupNode]s.
+     * Leaf nodes multiply this against their own [IsometricNode.alpha] to obtain
+     * the final per-command alpha.
+     */
+    val effectiveAlpha: Float get() = accumulatedAlpha
+
+    /**
+     * Returns a new [RenderContext] whose [accumulatedAlpha] is the product of
+     * the current [accumulatedAlpha] and [alpha], clamped to [0, 1].
+     *
+     * Called by [GroupNode] during tree traversal so every descendant inherits
+     * the group's opacity. Multiple nested calls multiply naturally:
+     * `withAlpha(0.5f).withAlpha(0.5f)` yields `accumulatedAlpha = 0.25f`.
+     *
+     * @param alpha The group node's own opacity (must be in 0..1).
+     */
+    fun withAlpha(alpha: Float): RenderContext = RenderContext(
+        width = width,
+        height = height,
+        renderOptions = renderOptions,
+        lightDirection = lightDirection,
+        accumulatedPosition = accumulatedPosition,
+        accumulatedRotation = accumulatedRotation,
+        accumulatedScale = accumulatedScale,
+        rotationOrigin = rotationOrigin,
+        scaleOrigin = scaleOrigin,
+        accumulatedAlpha = (accumulatedAlpha * alpha).coerceIn(0f, 1f)
     )
 
     /**
@@ -57,7 +91,8 @@ class RenderContext(
             accumulatedRotation = accumulatedRotation,
             accumulatedScale = accumulatedScale,
             rotationOrigin = rotationOrigin,
-            scaleOrigin = scaleOrigin
+            scaleOrigin = scaleOrigin,
+            accumulatedAlpha = accumulatedAlpha
         )
     }
 
@@ -126,7 +161,8 @@ class RenderContext(
             accumulatedRotation = newRotation,
             accumulatedScale = newScale,
             rotationOrigin = rotationOrigin,
-            scaleOrigin = scaleOrigin ?: this.scaleOrigin
+            scaleOrigin = scaleOrigin ?: this.scaleOrigin,
+            accumulatedAlpha = accumulatedAlpha
         )
     }
 
@@ -232,7 +268,8 @@ class RenderContext(
             accumulatedRotation == other.accumulatedRotation &&
             accumulatedScale == other.accumulatedScale &&
             rotationOrigin == other.rotationOrigin &&
-            scaleOrigin == other.scaleOrigin
+            scaleOrigin == other.scaleOrigin &&
+            accumulatedAlpha == other.accumulatedAlpha
 
     override fun hashCode(): Int {
         var result = width
@@ -244,6 +281,7 @@ class RenderContext(
         result = 31 * result + accumulatedScale.hashCode()
         result = 31 * result + (rotationOrigin?.hashCode() ?: 0)
         result = 31 * result + (scaleOrigin?.hashCode() ?: 0)
+        result = 31 * result + accumulatedAlpha.hashCode()
         return result
     }
 

@@ -5,18 +5,18 @@ slug: full-codebase-audit-fixes
 status: in-progress
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T14:15:38Z"
-slices-implemented: 2
+updated-at: "2026-07-07T15:36:27Z"
+slices-implemented: 3
 slices-total: 7
-metric-total-files-changed: 17
-metric-total-lines-added: 1499
-metric-total-lines-removed: 129
+metric-total-files-changed: 26
+metric-total-lines-added: 1768
+metric-total-lines-removed: 151
 tags: []
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes gesture-coordination"
+next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
 ---
 
 # Implement Index
@@ -30,19 +30,20 @@ next-invocation: "/wf verify full-codebase-audit-fixes gesture-coordination"
   `pointerInput(Unit)` block replaces the two sibling blocks. Four new JVM test files,
   one new instrumented test file (AC-S3 gate). All JVM tests pass; instrumented suite
   compiles and is ready for AVD run. Committed (SHA: dc11217).
-- Remaining slices (`compose-contracts`, `view-module`, `shape-geometry`, `docs-and-changelog`,
-  `snapshot-sweep-gate`) have no code dependency on gesture-coordination being verify-complete
-  before they start.
-- `docs-and-changelog` (E-zone) will describe the new tap/double-tap contract delivered by
-  this slice. It depends on gesture-coordination being implemented (now true).
-- `compose-contracts` does not touch `IsometricScene.kt` (only `GestureConfig.kt`,
-  `GestureEvents.kt`, `AdvancedSceneConfig.kt`). No conflict with gesture-coordination.
+- `compose-contracts` slice (3/7) is complete. G1 (GroupNode alpha propagation), G3
+  (AdvancedSceneConfig callback KDoc), F3 (exact-value alpha test), E4 (secondary
+  constructor + annotation honesty) are all implemented. Three new GroupNode alpha tests,
+  F3 exact-value pin, apiDump regenerated, 42/42 JVM tests pass. Committed in this session
+  (SHA recorded in 05-implement-compose-contracts.md after commit).
+- Remaining slices (`view-module`, `shape-geometry`, `docs-and-changelog`, `snapshot-sweep-gate`)
+  have no code dependency on compose-contracts being verify-complete before they start.
+- `docs-and-changelog` will add the Group alpha composables.mdx row after this lands.
+- `compose-contracts` did not touch `IsometricScene.kt`. No conflict with gesture-coordination.
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf verify full-codebase-audit-fixes gesture-coordination` — run
-  `./gradlew :isometric-compose:test` for the JVM gate, then attempt
-  `connectedDebugAndroidTest` for the AC-S3 emulator gate. JVM: BUILD SUCCESSFUL (confirmed
-  in implement session). Instrumented: requires AVD boot (AC-S3 deferral in place).
-- **Option B:** Continue with `compose-contracts` or other remaining slices in parallel
-  while verify runs on `gesture-coordination` — those slices have no dependency on this one.
+- **Option A (default):** `/wf verify full-codebase-audit-fixes compose-contracts` — run
+  `./gradlew :isometric-compose:test` (42/42 confirmed). KDoc ACs defer to review.
+  No device needed.
+- **Option B:** Continue with `view-module` or other remaining slices in parallel — no
+  dependency on this slice being verified first.

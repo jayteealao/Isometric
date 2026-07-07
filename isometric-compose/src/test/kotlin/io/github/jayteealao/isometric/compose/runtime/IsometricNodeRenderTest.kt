@@ -231,12 +231,95 @@ class IsometricNodeRenderTest {
         node.alpha = 0.5f
         val commands = node.collectCommands(baseContext())
         assertTrue("Prism must produce at least one render command", commands.isNotEmpty())
-        // Every command's color alpha must be strictly below the original 255.
+        // IsoColor.withAlpha(0.5f): a = (255.0 * 0.5).coerceIn(0.0, 255.0) = 127.5
         for (cmd in commands) {
-            assertTrue(
-                "Command color alpha ${cmd.color.a} must be < 255 when node.alpha = 0.5",
-                cmd.color.a < 255.0
+            assertEquals(
+                "Command color alpha must equal 127.5 when node.alpha = 0.5 and base alpha = 255",
+                127.5,
+                cmd.color.a,
+                0.5
             )
         }
+    }
+
+    // --- AC-G1: GroupNode alpha propagation -----------------------------------------
+
+    @Test
+    fun groupAlphaHalfScalesChildCommandAlpha() {
+        // GroupNode alpha=0.5, child ShapeNode alpha=1.0, base color a=255.
+        // Expected: cmd.color.a = 255 * 0.5 * 1.0 = 127.5
+        val group = GroupNode()
+        group.alpha = 0.5f
+        val child = ShapeNode(
+            shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+            color = IsoColor(200.0, 100.0, 50.0, 255.0)
+        )
+        child.alpha = 1.0f
+        group.children.add(child)
+        child.parent = group
+        group.updateChildrenSnapshot()
+
+        val commands = group.collectCommands(baseContext())
+        assertTrue("Group with child must produce commands", commands.isNotEmpty())
+        for (cmd in commands) {
+            assertEquals(
+                "Group alpha=0.5 with child alpha=1.0 and base a=255 must yield cmd.color.a ≈ 127.5",
+                127.5,
+                cmd.color.a,
+                0.5
+            )
+        }
+    }
+
+    @Test
+    fun nestedGroupAlphaMultiplies() {
+        // Outer Group alpha=0.5, inner Group alpha=0.5, leaf ShapeNode alpha=1.0, base color a=255.
+        // Expected: 255 * 0.5 * 0.5 * 1.0 = 63.75
+        val outer = GroupNode()
+        outer.alpha = 0.5f
+        val inner = GroupNode()
+        inner.alpha = 0.5f
+        val leaf = ShapeNode(
+            shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+            color = IsoColor(200.0, 100.0, 50.0, 255.0)
+        )
+        leaf.alpha = 1.0f
+        inner.children.add(leaf)
+        leaf.parent = inner
+        inner.updateChildrenSnapshot()
+        outer.children.add(inner)
+        inner.parent = outer
+        outer.updateChildrenSnapshot()
+
+        val commands = outer.collectCommands(baseContext())
+        assertTrue("Nested groups must produce commands", commands.isNotEmpty())
+        for (cmd in commands) {
+            assertEquals(
+                "Outer alpha=0.5, inner alpha=0.5, leaf alpha=1.0, base a=255 must yield cmd.color.a ≈ 63.75",
+                63.75,
+                cmd.color.a,
+                0.5
+            )
+        }
+    }
+
+    @Test
+    fun groupAlphaZeroSkipsChildren() {
+        // GroupNode with alpha=0 must produce no render commands (early return).
+        val group = GroupNode()
+        group.alpha = 0.0f
+        val child = ShapeNode(
+            shape = Prism(Point.ORIGIN, 1.0, 1.0, 1.0),
+            color = IsoColor.BLUE
+        )
+        group.children.add(child)
+        child.parent = group
+        group.updateChildrenSnapshot()
+
+        val commands = group.collectCommands(baseContext())
+        assertTrue(
+            "GroupNode with alpha=0 must skip children and produce no render commands",
+            commands.isEmpty()
+        )
     }
 }

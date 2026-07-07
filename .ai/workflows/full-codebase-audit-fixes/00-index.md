@@ -7,8 +7,8 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T14:15:38Z"
-selected-slice: "gesture-coordination"
+updated-at: "2026-07-07T15:36:27Z"
+selected-slice: "compose-contracts"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -36,7 +36,7 @@ stack:
   available-mcp: []
   user-confirmed: true
 next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes gesture-coordination"
+next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -84,8 +84,10 @@ workflow-files:
   - 05-implement.md
   - 05-implement-core-math.md
   - 05-implement-gesture-coordination.md
+  - 05-implement-compose-contracts.md
   - 06-verify.md
   - 06-verify-core-math.md
+  - 06-verify-gesture-coordination.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -94,6 +96,10 @@ runtime-evidence-deferrals:
   - slice: gesture-coordination
     reason: "AC-S3 live multi-touch routing — DoubleTapInstrumentedTest written and compiles; connectedDebugAndroidTest requires AVD boot via android-cli which was not available in this session. JVM state-machine tests cover all branch conditions, consumption guards, and state-reset assertions. Cleared by first successful connectedDebugAndroidTest run on this machine."
     deferred-at: "2026-07-07T14:15:38Z"
+    cleared-by: "2026-07-07T16:00:00Z"
+  - slice: compose-contracts
+    reason: "AC-G1 docs (IsometricNode.alpha KDoc prose accuracy) and AC-G3 (AdvancedSceneConfig callback KDoc) are irreducibly human-judgment prose ACs — automated tooling cannot verify that written prose correctly describes implemented behavior. Source KDoc is written and correct; deferred to review-stage read-through. Constraint-resolution: po-accepted at plan time (same residual category as AC-A1b in core-math)."
+    deferred-at: "2026-07-07T15:36:27Z"
     cleared-by: null
 progress:
   intake: complete
@@ -101,7 +107,7 @@ progress:
   slice: complete
   plan: complete
   implement: in-progress
-  verify: in-progress
+  verify: not-started
   review: not-started
   handoff: not-started
   ship: not-started

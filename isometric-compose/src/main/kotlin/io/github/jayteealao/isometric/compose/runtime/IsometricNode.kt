@@ -94,6 +94,11 @@ abstract class IsometricNode {
     /**
      * Optional caller-supplied identifier. When non-null, becomes the effective [nodeId].
      * Must be non-blank when set.
+     *
+     * This property is the backing store for the `nodeId` parameter accepted by the
+     * `IsoShape`, `IsoPath`, and related composables. Reading [nodeId] always returns
+     * the effective identifier — [explicitNodeId] when the caller supplied one, or the
+     * auto-generated id otherwise.
      */
     var explicitNodeId: String? = null
         set(value) {
@@ -112,9 +117,18 @@ abstract class IsometricNode {
         get() = explicitNodeId ?: generatedNodeId
 
     /**
-     * Opacity multiplier for this node's rendered output.
-     * Applied at render time by scaling the command color's alpha channel.
-     * Must be in 0..1 range.
+     * Opacity multiplier for this node's rendered output. Must be in 0..1 range.
+     *
+     * **Leaf nodes** ([ShapeNode], [PathNode], [BatchNode], [CustomRenderNode]): the node's own
+     * alpha is multiplied against the accumulated group alpha from all ancestor [GroupNode]s,
+     * then applied to the render command color. A fully-opaque leaf (`alpha = 1.0`) inside a
+     * half-transparent group (`alpha = 0.5`) produces a command color with alpha × 0.5.
+     *
+     * **GroupNode**: the value is multiplied into the [RenderContext] and propagated to all
+     * descendants. Nested groups multiply their alphas — a group with `alpha = 0.5` inside
+     * another group with `alpha = 0.5` yields an effective opacity of `0.25` for all leaves.
+     * A [GroupNode] with `alpha = 0` skips rendering its entire subtree entirely (no render
+     * commands are produced, at zero traversal cost).
      */
     var alpha: Float = 1f
         set(value) {
@@ -177,6 +191,13 @@ abstract class IsometricNode {
     }
 
     /**
+     * Applies this node's [alpha] to [color], returning a tinted copy only when
+     * [alpha] is less than 1. Avoids an object allocation on fully-opaque nodes.
+     */
+    protected fun applyAlpha(color: IsoColor): IsoColor =
+        if (alpha < 1f) color.withAlpha(alpha) else color
+
+    /**
      * Render this node and its children into the given accumulator list.
      * Eliminates intermediate list allocations compared to a returning `render()` method.
      */
@@ -192,6 +213,8 @@ class GroupNode : IsometricNode() {
 
     override fun renderTo(output: MutableList<RenderCommand>, context: RenderContext) {
         if (!isVisible) return
+        // alpha=0 skips the entire subtree — no traversal cost, no render commands.
+        if (alpha == 0f) return
 
         // Apply per-node render options override if set
         val effectiveContext = if (renderOptions != null) {
@@ -200,8 +223,12 @@ class GroupNode : IsometricNode() {
             context
         }
 
-        // Create child context with accumulated transforms
-        val childContext = effectiveContext.withTransform(
+        // Propagate this group's alpha into the child context before applying transforms.
+        // withAlpha multiplies accumulatedAlpha * alpha so nested groups multiply naturally.
+        val alphaContext = if (alpha < 1f) effectiveContext.withAlpha(alpha) else effectiveContext
+
+        // Create child context with accumulated transforms (preserves accumulatedAlpha)
+        val childContext = alphaContext.withTransform(
             position = position,
             rotation = rotation,
             scale = scale,
@@ -241,7 +268,8 @@ class ShapeNode(
             scaleOrigin = scaleOrigin
         )
         val transformedShape = localContext.applyTransformsToShape(shape)
-        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
+        val effectiveAlpha = context.effectiveAlpha * alpha
+        val effectiveColor = if (effectiveAlpha < 1f) color.withAlpha(effectiveAlpha) else color
 
         // Convert shape to render commands — adds directly to accumulator
         for (path in transformedShape.paths) {
@@ -284,7 +312,8 @@ class PathNode(
             scaleOrigin = scaleOrigin
         )
         val transformedPath = localContext.applyTransformsToPath(path)
-        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
+        val effectiveAlpha = context.effectiveAlpha * alpha
+        val effectiveColor = if (effectiveAlpha < 1f) color.withAlpha(effectiveAlpha) else color
 
         output.add(
             RenderCommand(
@@ -325,7 +354,8 @@ class BatchNode(
             scaleOrigin = scaleOrigin
         )
 
-        val effectiveColor = if (alpha < 1f) color.withAlpha(alpha) else color
+        val effectiveAlpha = context.effectiveAlpha * alpha
+        val effectiveColor = if (effectiveAlpha < 1f) color.withAlpha(effectiveAlpha) else color
 
         shapes.forEachIndexed { index, shape ->
             val transformedShape = localContext.applyTransformsToShape(shape)
@@ -378,13 +408,14 @@ class CustomRenderNode(
         )
 
         val commands = renderFunction(localContext, nodeId)
-        if (alpha < 1f) {
+        val effectiveAlpha = context.effectiveAlpha * alpha
+        if (effectiveAlpha < 1f) {
             for (cmd in commands) {
                 output.add(
                     RenderCommand(
                         commandId = cmd.commandId,
                         points = cmd.points,
-                        color = cmd.color.withAlpha(alpha),
+                        color = cmd.color.withAlpha(effectiveAlpha),
                         originalPath = cmd.originalPath,
                         originalShape = cmd.originalShape,
                         ownerNodeId = cmd.ownerNodeId
