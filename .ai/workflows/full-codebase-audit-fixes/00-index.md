@@ -7,7 +7,7 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T18:47:51Z"
+updated-at: "2026-07-07T19:01:23Z"
 selected-slice: "snapshot-sweep-gate"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes snapshot-sweep-gate"
+next-command: wf-review
+next-invocation: "/wf review full-codebase-audit-fixes snapshot-sweep-gate"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -96,6 +96,7 @@ workflow-files:
   - 05-implement-docs-and-changelog.md
   - 06-verify-docs-and-changelog.md
   - 05-implement-snapshot-sweep-gate.md
+  - 06-verify-snapshot-sweep-gate.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -124,13 +125,18 @@ runtime-evidence-deferrals:
     deferred-at: "2026-07-07T16:49:09Z"
     cleared-by: null
     repeat-of: compose-contracts
+  - slice: snapshot-sweep-gate
+    reason: "AC-S2a CI drift gate (Paparazzi Linux verify) — recordPaparazziDebug on Windows JVM produced 29 attributed goldens (commit 32b31bc); ./gradlew test BUILD SUCCESSFUL locally; attribution ledger: 0 unattributable diffs. Residual: CI ubuntu-latest verifyPaparazziDebug — branch not yet pushed. Plan pre-authorized: constraint-resolution: proxy+deferral in 04-plan-snapshot-sweep-gate.md. Cleared when feat/ws10-interaction-props pushed and CI build job passes. AC-S2b doc visual inspection — DocScreenshotGenerator ran, 5/17 PNGs changed (geometry-attributed); OctahedronGeometryTest 6/6 + KnotGeometryTest 5/5 prove correctness. Residual: human pixel inspection, no display available. Plan pre-accepted: constraint-resolution: po-accepted. Cleared at review stage."
+    deferred-at: "2026-07-07T19:01:23Z"
+    cleared-by: null
+    repeat-of: null
 progress:
   intake: complete
   shape: complete
   slice: complete
   plan: complete
   implement: complete
-  verify: in-progress
+  verify: complete
   review: not-started
   handoff: not-started
   ship: not-started
