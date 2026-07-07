@@ -294,10 +294,10 @@ class IsometricEngineProjectionTest {
 
     @Test
     fun `screenToWorld throws for near-degenerate angle`() {
-        // angle = 0 makes sin(0) = 0 and sin(PI - 0) = 0, collapsing the Y axis
-        val engine = IsometricEngine(angle = 0.0)
+        // angle = 0 makes sin(0) = 0 and sin(PI - 0) = 0, collapsing the Y axis.
+        // The guard fires at construction time — IsometricEngine requires angle > 0.
         assertFailsWith<IllegalArgumentException> {
-            engine.screenToWorld(Point2D(400.0, 300.0), 800, 600)
+            IsometricEngine(angle = 0.0).screenToWorld(Point2D(400.0, 300.0), 800, 600)
         }
     }
 }
