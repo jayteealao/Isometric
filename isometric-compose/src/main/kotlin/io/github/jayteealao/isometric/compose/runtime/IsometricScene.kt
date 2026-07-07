@@ -598,19 +598,31 @@ fun IsometricScene(
                                                 // selection. Single-selection by construction.
                                                 currentNodeDragState?.select(hitNode?.nodeId)
 
-                                                // C1 fix: delay per-node onClick dispatch to confirm
-                                                // this is not the first tap of a double-tap sequence.
+                                                // C1 fix: delay per-node onClick dispatch only when
+                                                // onDoubleClick is registered, to confirm this is not
+                                                // the first tap of a double-tap sequence.
                                                 // If a second Press arrives within the window, it
                                                 // cancels this job (see Press handler above).
+                                                // When onDoubleClick is null, onClick fires immediately:
+                                                // there is no second-tap that could override it.
                                                 val capturedHitNode = hitNode
                                                 val capturedHitX = hitX
                                                 val capturedHitY = hitY
                                                 val capturedIsometricEngine = currentIsometricEngine
-                                                pendingTapJob = longPressScope.launch {
-                                                    delay(doubleTapWindowMs)
-                                                    // Window expired: no second tap arrived.
-                                                    // Dispatch per-node onClick and TileGrid handlers.
+                                                if (capturedHitNode?.onDoubleClick == null) {
+                                                    // No disambiguation needed: fire onClick instantly.
                                                     capturedHitNode?.onClick?.invoke()
+                                                }
+                                                pendingTapJob = longPressScope.launch {
+                                                    // Only delay when onDoubleClick is registered.
+                                                    if (capturedHitNode?.onDoubleClick != null) {
+                                                        delay(doubleTapWindowMs)
+                                                    }
+                                                    // Window expired (or not needed): no second tap arrived.
+                                                    // Dispatch per-node onClick when disambiguation was active.
+                                                    if (capturedHitNode?.onDoubleClick != null) {
+                                                        capturedHitNode.onClick?.invoke()
+                                                    }
 
                                                     // Route to any registered TileGrid tap handlers.
                                                     // Uses hitX/hitY (camera-corrected) so screenToTile
