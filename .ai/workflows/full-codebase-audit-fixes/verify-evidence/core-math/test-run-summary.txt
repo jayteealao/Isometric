@@ -1,0 +1,21 @@
+Run timestamp: 2026-07-07T13:58:52Z
+Branch: feat/ws10-interaction-props
+Commit: 36afbbd
+
+Core-math test classes (targeted run):
+  DepthSorterTest:        tests=24  failures=0  errors=0  skipped=1
+  IntersectionUtilsTest:  tests=11  failures=0  errors=0  skipped=0
+  IsoColorTest:           tests=16  failures=0  errors=0  skipped=0
+  PointTest:              tests=12  failures=0  errors=0  skipped=0
+  TileCoordinateTest:     tests=26  failures=0  errors=0  skipped=0
+  VectorTest:             tests=6   failures=0  errors=0  skipped=0
+  PathTest (AC-A6):       tests=14  failures=0  errors=0  skipped=0
+  TOTAL:                  tests=109 failures=0  skipped=1
+
+Full isometric-core suite:
+  232 tests completed, 1 failed (pre-existing: IsometricEngineProjectionTest.screenToWorld throws for near-degenerate angle), 1 skipped
+  Pre-existing failure is NOT in scope of this slice (file not modified by this commit).
+
+Build: BUILD SUCCESSFUL
+API check: BUILD SUCCESSFUL
+Dokka (V2): BUILD SUCCESSFUL with pre-existing cross-module link warnings in StackAxis.kt / TileGridConfig.kt (not introduced by this slice)

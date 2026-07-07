@@ -1,0 +1,65 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="core-math" data-rev="1">
+  <!-- page owns heading + metric-row + topology figure — fragment starts at files-touched table -->
+
+  <table class="files-touched">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Role</th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Point.kt", "delta": { "add": 12, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IntersectionUtils.kt", "delta": { "add": 15, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IsoColor.kt", "delta": { "add": 3, "rem": 2 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/Vector.kt", "delta": { "add": 3, "rem": 1 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/TileCoordinate.kt", "delta": { "add": 4, "rem": 1 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/IsometricProjection.kt", "delta": { "add": 0, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/PointTest.kt", "delta": { "add": 25, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/VectorTest.kt", "delta": { "add": 7, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/IsoColorTest.kt", "delta": { "add": 20, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/TileCoordinateTest.kt", "delta": { "add": 15, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/IntersectionUtilsTest.kt", "delta": { "add": 20, "rem": 0 } } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/DepthSorterTest.kt", "delta": { "add": 10, "rem": 5 } } -->
+    </tbody>
+  </table>
+
+  <div class="pl-risks">
+    <!-- @include callout { "kind": "risk", "title": "A1 rotation matrices — verify before flipping", "body": "Current rotateX/Y matrices produce wrong CCW results (analysis confirms A1a still broken). Must empirically verify by running the AC-A1a assertion against HEAD before writing tests, to avoid writing a test that passes against code that is wrong in the same direction as the test's expectation." } -->
+    <!-- @include callout { "kind": "risk", "title": "TileCoordinate.hashCode ORIGIN still returns 0", "body": "The x * 1_000_003 xor y formula was changed but ORIGIN(0,0) → 0 xor 0 = 0. Use Objects.hash(x, y) which produces 961 for ORIGIN. The current partial fix does not satisfy AC-A7." } -->
+    <!-- @include callout { "kind": "warn", "title": "A3 ordering constraint is hard", "body": "Private isPointCloseToEdges helper must be extracted and callers migrated BEFORE the inside-test is added to the public function. Violating this order changes depth-sort semantics before the regression net is in place." } -->
+  </div>
+
+  <details class="pl-revs">
+    <summary>0 prior revisions</summary>
+    <ul>
+      <li><em>No prior revisions — initial plan authoring.</em></li>
+    </ul>
+  </details>
+
+  <style>
+    .fragment-plan .files-touched { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .fragment-plan .files-touched th,
+    .fragment-plan .files-touched td { padding: 0.4rem 0.6rem; text-align: left; border-bottom: 1px solid var(--border, #e2e8f0); }
+    .fragment-plan .files-touched th { background: var(--surface-2, #f8fafc); font-weight: 600; }
+    .fragment-plan .pl-risks { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .fragment-plan .pl-revs { margin-top: 1.5rem; }
+    .fragment-plan .pl-revs summary { cursor: pointer; font-weight: 600; padding: 0.25rem 0; }
+  </style>
+
+  <script>
+    (function () {
+      const section = document.currentScript.closest('.fragment-plan');
+      const files = section ? section.querySelectorAll('.files-touched tbody tr').length : 12;
+      window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+        detail: {
+          name: 'plan',
+          artifact: 'plan',
+          counts: { files: 12, modules: 7, risks: 3 }
+        }
+      }));
+    })();
+  </script>
+</section>

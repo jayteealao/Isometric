@@ -1,0 +1,49 @@
+<section style="font-family:system-ui,sans-serif;max-width:960px;margin:1.5rem auto;">
+  <h3 style="margin:0 0 .25rem;">Decision ledger — 20 PO answers &rarr; spec</h3>
+  <p style="margin:0 0 1rem;color:#555;font-size:.9rem;">
+    Every contract question closed. Theme: <strong>make the documented contract true</strong> (7 of 8 contract calls fix the code, not the docs).
+  </p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:.75rem;font-size:.83rem;">
+    <div style="border:1px solid #ddd;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">R1 &middot; Core contracts</div>
+      <div>C1 tap: <strong>delay only when both handlers set</strong> (platform default)</div>
+      <div>A1 rotation: <strong>flip + document CCW convention</strong> <span style="color:#c5221f;">&#9888;&#65039; breaking</span></div>
+      <div>A5 normalize: <strong>KDoc wins</strong> (zero-vector stays)</div>
+      <div>A3 hit-test: <strong>code matches KDoc</strong> (inside-test added)</div>
+    </div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">R2 &middot; Behavior dynamics</div>
+      <div>C2: <strong>consume only when acting</strong></div>
+      <div>A2: <strong>full-3D segment distance</strong></div>
+      <div>F1/F2: <strong>convert diagnostics to asserting tests</strong></div>
+      <div>A6: <strong>full shoelace winding</strong></div>
+    </div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">R3 &middot; Surfaces</div>
+      <div>Snapshots: <strong>one re-record pass at sweep end</strong></div>
+      <div>G1: <strong>implement Group alpha</strong> (additive API)</div>
+      <div>E3: <strong>full changelog + per-break migration notes</strong></div>
+      <div>D1: <strong>single reused Paint</strong></div>
+    </div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">R4 &middot; Failure modes</div>
+      <div>A3 internals: <strong>private edge-only helper</strong> (no depth-sort ripple)</div>
+      <div>Versioning: <strong>pre-1.0 minor + notes</strong></div>
+      <div>E4: <strong>verify annotations, then make honest</strong></div>
+      <div>Verify bar: <strong>CI parity + instrumented for gestures</strong></div>
+    </div>
+    <div style="border:1px solid #ddd;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">R5 &middot; Boundaries</div>
+      <div>A7 + F4: <strong>both included</strong> (cheap rigor)</div>
+      <div>B3: <strong>fix validation order</strong></div>
+      <div>G4: <strong>verify-only</strong> (expected no-op)</div>
+      <div>C1 latitude: <strong>restructuring allowed</strong></div>
+    </div>
+    <div style="border:1px solid #b7d4b9;background:#f3faf3;border-radius:8px;padding:.6rem .8rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">Risk relief from the scan</div>
+      <div>&bull; No caller depends on rotateX/rotateY direction &rarr; A1 blast radius &asymp; internal only</div>
+      <div>&bull; Snapshot churn localizes to octahedron/knot goldens + doc screenshots</div>
+      <div>&bull; detectTapGestures already implements the chosen tap contract</div>
+    </div>
+  </div>
+</section>
