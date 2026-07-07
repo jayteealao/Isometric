@@ -26,9 +26,9 @@ class IsometricView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
-    // sdlc-debt: internal test seam — injected projector for projection-count assertions;
-    // upgrade path: a proper DI mechanism or a @VisibleForTesting companion factory if
-    // the module ever adopts Hilt/Koin.
+    // Internal test seam — injected projector for projection-count assertions.
+    // Upgrade path: a proper DI mechanism or a @VisibleForTesting companion factory
+    // if the module ever adopts Hilt/Koin.
     internal val engine: SceneProjector = IsometricEngine()
 ) : View(context, attrs, defStyleAttr) {
 
@@ -43,9 +43,8 @@ class IsometricView @JvmOverloads constructor(
     private var touchRadius = 0.0
     private var strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke()
 
-    // sdlc-debt: test-visible via internal accessor; upgrade path: remove once
-    // a Robolectric hardware-canvas mode or instrumented smoke makes pixel-level
-    // assertions feasible in the fast-test layer.
+    // Test-visible via internal accessor. Remove once a Robolectric hardware-canvas
+    // mode or instrumented smoke test makes pixel-level assertions feasible.
     internal var cachedScene: PreparedScene? = null
         private set
 
