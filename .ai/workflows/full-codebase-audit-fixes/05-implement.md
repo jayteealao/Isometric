@@ -5,12 +5,12 @@ slug: full-codebase-audit-fixes
 status: in-progress
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T15:36:27Z"
-slices-implemented: 3
+updated-at: "2026-07-07T15:55:11Z"
+slices-implemented: 4
 slices-total: 7
-metric-total-files-changed: 26
-metric-total-lines-added: 1768
-metric-total-lines-removed: 151
+metric-total-files-changed: 27
+metric-total-lines-added: 1770
+metric-total-lines-removed: 153
 tags: []
 refs:
   index: 00-index.md
@@ -35,15 +35,18 @@ next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
   constructor + annotation honesty) are all implemented. Three new GroupNode alpha tests,
   F3 exact-value pin, apiDump regenerated, 42/42 JVM tests pass. Committed in this session
   (SHA recorded in 05-implement-compose-contracts.md after commit).
-- Remaining slices (`view-module`, `shape-geometry`, `docs-and-changelog`, `snapshot-sweep-gate`)
-  have no code dependency on compose-contracts being verify-complete before they start.
+- `view-module` slice (4/7) is complete. D2 KDoc fix applied in
+  `InteractionSamplesActivity.kt`. D1/D3/G2 confirmed already in place (38c77e1); 16
+  Robolectric tests pass (0 failures). AC-D2 prose check deferred to review stage.
+- Remaining slices (`shape-geometry`, `docs-and-changelog`, `snapshot-sweep-gate`)
+  have no code dependency on view-module or compose-contracts being verify-complete before they start.
 - `docs-and-changelog` will add the Group alpha composables.mdx row after this lands.
 - `compose-contracts` did not touch `IsometricScene.kt`. No conflict with gesture-coordination.
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf verify full-codebase-audit-fixes compose-contracts` — run
-  `./gradlew :isometric-compose:test` (42/42 confirmed). KDoc ACs defer to review.
-  No device needed.
-- **Option B:** Continue with `view-module` or other remaining slices in parallel — no
-  dependency on this slice being verified first.
+- **Option A (default):** `/wf verify full-codebase-audit-fixes view-module` — 16/16
+  Robolectric tests already confirmed in this implement pass. Only AC-D2 prose check
+  remains (defers to review). Fast verify.
+- **Option B:** Continue with `shape-geometry`, `docs-and-changelog`, or
+  `snapshot-sweep-gate` slices — no dependency on view-module being verified first.
