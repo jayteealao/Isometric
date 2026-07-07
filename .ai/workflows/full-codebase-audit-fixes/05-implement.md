@@ -2,13 +2,13 @@
 schema: sdlc/v1
 type: implement-index
 slug: full-codebase-audit-fixes
-status: in-progress
+status: complete
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T16:40:52Z"
-slices-implemented: 6
+updated-at: "2026-07-07T18:47:51Z"
+slices-implemented: 7
 slices-total: 7
-metric-total-files-changed: 46
+metric-total-files-changed: 80
 metric-total-lines-added: 2050
 metric-total-lines-removed: 177
 tags: []
@@ -16,7 +16,7 @@ refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
+next-invocation: "/wf verify full-codebase-audit-fixes snapshot-sweep-gate"
 ---
 
 # Implement Index
@@ -51,10 +51,18 @@ next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
   composables.mdx) are all in place. sync-docs.js run and all 33 mirrors regenerated. All
   prose ACs are manual-review residual deferrable to review stage.
 - `compose-contracts` did not touch `IsometricScene.kt`. No conflict with gesture-coordination.
+- `snapshot-sweep-gate` slice (7/7) is complete. All 29 Paparazzi goldens recorded and
+  committed (SHA: 32b31bc). Attribution ledger: octahedron/knot/sampleThree attributed to
+  B1/B2; grid/rotateZ attributed to pre-sweep depth-sort and A1a fixes; 10 files PNG noise;
+  15 files byte-identical. Doc screenshots: 5 of 17 updated (shape-octahedron, shape-knot,
+  complex-scene, grid, multiple-shapes). `./gradlew test apiCheck` BUILD SUCCESSFUL (AC-S1).
+  AC-S3 checkpoint: gesture evidence still current (IsometricScene.kt not in 9cf6c43).
+  CI drift gate still open (Windows record / Linux verify — fallback pre-resolved).
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf verify full-codebase-audit-fixes docs-and-changelog` — mechanics
-  AC (sync-docs.js) passes; prose ACs are manual-review residual deferrable to review stage.
-- **Option B:** Continue with `snapshot-sweep-gate` — only remaining slice; no dependency on
-  docs-and-changelog being verified first.
+- **Option A (default):** `/wf verify full-codebase-audit-fixes snapshot-sweep-gate` —
+  verify AC-S1 (confirmed BUILD SUCCESSFUL), AC-S2 (attribution ledger complete, CI drift
+  gate open), AC-S3 (checkpoint passed, no re-run needed).
+- **Option B:** `/wf review full-codebase-audit-fixes` — slug-wide review after all 7
+  slices verified.
