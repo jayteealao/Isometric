@@ -147,6 +147,11 @@ class Point @JvmOverloads constructor(
     /**
      * Rotate about origin on the X axis.
      *
+     * Positive angles rotate CCW around the positive X axis (right-handed convention):
+     * `Point(0,1,0)` → `Point(0,0,1)` at π/2.
+     *
+     * Matrix (CCW, right-handed): y' = y·cos(θ) − z·sin(θ); z' = y·sin(θ) + z·cos(θ).
+     *
      * @param origin The center of rotation.
      * @param angle The rotation angle in radians.
      * @return A new point rotated around the X axis through [origin].
@@ -156,13 +161,18 @@ class Point @JvmOverloads constructor(
         val pZ = z - origin.z
         val cosAngle = cos(angle)
         val sinAngle = sin(angle)
-        val newZ = pZ * cosAngle - pY * sinAngle
-        val newY = pZ * sinAngle + pY * cosAngle
+        val newY = pY * cosAngle - pZ * sinAngle
+        val newZ = pY * sinAngle + pZ * cosAngle
         return Point(x, newY + origin.y, newZ + origin.z)
     }
 
     /**
      * Rotate about origin on the Y axis.
+     *
+     * Positive angles rotate CCW around the positive Y axis (right-handed convention):
+     * `Point(0,0,1)` → `Point(1,0,0)` at π/2.
+     *
+     * Matrix (CCW, right-handed): z' = z·cos(θ) − x·sin(θ); x' = z·sin(θ) + x·cos(θ).
      *
      * @param origin The center of rotation.
      * @param angle The rotation angle in radians.
@@ -173,13 +183,18 @@ class Point @JvmOverloads constructor(
         val pZ = z - origin.z
         val cosAngle = cos(angle)
         val sinAngle = sin(angle)
-        val newX = pX * cosAngle - pZ * sinAngle
-        val newZ = pX * sinAngle + pZ * cosAngle
+        val newZ = pZ * cosAngle - pX * sinAngle
+        val newX = pZ * sinAngle + pX * cosAngle
         return Point(newX + origin.x, y, newZ + origin.z)
     }
 
     /**
      * Rotate about origin on the Z axis.
+     *
+     * Positive angles rotate CCW around the positive Z axis (right-handed convention):
+     * `Point(1,0,0)` → `Point(0,1,0)` at π/2.
+     *
+     * Matrix (CCW, right-handed): x' = x·cos(θ) − y·sin(θ); y' = x·sin(θ) + y·cos(θ).
      *
      * @param origin The center of rotation.
      * @param angle The rotation angle in radians.

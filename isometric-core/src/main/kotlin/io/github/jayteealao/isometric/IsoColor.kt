@@ -82,13 +82,14 @@ data class IsoColor @JvmOverloads constructor(
     }
 
     /**
-     * Produces a lighter variant of this color by blending with [lightColor] and
-     * then increasing the HSL lightness by [percentage].
+     * Produces a lighter or darker variant of this color by blending with [lightColor] and
+     * then adjusting the HSL lightness by [percentage].
      *
      * Used internally by the renderer to simulate directional lighting on faces.
      *
-     * @param percentage Amount to add to the lightness component (0&ndash;1 range,
-     *   clamped to a maximum lightness of 1.0).
+     * @param percentage Amount to add to the lightness component (range [−1, 1]);
+     *   the result is clamped to [0, 1] so negative values darken without producing
+     *   invalid (sub-zero) lightness.
      * @param lightColor The color to blend with before adjusting lightness.
      * @return A new [IsoColor] with the adjusted lightness, preserving the original alpha.
      */
@@ -100,7 +101,7 @@ data class IsoColor @JvmOverloads constructor(
             a
         )
 
-        val newLightness = min(newColor.l + percentage, 1.0)
+        val newLightness = (newColor.l + percentage).coerceIn(0.0, 1.0)
 
         return newColor.withLightness(newLightness)
     }

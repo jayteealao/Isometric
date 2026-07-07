@@ -89,8 +89,15 @@ class DepthSorterTest {
         val expectedSides = (0 until 6).map { Triple(it, 0, "FRONT") } + (0 until 6).map { Triple(0, it, "LEFT") }
         println("Missing front-edge sides (Default): ${(expectedSides.toSet() - sidesDefault).sortedWith(compareBy({ it.first }, { it.second }, { it.third }))}")
 
-        // No assertion yet — diagnostic only. Fail-line will be added once the
-        // bug is localised.
+        // AC-F1: assert face presence so this test cannot silently pass when faces
+        // are missing. A 6x6 grid of unit prisms with culling enabled should expose
+        // exactly 36 tops + 6 front walls + 6 left walls = 48 exterior faces.
+        assertEquals(48, sceneDefault.commands.size,
+            "Default 6x6 TileGrid must produce exactly 48 exterior faces (36 tops + 6 front + 6 left)")
+        assertEquals(36, topsDefault.size,
+            "All 36 tile tops must be present in the default render")
+        assertTrue((expected - topsDefault).isEmpty(),
+            "No top face may be missing: missing=${(expected - topsDefault).sortedBy { it.first * 6 + it.second }}")
     }
 
     @Test
@@ -247,24 +254,26 @@ class DepthSorterTest {
         println("YELLOW(2)_TOP idx=$prism2Top, RED(3)_LEFT idx=$prism3Left, RED(3)_FRONT idx=$prism3Front")
         println("YELLOW(2)_LEFT idx=$prism2Left, YELLOW(2)_FRONT idx=$prism2Front")
 
+        // AC-F2: assert face existence before ordering assertions so the test cannot
+        // silently pass when faces are absent (findFace returns -1).
+        assertTrue(prism2Top >= 0, "YELLOW(2) TOP face must exist in scene commands")
+        assertTrue(prism3Left >= 0, "RED(3) LEFT face must exist in scene commands")
+        assertTrue(prism3Front >= 0, "RED(3) FRONT face must exist in scene commands")
+
         // Per painter's algorithm: closer face draws AFTER (higher index).
         // RED's walls are higher z than YELLOW's TOP, but they share an EDGE
         // at z=3, x=1 (or y=1). RED LEFT/FRONT iso-overlaps with YELLOW TOP
         // (vertices on plane). The cascade should declare RED's wall closer →
         // RED wall paints after YELLOW TOP → RED wall_index > YELLOW TOP_index.
-        if (prism2Top >= 0 && prism3Left >= 0) {
-            assertTrue(
-                prism3Left > prism2Top,
-                "RED(3)_LEFT (idx=$prism3Left) must draw after YELLOW(2)_TOP (idx=$prism2Top); " +
-                    "if not, YELLOW's top color shows through where RED's left wall should paint"
-            )
-        }
-        if (prism2Top >= 0 && prism3Front >= 0) {
-            assertTrue(
-                prism3Front > prism2Top,
-                "RED(3)_FRONT (idx=$prism3Front) must draw after YELLOW(2)_TOP (idx=$prism2Top)"
-            )
-        }
+        assertTrue(
+            prism3Left > prism2Top,
+            "RED(3)_LEFT (idx=$prism3Left) must draw after YELLOW(2)_TOP (idx=$prism2Top); " +
+                "if not, YELLOW's top color shows through where RED's left wall should paint"
+        )
+        assertTrue(
+            prism3Front > prism2Top,
+            "RED(3)_FRONT (idx=$prism3Front) must draw after YELLOW(2)_TOP (idx=$prism2Top)"
+        )
     }
 
     @Test

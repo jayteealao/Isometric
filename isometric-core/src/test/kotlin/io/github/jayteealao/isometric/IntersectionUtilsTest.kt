@@ -5,7 +5,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Baseline coverage for [IntersectionUtils.hasIntersection]. This predicate
+ * Baseline coverage for [IntersectionUtils.hasIntersection] and
+ * [IntersectionUtils.isPointCloseToPoly]. The hasIntersection predicate
  * gates `DepthSorter.checkDepthDependency`: when it returns false, no edge
  * is added between two faces regardless of [Path.closerThan]. Any future
  * change here ripples directly into depth-sort correctness, so these tests
@@ -13,6 +14,55 @@ import kotlin.test.assertTrue
  * regression markers.
  */
 class IntersectionUtilsTest {
+
+    // ------------------------------------------------------------------
+    // isPointCloseToPoly — combines interior test with edge-proximity.
+    // Pre-fix the function only checked edge proximity; interior points
+    // far from all edges returned false. Internal callers were migrated
+    // to the new private isPointCloseToEdges helper to preserve their
+    // edge-only semantics; the public function gained the interior test.
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `isPointCloseToPoly returns true for strictly interior point far from edges`() {
+        // AC-A3: a point at (0,0) is strictly inside a 20×20 square centred
+        // on the origin. With radius=0.1 and all edges 10 units away, the
+        // old edge-only loop returned false. The new implementation checks
+        // isPointInPoly first and returns true.
+        val poly = listOf(
+            Point(-10.0, -10.0, 0.0), Point(10.0, -10.0, 0.0),
+            Point(10.0, 10.0, 0.0), Point(-10.0, 10.0, 0.0)
+        )
+        assertTrue(
+            IntersectionUtils.isPointCloseToPoly(poly, 0.0, 0.0, 0.1),
+            "A point strictly interior to the polygon must return true regardless of radius"
+        )
+    }
+
+    @Test
+    fun `isPointCloseToPoly returns true for point near edge but outside polygon`() {
+        // Edge-proximity still works for external near-boundary points.
+        val poly = listOf(
+            Point(0.0, 0.0, 0.0), Point(4.0, 0.0, 0.0),
+            Point(4.0, 4.0, 0.0), Point(0.0, 4.0, 0.0)
+        )
+        assertTrue(
+            IntersectionUtils.isPointCloseToPoly(poly, -0.05, 2.0, 0.1),
+            "A point just outside the left edge must be within radius=0.1 of that edge"
+        )
+    }
+
+    @Test
+    fun `isPointCloseToPoly returns false for point far outside polygon`() {
+        val poly = listOf(
+            Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0)
+        )
+        assertFalse(
+            IntersectionUtils.isPointCloseToPoly(poly, 5.0, 5.0, 0.1),
+            "A point far outside the polygon must return false"
+        )
+    }
 
     @Test
     fun `hasIntersection returns false for fully disjoint polygons`() {
