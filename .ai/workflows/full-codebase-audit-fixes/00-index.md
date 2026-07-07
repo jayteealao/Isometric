@@ -7,7 +7,7 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T22:07:54Z"
+updated-at: "2026-07-07T22:19:21Z"
 selected-slice: "path-caching-test-fix"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -102,6 +102,7 @@ workflow-files:
   - 05-implement-snapshot-sweep-gate.md
   - 06-verify-snapshot-sweep-gate.md
   - 05-implement-path-caching-test-fix.md
+  - 06-verify-path-caching-test-fix.md
   - 07-review.md
   - 07-review.yaml
   - 07-review.html.fragment

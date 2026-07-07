@@ -5,9 +5,9 @@ slug: full-codebase-audit-fixes
 status: complete
 stage-number: 6
 created-at: "2026-07-07T13:58:52Z"
-updated-at: "2026-07-07T21:51:49Z"
-slices-verified: 7
-slices-total: 7
+updated-at: "2026-07-07T22:19:21Z"
+slices-verified: 8
+slices-total: 8
 tags: [audit-findings, isometric-core, isometric-compose, isometric-android-view, gestures, docs, tests]
 refs:
   index: 00-index.md
@@ -28,7 +28,8 @@ next-invocation: "/wf review full-codebase-audit-fixes snapshot-sweep-gate"
 | view-module | partial | not-needed | 2026-07-07T21:32:46Z | 3/4 code-only ACs met (D1, D3, G2); 16/16 Robolectric tests pass (re-run: BUILD SUCCESSFUL); lint + apiCheck PASS; AC-D2 KDoc prose deferred (po-accepted; review residual); re-verified (run 2): no new issues, all checks still passing |
 | shape-geometry | pass | not-needed | 2026-07-07T21:40:28Z | 5/5 AC met; 247/247 JVM tests pass; apiCheck PASS; AC-B1-visual + AC-B2-visual cleared by snapshot-sweep-gate commit 32b31bc (octahedron.png, knot.png, sampleThree.png committed 2026-07-07T18:47:51Z); re-verified (run 2): deferrals cleared, result upgraded to pass |
 | docs-and-changelog | partial | converged | 2026-07-07T21:51:49Z | 6/6 AC met; 1 fix landed (03cdec0 — AC-E1 stale prose corrected after post-docs code fix c214af8); rendered-page screenshot deferred (pre-accepted po-accepted; review residual) |
-| snapshot-sweep-gate | partial | not-needed | 2026-07-07T19:01:23Z | 2/4 AC fully met (AC-S1 gradlew test+apiCheck BUILD SUCCESSFUL, AC-S3 gesture evidence current); AC-S2a CI drift gate deferred (plan proxy+deferral; push required); AC-S2b doc visual deferred (po-accepted; constructive unit-test proof provided) |
+| snapshot-sweep-gate | partial | not-needed | 2026-07-07T22:00:52Z | 2/4 AC fully met (AC-S1 gradlew test+apiCheck reconfirmed BUILD SUCCESSFUL after c214af8; Paparazzi goldens unaffected); AC-S2a CI drift gate deferred (plan proxy+deferral; push required); AC-S2b doc visual deferred (po-accepted; constructive unit-test proof provided); AC-S3 newly deferred (c214af8 modified IsometricScene.kt post-evidence — double-tap path unchanged, onClick-only path new, AVD re-run not available; repeat-of: gesture-coordination) |
+| path-caching-test-fix | pass | not-needed | 2026-07-07T22:19:21Z | 4/4 AC met; connectedDebugAndroidTest 36 tests 0 failures on 3 devices (Medium_Phone_API_36.0 AVD, Pixel_9_Pro AVD, SM-F956B); apiCheck PASS; all 3 IsometricRendererPathCachingTest cases pass; no deferrals |
 
 ## Runtime Evidence Deferrals
 
@@ -44,16 +45,13 @@ next-invocation: "/wf review full-codebase-audit-fixes snapshot-sweep-gate"
 
 ## Recommended Next Stage
 
-All 7 slices verified. `./gradlew test apiCheck` BUILD SUCCESSFUL. All slug-wide automated
-gates are green. Deferrals are plan-authorized (CI drift gate, doc visual, prose quality).
-No substantive code failures remain.
+All 8 slices verified. `./gradlew test apiCheck connectedDebugAndroidTest` all BUILD SUCCESSFUL.
+All slug-wide automated gates are green. Deferrals are plan-authorized (CI drift gate, doc visual,
+prose quality). No substantive code failures remain.
 
-- **snapshot-sweep-gate** (this slice): partial — automated gate green; CI drift gate and
-  doc visual inspection deferred per plan pre-authorization. Push branch to clear CI gate.
-- **shape-geometry** shape-geometry B1/B2 visual deferral cleared by this slice's
-  attribution ledger; original deferral `cleared-by` updated in 00-index.md.
-- **All slices** are ready for review: `/wf review full-codebase-audit-fixes <slice>`.
+- **path-caching-test-fix** (this slice): **pass** — 4/4 AC met; 36/36 instrumented tests pass
+  on 3 devices; no deferrals. The reflection wall is retired.
+- **All slices** are ready for review.
 
-Recommended next: `/wf review full-codebase-audit-fixes snapshot-sweep-gate` (slug-wide
-closing review). Alternatively start per-slice: `/wf review full-codebase-audit-fixes
-gesture-coordination` (only slice with result: pass).
+Recommended next: `/wf review full-codebase-audit-fixes path-caching-test-fix` (this slice, clean pass)
+or slug-wide `/wf review full-codebase-audit-fixes snapshot-sweep-gate`.
