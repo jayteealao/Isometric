@@ -1,0 +1,77 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="shape-geometry" data-rev="1">
+  <!-- page owns heading + metric-row + topology figure — fragment starts at the interactive table -->
+
+  <table class="files-touched">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Change</th>
+        <th>Role</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/shapes/Octahedron.kt", "delta": { "add": 3, "rem": 4 }, "planned_change": "Remove non-uniform post-scale (sqrt(2)/2, sqrt(2)/2, 1.0) at line 44 — pre-scale vertex geometry already satisfies unit-cube KDoc" } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/shapes/Knot.kt", "delta": { "add": 1, "rem": 2 }, "planned_change": "Remove hardcoded translate(-0.1, 0.15, 0.4) offset at line 50 — collapse to a single position translate" } -->
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-core/src/main/kotlin/io/github/jayteealao/isometric/shapes/Cylinder.kt", "delta": { "add": 8, "rem": 3 }, "planned_change": "Introduce private companion factory that validates before Circle instantiation so Cylinder's own messages fire" } -->
+      <!-- @include files-touched-row { "role": "new", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/shapes/OctahedronGeometryTest.kt", "delta": { "add": 60, "rem": 0 }, "planned_change": "New: vertex-span assertions (FAILS pre-fix), path-count co-location, winding/signed-area guards for depth-sort stability" } -->
+      <!-- @include files-touched-row { "role": "new", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/shapes/KnotGeometryTest.kt", "delta": { "add": 40, "rem": 0 }, "planned_change": "New: bounding-box lower-bound assertion (FAILS pre-fix due to offset), position carry-through test" } -->
+      <!-- @include files-touched-row { "role": "new", "path": "isometric-core/src/test/kotlin/io/github/jayteealao/isometric/shapes/CylinderValidationTest.kt", "delta": { "add": 35, "rem": 0 }, "planned_change": "New: Cylinder message-text assertions (FAILS pre-fix; message says 'Circle' not 'Cylinder')" } -->
+    </tbody>
+  </table>
+
+  <div class="pl-risks">
+    <!-- @include callout { "kind": "risk", "title": "Known-red Paparazzi goldens (pre-registered)", "body": "octahedron.png, knot.png, and sampleThree.png will fail snapshot verification from B1/B2 landing until snapshot-sweep-gate's re-record. Verify scopes to :isometric-core:test only in this window; failures are attributed and expected." } -->
+    <!-- @include callout { "kind": "warn", "title": "B1 depth-sort regression window", "body": "Corrected vertex proportions change face projections. OctahedronGeometryTest adds winding/signed-area guards so a depth-sort hazard surfaces as a test failure before the visual re-record, not after." } -->
+    <!-- @include callout { "kind": "info", "title": "Cylinder API unchanged", "body": "The companion-factory refactor preserves the public @JvmOverloads constructor signature exactly. apiCheck must pass — no API dump changes expected." } -->
+  </div>
+
+  <details class="pl-revs">
+    <summary>0 prior revisions</summary>
+    <ul>
+      <li><em>No prior revisions.</em></li>
+    </ul>
+  </details>
+
+  <style>
+    .fragment-plan table.files-touched {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .fragment-plan table.files-touched th,
+    .fragment-plan table.files-touched td {
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border, #e2e8f0);
+      text-align: left;
+      vertical-align: top;
+    }
+    .fragment-plan table.files-touched th {
+      font-weight: 600;
+      background: var(--surface-2, #f8fafc);
+    }
+    .fragment-plan .pl-risks {
+      margin-top: 1.5rem;
+    }
+    .fragment-plan .pl-revs {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted, #64748b);
+    }
+  </style>
+
+  <script>
+    (function () {
+      const section = document.currentScript.closest('.fragment-plan');
+      const files = section ? section.querySelectorAll('table.files-touched tbody tr').length : 0;
+      const risks = section ? section.querySelectorAll('.pl-risks .callout').length : 0;
+      window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+        detail: {
+          name: 'plan',
+          artifact: 'plan',
+          counts: { files: 6, modules: 2, risks: 3 }
+        }
+      }));
+    })();
+  </script>
+</section>

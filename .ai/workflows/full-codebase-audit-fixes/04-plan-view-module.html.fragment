@@ -1,0 +1,160 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="view-module" data-rev="1">
+  <!-- page owns heading + metric-row + topology figure — fragment starts at the files-touched table -->
+
+  <table class="files-touched">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Module</th>
+        <th>Intent</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-android-view/src/main/kotlin/io/github/jayteealao/isometric/view/AndroidCanvasRenderer.kt", "delta": { "add": 52, "rem": 15 } } -->
+      <tr class="is-modified">
+        <td>
+          <details class="pl-card-wrap">
+            <summary>
+              <span class="pl-path">isometric-android-view/…/AndroidCanvasRenderer.kt</span>
+              <span class="pl-chip pl-chip--modified">modified</span>
+              <span class="pl-chip pl-chip--module">renderer</span>
+              <span class="pl-delta"><span class="pl-delta-add">+52</span> <span class="pl-delta-rem">−15</span></span>
+            </summary>
+            <div class="pl-card">
+              <p><strong>Intent:</strong> ALREADY FIXED (38c77e1) — single <code>Paint</code> and <code>Path</code> reused per render loop, mutated per face. Residual: code-review verification that per-face field resets (lines 59–82) prevent state leaks, satisfying AC-D1's code-review gate.</p>
+            </div>
+          </details>
+        </td>
+      </tr>
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-android-view/src/main/kotlin/io/github/jayteealao/isometric/view/IsometricView.kt", "delta": { "add": 117, "rem": 40 } } -->
+      <tr class="is-modified">
+        <td>
+          <details class="pl-card-wrap">
+            <summary>
+              <span class="pl-path">isometric-android-view/…/IsometricView.kt</span>
+              <span class="pl-chip pl-chip--modified">modified</span>
+              <span class="pl-chip pl-chip--module">view</span>
+              <span class="pl-delta"><span class="pl-delta-add">+117</span> <span class="pl-delta-rem">−40</span></span>
+            </summary>
+            <div class="pl-card">
+              <p><strong>Intent:</strong> ALREADY FIXED (38c77e1) — <code>sceneDirty</code> flag; <code>setSort</code>/<code>setCull</code>/<code>setBoundsCheck</code> set <code>sceneDirty=true</code>; <code>onDraw</code> re-projects once when dirty (AC-D3). <code>onTouchEvent</code> returns <code>true</code> for <code>ACTION_UP</code> when listener registered (AC-G2).</p>
+            </div>
+          </details>
+        </td>
+      </tr>
+      <!-- @include files-touched-row { "role": "modified", "path": "isometric-android-view/src/test/kotlin/io/github/jayteealao/isometric/view/IsometricViewLifecycleTest.kt", "delta": { "add": 422, "rem": 0 } } -->
+      <tr class="is-modified">
+        <td>
+          <details class="pl-card-wrap">
+            <summary>
+              <span class="pl-path">isometric-android-view/…/IsometricViewLifecycleTest.kt</span>
+              <span class="pl-chip pl-chip--modified">modified</span>
+              <span class="pl-chip pl-chip--module">tests</span>
+              <span class="pl-delta"><span class="pl-delta-add">+422</span> <span class="pl-delta-rem">−0</span></span>
+            </summary>
+            <div class="pl-card">
+              <p><strong>Intent:</strong> ALREADY PRESENT (38c77e1) — 16 Robolectric tests covering AC-D1 proxy, AC-D3 setter invalidation + batching, AC-G2 return value. Residual: run <code>./gradlew :isometric-android-view:test</code> to confirm all pass.</p>
+            </div>
+          </details>
+        </td>
+      </tr>
+      <!-- @include files-touched-row { "role": "modified", "path": "app/src/main/kotlin/io/github/jayteealao/isometric/sample/InteractionSamplesActivity.kt", "delta": { "add": 3, "rem": 3 } } -->
+      <tr class="is-modified">
+        <td>
+          <details class="pl-card-wrap">
+            <summary>
+              <span class="pl-path">app/…/InteractionSamplesActivity.kt</span>
+              <span class="pl-chip pl-chip--modified">modified</span>
+              <span class="pl-chip pl-chip--module">sample</span>
+              <span class="pl-delta"><span class="pl-delta-add">+3</span> <span class="pl-delta-rem">−3</span></span>
+            </summary>
+            <div class="pl-card">
+              <p><strong>Intent:</strong> NOT YET FIXED — D2 KDoc edit. Lines 612–615: replace "the drag-start position, captured in onDragStart" with accurate per-event semantics matching <code>GestureEvents.kt</code> lines 34–44. In <code>onDrag</code>, <code>x/y</code> is the <em>live</em> pointer position, not the start position.</p>
+              <pre class="diff">
+<span class="diff-rem">- * The status card makes the [DragEvent] field contract visible: `x`/`y` are the absolute</span>
+<span class="diff-rem">- * pointer position (the drag-start position, captured in onDragStart), while `delta` is the</span>
+<span class="diff-rem">- * per-event movement that callers accumulate — the same value camera autopan sums. Reading</span>
+<span class="diff-rem">- * the absolute start from `x`/`y` and the running total from `delta` is the hero use case.</span>
+<span class="diff-add">+ * The status card makes the [DragEvent] field contract visible: `x`/`y` are the</span>
+<span class="diff-add">+ * **absolute** pointer position — the drag-start position in `onDragStart`, and the</span>
+<span class="diff-add">+ * **live** (current) pointer position in `onDrag`. `delta` is the per-event movement</span>
+<span class="diff-add">+ * that callers accumulate — the same value camera autopan sums.</span>
+              </pre>
+            </div>
+          </details>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pl-risks">
+    <!-- @include callout { "kind": "info", "title": "D1/D3/G2 already fixed (38c77e1)", "body": "Three of four findings landed in commit 38c77e1 with 16 Robolectric regression tests. This plan's implement stage is a one-KDoc-edit for D2 plus a test run and code-review pass." } -->
+    <div class="callout callout-info">
+      <strong>D1/D3/G2 already fixed (38c77e1)</strong>
+      <p>Three of four findings landed in commit 38c77e1 with 16 Robolectric regression tests. This plan's implement stage is a one-KDoc-edit for D2 plus a test run and code-review pass.</p>
+    </div>
+
+    <!-- @include callout { "kind": "warn", "title": "AC-D1: allocation assertion ceiling", "body": "Robolectric's stub Canvas cannot count Paint allocations. The code-review gate is the real acceptance mechanism for AC-D1; the ac8_* proxy test covers the structural invariant only. No instrumented test is required for this slice." } -->
+    <div class="callout callout-warn">
+      <strong>AC-D1: allocation assertion ceiling</strong>
+      <p>Robolectric's stub Canvas cannot count Paint allocations. The code-review gate is the real acceptance mechanism for AC-D1; the <code>ac8_*</code> proxy test covers the structural invariant only. No instrumented test is required for this slice.</p>
+    </div>
+
+    <!-- @include callout { "kind": "info", "title": "D3: lazy strategy confirmed", "body": "38c77e1 chose lazy rebuild (sceneDirty flag + invalidate → single reprojection on next onDraw). The slice AC allowed either lazy or eager; lazy is correct and preferable." } -->
+    <div class="callout callout-info">
+      <strong>D3: lazy strategy confirmed</strong>
+      <p>38c77e1 chose lazy rebuild (<code>sceneDirty</code> flag + <code>invalidate</code> → single re-projection on next <code>onDraw</code>). The slice AC allowed either lazy or eager; lazy is correct and preferable.</p>
+    </div>
+  </div>
+
+  <details class="pl-revs">
+    <summary>0 prior revisions</summary>
+    <ul>
+      <li><em>No prior revisions — initial authoring.</em></li>
+    </ul>
+  </details>
+
+  <style>
+    .fragment-plan .pl-path { font-family: monospace; font-size: 0.85em; }
+    .fragment-plan .pl-chip { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75em; margin-left: 6px; }
+    .fragment-plan .pl-chip--modified { background: #dbeafe; color: #1e40af; }
+    .fragment-plan .pl-chip--module { background: #f3f4f6; color: #374151; }
+    .fragment-plan .pl-delta { font-size: 0.8em; margin-left: 6px; }
+    .fragment-plan .pl-delta-add { color: #166534; }
+    .fragment-plan .pl-delta-rem { color: #991b1b; }
+    .fragment-plan .pl-card { padding: 8px 12px; background: var(--surface-2, #f9fafb); border-left: 3px solid #d1d5db; margin-top: 4px; font-size: 0.875em; }
+    .fragment-plan .pl-card pre.diff { font-size: 0.8em; overflow-x: auto; }
+    .fragment-plan .diff-add { color: #166534; background: #dcfce7; display: block; }
+    .fragment-plan .diff-rem { color: #991b1b; background: #fee2e2; display: block; }
+    .fragment-plan .pl-card-wrap summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; padding: 6px 0; }
+    .fragment-plan .pl-card-wrap summary::-webkit-details-marker { display: none; }
+    .fragment-plan table.files-touched { width: 100%; border-collapse: collapse; }
+    .fragment-plan table.files-touched td { padding: 4px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .fragment-plan table.files-touched th { padding: 6px 8px; background: #f3f4f6; text-align: left; font-size: 0.8em; color: #6b7280; }
+    .fragment-plan .pl-risks { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .fragment-plan .callout { padding: 10px 14px; border-radius: 4px; font-size: 0.875em; }
+    .fragment-plan .callout-info { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .fragment-plan .callout-warn { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .fragment-plan .callout-risk { background: #fef2f2; border-left: 4px solid #ef4444; }
+    .fragment-plan .callout strong { display: block; margin-bottom: 4px; }
+    .fragment-plan .pl-revs { margin-top: 16px; font-size: 0.875em; color: #6b7280; }
+    .fragment-plan .pl-revs summary { cursor: pointer; }
+  </style>
+
+  <script>
+  (function() {
+    const section = document.currentScript.closest('.fragment-plan');
+    const files = section ? section.querySelectorAll('table.files-touched tbody tr') : [];
+    const modules = 4;
+    const risks = 3;
+    window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+      detail: {
+        name: 'plan',
+        artifact: 'plan',
+        counts: { files: files.length, modules: modules, risks: risks }
+      }
+    }));
+  })();
+  </script>
+</section>

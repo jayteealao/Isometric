@@ -1,0 +1,175 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="compose-contracts" data-rev="1">
+
+  <table class="files-touched">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Role</th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>…/compose/runtime/IsometricNode.kt</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> G1 — Add alpha propagation in GroupNode.renderTo: early return when alpha==0f; call context.withAlpha(alpha) to build childContext; update leaf nodes to multiply context.accumulatedAlpha into applyAlpha. Update IsometricNode.alpha KDoc to describe both leaf and Group paths.</p>
+            <pre class="diff"><span class="diff-add">+ if (alpha == 0f) return</span>
+<span class="diff-add">+ val alphaContext = effectiveContext.withAlpha(alpha)</span>
+<span class="diff-ctx">  // pass alphaContext (not effectiveContext) to withTransform</span>
+<span class="diff-add">+ val effectiveColor = color.withAlpha(context.accumulatedAlpha * alpha)</span></pre>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>domain</td>
+        <td>+30 / -5</td>
+      </tr>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>…/compose/runtime/RenderContext.kt</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> Add <code>private val accumulatedAlpha: Float = 1f</code> to primary constructor. Add <code>fun withAlpha(alpha: Float): RenderContext</code> factory that returns copy with product. Update equals/hashCode. RenderContext remains @Immutable — all new fields are val.</p>
+            <pre class="diff"><span class="diff-add">+ private val accumulatedAlpha: Float = 1f</span>
+<span class="diff-add">+ fun withAlpha(alpha: Float): RenderContext = RenderContext(</span>
+<span class="diff-add">+     …, accumulatedAlpha = (this.accumulatedAlpha * alpha).coerceIn(0f, 1f)</span>
+<span class="diff-add">+ )</span>
+<span class="diff-add">+ val effectiveAlpha: Float get() = accumulatedAlpha</span></pre>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>domain</td>
+        <td>+12 / -2</td>
+      </tr>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>…/compose/runtime/IsometricComposables.kt</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> G1 — Add <code>alpha: Float = 1f</code> parameter to <code>Group</code> composable. Wire via <code>set(alpha) { this.alpha = it; markDirty() }</code>. Purely additive — no existing parameters change.</p>
+            <pre class="diff"><span class="diff-add">+ alpha: Float = 1f,</span>
+<span class="diff-add">+ set(alpha) { this.alpha = it; markDirty() }</span></pre>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>ui</td>
+        <td>+8 / -0</td>
+      </tr>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>…/compose/runtime/AdvancedSceneConfig.kt</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> G3 — Add KDoc paragraph documenting that callback fields are excluded from equals()/hashCode() and what callers must do instead. E4 secondary constructor already in working tree; commit it.</p>
+            <pre class="diff"><span class="diff-add">+ * **Callback re-registration:** The callback parameters (onHitTestReady,</span>
+<span class="diff-add">+ *   onFlagsReady, etc.) are excluded from equals() and hashCode(). Replacing</span>
+<span class="diff-add">+ *   an AdvancedSceneConfig whose only difference is a callback will NOT trigger</span>
+<span class="diff-add">+ *   recomposition. Use rememberUpdatedState for callbacks, or key the config</span>
+<span class="diff-add">+ *   on a version counter.</span></pre>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>config</td>
+        <td>+20 / -0</td>
+      </tr>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>…/compose/runtime/IsometricNodeRenderTest.kt</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> F3 — Pin exact alpha value in existing test (127.5±0.5). Add three new GroupNode tests: group alpha=0.5 multiplies into child; nested groups multiply; alpha=0 skips children. All three new tests must FAIL before GroupNode.renderTo change.</p>
+            <pre class="diff"><span class="diff-rem">- assertTrue(cmd.color.a &lt; 255.0)</span>
+<span class="diff-add">+ assertEquals(127.5, cmd.color.a, 0.5)</span>
+<span class="diff-add">+ @Test fun groupAlphaHalfScalesChildCommandAlpha() { … }</span>
+<span class="diff-add">+ @Test fun nestedGroupAlphaMultiplies() { … }</span>
+<span class="diff-add">+ @Test fun groupAlphaZeroSkipsChildren() { … }</span></pre>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>infra</td>
+        <td>+80 / -10</td>
+      </tr>
+      <tr class="is-modified">
+        <td><details>
+          <summary>
+            <code>isometric-compose/api/isometric-compose.api</code>
+            <span class="pl-chip pl-chip--modified">modified</span>
+          </summary>
+          <div class="pl-card">
+            <p><strong>Intent:</strong> Regenerated via <code>./gradlew :isometric-compose:apiDump</code>. Diff must show only the Group composable gaining the alpha Float parameter. Any unexpected change is a blocker.</p>
+          </div>
+        </details></td>
+        <td>modified</td>
+        <td>infra</td>
+        <td>+3 / -0</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="pl-risks">
+    <!-- @include callout { "kind": "risk", "title": "PO-DECISION-PENDING: alpha=0 semantics", "body": "GroupNode.alpha == 0f: early return (skip children — recommended) vs propagate alpha=0f (render fully transparent at full traversal cost). Plan implements early return; PO must confirm before implementation begins." } -->
+    <!-- @include callout { "kind": "warn", "title": "E4 working-tree changes must be committed first", "body": "The AdvancedSceneConfig secondary constructor and IsometricNode.applyAlpha refactor are in the uncommitted working tree. These must be staged and committed as part of this slice — do not leave them stranded." } -->
+    <!-- @include callout { "kind": "info", "title": "apiDump: only Group alpha addition expected", "body": "E4 annotation changes already landed in commit 187e8f4. This slice's apiDump should produce exactly one change: the Group composable descriptor gains the alpha Float parameter. Verify with git diff on isometric-compose.api." } -->
+  </div>
+
+  <details class="pl-revs">
+    <summary>0 prior revisions</summary>
+    <ul></ul>
+  </details>
+
+  <style>
+    .fragment-plan .pl-chip {
+      display: inline-block;
+      font-size: 0.75em;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: 8px;
+      font-weight: 500;
+    }
+    .fragment-plan .pl-chip--modified { background: #e8f4fd; color: #0550ae; }
+    .fragment-plan .pl-chip--new { background: #e6ffec; color: #1a7f37; }
+    .fragment-plan .files-touched { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    .fragment-plan .files-touched th,
+    .fragment-plan .files-touched td { padding: 6px 8px; border-bottom: 1px solid #e1e4e8; vertical-align: top; }
+    .fragment-plan .files-touched th { background: #f6f8fa; font-weight: 600; text-align: left; }
+    .fragment-plan .files-touched details summary { cursor: pointer; }
+    .fragment-plan .pl-card { padding: 8px 12px; background: #f6f8fa; border-left: 3px solid #0550ae; margin-top: 8px; font-size: 0.9em; }
+    .fragment-plan .pl-card pre.diff { background: #fff; border: 1px solid #e1e4e8; padding: 8px; overflow-x: auto; font-size: 0.85em; }
+    .fragment-plan .diff-add { color: #1a7f37; }
+    .fragment-plan .diff-rem { color: #cf222e; }
+    .fragment-plan .diff-ctx { color: #57606a; }
+    .fragment-plan .pl-risks { margin: 1.5rem 0; }
+    .fragment-plan .pl-revs { margin-top: 1.5rem; }
+    .fragment-plan .is-modified td:nth-child(2) { color: #0550ae; }
+    .fragment-plan .is-new td:nth-child(2) { color: #1a7f37; }
+  </style>
+
+  <script>
+    (function() {
+      var section = document.currentScript.closest('.fragment-plan');
+      var files = section ? section.querySelectorAll('.files-touched tbody tr') : [];
+      var modules = 5;
+      var risks = 3;
+      window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+        detail: {
+          name: 'plan',
+          artifact: 'plan',
+          counts: { files: files.length, modules: modules, risks: risks }
+        }
+      }));
+    })();
+  </script>
+
+</section>

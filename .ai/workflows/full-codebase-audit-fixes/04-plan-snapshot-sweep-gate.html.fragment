@@ -1,0 +1,239 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="snapshot-sweep-gate" data-rev="1">
+  <style>
+    .fragment-plan .pl-topology {
+      width: 100%;
+      max-width: 700px;
+      display: block;
+      margin: 0 auto 1.5rem;
+    }
+    .fragment-plan .files-touched {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .fragment-plan .files-touched th,
+    .fragment-plan .files-touched td {
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border, #e2e8f0);
+    }
+    .fragment-plan .files-touched th {
+      font-weight: 600;
+      background: var(--surface-raised, #f8fafc);
+    }
+    .fragment-plan .files-touched details summary {
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 0.83rem;
+    }
+    .fragment-plan .pl-card {
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-raised, #f8fafc);
+      border-left: 3px solid var(--accent, #6366f1);
+      margin-top: 0.5rem;
+      font-size: 0.82rem;
+    }
+    .fragment-plan .pl-risks {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .fragment-plan .pl-revs {
+      margin-top: 1.5rem;
+      font-size: 0.84rem;
+    }
+    .fragment-plan .pl-revs summary {
+      cursor: pointer;
+      color: var(--text-muted, #64748b);
+    }
+    .fragment-plan .attr-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-right: 0.3rem;
+    }
+    .fragment-plan .attr-b1 { background: #fef3c7; color: #92400e; }
+    .fragment-plan .attr-b2 { background: #d1fae5; color: #065f46; }
+    .fragment-plan .attr-g1 { background: #ede9fe; color: #4c1d95; }
+    .fragment-plan .attr-clean { background: #f0fdf4; color: #166534; }
+    .fragment-plan .attr-infra { background: #e0f2fe; color: #0c4a6e; }
+  </style>
+
+  <!-- Files-touched table: goldens + doc screenshots -->
+  <table class="files-touched">
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Status</th>
+        <th>Attribution</th>
+        <th>Planned Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>…IsometricCanvasSnapshotTest_octahedron.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-b1">B1</span> Octahedron non-uniform scale removed.<br>
+              <strong>Expected diff:</strong> Octahedron vertices now span the full unit cube on all axes. Pre-fix bounding box was ~0.707×0.707×1.0; post-fix is 1.0×1.0×1.0.<br>
+              <strong>Inspect:</strong> PNG must show wider equatorial span matching the unit cube.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-b1">B1</span></td>
+        <td>Re-record after shape-geometry slice</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>…IsometricCanvasSnapshotTest_knot.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-b2">B2</span> Knot hardcoded offset removed.<br>
+              <strong>Expected diff:</strong> Knot(Point(1,1,1)) geometry now positioned at Point(1,1,1). Pre-fix was offset by (-0.1, 0.15, 0.4).<br>
+              <strong>Inspect:</strong> PNG must show knot shape correctly placed at requested isometric position.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-b2">B2</span></td>
+        <td>Re-record after shape-geometry slice</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>…IsometricCanvasSnapshotTest_sampleThree.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-b1">B1</span> Composite scene with Octahedron(Point(3,2,3.2)).<br>
+              <strong>Expected diff:</strong> The Octahedron in the composite scene has corrected proportions.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-b1">B1</span></td>
+        <td>Re-record after shape-geometry slice</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>…IsometricCanvasSnapshotTest_alphaSampleScene.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-g1">G1 (conditional)</span> Group alpha propagation.<br>
+              <strong>Expected diff:</strong> Only if G1 affects the AlphaSampleScene rendering (GroupNode alpha applied to descendants). If no Group node in this scene → expect byte-identical.<br>
+              <strong>Inspect:</strong> Determine whether this scene exercises GroupNode alpha.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-g1">G1?</span></td>
+        <td>Conditional — inspect after record</td>
+      </tr>
+      <tr class="is-external">
+        <td>
+          <details>
+            <summary>…_*.png (25 remaining goldens)</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-clean">NONE expected</span><br>
+              <strong>Expected:</strong> Byte-identical to post-record output. Any diff = unattributable regression → halt, reopen owning slice.<br>
+              <strong>Files include:</strong> grid, path, sampleOne, sampleTwo, translate, scale, rotateZ, extrude, cylinder, prism, pyramid, stairs, nodeIdRowScene, onClickRowScene, longPressGridScene, dragLifecycleScene, dragNodeScene, longPressConfigScene, doubleTapScene, perNodeCallbackScene, cameraControlScene, pinchZoomRecipeScene, hoverRecipeScene, occludedPickScene, elevatedTileScene.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">external</span></td>
+        <td><span class="attr-badge attr-clean">Must be clean</span></td>
+        <td>No change expected; any diff is a regression</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>docs/assets/screenshots/shape-octahedron.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-b1">B1</span> DocScreenshotGenerator.shapeOctahedron()<br>
+              <strong>Current state:</strong> Committed; shows elongated pre-fix Octahedron.<br>
+              <strong>After sweep:</strong> Corrected unit-cube proportions.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-b1">B1</span></td>
+        <td>Regenerate via DocScreenshotGenerator</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>docs/assets/screenshots/shape-knot.png</summary>
+            <div class="pl-card">
+              <strong>Attribution:</strong> <span class="attr-badge attr-b2">B2</span> DocScreenshotGenerator.shapeKnot()<br>
+              <strong>After sweep:</strong> Knot at origin, no spurious offset.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-b2">B2</span></td>
+        <td>Regenerate via DocScreenshotGenerator</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>docs/assets/screenshots/grid.png</summary>
+            <div class="pl-card">
+              <strong>Current state:</strong> MODIFIED (unstaged) — 16,266 → 21,499 bytes. From a prior DocScreenshotGenerator run, not attributed to sweep.<br>
+              <strong>After sweep:</strong> Overwritten by generateAll(). Attribution: depth-sort fixes already committed (grid scene does not use Octahedron/Knot).
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-infra">infra</span></td>
+        <td>Overwrite via DocScreenshotGenerator; inspect delta</td>
+      </tr>
+      <tr class="is-modified">
+        <td>
+          <details>
+            <summary>docs/assets/screenshots/multiple-shapes.png</summary>
+            <div class="pl-card">
+              <strong>Current state:</strong> MODIFIED (unstaged) — from prior run. multipleShapes() scene uses Prism only, not Octahedron/Knot.<br>
+              <strong>After sweep:</strong> Overwritten by generateAll(). Change should be stable/attributable to earlier depth-sort work.
+            </div>
+          </details>
+        </td>
+        <td><span class="status-badge">modified</span></td>
+        <td><span class="attr-badge attr-infra">infra</span></td>
+        <td>Overwrite via DocScreenshotGenerator; inspect delta</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Risk callouts -->
+  <div class="pl-risks">
+    <!-- @include callout { "kind": "risk", "title": "Cross-platform pixel drift (R1 — HIGH)", "body": "Paparazzi 1.3.0 issues #1465/#1716: Windows record vs ubuntu-latest CI verify may produce sub-pixel differences on identical geometry. Local recordPaparazziDebug green does NOT close AC-S2. Gate closes when CI verifyPaparazziDebug passes the record commit. Fallback: set maxPercentDifference per-test in IsometricCanvasSnapshotTest (e.g. 0.5f) — PO-DECISION-PENDING." } -->
+    <!-- @include callout { "kind": "risk", "title": "Unattributable golden diff (R2 — BLOCKER)", "body": "Any PNG diff outside the expected-change set {octahedron, knot, sampleThree, alphaSampleScene?} is a regression. This slice never patches code — the diff reopens the owning content slice. Attribution ledger (Step 4) is the gate. Halt if any unattributed diff is found." } -->
+    <!-- @include callout { "kind": "warn", "title": "Stale untracked goldens (R3 — MED)", "body": "isometric-compose/src/test/snapshots/ exists but was never committed. Contains 29 PNGs from an unknown prior record pass. Step 2 explicitly removes this directory before re-recording to prevent contamination. Do not skip Step 2." } -->
+  </div>
+
+  <!-- Prior revisions block -->
+  <details class="pl-revs">
+    <summary>0 prior revisions</summary>
+    <ul>
+      <li>No prior revisions — this is revision 1.</li>
+    </ul>
+  </details>
+
+  <script>
+    (function() {
+      var section = document.currentScript.closest('.fragment-plan');
+      var files = section.querySelectorAll('.files-touched tbody tr').length;
+      var risks = section.querySelectorAll('.pl-risks .callout, .pl-risks [class*="callout"]').length || 3;
+      window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+        detail: {
+          name: 'plan',
+          artifact: 'plan',
+          counts: { files: 9, modules: 3, risks: 4 }
+        }
+      }));
+    })();
+  </script>
+</section>

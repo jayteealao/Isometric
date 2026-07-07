@@ -1,0 +1,59 @@
+<section class="fragment-plan" data-artifact="plan" data-slice="gesture-coordination" data-rev="1">
+
+  <style>
+    .fragment-plan .pl-files { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 0.88em; }
+    .fragment-plan .pl-files th { text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--color-border, #e0e0e0); font-weight: 600; }
+    .fragment-plan .pl-files td { padding: 6px 10px; border-bottom: 1px solid var(--color-border, #e0e0e0); vertical-align: top; }
+    .fragment-plan .pl-status-modified { color: var(--color-warn, #c97a00); font-weight: 600; }
+    .fragment-plan .pl-status-new { color: var(--color-success, #228b22); font-weight: 600; }
+    .fragment-plan .pl-delta-add { color: var(--color-success, #228b22); }
+    .fragment-plan .pl-delta-rem { color: var(--color-danger, #cc0000); }
+    .fragment-plan .pl-change-card { display: none; padding: 10px 14px; background: var(--color-surface-alt, #f8f8f8); border-left: 3px solid var(--color-accent, #5c6bc0); margin: 4px 0 8px; font-size: 0.85em; line-height: 1.5; }
+    .fragment-plan .pl-change-card.open { display: block; }
+    .fragment-plan .pl-toggle { background: none; border: 1px solid var(--color-border, #ccc); border-radius: 3px; cursor: pointer; font-size: 0.78em; padding: 1px 7px; color: var(--color-fg, #333); }
+    .fragment-plan .pl-callout { border-left: 4px solid; padding: 10px 14px; margin: 1em 0; border-radius: 0 4px 4px 0; font-size: 0.9em; line-height: 1.5; }
+    .fragment-plan .pl-callout-risk { border-color: var(--color-danger, #cc0000); background: var(--color-danger-bg, #fff5f5); }
+    .fragment-plan .pl-callout-warn { border-color: var(--color-warn, #c97a00); background: var(--color-warn-bg, #fffbf0); }
+    .fragment-plan .pl-callout-info { border-color: var(--color-accent, #5c6bc0); background: var(--color-accent-bg, #f5f7ff); }
+    .fragment-plan .pl-callout-title { font-weight: 700; margin-bottom: 4px; }
+    .fragment-plan .pl-revs summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+  </style>
+
+  <!-- @include files-touched-row { "role": "modified", "path": "isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScene.kt", "delta": { "add": 120, "rem": 90 } } -->
+  <!-- @include files-touched-row { "role": "new", "path": "isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DoubleTapDisambiguationTest.kt", "delta": { "add": 120, "rem": 0 } } -->
+  <!-- @include files-touched-row { "role": "modified", "path": "isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DragANodeTest.kt", "delta": { "add": 30, "rem": 0 } } -->
+  <!-- @include files-touched-row { "role": "new", "path": "isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/ConsumptionGatingTest.kt", "delta": { "add": 80, "rem": 0 } } -->
+  <!-- @include files-touched-row { "role": "new", "path": "isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/GestureStateResetTest.kt", "delta": { "add": 80, "rem": 0 } } -->
+  <!-- @include files-touched-row { "role": "new", "path": "isometric-compose/src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/DoubleTapInstrumentedTest.kt", "delta": { "add": 80, "rem": 0 } } -->
+
+  <!-- @include callout { "kind": "risk", "title": "Restructure may starve detectTapGestures via early consumption", "body": "detectTapGestures uses awaitFirstDown(requireUnconsumed=true) internally. Any consumption of Press or Release events BEFORE detectTapGestures' coroutine resumes will stall the next gesture. The existing code only consumes on Move during active drag — this invariant must survive the merge intact." } -->
+  <!-- @include callout { "kind": "risk", "title": "Wrong pointerInput key restarts handler mid-gesture (C3 re-introduced)", "body": "Keying the merged block on anything other than Unit (e.g., a lambda reference that changes per-recomposition) will silently restart the handler mid-gesture, losing isDragging/draggedNode state and re-introducing C3-style stale state. Key on Unit; read callbacks through rememberUpdatedState." } -->
+  <!-- @include callout { "kind": "warn", "title": "AVD emulator required for AC-S3 live routing evidence", "body": "The AC-C1 interactive half (live pointer routing) requires an android-cli-managed AVD. If boot fails, the JVM state-machine tests (rung 1) cover all branch conditions but cannot evidence live multi-touch routing. Pre-registered deferral: cleared by first successful connectedDebugAndroidTest run." } -->
+
+  <!-- @include fragment-ready { "name": "plan", "artifact": "plan", "detailJson": "{\"counts\":{\"files\":6,\"modules\":3,\"risks\":3}}" } -->
+
+  <details class="pl-revs">
+    <summary>Prior revisions (0)</summary>
+    <p><em>No prior revisions.</em></p>
+  </details>
+
+  <script>
+    (function() {
+      var frag = document.currentScript.closest('.fragment-plan');
+      if (!frag) return;
+      frag.querySelectorAll('.pl-toggle').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var card = btn.closest('tr').nextElementSibling;
+          if (card && card.querySelector('.pl-change-card')) {
+            card.querySelector('.pl-change-card').classList.toggle('open');
+            btn.textContent = btn.textContent === '▶ diff' ? '▼ diff' : '▶ diff';
+          }
+        });
+      });
+      window.dispatchEvent(new CustomEvent('sdlc:fragment-ready', {
+        detail: { name: 'plan', artifact: 'plan', counts: { files: 6, modules: 3, risks: 3 } }
+      }));
+    })();
+  </script>
+
+</section>

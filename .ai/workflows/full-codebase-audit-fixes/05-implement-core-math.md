@@ -12,7 +12,7 @@ metric-lines-added: 433
 metric-lines-removed: 45
 metric-deviations-from-plan: 2
 metric-review-fixes-applied: 0
-commit-sha: "dbe33cc"
+commit-sha: "36afbbd"
 tags: [isometric-core, math, geometry, tests, kdoc]
 refs:
   index: 00-index.md

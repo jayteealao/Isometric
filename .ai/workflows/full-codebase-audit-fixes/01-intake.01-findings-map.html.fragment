@@ -1,0 +1,66 @@
+<section style="font-family:system-ui,sans-serif;max-width:960px;margin:1.5rem auto;">
+  <h3 style="margin:0 0 .25rem;">Audit funnel &amp; findings map</h3>
+  <p style="margin:0 0 1rem;color:#555;font-size:.9rem;">
+    111-agent audit (2026-07-06): 75 raw findings &rarr; 42 refuted by adversarial verifiers &rarr;
+    29 confirmed &rarr; <strong>24 distinct after dedup</strong> + 4 judgment calls. Breaking fixes accepted: A1, B1, B2.
+  </p>
+  <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;align-items:stretch;">
+    <div style="flex:75;background:#e8eaed;border-radius:6px;padding:.5rem;text-align:center;font-size:.85rem;">75 raw</div>
+    <div style="flex:42;background:#f6d5d3;border-radius:6px;padding:.5rem;text-align:center;font-size:.85rem;">42 refuted</div>
+    <div style="flex:24;background:#d3e8d5;border-radius:6px;padding:.5rem;text-align:center;font-size:.85rem;"><strong>24 confirmed (deduped)</strong></div>
+    <div style="flex:8;background:#fdf3d0;border-radius:6px;padding:.5rem;text-align:center;font-size:.85rem;">4 calls</div>
+  </div>
+  <table style="border-collapse:collapse;width:100%;font-size:.85rem;">
+    <thead>
+      <tr style="background:#f2f3f5;">
+        <th style="text-align:left;padding:.4rem .6rem;border:1px solid #ddd;">Zone</th>
+        <th style="text-align:left;padding:.4rem .6rem;border:1px solid #ddd;">High</th>
+        <th style="text-align:left;padding:.4rem .6rem;border:1px solid #ddd;">Medium</th>
+        <th style="text-align:left;padding:.4rem .6rem;border:1px solid #ddd;">Low</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>A</strong> Core math</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fce8e6;">A1 rotateX/Y inverted &#9888;&#65039;BR &middot; A2 segment-dist 2D/3D mix &middot; A3 isPointCloseToPoly contract</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">A4 lighten() black faces &middot; A5 normalize KDoc &middot; A6 cullPath winding (Stairs)</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">A7 TileCoordinate hashCode</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>B</strong> Shapes</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fce8e6;">B1 Octahedron distortion &#9888;&#65039;BR</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">B2 Knot offset &#9888;&#65039;BR &middot; B3 Cylinder requires</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">&mdash;</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>C</strong> Gestures</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fce8e6;">C1 double-tap spurious onClick (3&times; found)</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">C2 unconditional consumption</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">C3 stale drag state</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>D</strong> View/samples</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">&mdash;</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">D1 Paint per frame &middot; D2 sample KDoc</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">D3 setters vs cache</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>E</strong> Docs/API</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">&mdash;</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">E1 onDoubleClick doc &middot; E2 missing nodeDragState &middot; E3 CHANGELOG gaps &middot; E4 @Stable/@Immutable</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">&mdash;</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>F</strong> Tests</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fce8e6;">F1 zero-assertion test &middot; F2 vacuous guards</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;background:#fef7e0;">F3 weak alpha assert</td>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;">F4 autopan coverage gap</td>
+      </tr>
+      <tr>
+        <td style="padding:.4rem .6rem;border:1px solid #ddd;"><strong>G</strong> Judgment</td>
+        <td colspan="3" style="padding:.4rem .6rem;border:1px solid #ddd;background:#fdf3d0;">G1 Group alpha doc conflict &middot; G2 ACTION_UP return &middot; G3 callback re-register doc &middot; G4 DragEvent ABI note (likely no-op)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin:.75rem 0 0;color:#777;font-size:.8rem;">&#9888;&#65039;BR = accepted breaking change (behavior/rendered output changes; Paparazzi re-record required).</p>
+</section>

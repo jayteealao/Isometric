@@ -1,0 +1,122 @@
+<!-- Free narrative fragment: B1 before/after Octahedron proportions -->
+<div style="font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem;">
+  <h3 style="font-size: 1rem; font-weight: 600; color: var(--text, #1e293b); margin-bottom: 0.75rem;">
+    B1 — Octahedron: elongated vs unit-cube-inscribed
+  </h3>
+  <p style="font-size: 0.85rem; color: var(--text-muted, #64748b); margin-bottom: 1.25rem;">
+    Front view (X–Z plane). Equatorial vertices shown as dots; unit-cube boundary as a dashed rectangle.
+    The bounding box numbers are the actual XY and Z spans produced by the code, before and after removing
+    the non-uniform <code>scale(center, √2/2, √2/2, 1.0)</code> call.
+  </p>
+  <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg"
+       style="width: 100%; max-width: 640px; height: auto; display: block;">
+
+    <!-- ============ BEFORE (left panel) ============ -->
+    <g transform="translate(20, 20)">
+      <text x="130" y="16" text-anchor="middle" font-size="13" font-weight="600" fill="#dc2626">BEFORE (current code)</text>
+
+      <!-- unit cube boundary (dashed) -->
+      <rect x="30" y="30" width="200" height="200" fill="none" stroke="#94a3b8" stroke-width="1"
+            stroke-dasharray="5,4" rx="2"/>
+      <text x="230" y="238" font-size="10" fill="#94a3b8">x=1.0</text>
+      <text x="30" y="238" font-size="10" fill="#94a3b8">x=0</text>
+      <text x="5" y="35" font-size="10" fill="#94a3b8" text-anchor="middle">z=1</text>
+      <text x="5" y="235" font-size="10" fill="#94a3b8" text-anchor="middle">z=0</text>
+
+      <!-- actual XY span: 0.146 → 0.854 → scaled to pixel space -->
+      <!-- 0 maps to x=30, 1 maps to x=230 (200px = 1 unit) -->
+      <!-- 0.146 → 30 + 0.146*200 = 59.2; 0.854 → 30 + 0.854*200 = 200.8 -->
+      <!-- z: 0 → y=230, 1 → y=30 (inverted) -->
+
+      <!-- elongated shape fill -->
+      <polygon points="59,130 130,30 201,130 130,230"
+               fill="#fecaca" stroke="#dc2626" stroke-width="1.5" opacity="0.8"/>
+
+      <!-- equatorial vertices -->
+      <circle cx="59" cy="130" r="4" fill="#dc2626"/>
+      <circle cx="201" cy="130" r="4" fill="#dc2626"/>
+      <!-- apices -->
+      <circle cx="130" cy="30" r="4" fill="#dc2626"/>
+      <circle cx="130" cy="230" r="4" fill="#dc2626"/>
+
+      <!-- XY span annotation -->
+      <line x1="59" y1="252" x2="201" y2="252" stroke="#dc2626" stroke-width="1.5"
+            marker-start="url(#arr)" marker-end="url(#arr)"/>
+      <text x="130" y="265" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">
+        XY span ≈ 0.707
+      </text>
+
+      <!-- Z span annotation -->
+      <line x1="252" y1="30" x2="252" y2="230" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="265" y="135" font-size="11" fill="#dc2626" font-weight="600" dominant-baseline="middle">
+        Z span = 1.0
+      </text>
+
+      <!-- bounding box label -->
+      <rect x="59" y="30" width="142" height="200" fill="none" stroke="#dc2626" stroke-width="1"
+            stroke-dasharray="3,3" opacity="0.5"/>
+      <text x="130" y="270" text-anchor="middle" font-size="10" fill="#94a3b8">
+        bbox: 0.707 × 0.707 × 1.0  ✗ not a cube
+      </text>
+    </g>
+
+    <!-- ============ divider ============ -->
+    <line x1="320" y1="20" x2="320" y2="260" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="320" y="148" text-anchor="middle" font-size="24" fill="#94a3b8" dominant-baseline="middle">→</text>
+
+    <!-- ============ AFTER (right panel) ============ -->
+    <g transform="translate(340, 20)">
+      <text x="130" y="16" text-anchor="middle" font-size="13" font-weight="600" fill="#16a34a">AFTER (remove scale call)</text>
+
+      <!-- unit cube boundary (dashed) -->
+      <rect x="30" y="30" width="200" height="200" fill="none" stroke="#94a3b8" stroke-width="1"
+            stroke-dasharray="5,4" rx="2"/>
+      <text x="230" y="238" font-size="10" fill="#94a3b8">x=1.0</text>
+      <text x="30" y="238" font-size="10" fill="#94a3b8">x=0</text>
+      <text x="5" y="35" font-size="10" fill="#94a3b8" text-anchor="middle">z=1</text>
+      <text x="5" y="235" font-size="10" fill="#94a3b8" text-anchor="middle">z=0</text>
+
+      <!-- correct shape: equatorial vertices at x=0, x=1; apices at z=0, z=1 -->
+      <!-- x=0 → px=30, x=1 → px=230, midpoint=130 -->
+      <polygon points="30,130 130,30 230,130 130,230"
+               fill="#bbf7d0" stroke="#16a34a" stroke-width="1.5" opacity="0.8"/>
+
+      <!-- equatorial vertices -->
+      <circle cx="30" cy="130" r="4" fill="#16a34a"/>
+      <circle cx="230" cy="130" r="4" fill="#16a34a"/>
+      <!-- apices -->
+      <circle cx="130" cy="30" r="4" fill="#16a34a"/>
+      <circle cx="130" cy="230" r="4" fill="#16a34a"/>
+
+      <!-- XY span annotation -->
+      <line x1="30" y1="252" x2="230" y2="252" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="130" y="265" text-anchor="middle" font-size="11" fill="#16a34a" font-weight="600">
+        XY span = 1.0
+      </text>
+
+      <!-- Z span annotation -->
+      <line x1="252" y1="30" x2="252" y2="230" stroke="#16a34a" stroke-width="1.5"/>
+      <text x="265" y="135" font-size="11" fill="#16a34a" font-weight="600" dominant-baseline="middle">
+        Z span = 1.0
+      </text>
+
+      <!-- bounding box coincides with unit cube — just the cube outline -->
+      <text x="130" y="270" text-anchor="middle" font-size="10" fill="#94a3b8">
+        bbox: 1.0 × 1.0 × 1.0  ✓ unit cube
+      </text>
+    </g>
+
+    <!-- arrow markers -->
+    <defs>
+      <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L6,3 z" fill="#dc2626"/>
+      </marker>
+    </defs>
+  </svg>
+  <p style="font-size: 0.8rem; color: var(--text-muted, #64748b); margin-top: 0.75rem;">
+    Fix: delete <code>val scale = sqrt(2.0) / 2.0</code> and
+    <code>return paths.map { it.scale(center, scale, scale, 1.0) }</code>;
+    replace with <code>return paths</code>.
+    The pre-scale vertices are already correct — the scale call was the only error.
+  </p>
+</div>
