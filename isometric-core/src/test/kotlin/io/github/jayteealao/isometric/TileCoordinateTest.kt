@@ -57,6 +57,27 @@ class TileCoordinateTest {
     }
 
     @Test
+    fun `hashCode of ORIGIN is not zero`() {
+        // AC-A7: the old formula x * 1_000_003 xor y evaluated to 0 for ORIGIN (0 xor 0).
+        // Objects.hash(0, 0) = 961 (the Arrays.hashCode seed for two-element arrays).
+        assertNotEquals(0, TileCoordinate.ORIGIN.hashCode(),
+            "ORIGIN.hashCode() must not be zero — prevents degenerate bucketing in HashMap")
+    }
+
+    @Test
+    fun `hashCode distributes k vs k-times-1_000_003 patterns`() {
+        // AC-A7: the old formula x * 1_000_003 xor y produced identical values for
+        // (k, k*1_000_003) pairs because k*1_000_003 xor k*1_000_003 = 0.
+        // Objects.hash distributes these without collision.
+        for (k in 1..5) {
+            val a = TileCoordinate(k, k * 1_000_003)
+            val b = TileCoordinate(k * 1_000_003, k)
+            assertNotEquals(a.hashCode(), b.hashCode(),
+                "($k, ${k * 1_000_003}) and (${k * 1_000_003}, $k) must have different hashCodes")
+        }
+    }
+
+    @Test
     fun `usable as HashMap key`() {
         val map = HashMap<TileCoordinate, String>()
         val key = TileCoordinate(3, 5)

@@ -1,5 +1,7 @@
 package io.github.jayteealao.isometric
 
+import java.util.Objects
+
 /**
  * Discrete 2D tile grid coordinate.
  *
@@ -45,7 +47,7 @@ class TileCoordinate(
     override fun equals(other: Any?): Boolean =
         other is TileCoordinate && x == other.x && y == other.y
 
-    override fun hashCode(): Int = x * 1_000_003 xor y
+    override fun hashCode(): Int = Objects.hash(x, y)
 
     override fun toString(): String = "TileCoordinate($x, $y)"
 

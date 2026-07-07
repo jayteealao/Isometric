@@ -6,10 +6,37 @@ package io.github.jayteealao.isometric
 object IntersectionUtils {
 
     /**
+     * Tests whether the point ([x], [y]) is within [radius] pixels of any edge of [poly].
+     *
+     * Pure edge-proximity check — does NOT test point-in-polygon. Used internally by
+     * [hasIntersection] and [hasInteriorIntersection] where the caller already performs
+     * a separate [isPointInPoly] test and needs only the boundary-band check to remain
+     * semantically unchanged after the public [isPointCloseToPoly] was extended with an
+     * interior test.
+     *
+     * @param poly Polygon vertices (projected 2D points).
+     * @param x X coordinate to test.
+     * @param y Y coordinate to test.
+     * @param radius Maximum distance from any polygon edge.
+     * @return `true` if the point is within [radius] of any edge of the polygon.
+     */
+    private fun isPointCloseToEdges(poly: List<Point>, x: Double, y: Double, radius: Double): Boolean {
+        val p = Point(x, y, 0.0)
+        for (i in poly.indices) {
+            val j = (i + 1) % poly.size
+            val v = poly[i]
+            val w = poly[j]
+            if (Point.distanceToSegment(p, v, w) < radius) return true
+        }
+        return false
+    }
+
+    /**
      * Tests whether the point ([x], [y]) is within [radius] pixels of the polygon [poly].
      *
-     * Combines a point-in-polygon test with an edge-proximity test so that points
-     * near the polygon boundary also return `true`.
+     * Returns `true` if the point is strictly inside the polygon (ray-casting test) OR
+     * within [radius] of any polygon edge. This means a point deep inside a large polygon
+     * with [radius] smaller than the nearest edge returns `true`.
      *
      * @param poly Polygon vertices (projected 2D points).
      * @param x X coordinate to test.
@@ -18,22 +45,9 @@ object IntersectionUtils {
      * @return `true` if the point is inside or within [radius] of the polygon.
      */
     fun isPointCloseToPoly(poly: List<Point>, x: Double, y: Double, radius: Double): Boolean {
-        val p = Point(x, y, 0.0)
-
-        // Iterate over each line segment
-        for (i in poly.indices) {
-            val j = (i + 1) % poly.size
-            val v = poly[i]
-            val w = poly[j]
-
-            val dist = Point.distanceToSegment(p, v, w)
-
-            if (dist < radius) {
-                return true
-            }
-        }
-
-        return false
+        // Interior points are always "close" regardless of radius.
+        if (isPointInPoly(poly, x, y)) return true
+        return isPointCloseToEdges(poly, x, y, radius)
     }
 
     /**
@@ -87,13 +101,13 @@ object IntersectionUtils {
         for (i in pointsA.indices) {
             val p = pointsA[i]
             if (isPointInPoly(pointsB, p.x, p.y) ||
-                isPointCloseToPoly(pointsB, p.x, p.y, EDGE_BAND)
+                isPointCloseToEdges(pointsB, p.x, p.y, EDGE_BAND)
             ) return true
         }
         for (i in pointsB.indices) {
             val p = pointsB[i]
             if (isPointInPoly(pointsA, p.x, p.y) ||
-                isPointCloseToPoly(pointsA, p.x, p.y, EDGE_BAND)
+                isPointCloseToEdges(pointsA, p.x, p.y, EDGE_BAND)
             ) return true
         }
         return false
@@ -143,7 +157,7 @@ object IntersectionUtils {
         for (i in pointsA.indices) {
             val p = pointsA[i]
             if (isPointInPoly(pointsB, p.x, p.y) &&
-                !isPointCloseToPoly(pointsB, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges(pointsB, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
@@ -151,12 +165,173 @@ object IntersectionUtils {
         for (i in pointsB.indices) {
             val p = pointsB[i]
             if (isPointInPoly(pointsA, p.x, p.y) &&
-                !isPointCloseToPoly(pointsA, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges(pointsA, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
         }
         return false
+    }
+
+    /**
+     * Tests whether two convex polygons share a non-trivial *interior* overlap area.
+     *
+     * Identical semantics to [hasInteriorIntersection] with `List<Point>` arguments,
+     * but accepts [Point2D] screen-space vertices directly — eliminating the
+     * per-pair `List<Point>` allocation that the `List<Point>` overload would
+     * require.
+     *
+     * @param pointsA Vertices of the first polygon (projected 2D points).
+     * @param pointsB Vertices of the second polygon (projected 2D points).
+     * @return `true` only if the polygons share a non-trivial interior overlap.
+     */
+    @JvmName("hasInteriorIntersectionPoint2D")
+    fun hasInteriorIntersection(pointsA: List<Point2D>, pointsB: List<Point2D>): Boolean {
+        if (pointsA.isEmpty() || pointsB.isEmpty()) return false
+        if (!aabbsOverlap2D(pointsA, pointsB)) return false
+
+        val edgesA = EdgeEquations2D.of(pointsA)
+        val edgesB = EdgeEquations2D.of(pointsB)
+
+        if (edgesCrossStrictly2D(pointsA, edgesA, pointsB, edgesB)) return true
+
+        for (i in pointsA.indices) {
+            val p = pointsA[i]
+            if (isPointInPoly2D(pointsB, p.x, p.y) &&
+                !isPointCloseToPoly2D(pointsB, p.x, p.y, EDGE_BAND)
+            ) {
+                return true
+            }
+        }
+        for (i in pointsB.indices) {
+            val p = pointsB[i]
+            if (isPointInPoly2D(pointsA, p.x, p.y) &&
+                !isPointCloseToPoly2D(pointsA, p.x, p.y, EDGE_BAND)
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Quick axis-aligned bounding-box overlap test for [Point2D] vertices.
+     */
+    private fun aabbsOverlap2D(pointsA: List<Point2D>, pointsB: List<Point2D>): Boolean {
+        var aMinX = pointsA[0].x; var aMinY = pointsA[0].y
+        var aMaxX = aMinX; var aMaxY = aMinY
+        for (i in pointsA.indices) {
+            val p = pointsA[i]
+            if (p.x < aMinX) aMinX = p.x else if (p.x > aMaxX) aMaxX = p.x
+            if (p.y < aMinY) aMinY = p.y else if (p.y > aMaxY) aMaxY = p.y
+        }
+        var bMinX = pointsB[0].x; var bMinY = pointsB[0].y
+        var bMaxX = bMinX; var bMaxY = bMinY
+        for (i in pointsB.indices) {
+            val p = pointsB[i]
+            if (p.x < bMinX) bMinX = p.x else if (p.x > bMaxX) bMaxX = p.x
+            if (p.y < bMinY) bMinY = p.y else if (p.y > bMaxY) bMaxY = p.y
+        }
+        if (aMaxX < bMinX || bMaxX < aMinX) return false
+        if (aMaxY < bMinY || bMaxY < aMinY) return false
+        return true
+    }
+
+    /** Point-in-polygon ray-casting test for [Point2D] vertices. */
+    private fun isPointInPoly2D(poly: List<Point2D>, x: Double, y: Double): Boolean {
+        var c = false
+        var j = poly.size - 1
+        for (i in poly.indices) {
+            if (((poly[i].y <= y && y < poly[j].y) || (poly[j].y <= y && y < poly[i].y)) &&
+                (x < (poly[j].x - poly[i].x) * (y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)
+            ) {
+                c = !c
+            }
+            j = i
+        }
+        return c
+    }
+
+    /** Edge-proximity test for [Point2D] vertices. */
+    private fun isPointCloseToPoly2D(poly: List<Point2D>, x: Double, y: Double, radius: Double): Boolean {
+        for (i in poly.indices) {
+            val j = (i + 1) % poly.size
+            val v = poly[i]
+            val w = poly[j]
+            // Inlined Point.distanceToSegment using x/y coordinates only.
+            val dx = w.x - v.x
+            val dy = w.y - v.y
+            val lenSq = dx * dx + dy * dy
+            val dist = if (lenSq == 0.0) {
+                val ex = x - v.x; val ey = y - v.y
+                kotlin.math.sqrt(ex * ex + ey * ey)
+            } else {
+                val t = ((x - v.x) * dx + (y - v.y) * dy) / lenSq
+                val tc = t.coerceIn(0.0, 1.0)
+                val px = v.x + tc * dx - x
+                val py = v.y + tc * dy - y
+                kotlin.math.sqrt(px * px + py * py)
+            }
+            if (dist < radius) return true
+        }
+        return false
+    }
+
+    /** Strict SAT edge-crossing test for [Point2D] vertices. */
+    private fun edgesCrossStrictly2D(
+        pointsA: List<Point2D>, edgesA: EdgeEquations2D,
+        pointsB: List<Point2D>, edgesB: EdgeEquations2D,
+    ): Boolean {
+        val n = edgesA.size
+        val m = edgesB.size
+        for (i in 0 until n) {
+            val ai0 = pointsA[i]
+            val ai1 = pointsA[(i + 1) % n]
+            val dxA = edgesA.deltaX[i]; val dyA = edgesA.deltaY[i]; val rAi = edgesA.r[i]
+            for (j in 0 until m) {
+                val dxB = edgesB.deltaX[j]; val dyB = edgesB.deltaY[j]; val rBj = edgesB.r[j]
+                if (dxA * dyB == dyA * dxB) continue
+                val bj0 = pointsB[j]
+                val bj1 = pointsB[(j + 1) % m]
+                val side1a = dyA * bj0.x - dxA * bj0.y + rAi
+                val side1b = dyA * bj1.x - dxA * bj1.y + rAi
+                val side2a = dyB * ai0.x - dxB * ai0.y + rBj
+                val side2b = dyB * ai1.x - dxB * ai1.y + rBj
+                if (side1a * side1b < SAT_CROSS_THRESHOLD &&
+                    side2a * side2b < SAT_CROSS_THRESHOLD
+                ) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * Pre-computed edge equations for a closed [Point2D] polygon.
+     */
+    private class EdgeEquations2D(
+        val deltaX: DoubleArray,
+        val deltaY: DoubleArray,
+        val r: DoubleArray,
+        val size: Int,
+    ) {
+        companion object {
+            fun of(points: List<Point2D>): EdgeEquations2D {
+                val n = points.size
+                val dx = DoubleArray(n)
+                val dy = DoubleArray(n)
+                val r = DoubleArray(n)
+                for (i in 0 until n) {
+                    val p = points[i]
+                    val q = points[(i + 1) % n]
+                    dx[i] = q.x - p.x
+                    dy[i] = q.y - p.y
+                    r[i] = dx[i] * p.y - dy[i] * p.x
+                }
+                return EdgeEquations2D(dx, dy, r, n)
+            }
+        }
     }
 
     /**

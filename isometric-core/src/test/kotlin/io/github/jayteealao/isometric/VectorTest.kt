@@ -35,6 +35,14 @@ class VectorTest {
     }
 
     @Test
+    fun `normalize of zero vector returns zero vector`() {
+        // AC-A5: pins the KDoc contract — "Returns a zero vector if the magnitude is zero."
+        // The implementation is already correct; this test ensures the contract is not
+        // accidentally regressed by a future change to normalize().
+        assertEquals(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 0.0).normalize())
+    }
+
+    @Test
     fun `magnitude calculates correctly`() {
         val v = Vector(3.0, 4.0, 0.0)
         assertEquals(5.0, v.magnitude(), 0.0001)
