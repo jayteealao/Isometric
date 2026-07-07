@@ -7,8 +7,8 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T16:17:07Z"
-selected-slice: "shape-geometry"
+updated-at: "2026-07-07T16:40:52Z"
+selected-slice: "docs-and-changelog"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes shape-geometry"
+next-command: wf-review
+next-invocation: "/wf review full-codebase-audit-fixes shape-geometry"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -92,6 +92,8 @@ workflow-files:
   - 05-implement-view-module.md
   - 06-verify-view-module.md
   - 05-implement-shape-geometry.md
+  - 06-verify-shape-geometry.md
+  - 05-implement-docs-and-changelog.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."

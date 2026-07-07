@@ -95,6 +95,25 @@ val box = Prism(Point.ORIGIN)
 val rotated = box.rotateZ(Point(0.5, 0.5, 0.0), Math.PI / 4) // 45 degrees
 ```
 
+> **Note**
+>
+All three rotate functions — `rotateX`, `rotateY`, and `rotateZ` — use the **right-handed
+counter-clockwise convention**: a positive angle rotates counter-clockwise when viewed from the
+positive end of the axis toward the origin. This is the standard mathematical convention.
+
+**Migration note:** If your project was built against a version where `rotateX`/`rotateY` rotated
+clockwise, negate the angle to preserve the old visual output:
+
+```kotlin
+// Before (old CW behavior)
+shape.rotateX(origin, angle)
+
+// After (CCW right-handed convention)
+shape.rotateX(origin, -angle)  // negate to restore old visual
+```
+
+`rotateZ` has always used the CCW convention and is unchanged.
+
 ## Extruding 2D Paths
 
 `Shape.extrude` takes a 2D `Path` and lifts it into a 3D solid. See the [Custom Shapes guide](custom-shapes.md) for the full extrusion walkthrough and examples.

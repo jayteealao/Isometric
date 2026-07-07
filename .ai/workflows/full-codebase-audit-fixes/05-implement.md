@@ -5,12 +5,12 @@ slug: full-codebase-audit-fixes
 status: in-progress
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T16:17:07Z"
-slices-implemented: 5
+updated-at: "2026-07-07T16:40:52Z"
+slices-implemented: 6
 slices-total: 7
-metric-total-files-changed: 35
-metric-total-lines-added: 1891
-metric-total-lines-removed: 165
+metric-total-files-changed: 46
+metric-total-lines-added: 2050
+metric-total-lines-removed: 177
 tags: []
 refs:
   index: 00-index.md
@@ -45,13 +45,16 @@ next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
   pre-registered as deferred to snapshot-sweep-gate.
 - Remaining slices (`docs-and-changelog`, `snapshot-sweep-gate`)
   have no code dependency on shape-geometry being verify-complete before they start.
-- `docs-and-changelog` will add the Group alpha composables.mdx row after this lands.
+- `docs-and-changelog` slice (6/7) is complete. E1 (interactions.mdx onDoubleClick rewrite),
+  E2 (scene-config.mdx nodeDragState row), E3 (CHANGELOG three Features + four Migration
+  entries), G4 (DragEvent ABI callout), and companion updates (gestures.mdx, shapes.mdx,
+  composables.mdx) are all in place. sync-docs.js run and all 33 mirrors regenerated. All
+  prose ACs are manual-review residual deferrable to review stage.
 - `compose-contracts` did not touch `IsometricScene.kt`. No conflict with gesture-coordination.
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf verify full-codebase-audit-fixes view-module` — 16/16
-  Robolectric tests already confirmed in this implement pass. Only AC-D2 prose check
-  remains (defers to review). Fast verify.
-- **Option B:** Continue with `shape-geometry`, `docs-and-changelog`, or
-  `snapshot-sweep-gate` slices — no dependency on view-module being verified first.
+- **Option A (default):** `/wf verify full-codebase-audit-fixes docs-and-changelog` — mechanics
+  AC (sync-docs.js) passes; prose ACs are manual-review residual deferrable to review stage.
+- **Option B:** Continue with `snapshot-sweep-gate` — only remaining slice; no dependency on
+  docs-and-changelog being verified first.
