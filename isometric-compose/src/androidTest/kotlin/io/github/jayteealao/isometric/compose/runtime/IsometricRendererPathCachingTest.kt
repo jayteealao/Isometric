@@ -35,12 +35,7 @@ class IsometricRendererPathCachingTest {
         return root
     }
 
-    private fun cachedPathCount(renderer: IsometricRenderer): Int {
-        val field = renderer.javaClass.getDeclaredField("cachedPaths")
-        field.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        return (field.get(renderer) as? List<*>)?.size ?: 0
-    }
+    private fun cachedPathCount(renderer: IsometricRenderer): Int = renderer.cachedPathCountForTest
 
     @Test
     fun rebuildCache_buildsCachedPathsOnlyWhenEnabled() {

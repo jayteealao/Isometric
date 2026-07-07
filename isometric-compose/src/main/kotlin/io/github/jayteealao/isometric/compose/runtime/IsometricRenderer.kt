@@ -85,6 +85,10 @@ class IsometricRenderer(
 
     internal val currentPreparedScene: PreparedScene? get() = cache.currentPreparedScene
 
+    /** Number of cached render paths. Visible for testing; not part of the public API. */
+    internal val cachedPathCountForTest: Int
+        get() = cache.cachedPaths?.size ?: 0
+
     // --- Public API ---
 
     /**

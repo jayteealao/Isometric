@@ -7,8 +7,8 @@ status: active
 current-stage: review
 stage-number: 7
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T19:15:34Z"
-selected-slice: "snapshot-sweep-gate"
+updated-at: "2026-07-07T22:07:54Z"
+selected-slice: "path-caching-test-fix"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-handoff
-next-invocation: "/wf handoff full-codebase-audit-fixes"
+next-command: wf-verify
+next-invocation: "/wf verify full-codebase-audit-fixes path-caching-test-fix"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -52,6 +52,10 @@ workflow-files:
   - 03-slice-shape-geometry.md
   - 03-slice-docs-and-changelog.md
   - 03-slice-snapshot-sweep-gate.md
+  - 03-slice-path-caching-test-fix.md
+  - 04-plan-path-caching-test-fix.md
+  - 04-plan-path-caching-test-fix.yaml
+  - 04-plan-path-caching-test-fix.html.fragment
   - audit-findings.json
   - po-answers.md
   - 04-plan-core-math.yaml
@@ -97,6 +101,7 @@ workflow-files:
   - 06-verify-docs-and-changelog.md
   - 05-implement-snapshot-sweep-gate.md
   - 06-verify-snapshot-sweep-gate.md
+  - 05-implement-path-caching-test-fix.md
   - 07-review.md
   - 07-review.yaml
   - 07-review.html.fragment
@@ -124,15 +129,20 @@ runtime-evidence-deferrals:
     cleared-by: "2026-07-07T18:47:51Z"
     repeat-of: null
   - slice: docs-and-changelog
-    reason: "All 5 user-observable ACs (rendered-page screenshot format) — prose accuracy of interactions.mdx, scene-config.mdx, CHANGELOG.md, gestures.mdx, shapes.mdx, and composables.mdx verified by source read-through against landed code. Rungs tried: (1) Source file read-through for all five mdx files and CHANGELOG.md — all content confirmed correct against IsometricScene.kt:309-320, SceneConfig.kt:50, isometric-compose.api:120, IsometricComposables.kt:132, Point.kt:150-199; (2) sync-docs.js ran clean (Synced 33 files); (3) Astro dev server not available (no display). Residual: rendered-page visual presentation format only — prose accuracy is confirmed by source read-through. Plan pre-accepted: constraint-resolution: po-accepted on all five ACs in 04-plan-docs-and-changelog.md. Cleared by human read-through at review stage."
+    reason: "All 5 user-observable ACs (rendered-page screenshot format) — prose accuracy of interactions.mdx (AC-E1 corrected in 03cdec0 after c214af8 changed onClick-only behavior), scene-config.mdx, CHANGELOG.md, gestures.mdx, shapes.mdx, and composables.mdx verified by source read-through against landed code. Rungs tried: (1) Source file read-through for all five mdx files and CHANGELOG.md — all content confirmed correct against IsometricScene.kt:612-614, SceneConfig.kt:50, isometric-compose.api:120, IsometricComposables.kt:132, Point.kt:150-199; (2) sync-docs.js ran clean (Synced 33 files, twice); (3) Astro dev server not available (no display). Residual: rendered-page visual presentation format only — prose accuracy is confirmed by source read-through. Plan pre-accepted: constraint-resolution: po-accepted on all five ACs in 04-plan-docs-and-changelog.md. Cleared by human read-through at review stage."
     deferred-at: "2026-07-07T16:49:09Z"
     cleared-by: null
     repeat-of: compose-contracts
   - slice: snapshot-sweep-gate
-    reason: "AC-S2a CI drift gate (Paparazzi Linux verify) — recordPaparazziDebug on Windows JVM produced 29 attributed goldens (commit 32b31bc); ./gradlew test BUILD SUCCESSFUL locally; attribution ledger: 0 unattributable diffs. Residual: CI ubuntu-latest verifyPaparazziDebug — branch not yet pushed. Plan pre-authorized: constraint-resolution: proxy+deferral in 04-plan-snapshot-sweep-gate.md. Cleared when feat/ws10-interaction-props pushed and CI build job passes. AC-S2b doc visual inspection — DocScreenshotGenerator ran, 5/17 PNGs changed (geometry-attributed); OctahedronGeometryTest 6/6 + KnotGeometryTest 5/5 prove correctness. Residual: human pixel inspection, no display available. Plan pre-accepted: constraint-resolution: po-accepted. Cleared at review stage."
+    reason: "AC-S2a CI drift gate (Paparazzi Linux verify) — recordPaparazziDebug on Windows JVM produced 29 attributed goldens (commit 32b31bc); ./gradlew test BUILD SUCCESSFUL locally and in re-verify run (2026-07-07T22:00:52Z); attribution ledger: 0 unattributable diffs; Paparazzi goldens unaffected by c214af8. Residual: CI ubuntu-latest verifyPaparazziDebug — branch not yet pushed. Plan pre-authorized: constraint-resolution: proxy+deferral in 04-plan-snapshot-sweep-gate.md. Cleared when feat/ws10-interaction-props pushed and CI build job passes. AC-S2b doc visual inspection — DocScreenshotGenerator ran, 5/17 PNGs changed (geometry-attributed); OctahedronGeometryTest 6/6 + KnotGeometryTest 5/5 prove correctness. Residual: human pixel inspection, no display available. Plan pre-accepted: constraint-resolution: po-accepted. Cleared at review stage."
     deferred-at: "2026-07-07T19:01:23Z"
     cleared-by: null
     repeat-of: null
+  - slice: snapshot-sweep-gate
+    reason: "AC-S3 instrumented re-run (gesture-touching code changed by c214af8) — IsometricScene.kt modified post-original-verify by c214af8 (onClick-only fast-fire path added). Rungs tried: (1) git show c214af8 diff inspection confirms onDoubleClick != null path unchanged — DoubleTapInstrumentedTest evidence (bbc5fda) valid for that specific path; (2) ./gradlew test BUILD SUCCESSFUL (JVM tests pass); (3) AVD boot not available in this session (same wall as gesture-coordination deferral). Residual: live connectedDebugAndroidTest re-run to confirm double-tap path and exercise new onClick-only path. Plan constraint-resolution for AC-S3 names prerequisite-slice: gesture-coordination verify — evidence stands for double-tap; new path is untested. Constraint-resolution: same proxy+deferral wall as gesture-coordination. Cleared by connectedDebugAndroidTest run in capable environment after c214af8."
+    deferred-at: "2026-07-07T22:00:52Z"
+    cleared-by: null
+    repeat-of: gesture-coordination
 progress:
   intake: complete
   shape: complete

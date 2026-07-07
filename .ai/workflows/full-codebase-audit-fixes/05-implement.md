@@ -5,18 +5,18 @@ slug: full-codebase-audit-fixes
 status: complete
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T18:47:51Z"
-slices-implemented: 7
-slices-total: 7
-metric-total-files-changed: 80
-metric-total-lines-added: 2050
-metric-total-lines-removed: 177
+updated-at: "2026-07-07T22:07:54Z"
+slices-implemented: 8
+slices-total: 8
+metric-total-files-changed: 83
+metric-total-lines-added: 2067
+metric-total-lines-removed: 182
 tags: []
 refs:
   index: 00-index.md
   plan-index: 04-plan.md
 next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes snapshot-sweep-gate"
+next-invocation: "/wf verify full-codebase-audit-fixes path-caching-test-fix"
 ---
 
 # Implement Index
@@ -58,11 +58,19 @@ next-invocation: "/wf verify full-codebase-audit-fixes snapshot-sweep-gate"
   complex-scene, grid, multiple-shapes). `./gradlew test apiCheck` BUILD SUCCESSFUL (AC-S1).
   AC-S3 checkpoint: gesture evidence still current (IsometricScene.kt not in 9cf6c43).
   CI drift gate still open (Windows record / Linux verify — fallback pre-resolved).
+- `path-caching-test-fix` slice (8/8) is complete. Two instrumented tests fixed by replacing
+  a broken reflection helper with an `internal` accessor on `IsometricRenderer`. A Gradle
+  Managed Device block (`pixel2Api30`, `aosp-atd`, API 30) lands the headless execution
+  harness that retires the environment wall. `compileDebugKotlin + compileDebugAndroidTestKotlin`
+  BUILD SUCCESSFUL; `apiCheck` BUILD SUCCESSFUL (internal accessor absent from public dump).
+  Runtime AC-T1/T3 carry a device-run deferral cleared by first successful device run.
 
 ## Recommended Next Stage
 
-- **Option A (default):** `/wf verify full-codebase-audit-fixes snapshot-sweep-gate` —
-  verify AC-S1 (confirmed BUILD SUCCESSFUL), AC-S2 (attribution ledger complete, CI drift
-  gate open), AC-S3 (checkpoint passed, no re-run needed).
-- **Option B:** `/wf review full-codebase-audit-fixes` — slug-wide review after all 7
-  slices verified.
+- **Option A (default):** `/wf verify full-codebase-audit-fixes path-caching-test-fix` —
+  AC-T2 and AC-T4 are statically satisfied (compile + apiCheck pass); AC-T1/T3 carry a
+  device-run deferral.
+- **Option B:** `/wf review full-codebase-audit-fixes path-caching-test-fix` — skip verify;
+  static evidence (compile + apiCheck) sufficient for the reviewer's confidence bar.
+- **Option C:** `/wf handoff full-codebase-audit-fixes` — all 8 slices complete; proceed
+  to handoff for the overall workflow.
