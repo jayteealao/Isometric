@@ -85,6 +85,7 @@ engine injection, renderer flags, and lifecycle hooks. See
 | rotationOrigin | Point? | null | Center of rotation |
 | scaleOrigin | Point? | null | Center of scale |
 | visible | Boolean | true | Visibility toggle for entire group |
+| alpha | Float | 1f | Opacity multiplier in 0..1. Multiplied into every descendant's rendered color. Nested groups multiply their alphas — an outer `alpha = 0.5` containing an inner `alpha = 0.5` yields `0.25` at the leaves. A group with `alpha = 0` skips rendering its entire subtree. |
 | renderOptions | RenderOptions? | null | Override render options for this subtree |
 | testTag | String? | null | Optional tag for testing and diagnostics. |
 | nodeId | String? | null | Optional caller-supplied stable identifier. Must be unique within the scene when provided. |
@@ -92,7 +93,7 @@ engine injection, renderer flags, and lifecycle hooks. See
 
 Transforms accumulate through the hierarchy. A shape inside a rotated group inherits the group's rotation.
 
-`Group` does not accept `alpha`, `onClick`, or `onLongClick` directly &mdash; apply those to the
+`Group` does not accept `onClick` or `onLongClick` directly &mdash; apply those to the
 contained `Shape`, `Path`, or `Batch` nodes individually.
 
 ### Path (composable)

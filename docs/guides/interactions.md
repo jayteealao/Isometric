@@ -166,9 +166,17 @@ lookup &mdash; the per-node callback dispatches directly.
 
 ## onDoubleClick
 
-`onDoubleClick` fires when this node is double-tapped within the system double-tap window. A single
-tap still routes to `onClick` &mdash; the two are independent, and the gesture system disambiguates a
-single tap from the first half of a double tap for you.
+`onDoubleClick` fires when this node is double-tapped within the platform double-tap window
+(`ViewConfiguration.doubleTapTimeoutMillis`). The scene uses **delayed disambiguation**: when a
+node has both `onClick` and `onDoubleClick`, `onClick` is not dispatched immediately on the first
+tap &mdash; instead, it waits until the double-tap window expires to confirm no second tap is
+coming. If a second tap arrives within the window, `onDoubleClick` fires and `onClick` is
+suppressed entirely. If the window expires with no second tap, `onClick` fires once.
+
+When a node has **only** `onClick` (no `onDoubleClick`), `onClick` is still subject to the same
+delayed dispatch &mdash; the scene cannot know at first-tap time whether a second tap is coming,
+so the window applies. The scene-level `GestureConfig.onTap` handler fires immediately on the
+first tap regardless.
 
 ```kotlin
 // Source: InteractionSamplesActivity.kt — DoubleTapSample

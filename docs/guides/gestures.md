@@ -71,6 +71,15 @@ pointer position; the `delta` field is the **per-event** movement, present only 
 
 The `dragThreshold` property (default `8f`) controls how many pixels of movement are required before a drag gesture is recognized. This prevents accidental drags during taps. The long-press timeout is configurable through `GestureConfig.longPressTimeoutMs` (default `500L`).
 
+> **Note**
+>
+The scene consumes pointer events **only when actively handling the gesture** — that is, when at
+least one of `GestureConfig.onDrag`, a `CameraState`, or a `NodeDragState` is present and the
+pointer is dragging. An otherwise inert scene (no drag handler, no camera, no node-drag state)
+lets all pointer events pass through to parent scrollables and other composables unobstructed.
+This means you can safely embed an `IsometricScene` without drag handling inside a
+`LazyColumn` or `HorizontalPager` &mdash; the host scrollable will receive the gesture.
+
 ## Example: Tap to Change Color, Drag to Pan
 
 ```kotlin
