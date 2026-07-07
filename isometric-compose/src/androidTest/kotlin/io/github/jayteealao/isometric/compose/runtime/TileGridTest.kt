@@ -28,7 +28,7 @@ class TileGridTest {
     // ── Validation ────────────────────────────────────────────────────────────
 
     @Test(expected = IllegalArgumentException::class)
-    fun `width zero throws at composition time`() {
+    fun widthZero_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(width = 0, height = 10) { }
@@ -37,7 +37,7 @@ class TileGridTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `height zero throws at composition time`() {
+    fun heightZero_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(width = 10, height = 0) { }
@@ -46,7 +46,7 @@ class TileGridTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `negative width throws at composition time`() {
+    fun negativeWidth_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(width = -1, height = 10) { }
@@ -57,7 +57,7 @@ class TileGridTest {
     // ── Content invocation ────────────────────────────────────────────────────
 
     @Test
-    fun `content is called for every tile coordinate in a 3x3 grid`() {
+    fun content_isCalledForEveryTile_in3x3Grid() {
         // Plain ArrayList — not a snapshot-state type, so writes here do not
         // trigger recomposition. Using mutableStateListOf would cause an
         // infinite recomposition loop (write during composition → recompose → write …).
@@ -87,7 +87,7 @@ class TileGridTest {
     }
 
     @Test
-    fun `1x1 grid renders exactly one tile at origin`() {
+    fun grid1x1_rendersExactlyOneTile_atOrigin() {
         val visited = ArrayList<TileCoordinate>()
 
         composeRule.setContent {
@@ -106,7 +106,7 @@ class TileGridTest {
     // ── Gesture hub registration ──────────────────────────────────────────────
 
     @Test
-    fun `TileGrid without onTileClick does not register with hub`() {
+    fun tileGridWithoutOnTileClick_doesNotRegisterWithHub() {
         // Composes without crash. The hub has no registration — verified
         // indirectly: if gesturesActive were spuriously true, the pointerInput
         // modifier would be installed but no callback fired. No assert needed here.
@@ -121,7 +121,7 @@ class TileGridTest {
     }
 
     @Test
-    fun `TileGrid with onTileClick composes without crash`() {
+    fun tileGridWithOnTileClick_composesWithoutCrash() {
         var clicked: TileCoordinate? = null
 
         composeRule.setContent {
@@ -140,7 +140,7 @@ class TileGridTest {
     // ── Elevation ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `elevation function receives correct TileCoordinate per tile`() {
+    fun elevationFunction_receivesCorrectTileCoordinate_perTile() {
         // Capture coords seen by the elevation function (called during Group
         // position computation, not during rendering — safe to collect here).
         val elevationInputs = ArrayList<TileCoordinate>()
@@ -171,7 +171,7 @@ class TileGridTest {
     // ── Config with custom tileSize ───────────────────────────────────────────
 
     @Test
-    fun `custom tileSize composes without crash`() {
+    fun customTileSize_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(
@@ -189,7 +189,7 @@ class TileGridTest {
     // ── Dynamic width/height ──────────────────────────────────────────────────
 
     @Test
-    fun `changing width produces correct tile count`() {
+    fun changingWidth_producesCorrectTileCount() {
         var width by mutableStateOf(3)
         // Track unique coordinates seen after the final state settles.
         // remember{} keeps the list stable across recompositions; the plain

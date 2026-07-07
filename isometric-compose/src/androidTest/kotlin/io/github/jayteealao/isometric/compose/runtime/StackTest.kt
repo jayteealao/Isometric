@@ -26,7 +26,7 @@ class StackTest {
     // ── Validation ────────────────────────────────────────────────────────────
 
     @Test(expected = IllegalArgumentException::class)
-    fun `count zero throws at composition time`() {
+    fun countZero_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 0) { }
@@ -35,7 +35,7 @@ class StackTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `count negative throws at composition time`() {
+    fun countNegative_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = -1) { }
@@ -44,7 +44,7 @@ class StackTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `gap zero throws at composition time`() {
+    fun gapZero_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, gap = 0.0) { }
@@ -53,7 +53,7 @@ class StackTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `gap NaN throws at composition time with finite message`() {
+    fun gapNaN_throwsAtCompositionTime_withFiniteMessage() {
         // isFinite check fires before != 0.0 check
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
@@ -63,7 +63,7 @@ class StackTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `gap positive infinity throws at composition time`() {
+    fun gapPositiveInfinity_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, gap = Double.POSITIVE_INFINITY) { }
@@ -72,7 +72,7 @@ class StackTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun `gap negative infinity throws at composition time`() {
+    fun gapNegativeInfinity_throwsAtCompositionTime() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, gap = Double.NEGATIVE_INFINITY) { }
@@ -83,7 +83,7 @@ class StackTest {
     // ── Content invocation count ──────────────────────────────────────────────
 
     @Test
-    fun `content is called for every index in a count-5 stack`() {
+    fun content_isCalledForEveryIndex_inCount5Stack() {
         // Plain ArrayList — not snapshot state, so writes here do not trigger
         // recomposition. Using mutableStateListOf would cause an infinite
         // recomposition loop (write during composition → recompose → write …).
@@ -104,7 +104,7 @@ class StackTest {
     }
 
     @Test
-    fun `indices are 0-based and sequential`() {
+    fun indices_are0BasedAndSequential() {
         val indices = ArrayList<Int>()
 
         composeRule.setContent {
@@ -121,7 +121,7 @@ class StackTest {
     }
 
     @Test
-    fun `count 1 renders exactly one child with index 0`() {
+    fun count1_rendersExactlyOneChild_withIndex0() {
         val indices = ArrayList<Int>()
 
         composeRule.setContent {
@@ -141,7 +141,7 @@ class StackTest {
     // ── Axis / gap ────────────────────────────────────────────────────────────
 
     @Test
-    fun `Z axis stack composes without crash`() {
+    fun zAxisStack_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, axis = StackAxis.Z, gap = 1.0) { _ ->
@@ -153,7 +153,7 @@ class StackTest {
     }
 
     @Test
-    fun `X axis stack composes without crash`() {
+    fun xAxisStack_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, axis = StackAxis.X, gap = 2.0) { _ ->
@@ -165,7 +165,7 @@ class StackTest {
     }
 
     @Test
-    fun `Y axis stack composes without crash`() {
+    fun yAxisStack_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, axis = StackAxis.Y, gap = 1.5) { _ ->
@@ -177,7 +177,7 @@ class StackTest {
     }
 
     @Test
-    fun `negative gap composes without crash`() {
+    fun negativeGap_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, axis = StackAxis.Z, gap = -1.0) { _ ->
@@ -191,7 +191,7 @@ class StackTest {
     // ── Dynamic count ─────────────────────────────────────────────────────────
 
     @Test
-    fun `increasing count produces correct index set`() {
+    fun increasingCount_producesCorrectIndexSet() {
         var count by mutableStateOf(2)
         // Track unique indices seen after the final state settles.
         // Plain ArrayList does not trigger further recomposition when written.
@@ -219,7 +219,7 @@ class StackTest {
     // ── Nesting ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `nested stacks compose without crash`() {
+    fun nestedStacks_composeWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Stack(count = 3, axis = StackAxis.X, gap = 2.0) { _ ->
@@ -233,7 +233,7 @@ class StackTest {
     }
 
     @Test
-    fun `Stack inside TileGrid content block composes without crash`() {
+    fun stackInsideTileGrid_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 TileGrid(width = 3, height = 3) { coord ->
@@ -248,7 +248,7 @@ class StackTest {
     }
 
     @Test
-    fun `Stack inside Group composes without crash`() {
+    fun stackInsideGroup_composesWithoutCrash() {
         composeRule.setContent {
             IsometricScene(modifier = Modifier.fillMaxSize()) {
                 Group(position = Point(2.0, 3.0, 0.0)) {
