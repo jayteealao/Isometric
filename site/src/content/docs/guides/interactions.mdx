@@ -173,10 +173,9 @@ tap &mdash; instead, it waits until the double-tap window expires to confirm no 
 coming. If a second tap arrives within the window, `onDoubleClick` fires and `onClick` is
 suppressed entirely. If the window expires with no second tap, `onClick` fires once.
 
-When a node has **only** `onClick` (no `onDoubleClick`), `onClick` is still subject to the same
-delayed dispatch &mdash; the scene cannot know at first-tap time whether a second tap is coming,
-so the window applies. The scene-level `GestureConfig.onTap` handler fires immediately on the
-first tap regardless.
+When a node has **only** `onClick` (no `onDoubleClick`), `onClick` fires immediately &mdash; no
+disambiguation window applies because there is no competing handler that a second tap could trigger.
+The scene-level `GestureConfig.onTap` handler also fires immediately on the first tap regardless.
 
 ```kotlin
 // Source: InteractionSamplesActivity.kt — DoubleTapSample
