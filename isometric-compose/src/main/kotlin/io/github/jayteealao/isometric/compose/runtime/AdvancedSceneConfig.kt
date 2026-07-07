@@ -17,6 +17,16 @@ import io.github.jayteealao.isometric.Vector
  * enabling path caching, configuring the spatial index, or receiving callbacks at
  * specific points in the render lifecycle.
  *
+ * **Callback re-registration:** The callback parameters (`onHitTestReady`, `onFlagsReady`,
+ * `onRenderError`, `onEngineReady`, `onRendererReady`, `onBeforeDraw`, `onAfterDraw`,
+ * `onPreparedSceneReady`) are intentionally excluded from [equals] and [hashCode]. Replacing
+ * an [AdvancedSceneConfig] instance whose only change is a callback lambda will **not** trigger
+ * recomposition in [IsometricScene]. To update callbacks at runtime, either:
+ * - Wrap them in `rememberUpdatedState` and read `.value` inside a stable lambda passed to
+ *   the config, so the lambda reference stays stable while the captured state updates, or
+ * - Key the entire config on a version counter (e.g., `remember(version) { AdvancedSceneConfig(...) }`)
+ *   that you increment when any callback needs to change.
+ *
  * @param renderOptions Controls rendering behaviour such as sorting and face culling.
  * @param lightDirection Normalized direction vector for the scene's light source.
  * @param defaultColor Fallback [IsoColor] for shapes without an explicit color.
@@ -90,12 +100,51 @@ class AdvancedSceneConfig(
     cameraState = cameraState,
     nodeDragState = nodeDragState
 ) {
+    /**
+     * Binary-compatible secondary constructor preserving the pre-nodeDragState descriptor.
+     * Delegates with `nodeDragState = null`.
+     */
+    constructor(
+        renderOptions: RenderOptions = RenderOptions.Default,
+        lightDirection: Vector = SceneProjector.DEFAULT_LIGHT_DIRECTION.normalize(),
+        defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
+        colorPalette: ColorPalette = ColorPalette(),
+        strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
+        gestures: GestureConfig = GestureConfig.Disabled,
+        useNativeCanvas: Boolean = false,
+        cameraState: CameraState? = null,
+        engine: SceneProjector = IsometricEngine(),
+        enablePathCaching: Boolean = false,
+        enableSpatialIndex: Boolean = true,
+        spatialIndexCellSize: Double = IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE,
+        forceRebuild: Boolean = false,
+        frameVersion: Long = 0L,
+        onHitTestReady: ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? = null,
+        onFlagsReady: ((RuntimeFlagSnapshot) -> Unit)? = null,
+        onRenderError: ((commandId: String, error: Throwable) -> Unit)? = null,
+        onEngineReady: ((SceneProjector) -> Unit)? = null,
+        onRendererReady: ((IsometricRenderer) -> Unit)? = null,
+        onBeforeDraw: (DrawScope.() -> Unit)? = null,
+        onAfterDraw: (DrawScope.() -> Unit)? = null,
+        onPreparedSceneReady: ((PreparedScene) -> Unit)? = null
+    ) : this(
+        renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures,
+        useNativeCanvas, cameraState, null, engine, enablePathCaching, enableSpatialIndex,
+        spatialIndexCellSize, forceRebuild, frameVersion, onHitTestReady, onFlagsReady,
+        onRenderError, onEngineReady, onRendererReady, onBeforeDraw, onAfterDraw,
+        onPreparedSceneReady
+    )
+
     init {
         require(spatialIndexCellSize.isFinite() && spatialIndexCellSize > 0.0) {
             "spatialIndexCellSize must be positive and finite, got $spatialIndexCellSize"
         }
     }
 
+    // Callback fields (onHitTestReady, onFlagsReady, onRenderError, onEngineReady,
+    // onRendererReady, onBeforeDraw, onAfterDraw, onPreparedSceneReady) are intentionally
+    // excluded from equals() and hashCode(). See class-level KDoc for the re-registration
+    // guidance callers must follow when updating callbacks at runtime.
     override fun equals(other: Any?): Boolean =
         other is AdvancedSceneConfig &&
             super.equals(other) &&

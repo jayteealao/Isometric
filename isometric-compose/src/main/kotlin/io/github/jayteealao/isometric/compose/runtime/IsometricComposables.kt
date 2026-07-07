@@ -95,7 +95,13 @@ fun IsometricScope.Shape(
 }
 
 /**
- * Create a group that applies transforms to all its children.
+ * Create a group that applies transforms and opacity to all its children.
+ *
+ * **Alpha propagation:** `alpha` multiplies into the render context and is propagated to
+ * all descendants. Nested groups multiply their alphas — an outer group with `alpha = 0.5`
+ * containing an inner group with `alpha = 0.5` yields an effective opacity of `0.25` for
+ * all leaf nodes. A group with `alpha = 0` skips rendering its entire subtree (no render
+ * commands are produced, at zero traversal cost).
  *
  * @param position Local position offset for all children
  * @param rotation Local rotation around Z axis for all children
@@ -103,6 +109,9 @@ fun IsometricScope.Shape(
  * @param rotationOrigin Origin point for rotation
  * @param scaleOrigin Origin point for scaling
  * @param visible Whether the group and its children are visible
+ * @param alpha Opacity multiplier (0 = fully transparent, 1 = fully opaque). Multiplied
+ *   into all descendants' rendered colors; nested groups multiply their alphas. A value
+ *   of 0 skips the entire subtree — no render commands are produced.
  * @param renderOptions Optional per-subtree render options override (null inherits from parent)
  * @param testTag Optional tag for testing and diagnostics
  * @param nodeId Optional stable identifier. Must be unique within the scene when provided.
@@ -120,6 +129,7 @@ fun IsometricScope.Group(
     rotationOrigin: Point? = null,
     scaleOrigin: Point? = null,
     visible: Boolean = true,
+    alpha: Float = 1f,
     renderOptions: RenderOptions? = null,
     testTag: String? = null,
     nodeId: String? = null,
@@ -142,6 +152,7 @@ fun IsometricScope.Group(
             set(rotationOrigin) { this.rotationOrigin = it; markDirty() }
             set(scaleOrigin) { this.scaleOrigin = it; markDirty() }
             set(visible) { this.isVisible = it; markDirty() }
+            set(alpha) { this.alpha = it; markDirty() }
             set(renderOptions) { this.renderOptions = it; markDirty() }
             set(testTag) { this.testTag = it }
             set(nodeId) { this.explicitNodeId = it; markDirty() }

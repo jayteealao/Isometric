@@ -35,6 +35,17 @@ class GestureConfig(
     val dragThreshold: Float = 8f,
     val longPressTimeoutMs: Long = 500L
 ) {
+    /**
+     * Binary-compatible secondary constructor preserving the pre-longPressTimeoutMs `(…F)V`
+     * descriptor. Delegates with the default timeout of 500 ms.
+     */
+    constructor(
+        onTap: ((TapEvent) -> Unit)? = null,
+        onDrag: ((DragEvent) -> Unit)? = null,
+        onDragStart: ((DragEvent) -> Unit)? = null,
+        onDragEnd: (() -> Unit)? = null,
+        dragThreshold: Float = 8f
+    ) : this(onTap, onDrag, onDragStart, onDragEnd, dragThreshold, 500L)
     init {
         require(dragThreshold >= 0f) { "dragThreshold must be non-negative, got $dragThreshold" }
         require(longPressTimeoutMs > 0L) { "longPressTimeoutMs must be positive, got $longPressTimeoutMs" }

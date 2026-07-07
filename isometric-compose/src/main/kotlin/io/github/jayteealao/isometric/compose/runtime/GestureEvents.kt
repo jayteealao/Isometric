@@ -49,4 +49,10 @@ data class DragEvent(
     val x: Double,
     val y: Double,
     val delta: DragDelta? = null
-)
+) {
+    /**
+     * Binary-compatible secondary constructor preserving the pre-delta `(DD)V` descriptor.
+     * Equivalent to `DragEvent(x, y, null)`.
+     */
+    constructor(x: Double, y: Double) : this(x, y, null)
+}

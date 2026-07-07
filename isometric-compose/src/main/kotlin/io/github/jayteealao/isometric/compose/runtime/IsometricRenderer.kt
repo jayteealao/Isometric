@@ -277,7 +277,11 @@ class IsometricRenderer(
     ) {
         val scene = cache.rebuild(rootNode, context, width, height, onRenderError)
         if (scene != null) {
-            hitTestResolver.rebuildIndices(rootNode, scene)
+            try {
+                hitTestResolver.rebuildIndices(rootNode, scene)
+            } catch (e: Exception) {
+                onRenderError?.invoke("rebuildIndices", e)
+            }
         }
     }
 
