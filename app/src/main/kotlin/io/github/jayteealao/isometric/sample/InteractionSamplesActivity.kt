@@ -610,9 +610,10 @@ private data class CitySlot(
  * Dragging past 32px fires onDragStart once, then onDrag repeatedly, then onDragEnd once.
  *
  * The status card makes the [DragEvent] field contract visible: `x`/`y` are the absolute
- * pointer position (the drag-start position, captured in onDragStart), while `delta` is the
- * per-event movement that callers accumulate — the same value camera autopan sums. Reading
- * the absolute start from `x`/`y` and the running total from `delta` is the hero use case.
+ * pointer position — the drag-start position when delivered to `onDragStart`, and the live
+ * (current) pointer position when delivered to `onDrag`. `delta` is the per-event movement
+ * that callers accumulate — the same value camera autopan sums. Reading the live position
+ * from `x`/`y` in `onDrag` and the running total from `delta` is the hero use case.
  */
 @Composable
 fun DragLifecycleSample() {

@@ -7,7 +7,7 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T15:36:27Z"
+updated-at: "2026-07-07T15:55:11Z"
 selected-slice: "compose-contracts"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
+next-command: wf-review
+next-invocation: "/wf review full-codebase-audit-fixes compose-contracts"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -88,6 +88,8 @@ workflow-files:
   - 06-verify.md
   - 06-verify-core-math.md
   - 06-verify-gesture-coordination.md
+  - 06-verify-compose-contracts.md
+  - 05-implement-view-module.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -98,8 +100,8 @@ runtime-evidence-deferrals:
     deferred-at: "2026-07-07T14:15:38Z"
     cleared-by: "2026-07-07T16:00:00Z"
   - slice: compose-contracts
-    reason: "AC-G1 docs (IsometricNode.alpha KDoc prose accuracy) and AC-G3 (AdvancedSceneConfig callback KDoc) are irreducibly human-judgment prose ACs — automated tooling cannot verify that written prose correctly describes implemented behavior. Source KDoc is written and correct; deferred to review-stage read-through. Constraint-resolution: po-accepted at plan time (same residual category as AC-A1b in core-math)."
-    deferred-at: "2026-07-07T15:36:27Z"
+    reason: "AC-G1 docs + AC-G3 KDoc prose accuracy — both consumer-facing prose ACs deferred to review-stage read-through. Rungs tried: (1) KDoc present in source (IsometricNode.kt:119-136 for G1; AdvancedSceneConfig.kt:20 for G3); (2) compileDebugKotlin + compileReleaseKotlin clean; (3) source read-through confirms semantic coverage (leaf vs Group semantics for G1; equals()-exclusion with rememberUpdatedState guidance for G3). Residual: prose quality is irreducibly human judgment. Constraint-resolution: po-accepted at plan time (04-plan-compose-contracts.md verification strategy table)."
+    deferred-at: "2026-07-07T15:47:26Z"
     cleared-by: null
 progress:
   intake: complete
@@ -107,7 +109,7 @@ progress:
   slice: complete
   plan: complete
   implement: in-progress
-  verify: not-started
+  verify: in-progress
   review: not-started
   handoff: not-started
   ship: not-started
