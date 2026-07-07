@@ -45,12 +45,9 @@ class Knot(val position: Point = Point.ORIGIN) : Shape(createPaths(position)) {
                 )
             )
 
-            // Scale and translate all paths
+            // Scale and translate all paths to the requested position
             val scaledPaths = allPaths.map { it.scale(Point.ORIGIN, 1.0 / 5.0) }
-            val translatedPaths = scaledPaths.map { it.translate(-0.1, 0.15, 0.4) }
-            val finalPaths = translatedPaths.map { it.translate(position.x, position.y, position.z) }
-
-            return finalPaths
+            return scaledPaths.map { it.translate(position.x, position.y, position.z) }
         }
     }
 }

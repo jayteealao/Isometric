@@ -4,7 +4,6 @@ import io.github.jayteealao.isometric.Path
 import io.github.jayteealao.isometric.Point
 import io.github.jayteealao.isometric.Shape
 import kotlin.math.PI
-import kotlin.math.sqrt
 
 /**
  * An octahedron (8-faced polyhedron) inscribed in a unit cube.
@@ -39,9 +38,7 @@ class Octahedron(val position: Point = Point.ORIGIN) : Shape(createPaths(positio
                 paths.add(lowerTriangle.rotateZ(center, i * PI / 2.0))
             }
 
-            // Scale all paths
-            val scale = sqrt(2.0) / 2.0
-            return paths.map { it.scale(center, scale, scale, 1.0) }
+            return paths
         }
     }
 }

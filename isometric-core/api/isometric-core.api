@@ -350,6 +350,7 @@ public final class io/github/jayteealao/isometric/paths/Circle$Companion {
 }
 
 public final class io/github/jayteealao/isometric/shapes/Cylinder : io/github/jayteealao/isometric/Shape {
+	public static final field Companion Lio/github/jayteealao/isometric/shapes/Cylinder$Companion;
 	public fun <init> ()V
 	public fun <init> (Lio/github/jayteealao/isometric/Point;)V
 	public fun <init> (Lio/github/jayteealao/isometric/Point;D)V
@@ -362,6 +363,9 @@ public final class io/github/jayteealao/isometric/shapes/Cylinder : io/github/ja
 	public final fun getVertices ()I
 	public synthetic fun translate (DDD)Lio/github/jayteealao/isometric/Shape;
 	public fun translate (DDD)Lio/github/jayteealao/isometric/shapes/Cylinder;
+}
+
+public final class io/github/jayteealao/isometric/shapes/Cylinder$Companion {
 }
 
 public final class io/github/jayteealao/isometric/shapes/Knot : io/github/jayteealao/isometric/Shape {

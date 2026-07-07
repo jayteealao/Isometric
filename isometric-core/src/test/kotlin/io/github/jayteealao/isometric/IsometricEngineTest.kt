@@ -295,7 +295,7 @@ class IsometricEngineTest {
         assertEquals(6, Prism().paths.size)
         assertEquals(5, io.github.jayteealao.isometric.shapes.Pyramid().paths.size)
         assertTrue(io.github.jayteealao.isometric.shapes.Cylinder().paths.isNotEmpty())
-        assertEquals(8, Octahedron().paths.size)
+        assertEquals(8, Octahedron().paths.size) // B1 guard: 4 rotations × 2 triangles = 8; corrected geometry must preserve this count
         assertTrue(Knot().paths.isNotEmpty())
     }
 }
