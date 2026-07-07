@@ -1,0 +1,158 @@
+artifact: review
+slug: full-codebase-audit-fixes
+review-scope: slug-wide
+slice-slug: ""
+rev: 1
+verdict: caveats
+summary: >
+  248 files, 7 slices. Core math, gestures, shapes, renderer, view, docs all verified.
+  CR-1 (onClick-only latency) and CR-3 (CHANGELOG note) fixed in c214af8. CR-2
+  (projectionVersion polling) deferred HIGH. No blockers.
+counts:
+  blocker: 0
+  high: 1
+  med: 0
+  low: 2
+  nit: 1
+dimensions:
+  - name: correctness
+    status: caveats
+    blocker: 0
+    high: 0
+    med: 0
+    low: 0
+    nit: 0
+  - name: reliability
+    status: caveats
+    blocker: 0
+    high: 1
+    med: 0
+    low: 0
+    nit: 0
+  - name: security
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 0
+    nit: 0
+  - name: code-simplification
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 0
+    nit: 1
+  - name: testing
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 1
+    nit: 0
+  - name: maintainability
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 0
+    nit: 0
+  - name: docs
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 1
+    nit: 0
+  - name: release
+    status: ship
+    blocker: 0
+    high: 0
+    med: 0
+    low: 0
+    nit: 0
+findings:
+  - id: CR-2
+    severity: high
+    dimension: reliability
+    file: isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScene.kt
+    line: 148
+    confidence: med
+    action: defer
+    status: deferred
+    pre-existing: false
+    surfaced-at: "2026-07-07T19:11:28Z"
+    msg: >
+      projectionVersion polling busy-loop: while(true)/delay(16L) runs at ~60
+      polls/second indefinitely on idle scenes, burning CPU even when the engine
+      angle/scale never changes.
+    evidence:
+      snippet: "while (true) { delay(16L); val current = engine.projectionVersion; if (current != lastVersion) { sceneVersion++ } }"
+    fix: >
+      Expose a Flow<Int>/StateFlow<Int> from IsometricEngine or use
+      snapshotFlow { engine.projectionVersion } so the LaunchedEffect
+      collects reactively instead of polling.
+
+  - id: CS-1
+    severity: low
+    dimension: code-simplification
+    file: isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt
+    line: 190
+    confidence: med
+    action: defer
+    status: deferred
+    pre-existing: false
+    surfaced-at: "2026-07-07T19:11:28Z"
+    msg: >
+      applyAlpha() helper is defined on IsometricNode but never called — all
+      leaf nodes apply alpha inline. Dead code.
+    evidence:
+      snippet: "protected fun applyAlpha(color: IsoColor): IsoColor = if (alpha < 1f) color.withAlpha(alpha) else color"
+
+  - id: TST-1
+    severity: low
+    dimension: testing
+    file: isometric-compose/src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DoubleTapDisambiguationTest.kt
+    line: 170
+    confidence: med
+    action: defer
+    status: deferred
+    pre-existing: false
+    surfaced-at: "2026-07-07T19:11:28Z"
+    msg: >
+      Drag-within-window test asserts two counters start at zero — vacuous pass,
+      no gesture code is actually exercised.
+    evidence:
+      snippet: "assertThat(singleTaps).isEqualTo(0); assertThat(doubleTaps).isEqualTo(0)"
+
+  - id: CS-2
+    severity: nit
+    dimension: code-simplification
+    file: isometric-compose/src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScene.kt
+    line: 148
+    confidence: low
+    action: defer
+    status: deferred
+    pre-existing: false
+    surfaced-at: "2026-07-07T19:11:28Z"
+    msg: >
+      Magic constant delay(16L) approximates one 60fps frame boundary but has no
+      named constant explaining the intent.
+    evidence:
+      snippet: "delay(16L) // one frame boundary"
+
+  - id: DOCS-1
+    severity: low
+    dimension: docs
+    file: CHANGELOG.md
+    line: 22
+    confidence: low
+    action: defer
+    status: deferred
+    pre-existing: false
+    surfaced-at: "2026-07-07T19:11:28Z"
+    msg: >
+      NodeDragState/rememberNodeDragState feature is in the changelog and API reference
+      but lacks an end-to-end how-to guide for the tap-to-select-then-drag pattern.
+    evidence:
+      snippet: "Add `NodeDragState`, `rememberNodeDragState`, `NodeDragBounds`, and `SceneConfig.nodeDragState`"
