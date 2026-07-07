@@ -7,8 +7,8 @@ status: active
 current-stage: verify
 stage-number: 6
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T15:55:11Z"
-selected-slice: "compose-contracts"
+updated-at: "2026-07-07T16:17:07Z"
+selected-slice: "shape-geometry"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-review
-next-invocation: "/wf review full-codebase-audit-fixes compose-contracts"
+next-command: wf-verify
+next-invocation: "/wf verify full-codebase-audit-fixes shape-geometry"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -90,6 +90,8 @@ workflow-files:
   - 06-verify-gesture-coordination.md
   - 06-verify-compose-contracts.md
   - 05-implement-view-module.md
+  - 06-verify-view-module.md
+  - 05-implement-shape-geometry.md
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -103,6 +105,16 @@ runtime-evidence-deferrals:
     reason: "AC-G1 docs + AC-G3 KDoc prose accuracy — both consumer-facing prose ACs deferred to review-stage read-through. Rungs tried: (1) KDoc present in source (IsometricNode.kt:119-136 for G1; AdvancedSceneConfig.kt:20 for G3); (2) compileDebugKotlin + compileReleaseKotlin clean; (3) source read-through confirms semantic coverage (leaf vs Group semantics for G1; equals()-exclusion with rememberUpdatedState guidance for G3). Residual: prose quality is irreducibly human judgment. Constraint-resolution: po-accepted at plan time (04-plan-compose-contracts.md verification strategy table)."
     deferred-at: "2026-07-07T15:47:26Z"
     cleared-by: null
+  - slice: view-module
+    reason: "AC-D2 DragLifecycleSample KDoc prose accuracy — prose accuracy is human-judged. Rungs tried: (1) Source read-through of InteractionSamplesActivity.kt lines 608–617 confirms updated KDoc matches GestureEvents.kt lines 34–39 language (absolute pointer position; drag-start in onDragStart, live pointer in onDrag); (2) Kotlin compiler accepts KDoc without error (compileDebugKotlin + compileReleaseKotlin clean). Residual: prose quality is irreducibly human judgment at review stage. Constraint-resolution: po-accepted at plan time (04-plan-view-module.md verification strategy table, AC-D2 row). repeat-of: compose-contracts (same environment wall: prose accuracy judgment)."
+    deferred-at: "2026-07-07T16:04:28Z"
+    cleared-by: null
+    repeat-of: compose-contracts
+  - slice: shape-geometry
+    reason: "AC-B1-visual and AC-B2-visual (golden re-record + human diff inspection) — pre-registered PO deferral per 'snapshots once at sweep end' decision (po-answers.md Round 3). Geometric unit tests (vertex span, winding, bounding box) prove correctness; visual surface is deterministic from correct geometry. Rungs tried: (1) OctahedronGeometryTest vertex-span and winding assertions (6 tests pass); (2) KnotGeometryTest position carry-through (5 tests pass); (3) ./gradlew :isometric-compose:test BUILD SUCCESSFUL (local goldens auto-updated as untracked). Cleared by snapshot-sweep-gate slice's recordPaparazziDebug + inspection pass."
+    deferred-at: "2026-07-07T16:17:07Z"
+    cleared-by: null
+    repeat-of: null
 progress:
   intake: complete
   shape: complete

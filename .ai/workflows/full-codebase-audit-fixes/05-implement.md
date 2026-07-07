@@ -5,12 +5,12 @@ slug: full-codebase-audit-fixes
 status: in-progress
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T15:55:11Z"
-slices-implemented: 4
+updated-at: "2026-07-07T16:17:07Z"
+slices-implemented: 5
 slices-total: 7
-metric-total-files-changed: 27
-metric-total-lines-added: 1770
-metric-total-lines-removed: 153
+metric-total-files-changed: 35
+metric-total-lines-added: 1891
+metric-total-lines-removed: 165
 tags: []
 refs:
   index: 00-index.md
@@ -38,8 +38,13 @@ next-invocation: "/wf verify full-codebase-audit-fixes compose-contracts"
 - `view-module` slice (4/7) is complete. D2 KDoc fix applied in
   `InteractionSamplesActivity.kt`. D1/D3/G2 confirmed already in place (38c77e1); 16
   Robolectric tests pass (0 failures). AC-D2 prose check deferred to review stage.
-- Remaining slices (`shape-geometry`, `docs-and-changelog`, `snapshot-sweep-gate`)
-  have no code dependency on view-module or compose-contracts being verify-complete before they start.
+- `shape-geometry` slice (5/7) is complete. B1 (Octahedron non-uniform scale), B2 (Knot
+  cosmetic offset), B3 (Cylinder validation reachability) all fixed. Three new test classes
+  (OctahedronGeometryTest, KnotGeometryTest, CylinderValidationTest) — 247/247 JVM tests
+  pass. apiDump regenerated (Cylinder$Companion additive ABI). AC-B1/B2 visual halves
+  pre-registered as deferred to snapshot-sweep-gate.
+- Remaining slices (`docs-and-changelog`, `snapshot-sweep-gate`)
+  have no code dependency on shape-geometry being verify-complete before they start.
 - `docs-and-changelog` will add the Group alpha composables.mdx row after this lands.
 - `compose-contracts` did not touch `IsometricScene.kt`. No conflict with gesture-coordination.
 

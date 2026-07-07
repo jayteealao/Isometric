@@ -22,11 +22,15 @@ class Cylinder @JvmOverloads constructor(
     val radius: Double = 1.0,
     val height: Double = 1.0,
     val vertices: Int = 20
-) : Shape(Shape.extrude(Circle(position, radius, vertices), height).paths) {
-    init {
-        require(radius > 0.0) { "Cylinder radius must be positive, got $radius" }
-        require(vertices >= 3) { "Cylinder needs at least 3 vertices, got $vertices" }
-        require(height > 0.0) { "Cylinder height must be positive, got $height" }
+) : Shape(create(position, radius, height, vertices)) {
+
+    companion object {
+        private fun create(position: Point, radius: Double, height: Double, vertices: Int): List<io.github.jayteealao.isometric.Path> {
+            require(radius > 0.0) { "Cylinder radius must be positive, got $radius" }
+            require(vertices >= 3) { "Cylinder needs at least 3 vertices, got $vertices" }
+            require(height > 0.0) { "Cylinder height must be positive, got $height" }
+            return Shape.extrude(Circle(position, radius, vertices), height).paths
+        }
     }
 
     override fun translate(dx: Double, dy: Double, dz: Double): Cylinder =
