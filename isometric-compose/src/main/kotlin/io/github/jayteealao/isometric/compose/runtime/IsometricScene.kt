@@ -1,7 +1,6 @@
 package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composition
@@ -295,17 +294,35 @@ fun IsometricScene(
     val currentCameraState by rememberUpdatedState(config.cameraState)
     val currentNodeDragState by rememberUpdatedState(config.nodeDragState)
 
-    // Pointer input is always installed so per-node onClick / onLongClick
+    // Pointer input is always installed so per-node onClick / onLongClick / onDoubleClick
     // callbacks fire even when no scene-level GestureConfig is supplied.
     // Downstream hit-test and dispatch are no-ops when nothing is registered.
+    //
+    // One coordinated handler owns all pointer state. The pre-fix two-block structure (a
+    // hand-rolled awaitPointerEventScope loop + an independent detectTapGestures block for
+    // onDoubleTap) caused: (C1) double-tap firing onClick twice before onDoubleClick; (C2)
+    // unconditional consumption in the drag path blocking parent scrollables; (C3) stale
+    // draggedNode / longPressFired state after long-press drag.
+    //
+    // Post-fix: a single pointerInput(Unit) block with the hand-rolled loop handles
+    // tap/double-tap/long-press/drag in coordination. The double-tap window is tracked by
+    // recording the time of each Release and comparing against doubleTapTimeoutMillis.
+    // Consumption is gated on shouldConsume (C2 fix). draggedNode assignment is guarded
+    // by !longPressFired (C3 fix). onClick is dispatched only after verifying no second
+    // tap arrived within the window (C1 fix).
     Canvas(
         modifier = modifier
             .then(
                 Modifier.pointerInput(Unit) {
-                        // Capture coroutine scope for long-press detection.
-                        // pointerInput's lambda is a suspend PointerInputScope.() -> Unit,
-                        // so we wrap with coroutineScope to get a scope for launching.
-                        coroutineScope {
+                    // Capture viewConfiguration before entering awaitPointerEventScope.
+                    // viewConfiguration is on PointerInputScope; inside awaitPointerEventScope
+                    // the receiver is AwaitPointerEventScope, which does not expose it.
+                    val doubleTapWindowMs = viewConfiguration.doubleTapTimeoutMillis
+
+                    // Capture coroutine scope for long-press detection.
+                    // pointerInput's lambda is a suspend PointerInputScope.() -> Unit,
+                    // so we wrap with coroutineScope to get a scope for launching.
+                    coroutineScope {
                         val longPressScope: CoroutineScope = this
                         awaitPointerEventScope {
                             var isDragging = false
@@ -317,6 +334,12 @@ fun IsometricScene(
                             // and the camera-pan / onDrag lifecycle path is suppressed.
                             var draggedNode: IsometricNode? = null
 
+                            // C1: double-tap disambiguation state.
+                            // Records when the last Release occurred so we can detect a
+                            // second tap within the platform's double-tap window.
+                            var lastReleaseTimeMs: Long = -1L
+                            var pendingTapJob: Job? = null
+
                             while (true) {
                                 val event = awaitPointerEvent()
 
@@ -327,6 +350,20 @@ fun IsometricScene(
                                         dragStartPos = position
                                         isDragging = false
                                         longPressFired = false
+
+                                        // C1: If a second Press arrives within the double-tap
+                                        // window, cancel the pending single-tap dispatch job and
+                                        // record that we are in a double-tap sequence. The
+                                        // Release handler will then fire onDoubleClick instead.
+                                        val nowMs = System.currentTimeMillis()
+                                        val isDoubleTap = lastReleaseTimeMs >= 0L &&
+                                            (nowMs - lastReleaseTimeMs) < doubleTapWindowMs
+
+                                        if (isDoubleTap) {
+                                            // Cancel the pending single-tap so onClick does not fire.
+                                            pendingTapJob?.cancel()
+                                            pendingTapJob = null
+                                        }
 
                                         // Capture press position into a local val so the
                                         // long-press job reads a stable snapshot and never
@@ -391,26 +428,38 @@ fun IsometricScene(
                                                 // from the updated dragStartPos. (CR-1)
                                                 dragStartPos = position
                                                 longPressJob?.cancel()
+                                                // Cancel any pending single-tap: a drag supersedes it.
+                                                pendingTapJob?.cancel()
+                                                pendingTapJob = null
 
-                                                // Drag-a-node: if a node is selected and this
-                                                // drag began on it, the gesture moves that node
-                                                // instead of panning. Empty-space and other-node
-                                                // drags leave draggedNode null and pan as before.
-                                                draggedNode = resolveDraggedNode(
-                                                    nodeDragState = currentNodeDragState,
-                                                    pressPos = start,
-                                                    camera = currentCameraState,
-                                                    renderer = renderer,
-                                                    rootNode = rootNode,
-                                                    context = currentRenderContext,
-                                                    width = currentCanvasWidth,
-                                                    height = currentCanvasHeight
-                                                )
+                                                // C3 fix: draggedNode is only assigned when long-press
+                                                // has NOT already fired. After a long-press, a Move that
+                                                // crosses the threshold must not start a node drag —
+                                                // that would cause unintended node movement after
+                                                // long-click. Guard: draggedNode = if (longPressFired) null else ...
+                                                draggedNode = if (longPressFired) {
+                                                    null
+                                                } else {
+                                                    // Drag-a-node: if a node is selected and this
+                                                    // drag began on it, the gesture moves that node
+                                                    // instead of panning. Empty-space and other-node
+                                                    // drags leave draggedNode null and pan as before.
+                                                    resolveDraggedNode(
+                                                        nodeDragState = currentNodeDragState,
+                                                        pressPos = start,
+                                                        camera = currentCameraState,
+                                                        renderer = renderer,
+                                                        rootNode = rootNode,
+                                                        context = currentRenderContext,
+                                                        width = currentCanvasWidth,
+                                                        height = currentCanvasHeight
+                                                    )
+                                                }
 
                                                 // onDragStart belongs to the camera/custom-drag
                                                 // surface; a node drag owns the gesture, so only
                                                 // fire onDragStart when no node is being moved.
-                                                if (draggedNode == null) {
+                                                if (draggedNode == null && !longPressFired) {
                                                     currentGestures.onDragStart?.invoke(
                                                         // Absolute drag-start position; no movement yet, so delta is null.
                                                         DragEvent(start.x.toDouble(), start.y.toDouble(), delta = null)
@@ -456,12 +505,23 @@ fun IsometricScene(
                                                     if (onDrag != null) {
                                                         onDrag.invoke(dragEvent)
                                                     } else {
-                                                        // C2: Default drag→pan accumulates the per-event delta when cameraState is active
+                                                        // Default drag→pan accumulates the per-event delta when cameraState is active
                                                         dragEvent.delta?.let { currentCameraState?.pan(it.dx, it.dy) }
                                                     }
                                                 }
                                                 dragStartPos = position
-                                                event.changes.forEach { it.consume() }
+
+                                                // C2 fix: consume pointer events ONLY when the scene is
+                                                // actively handling the drag (node move, custom onDrag,
+                                                // or camera pan). An inert scene (no handlers, no camera,
+                                                // no dragged node) must not consume events — a parent
+                                                // scrollable needs them to scroll.
+                                                val shouldConsume = draggedNode != null ||
+                                                    currentGestures.onDrag != null ||
+                                                    currentCameraState != null
+                                                if (shouldConsume) {
+                                                    event.changes.forEach { it.consume() }
+                                                }
                                             }
                                         }
                                     }
@@ -473,7 +533,8 @@ fun IsometricScene(
 
                                         if (longPressFired) {
                                             // Long-press already dispatched on the press path;
-                                            // do not fire onTap or onDragEnd.
+                                            // do not fire onTap or onDragEnd. Clear long-press state.
+                                            lastReleaseTimeMs = -1L  // reset: long-press is not a tap
                                         } else if (isDragging) {
                                             // onDragEnd pairs with onDragStart on the camera/
                                             // custom-drag path; a node drag owns the gesture and
@@ -481,7 +542,13 @@ fun IsometricScene(
                                             if (draggedNode == null) {
                                                 currentGestures.onDragEnd?.invoke()
                                             }
+                                            lastReleaseTimeMs = -1L  // reset: drag is not a tap
                                         } else {
+                                            // Tap path. Check if this is the second tap of a double-tap.
+                                            val nowMs = System.currentTimeMillis()
+                                            val isSecondTap = lastReleaseTimeMs >= 0L &&
+                                                (nowMs - lastReleaseTimeMs) < doubleTapWindowMs
+
                                             // S8: Inverse-transform pointer coordinates when camera
                                             // is active, so hit testing uses engine-space coords.
                                             val (hitX, hitY) = screenToEngineCoords(
@@ -500,35 +567,66 @@ fun IsometricScene(
                                                 width = currentCanvasWidth,
                                                 height = currentCanvasHeight
                                             )
-                                            currentGestures.onTap?.invoke(
-                                                TapEvent(
-                                                    x = position.x.toDouble(),
-                                                    y = position.y.toDouble(),
-                                                    node = hitNode
+
+                                            if (isSecondTap) {
+                                                // C1 fix: this is the second tap of a double-tap.
+                                                // Cancel the pending single-tap job (onClick must
+                                                // not fire on a double-tap), fire onDoubleClick.
+                                                pendingTapJob?.cancel()
+                                                pendingTapJob = null
+                                                hitNode?.onDoubleClick?.invoke()
+                                                lastReleaseTimeMs = -1L  // reset after double-tap
+                                            } else {
+                                                // C1 fix: this may be the first tap of a double-tap.
+                                                // Record the time and launch a delayed dispatch job
+                                                // that fires onClick only after the disambiguation
+                                                // window expires without a second tap.
+                                                lastReleaseTimeMs = nowMs
+
+                                                // Scene-level onTap fires immediately (it always did;
+                                                // only per-node onClick is delayed for disambiguation).
+                                                currentGestures.onTap?.invoke(
+                                                    TapEvent(
+                                                        x = position.x.toDouble(),
+                                                        y = position.y.toDouble(),
+                                                        node = hitNode
+                                                    )
                                                 )
-                                            )
 
-                                            // Drag-a-node selection: a tap on a node selects it;
-                                            // a tap on empty space (hitNode == null) clears the
-                                            // selection. Single-selection by construction.
-                                            currentNodeDragState?.select(hitNode?.nodeId)
+                                                // Drag-a-node selection: a tap on a node selects it;
+                                                // a tap on empty space (hitNode == null) clears the
+                                                // selection. Single-selection by construction.
+                                                currentNodeDragState?.select(hitNode?.nodeId)
 
-                                            // Dispatch per-node onClick after scene-level onTap
-                                            hitNode?.onClick?.invoke()
+                                                // C1 fix: delay per-node onClick dispatch to confirm
+                                                // this is not the first tap of a double-tap sequence.
+                                                // If a second Press arrives within the window, it
+                                                // cancels this job (see Press handler above).
+                                                val capturedHitNode = hitNode
+                                                val capturedHitX = hitX
+                                                val capturedHitY = hitY
+                                                val capturedIsometricEngine = currentIsometricEngine
+                                                pendingTapJob = longPressScope.launch {
+                                                    delay(doubleTapWindowMs)
+                                                    // Window expired: no second tap arrived.
+                                                    // Dispatch per-node onClick and TileGrid handlers.
+                                                    capturedHitNode?.onClick?.invoke()
 
-                                            // Route to any registered TileGrid tap handlers.
-                                            // Uses hitX/hitY (camera-corrected) so screenToTile
-                                            // receives engine-space coordinates, matching the
-                                            // coordinate space that screenToWorld expects.
-                                            val isometricEngine = currentIsometricEngine
-                                            if (tileGestureHub.hasHandlers && isometricEngine != null) {
-                                                tileGestureHub.dispatch(
-                                                    tapX = hitX,
-                                                    tapY = hitY,
-                                                    viewportWidth = currentCanvasWidth,
-                                                    viewportHeight = currentCanvasHeight,
-                                                    engine = isometricEngine
-                                                )
+                                                    // Route to any registered TileGrid tap handlers.
+                                                    // Uses hitX/hitY (camera-corrected) so screenToTile
+                                                    // receives engine-space coordinates, matching the
+                                                    // coordinate space that screenToWorld expects.
+                                                    if (tileGestureHub.hasHandlers && capturedIsometricEngine != null) {
+                                                        tileGestureHub.dispatch(
+                                                            tapX = capturedHitX,
+                                                            tapY = capturedHitY,
+                                                            viewportWidth = currentCanvasWidth,
+                                                            viewportHeight = currentCanvasHeight,
+                                                            engine = capturedIsometricEngine
+                                                        )
+                                                    }
+                                                    pendingTapJob = null
+                                                }
                                             }
                                         }
 
@@ -540,38 +638,7 @@ fun IsometricScene(
                                 }
                             }
                         }
-                        } // coroutineScope
-                    }
-            )
-            .then(
-                // Double-tap detection lives in its own pointerInput block, independent of
-                // the hand-rolled tap/long-press/drag loop above. Stacking gesture detectors
-                // in a single block would dead-code all but the first; separate blocks run
-                // independently, so single-tap (onClick) dispatch and long-press timing in the
-                // loop above are unchanged.
-                Modifier.pointerInput(Unit) {
-                    detectTapGestures(
-                        onDoubleTap = { offset ->
-                            // Camera-correct the tap point exactly like the tap / long-press
-                            // paths, then dispatch the hit node's onDoubleClick (if any).
-                            val (hitX, hitY) = screenToEngineCoords(
-                                screenX = offset.x,
-                                screenY = offset.y,
-                                camera = currentCameraState,
-                                canvasWidth = currentCanvasWidth,
-                                canvasHeight = currentCanvasHeight
-                            )
-                            val hitNode = renderer.hitTest(
-                                rootNode = rootNode,
-                                x = hitX,
-                                y = hitY,
-                                context = currentRenderContext,
-                                width = currentCanvasWidth,
-                                height = currentCanvasHeight
-                            )
-                            hitNode?.onDoubleClick?.invoke()
-                        }
-                    )
+                    } // coroutineScope
                 }
             )
     ) {
