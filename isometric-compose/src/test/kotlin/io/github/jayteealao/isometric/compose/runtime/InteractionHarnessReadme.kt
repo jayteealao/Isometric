@@ -39,5 +39,21 @@
  *
  * See `AutopanDeltaContractTest` for the worked example: it locks the drag/autopan
  * delta-accumulation contract using exactly this approach.
+ *
+ * ## Double-tap test split
+ *
+ * The double-tap disambiguation fix (merged gesture handler) introduces two test levels:
+ *
+ * - **`DoubleTapDisambiguationTest`** (this JVM source set) — state-machine-only. Verifies what
+ *   happens WHEN the coordinated handler fires the correct callbacks, by invoking them directly.
+ *   Does NOT prove that real pointer events route to the right lambda.
+ *
+ * - **`DoubleTapInstrumentedTest`** (`src/androidTest/`) — live-routing. Uses `createComposeRule`
+ *   and `performTouchInput { doubleClick() }` on a real emulator/device. This is the AC-S3 gate:
+ *   run via `./gradlew :isometric-compose:connectedDebugAndroidTest`.
+ *
+ * The split is intentional: the JVM tier covers all callback-count, branch-condition, and
+ * state-reset assertions (no environment dependency); the instrumented tier covers the one thing
+ * JVM cannot — that real Compose pointer routing dispatches to the right lambdas.
  */
 package io.github.jayteealao.isometric.compose.runtime
