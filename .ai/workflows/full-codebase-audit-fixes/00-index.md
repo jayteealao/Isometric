@@ -4,10 +4,10 @@ type: index
 slug: full-codebase-audit-fixes
 title: "Fix the confirmed defects from the 2026-07-06 full-codebase multi-agent audit"
 status: active
-current-stage: verify
-stage-number: 6
+current-stage: review
+stage-number: 7
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T19:01:23Z"
+updated-at: "2026-07-07T19:15:34Z"
 selected-slice: "snapshot-sweep-gate"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-review
-next-invocation: "/wf review full-codebase-audit-fixes snapshot-sweep-gate"
+next-command: wf-handoff
+next-invocation: "/wf handoff full-codebase-audit-fixes"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -97,6 +97,9 @@ workflow-files:
   - 06-verify-docs-and-changelog.md
   - 05-implement-snapshot-sweep-gate.md
   - 06-verify-snapshot-sweep-gate.md
+  - 07-review.md
+  - 07-review.yaml
+  - 07-review.html.fragment
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -137,7 +140,7 @@ progress:
   plan: complete
   implement: complete
   verify: complete
-  review: not-started
+  review: complete
   handoff: not-started
   ship: not-started
   retro: not-started
