@@ -45,7 +45,7 @@ Every composable maps to exactly one node type:
 | Composable | Node Type | Purpose |
 |------------|-----------|---------|
 | `Shape` | `ShapeNode` | Single 3D geometry with color, position, rotation, and scale |
-| `Group` | `GroupNode` | Transform container -- children inherit translation, rotation, and scale |
+| `Group` | `GroupNode` | Transform container -- children inherit translation, rotation, scale, and alpha |
 | `Path` | `PathNode` | Single 2D polygon face with color (useful for custom faces or flat overlays) |
 | `Batch` | `BatchNode` | Multiple shapes submitted together for efficient bulk rendering |
 | `CustomNode` | `CustomRenderNode` | Escape hatch -- emit raw `RenderCommand` objects directly |
@@ -61,9 +61,13 @@ Root (GroupNode)
   +-- PathNode (a flat face)
 ```
 
-Every node except `GroupNode` also carries the per-node interaction state defined on the
-`IsometricNode` base — `alpha`, `onClick`, `onLongClick`, `testTag`, and `nodeId`. See
-[Per-Node Interactions](/guides/interactions/).
+Every node carries the per-node state defined on the `IsometricNode` base — `alpha`,
+`onClick`, `onLongClick`, `onDoubleClick`, `testTag`, and `nodeId` — though `GroupNode`
+exposes only `alpha`, `testTag`, and `nodeId` through its composable, since a group has
+no faces of its own to hit-test. A group's `alpha` is not inert, however: it multiplies
+into every descendant's effective alpha during traversal (see
+[Alpha accumulation](#alpha-accumulation) below). See
+[Per-Node Interactions](/guides/interactions/) for the user-facing guide.
 
 ## Dirty Tracking
 
@@ -75,18 +79,30 @@ When a node's properties change (for example, a `ShapeNode`'s color or position)
 4. `IsometricScene` bumps an internal scene-version state that the `Canvas` lambda reads.
 5. The canvas is invalidated, triggering a redraw.
 
-On the next frame, only the dirty subtree is re-traversed. Clean subtrees are skipped entirely. This is why animating one shape in a 200-shape scene is cheap -- 199 nodes are untouched.
+The dirty flag is deliberately coarse: it answers "does the cached scene need rebuilding at all?", not "which part changed?". When any node is dirty, the next frame re-traverses the whole visible tree and re-projects the scene; when nothing is dirty, the rebuild is skipped entirely and the cached `PreparedScene` is drawn as-is. The fine-grained savings happen one layer up, in composition: Compose re-executes only the composable whose state changed, so updating one shape's color in a 200-shape scene runs one composable body, not 200 — even though the subsequent render rebuild walks all 200 nodes.
 
 ```kotlin
-// Only this shape recomposes when `color` changes
+// Only this shape's composable re-executes when `color` changes;
+// the render rebuild that follows still traverses the whole tree.
 var color by remember { mutableStateOf(IsoColor.BLUE) }
 
 IsometricScene {
     Shape(geometry = Prism(Point.ORIGIN), color = color)       // recomposes
-    Shape(geometry = Prism(Point(2.0, 0.0, 0.0)))              // untouched
-    Shape(geometry = Prism(Point(4.0, 0.0, 0.0)))              // untouched
+    Shape(geometry = Prism(Point(2.0, 0.0, 0.0)))              // untouched by composition
+    Shape(geometry = Prism(Point(4.0, 0.0, 0.0)))              // untouched by composition
 }
 ```
+
+The trade-off: per-subtree render caching would add bookkeeping to every node for a win that only materializes in very large, mostly-static scenes, while the coarse flag keeps the common cases fast — idle scenes draw from cache for free, and animated scenes were going to re-project anyway.
+
+## Alpha Accumulation
+
+Opacity flows through the tree the same way transforms do. During traversal, `RenderContext` carries an accumulated alpha; when a `GroupNode` with `alpha < 1` is entered, the context multiplies the group's alpha into the accumulated value, and every leaf multiplies its own `alpha` on top before folding the result into its emitted command colors. The effective alpha at any leaf is therefore the product of its own alpha and every ancestor group's alpha — a shape at `0.5f` inside a group at `0.5f` renders at `0.25f`.
+
+Two consequences fall out of this design:
+
+1. **Fading a subtree is structural, not per-node.** Setting one group's alpha fades everything inside it, including nodes added later, without touching their individual props.
+2. **A group at `alpha = 0` short-circuits.** Its entire subtree is skipped during traversal — a fully transparent branch costs nothing to render.
 
 ## The Compose Runtime Integration
 
@@ -137,6 +153,7 @@ See [Advanced Patterns](/examples/advanced-patterns/) for worked examples of eac
 The context provides these transform methods:
 
 - **`withTransform(position, rotation, scale, rotationOrigin, scaleOrigin)`** -- returns a new context with the given local transform composed onto the accumulated stack
+- **`withAlpha(alpha)`** -- returns a new context with the given alpha multiplied into the accumulated alpha (see [Alpha Accumulation](#alpha-accumulation))
 - **`applyTransformsToShape(shape)`** -- applies all accumulated transforms to a `Shape`
 - **`applyTransformsToPath(path)`** -- applies all accumulated transforms to a `Path`
 - **`applyTransformsToPoint(point)`** -- applies all accumulated transforms to a single `Point`

@@ -22,7 +22,7 @@ as a change signal when you need to react to engine parameter changes.
 | gestures | GestureConfig | GestureConfig.Disabled | Gesture handlers |
 | useNativeCanvas | Boolean | false | Use Android native Canvas (faster on Android) |
 | cameraState | CameraState? | null | Camera pan/zoom state |
-| nodeDragState | NodeDragState? | null | State object for the single-node tap-to-select-then-drag affordance. See [Drag & Camera how-to](/guides/drag-and-camera/). |
+| nodeDragState | NodeDragState? | null | State object for the single-node tap-to-select-then-drag affordance. Create with [`rememberNodeDragState`](/reference/composables/#remembernodedragstate); see the [Drag & Camera how-to](/guides/drag-and-camera/). |
 
 ### RenderOptions
 
@@ -51,17 +51,17 @@ change and rebuilds. Failing to do so leaves the cache stale and changes are not
 | engine | SceneProjector | IsometricEngine() | Custom projection engine |
 | enablePathCaching | Boolean | false | Cache path projections |
 | enableSpatialIndex | Boolean | true | Spatial index for hit testing |
-| spatialIndexCellSize | Double | default | Grid cell size |
-| forceRebuild | Boolean | false | Force scene rebuild every frame |
-| frameVersion | Long | 0L | Manual frame versioning |
+| spatialIndexCellSize | Double | 100.0 (`IsometricRenderer.DEFAULT_SPATIAL_INDEX_CELL_SIZE`) | Grid cell size for the hit-test spatial index, in world units. Must be positive and finite. |
+| forceRebuild | Boolean | false | Clears the PreparedScene cache before every frame while `true` (disables caching) |
+| frameVersion | Long | 0L | Redraw trigger read by the draw phase; bumping redraws the cached scene without re-projection |
 | onFlagsReady | ((RuntimeFlagSnapshot) -> Unit)? | null | Receives active runtime flags after config is applied |
-| onRenderError | ((String, Throwable) -> Unit)? | null | Called when a render command fails (commandId + exception) |
+| onRenderError | ((commandId: String, error: Throwable) -> Unit)? | null | Called when a render command fails |
 | onHitTestReady | ((hitTest: (x: Double, y: Double) -> IsometricNode?) -> Unit)? | null | Receive hit-test function |
-| onEngineReady | callback? | null | Receive engine reference |
-| onRendererReady | callback? | null | Receive renderer reference |
-| onBeforeDraw | DrawScope callback? | null | Custom drawing before scene |
-| onAfterDraw | DrawScope callback? | null | Custom drawing after scene |
-| onPreparedSceneReady | callback? | null | Receive projected scene |
+| onEngineReady | ((SceneProjector) -> Unit)? | null | Receive engine reference |
+| onRendererReady | ((IsometricRenderer) -> Unit)? | null | Receive renderer reference |
+| onBeforeDraw | (DrawScope.() -> Unit)? | null | Custom drawing before scene |
+| onAfterDraw | (DrawScope.() -> Unit)? | null | Custom drawing after scene |
+| onPreparedSceneReady | ((PreparedScene) -> Unit)? | null | Receive the latest cached projected scene (delivered after recomposition; may lag the draw by one frame) |
 
 ### StrokeStyle
 

@@ -2,7 +2,7 @@
 title: Custom Shapes
 description: Create custom geometry with Path, extrude, and CustomNode
 sidebar:
-  order: 6
+  order: 11
 ---
 
 There are three approaches to creating custom geometry in Isometric, each offering a different level of control.
@@ -83,9 +83,15 @@ CustomNode(
 ```
 
 `CustomNode` also accepts the per-node interaction props (`alpha`, `onClick`, `onLongClick`,
-`testTag`, `nodeId`). For `onClick`/`onLongClick` to fire, set `ownerNodeId = nodeId` on the
-`RenderCommand`s you emit (as above) so hit testing can map a tapped face back to the node —
-then you no longer need a scene-level `onTap` plus a manual node lookup.
+`onDoubleClick`, `testTag`, `nodeId`). For the click handlers to fire, set
+`ownerNodeId = nodeId` on the `RenderCommand`s you emit (as above) so hit testing can map a
+tapped face back to the node — then you no longer need a scene-level `onTap` plus a manual
+node lookup.
+
+Alongside `applyTransformsToPath`, `RenderContext` also exposes
+`applyTransformsToShape(shape)` and `applyTransformsToPoint(point)` for transforming whole
+`Shape` geometry or a single reference `Point` — handy when your render lambda derives
+command geometry from points rather than paths.
 
 Use `CustomNode` when you need to:
 

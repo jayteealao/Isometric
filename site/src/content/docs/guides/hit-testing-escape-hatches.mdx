@@ -2,7 +2,7 @@
 title: Hit-Testing Escape Hatches
 description: findItemAt, HitOrder, onHitTestReady, screenToTile — low-level hit-test control
 sidebar:
-  order: 8
+  order: 10
 ---
 
 Reach for these low-level APIs when per-node `onClick` is not enough: when you need the item

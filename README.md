@@ -33,9 +33,12 @@ Isometric is a Kotlin library for rendering interactive isometric (2.5D) scenes 
 
 ```kotlin
 dependencies {
-    implementation("io.github.jayteealao:isometric-compose:1.1.0")
+    implementation("io.github.jayteealao:isometric-compose:1.2.0-alpha.01")
 }
 ```
+
+> Per-node interaction props, `NodeDragState`, and the hit-testing escape hatches ship in
+> `1.2.0-alpha.01` and later. The last stable release, `1.1.0`, predates them.
 
 ### Your First Scene
 

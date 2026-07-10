@@ -51,7 +51,7 @@ fun TowerDemo() {
 }
 ```
 
-Because `Tower` is a `@Composable` extension on `IsometricScope`, it composes naturally inside `IsometricScene` and can be mixed with other shapes and groups. A `Group` itself accepts `testTag` and `nodeId` (but not `onClick`/`onLongClick`/`alpha` — apply those to its children).
+Because `Tower` is a `@Composable` extension on `IsometricScope`, it composes naturally inside `IsometricScene` and can be mixed with other shapes and groups. A `Group` itself accepts `testTag`, `nodeId`, and `alpha` (which multiplies into every descendant's rendered color), but not `onClick`/`onLongClick`/`onDoubleClick` — apply the click handlers to its children.
 
 ## CustomNode with RenderCommands
 

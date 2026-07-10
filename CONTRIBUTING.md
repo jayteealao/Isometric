@@ -55,6 +55,19 @@ them in your commit:
 ./gradlew apiDump
 ```
 
+## Documentation Changes
+
+The canonical documentation source is the `.mdx` files under `site/src/content/docs/`.
+The `docs/` folder is a generated mirror for GitHub browsing — never edit its `.md`
+files directly. After editing any `.mdx`, regenerate the mirror and commit both:
+
+```bash
+node scripts/sync-docs.js
+```
+
+See [docs/contributing/docs-guide.md](docs/contributing/docs-guide.md) for the full
+documentation workflow.
+
 ## Submitting Changes
 
 1. Create a branch from `master` (or the current development branch).
@@ -67,6 +80,10 @@ them in your commit:
 - Follow standard Kotlin conventions.
 - Add KDoc to all new public API.
 - Keep commits focused — one logical change per commit.
+- Write commit messages in [Conventional Commits](https://www.conventionalcommits.org/)
+  format (`feat: …`, `fix(compose): …`, `docs: …`). The changelog is generated from
+  commit messages by git-cliff, so a malformed subject line produces a malformed
+  changelog entry.
 
 ## License
 

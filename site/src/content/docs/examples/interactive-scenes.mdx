@@ -40,10 +40,40 @@ fun TapToSelect() {
 ```
 
 :::tip
-The older approach uses a scene-level `GestureConfig.onTap` that reads `event.node?.nodeId`
-and matches it against your own ids. Per-node `onClick` removes that indirection — the shape
-that was tapped is the one whose callback runs.
+For scene-wide tap handling (including taps on empty space), use `GestureConfig.onTap`,
+which receives the hit node in `event.node`. For "this shape was tapped", per-node
+`onClick` is the direct route.
 :::
+
+## Double-Tap to Zoom a Tile
+
+`onDoubleClick` fires on the second tap within the platform double-tap window. When a node
+has **both** `onClick` and `onDoubleClick`, the scene delays `onClick` until the window
+expires so the two cannot both fire for one gesture; a node with only `onClick` keeps firing
+immediately.
+
+```kotlin
+@Composable
+fun DoubleTapToPromote() {
+    var promoted by remember { mutableStateOf(false) }
+    var taps by remember { mutableIntStateOf(0) }
+
+    IsometricScene(modifier = Modifier.fillMaxSize()) {
+        Shape(
+            geometry = Prism(Point.ORIGIN, 2.0, 2.0, if (promoted) 2.5 else 1.0),
+            color = if (promoted) IsoColor.ORANGE else IsoColor(33, 150, 243),
+            nodeId = "dt-tile",
+            onClick = { taps++ },                    // fires only if no second tap arrives
+            onDoubleClick = { promoted = !promoted } // wins on a double-tap
+        )
+    }
+}
+```
+
+The single-tap counter does not advance on a double-tap — `onClick` is suppressed once the
+second tap lands. See
+[Per-Node Interactions — onDoubleClick](/guides/interactions/#ondoubleclick) for the
+disambiguation rules.
 
 ## Long-Press to Lock
 

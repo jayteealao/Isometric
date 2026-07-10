@@ -48,8 +48,9 @@ Shape(
 - **visible** — toggle rendering without removing the node from the tree
 
 `Shape` also carries the per-node interaction and identity props — **alpha** (opacity
-multiplier in `0f..1f`), **onClick**, **onLongClick**, **testTag**, and **nodeId** — plus
-**rotationOrigin**/**scaleOrigin** to set the pivot for rotation and scaling:
+multiplier in `0f..1f`), **onClick**, **onLongClick**, **onDoubleClick**, **testTag**, and
+**nodeId** — plus **rotationOrigin**/**scaleOrigin** to set the pivot for rotation and
+scaling (when left `null`, the shape's natural pivot is used):
 
 ```kotlin
 Shape(

@@ -73,10 +73,20 @@ Compose runtime.
 
 | Factory | Mirrors | Used by |
 |---------|---------|---------|
-| `OnClickRowScene` | `OnClickSample` row of three prisms | `DepthSorterTest`, snapshot baselines |
+| `OnClickRowScene` | `OnClickSample` shape row | `DepthSorterTest`, snapshot baselines |
 | `LongPressGridScene` | `LongPressSample` 3×3 grid | `DepthSorterTest`, snapshot baselines |
-| `AlphaSampleScene` | `AlphaSample` mixed transparent/opaque scene | `DepthSorterTest`, snapshot baselines |
+| `AlphaSampleScene` | `AlphaSample` mixed-geometry scene | `DepthSorterTest`, snapshot baselines |
 | `NodeIdRowScene` | `NodeIdSample` factory + headquarters pair | `DepthSorterTest`, snapshot baselines |
+| `PerNodeCallbackScene` | `PerNodeCallbackSample` slab + Path/Batch/CustomNode trio | Snapshot baselines |
+| `DoubleTapScene` | `DoubleTapSample` onClick + onDoubleClick target | Snapshot baselines (dispatch covered by `NodeCallbacksInteractionTest`) |
+| `LongPressConfigScene` | `LongPressConfigSample` hold-target prism | Snapshot baselines |
+| `DragLifecycleScene` | `DragLifecycleSample` floor + two draggable prisms | Snapshot baselines, drag-lifecycle tests |
+| `DragNodeScene` | `DragNodeSample` five-prism cross with selection tint | Snapshot baselines, node-drag tests |
+| `CameraControlScene` | `CameraControlSample` slab + three landmarks | Snapshot baselines |
+| `PinchZoomRecipeScene` | `PinchZoomRecipeSample` slab + landmark prism | Snapshot baselines |
+| `HoverRecipeScene` | `HoverRecipeSample` hover target (not-hovered baseline) | Snapshot baselines |
+| `ElevatedTileScene` | Raised-tile fixture pinning `screenToTile` surface-elevation behavior | Tile hit-testing tests |
+| `OccludedPickScene` | Nested-prism fixture for `HitOrder.BACK_TO_FRONT` queries | Hit-order tests |
 
 Each factory returns a `List<RenderCommand>` produced by running the live composable
 under `IsometricEngine.projectScene()`, so changes to the sample geometry stay in

@@ -19,8 +19,9 @@ per-node interaction and identity:
 | `testTag` | `String?` | `null` | Tag for test/diagnostic identification. Does not affect rendering or hit testing. |
 | `nodeId` | `String?` | `null` | Caller-supplied stable identifier. When provided, must be non-blank and unique within the scene. Falls back to an auto-generated id when omitted. |
 
-`Group` accepts only `testTag` and `nodeId` &mdash; for opacity or click handling on a
-group, apply those props to the contained `Shape`/`Path`/`Batch` nodes individually.
+`Group` accepts `alpha`, `testTag`, and `nodeId`, but not the click handlers &mdash; a
+group's `alpha` is multiplied into every descendant's rendered color, while click
+handling must go on the contained `Shape`/`Path`/`Batch` nodes individually.
 
 `IsometricScene` always installs its `pointerInput` handler, so per-node `onClick`/`onLongClick`
 fire without any `GestureConfig`. When a tap hits a node, the scene-level `onTap` (if any) runs
@@ -93,8 +94,8 @@ engine injection, renderer flags, and lifecycle hooks. See
 
 Transforms accumulate through the hierarchy. A shape inside a rotated group inherits the group's rotation.
 
-`Group` does not accept `onClick` or `onLongClick` directly &mdash; apply those to the
-contained `Shape`, `Path`, or `Batch` nodes individually.
+`Group` does not accept `onClick`, `onLongClick`, or `onDoubleClick` directly &mdash;
+apply those to the contained `Shape`, `Path`, or `Batch` nodes individually.
 
 ### Path (composable)
 
@@ -273,3 +274,49 @@ Stack(count = 5, axis = StackAxis.Z, gap = 1.0) { floor ->
     Shape(geometry = Prism(Point.ORIGIN), color = IsoColor(33, 150, floor * 40))
 }
 ```
+
+### rememberNodeDragState
+
+Composable factory for the single-node drag affordance. Hand the result to
+`SceneConfig.nodeDragState`; the scene wires the interaction internally (tap selects the
+node under the pointer, tapping empty space clears the selection, dragging the selected
+node moves it, dragging empty space still pans the camera).
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `bounds` | `NodeDragBounds` | `NodeDragBounds.Default` | Engine-space box dragged nodes are confined to. The state holder is re-created only when a structurally different `bounds` is supplied. |
+
+Returns `NodeDragState`.
+
+```kotlin
+val dragState = rememberNodeDragState()
+IsometricScene(config = SceneConfig(nodeDragState = dragState)) { /* nodes */ }
+Text("Selected: ${dragState.selectedNodeId ?: "none"}")
+```
+
+### NodeDragState
+
+`@Stable` holder for the drag affordance's selection and configuration. Constructed only
+via `rememberNodeDragState`.
+
+| Member | Type | Description |
+|---|---|---|
+| `selectedNodeId` | `String?` | The `nodeId` of the currently selected node, or `null` when nothing is selected. Read-only; backed by snapshot state, so reading it in a composable recomposes on selection change. Only the scene mutates the selection. |
+| `bounds` | `NodeDragBounds` | The engine-space box dragged nodes are clamped to. |
+
+### NodeDragBounds
+
+`@Immutable` engine-space rectangle a dragged node's position offset is clamped to on
+every drag step, so a node cannot be flung off the scene.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `minX` | `Double` | `-DEFAULT_EXTENT` | Minimum allowed x offset, in engine units. |
+| `maxX` | `Double` | `DEFAULT_EXTENT` | Maximum allowed x offset. Must be `>= minX`, or the constructor throws `IllegalArgumentException`. |
+| `minY` | `Double` | `-DEFAULT_EXTENT` | Minimum allowed y offset, in engine units. |
+| `maxY` | `Double` | `DEFAULT_EXTENT` | Maximum allowed y offset. Must be `>= minY`, or the constructor throws `IllegalArgumentException`. |
+
+Companion members: `DEFAULT_EXTENT: Double = 32.0` (half-extent of the default box) and
+`Default: NodeDragBounds` (a generous ±32.0 box on each axis).
+
+See the [Drag and Camera guide](../guides/drag-and-camera.md) for usage recipes.

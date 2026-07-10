@@ -2,7 +2,7 @@
 title: Drag & Camera
 description: Drag-to-pan, pinch-to-zoom, reset, the drag lifecycle, and tap-to-select-then-drag
 sidebar:
-  order: 7
+  order: 9
 ---
 
 Task-oriented recipes for moving the viewport and moving a single node. Every snippet below mirrors

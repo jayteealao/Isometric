@@ -139,3 +139,50 @@ fun GroupedScene() {
     }
 }
 ```
+
+### Checkerboard Floor with TileGrid
+
+`TileGrid` renders each tile in its own local coordinate space — a `Shape` at
+`Point.ORIGIN` lands on the tile automatically. Alternate colors from the tile coordinate:
+
+```kotlin
+@Composable
+fun CheckerboardFloor() {
+    IsometricScene {
+        TileGrid(width = 8, height = 8) { coord ->
+            Shape(
+                geometry = Prism(Point.ORIGIN, 1.0, 1.0, 0.2),
+                color = if ((coord.x + coord.y) % 2 == 0)
+                    IsoColor(240, 240, 240)
+                else
+                    IsoColor(60, 60, 60)
+            )
+        }
+    }
+}
+```
+
+Add `onTileClick = { coord -> ... }` to make the board interactive — see the
+[Tile Grid guide](../guides/tile-grid.md).
+
+### Tower of Floors with Stack
+
+`Stack` arranges `count` children at equal spacing along a world axis — the content lambda
+receives the zero-based index:
+
+```kotlin
+@Composable
+fun TowerOfFloors() {
+    IsometricScene {
+        Stack(count = 6, axis = StackAxis.Z, gap = 1.0) { floor ->
+            Shape(
+                geometry = Prism(Point.ORIGIN, 2.0, 2.0, 0.8),
+                color = IsoColor(33, 150, 243 - floor * 30)
+            )
+        }
+    }
+}
+```
+
+Use `StackAxis.X` or `StackAxis.Y` for rows, or a negative `gap` to stack downward — see
+the [Stack guide](../guides/stack.md).

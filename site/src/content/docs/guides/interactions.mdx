@@ -2,7 +2,7 @@
 title: Per-Node Interactions
 description: Per-node alpha, click handlers, test tags, and stable identifiers
 sidebar:
-  order: 6
+  order: 7
 ---
 
 `Shape`, `Path`, `Batch`, and `CustomNode` each accept six optional properties for
@@ -21,9 +21,11 @@ the scene always installs its pointer-input handler, so per-node callbacks fire 
 when no `GestureConfig` is supplied. (When nothing is registered, hit-testing and
 dispatch are simply no-ops.)
 
-`Group` is the exception: it accepts only `testTag` and `nodeId`. A group has no faces
-of its own to render or hit-test, so `alpha`, `onClick`, and `onLongClick` do not apply
-to it &mdash; put those on the child `Shape`/`Path`/`Batch`/`CustomNode` nodes instead.
+`Group` is a partial exception: it accepts `alpha`, `testTag`, and `nodeId`, but not the
+click handlers. A group has no faces of its own to hit-test, so `onClick`, `onLongClick`,
+and `onDoubleClick` do not apply to it &mdash; put those on the child
+`Shape`/`Path`/`Batch`/`CustomNode` nodes instead. A group's `alpha`, by contrast, is
+multiplied into every descendant's rendered color (see [Alpha on groups](#alpha-on-groups)).
 
 ## Alpha
 
@@ -51,6 +53,23 @@ Alpha is multiplied against the existing alpha channel of `color`, so an `IsoCol
 that already has an alpha below 255 stays proportionally translucent. Values outside
 `0f..1f` throw `IllegalArgumentException` at the property setter, surfacing the bug
 at assignment time rather than at render time.
+
+### Alpha on groups
+
+`Group` also accepts `alpha`, and it propagates: a group's alpha is multiplied into
+every descendant's effective alpha during rendering. Nested groups multiply together,
+so a shape with `alpha = 0.5f` inside a group with `alpha = 0.5f` renders at an
+effective `0.25f`. This makes fading a whole subtree a one-liner:
+
+```kotlin
+IsometricScene(modifier = Modifier.fillMaxSize()) {
+    // Fade the entire district, including everything nested inside it
+    Group(position = Point(4.0, 0.0, 0.0), alpha = 0.3f) {
+        Shape(geometry = Prism(Point.ORIGIN), color = IsoColor.BLUE)
+        Shape(geometry = Prism(Point(1.0, 0.0, 0.0)), color = IsoColor.RED)
+    }
+}
+```
 
 ## onClick and onLongClick
 
@@ -138,7 +157,7 @@ you need per-shape handlers, render the shapes individually rather than batched.
 
 ### Per-node handlers on CustomNode
 
-`CustomNode` carries the same five props. For its `onClick`/`onLongClick` to fire, the
+`CustomNode` carries the same six props. For its `onClick`/`onLongClick` to fire, the
 `RenderCommand`s your `render` lambda returns must set `ownerNodeId = nodeId` (the id is
 passed into the lambda) so hit testing can map a tapped face back to the node:
 

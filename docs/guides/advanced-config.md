@@ -2,7 +2,7 @@
 title: Advanced Configuration
 description: AdvancedSceneConfig lifecycle hooks, custom engines, and escape hatches
 sidebar:
-  order: 8
+  order: 14
 ---
 
 `AdvancedSceneConfig` extends `SceneConfig` with lifecycle hooks, cache control, and the ability to inject a custom engine. Most scenes only need `SceneConfig`. Reach for the advanced variant when you need to observe or intercept the rendering pipeline.
@@ -31,7 +31,7 @@ All hooks are optional and default to `null`. They fire at specific points in th
 | `onRendererReady` | `(IsometricRenderer) -> Unit` | Renderer is initialized | Inspect or configure the renderer directly |
 | `onBeforeDraw` | `DrawScope.() -> Unit` | Immediately before scene drawing | Draw backgrounds, grids, or guidelines underneath the scene |
 | `onAfterDraw` | `DrawScope.() -> Unit` | Immediately after scene drawing | Draw debug overlays, bounding boxes, or HUD elements on top |
-| `onPreparedSceneReady` | `(PreparedScene) -> Unit` | Projection completes | Export, serialize, or inspect the projected render commands |
+| `onPreparedSceneReady` | `(PreparedScene) -> Unit` | After recomposition, with the latest cached `PreparedScene` — delivery may lag the draw that produced it by one frame | Export, serialize, or inspect the projected render commands |
 
 ## Drawing debug overlays
 
@@ -138,7 +138,7 @@ IsometricScene(
 }
 ```
 
-For testing, you can inject a mock `SceneProjector` to verify that your composables add the expected shapes without actually rendering:
+For testing, you can inject a mock `SceneProjector` to verify that your composables add the expected shapes without actually rendering. Note the import: `Shape` here is the geometry class `io.github.jayteealao.isometric.Shape`, not the composable of the same name — in a file that uses both, alias one of them (e.g. `import io.github.jayteealao.isometric.Shape as ShapeGeometry`):
 
 ```kotlin
 class MockProjector : SceneProjector {
@@ -175,8 +175,8 @@ class MockProjector : SceneProjector {
 
 Two parameters give you manual control over the PreparedScene cache:
 
-- **`forceRebuild = true`** -- disables caching entirely. The scene re-projects every frame. Use this temporarily when debugging visual glitches to rule out stale cache as the cause.
-- **`frameVersion`** -- an external cache key. The scene re-projects whenever this value changes. Useful when you modify something the dirty-tracking system cannot detect (such as a parameter on a custom `SceneProjector`).
+- **`forceRebuild = true`** -- disables caching entirely: the cache is cleared before every frame, so the scene re-projects each time it draws. Use this temporarily when debugging visual glitches to rule out stale cache as the cause.
+- **`frameVersion`** -- a redraw trigger, not a cache key. The draw phase reads it as Compose state, so bumping it redraws the canvas with the (possibly cached) scene — it does **not** re-project on its own. When you modify something the cache cannot detect (such as a parameter on a custom `SceneProjector`), pair a `frameVersion` bump with `forceRebuild` to get both the rebuild and the redraw.
 
 ```kotlin
 @Composable
@@ -185,7 +185,8 @@ fun CacheControlScene() {
 
     IsometricScene(
         config = AdvancedSceneConfig(
-            frameVersion = version
+            forceRebuild = true,   // re-project on every draw while debugging
+            frameVersion = version // bump to trigger the draw
         )
     ) {
         Shape(geometry = Prism(Point.ORIGIN))
@@ -196,6 +197,9 @@ fun CacheControlScene() {
     }
 }
 ```
+
+See [Rendering Pipeline — Cache Invalidation](../concepts/rendering-pipeline.md#cache-invalidation)
+for the full list of conditions that invalidate the cache.
 
 > **Caution**
 >

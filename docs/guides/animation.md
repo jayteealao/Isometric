@@ -2,7 +2,7 @@
 title: Animation
 description: Animate shapes with vsync-aligned frame callbacks
 sidebar:
-  order: 2
+  order: 4
 ---
 
 Isometric uses `withFrameNanos` for vsync-aligned animation. This ties updates to the display refresh rate, producing smooth motion without wasted work. Do not use `delay`-based loops for animation.
@@ -63,8 +63,37 @@ fun WaveScene() {
 }
 ```
 
+These grids iterate fixed ranges, so no `key` is needed. When animating a list that grows,
+shrinks, or reorders, pass `ForEach`'s `key` parameter (e.g. `key = { it.id }`) — without
+stable keys, Compose treats every item as changed and re-renders the whole list on each
+mutation.
+
+## Alpha Fade
+
+The per-node `alpha` prop animates like any other property — drive it from an animated
+value for fade-in/fade-out:
+
+```kotlin
+@Composable
+fun FadeInScene(visible: Boolean) {
+    val alpha by animateFloatAsState(if (visible) 1f else 0f)
+
+    IsometricScene {
+        Shape(
+            geometry = Prism(Point.ORIGIN),
+            color = IsoColor(33, 150, 243),
+            alpha = alpha
+        )
+    }
+}
+```
+
+To fade several shapes together, put the animated `alpha` on a wrapping `Group` — it
+multiplies into every descendant (see
+[Per-Node Interactions — Alpha on groups](interactions.md#alpha-on-groups)).
+
 For more animation recipes — color cycling, pulsing scale, orbiting shapes, staggered entrances — see [Animation Patterns](../examples/animation-patterns.md).
 
 > **Tip**
 >
-Isometric tracks dirty state per node. When `angle` or `time` changes, only the affected `Shape` composables recompose — the rest of the scene tree is skipped. Use `remember` for expensive geometry computations so they are not recalculated every frame. Only the properties that actually change (like `rotation` or `position`) should depend on the animated value.
+Isometric tracks dirty state per node. When `angle` or `time` changes, only the affected `Shape` composables recompose — the rest of the scene tree is skipped. Use `remember` for expensive geometry computations so they are not recalculated every frame. Only the properties that actually change (like `rotation` or `position`) should depend on the animated value. For many shapes animated with the **same** transform and color, render them through a single `Batch` — one node instead of N (see [Composables reference — Batch](../reference/composables.md#batch)).

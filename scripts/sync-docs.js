@@ -76,9 +76,15 @@ function rewriteLinks(content, srcRel) {
 }
 
 // ── Convert MDX → plain Markdown ─────────────────────────────────────────────
+// Import-stripping and admonition conversion apply to prose segments only —
+// fenced code blocks may legitimately contain `import` lines or `:::note`
+// syntax as examples (e.g. the docs-guide page) and must pass through intact.
 function convert(content, srcRel) {
-  return rewriteLinks(
-    content
+  const segments = content.split(/(^```[\s\S]*?^```)/gm);
+  const transformed = segments.map((seg, i) => {
+    if (i % 2 === 1) return seg; // inside a code fence — leave untouched
+
+    return seg
       // Strip import statements
       .replace(/^import\s+\{[^}]*\}\s+from\s+['"][^'"]+['"]\s*;?\s*\n/gm, '')
       .replace(/^import\s+\S+\s+from\s+['"][^'"]+['"]\s*;?\s*\n/gm, '')
@@ -87,7 +93,11 @@ function convert(content, srcRel) {
       .replace(/^:::tip\b[^\n]*\n/gm,     '> **Tip**\n>\n')
       .replace(/^:::caution\b[^\n]*\n/gm, '> **Caution**\n>\n')
       .replace(/^:::danger\b[^\n]*\n/gm,  '> **Danger**\n>\n')
-      .replace(/^:::\s*\n/gm,             '\n')
+      .replace(/^:::\s*\n/gm,             '\n');
+  }).join('');
+
+  return rewriteLinks(
+    transformed
       // Collapse runs of 3+ blank lines to 2
       .replace(/\n{3,}/g, '\n\n')
       .trimEnd() + '\n',

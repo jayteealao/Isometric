@@ -13,7 +13,7 @@ Isometric is published to [Maven Central](https://central.sonatype.com/artifact/
 <TabItem label="build.gradle.kts">
 ```kotlin
 dependencies {
-    implementation("io.github.jayteealao:isometric-compose:1.1.0")
+    implementation("io.github.jayteealao:isometric-compose:1.2.0-alpha.01")
 }
 ```
 </TabItem>
@@ -21,7 +21,7 @@ dependencies {
 ```toml
 # gradle/libs.versions.toml
 [versions]
-isometric = "1.1.0"
+isometric = "1.2.0-alpha.01"
 
 [libraries]
 isometric-core = { module = "io.github.jayteealao:isometric-core", version.ref = "isometric" }
@@ -37,6 +37,13 @@ dependencies {
 ```
 </TabItem>
 </Tabs>
+
+> **Note**
+>
+`1.2.0-alpha.01` is a pre-release. It adds the per-node interaction props (`onClick`,
+`onLongClick`, `onDoubleClick`, `alpha`, `testTag`, `nodeId`), `NodeDragState`, and the
+hit-testing escape hatches documented throughout this site. If you need the last stable
+release, pin `1.1.0` — but note that those APIs are absent from it.
 
 ## Composite Build (Unreleased / Development)
 
