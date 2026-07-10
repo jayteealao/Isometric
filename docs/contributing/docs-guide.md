@@ -100,6 +100,7 @@ The `slug` matches the file path relative to `site/src/content/docs/`, without t
 Starlight provides several built-in components. Import them at the top of your MDX file:
 
 ```mdx
+import { Tabs, TabItem, Card, CardGrid } from '@astrojs/starlight/components';
 ```
 
 <Tabs>
@@ -121,22 +122,21 @@ IsoColor color = new IsoColor(33, 150, 243);
 </TabItem>
 <TabItem label="Admonitions">
 ```mdx
-> **Note**
->
+:::note
 Informational note.
+:::
 
-> **Tip**
->
+:::tip
 Helpful suggestion.
+:::
 
-> **Caution**
->
+:::caution
 Proceed with care.
+:::
 
-> **Danger**
->
+:::danger
 Critical warning.
-
+:::
 ```
 </TabItem>
 </Tabs>
@@ -176,6 +176,22 @@ Link to other docs pages using root-relative paths:
 ```mdx
 See the [Composables Reference](/reference/composables) for details.
 ```
+
+## Keeping docs/ in Sync
+
+The `.mdx` files under `site/src/content/docs/` are the **canonical** documentation
+source. The plain-Markdown mirror under `docs/` (used for GitHub browsing) is generated
+from them — never edit `docs/*.md` by hand.
+
+After changing any `.mdx` file, regenerate the mirror and commit both together:
+
+```bash
+node scripts/sync-docs.js
+```
+
+The script strips MDX imports, converts Starlight admonitions to blockquotes, and
+rewrites site-absolute links to relative `.md` paths. It is not run by CI or any git
+hook, so forgetting it leaves the mirror stale — make it part of every docs change.
 
 ## Screenshot Workflow
 

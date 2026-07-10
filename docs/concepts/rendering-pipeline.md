@@ -16,12 +16,14 @@ Compose state change
 Recomposition: composables execute, node tree updates
   |
   v
-Is node tree dirty?  ----[no]----> Cache hit: reuse PreparedScene
+Cache stale?         ----[no]----> Cache hit: reuse PreparedScene
   |                                         |
   [yes]                                     |
   |                                         |
   v                                         |
-Traverse node tree, engine.add() each shape |
+Traverse node tree: fold group alpha into   |
+each leaf's command colors, engine.add()    |
+each resulting command                      |
   |                                         |
   v                                         |
 engine.projectScene(width, height)          |
@@ -40,36 +42,31 @@ When no state has changed, the entire left branch is skipped. The cached `Prepar
 
 ## Cache Invalidation
 
-Four independent conditions must all be clean for a cache hit. If any one changes, the scene re-projects:
+Five independent conditions must all be clean for a cache hit. If any one changes, the scene re-projects:
 
 | Condition | What changed | How it is detected |
 |-----------|-------------|-------------------|
 | Dirty tree flag | A node's content changed (color, position, geometry) | `markDirty()` propagates to root, incrementing an internal scene-version counter the `Canvas` observes |
+| Explicit invalidation | The cache was cleared (e.g., `forceRebuild` on `AdvancedSceneConfig`) | An internal validity flag is false until the next successful rebuild |
+| Viewport dimensions | Canvas width or height changed (e.g., device rotation) | Width/height compared against the cached dimensions |
+| Projection inputs | `RenderOptions` or the light direction changed | The (renderOptions, lightDirection) pair fed to the last projection is compared against the current one |
 | Projection version | Engine angle or scale changed | `projectionVersion` on `SceneProjector` increments |
-| Viewport dimensions | Canvas width or height changed (e.g., device rotation) | Width/height compared against cached `PreparedScene` dimensions |
-| Frame version | `frameVersion` bumped on `AdvancedSceneConfig` | External cache key — incrementing forces re-projection even when the tree is clean |
 
 ```kotlin
-// All three must match for a cache hit:
-val cacheValid = !tree.isDirty
-    && engine.projectionVersion == cachedVersion
-    && width == cachedScene.width
-    && height == cachedScene.height
-    && frameVersion == cachedFrameVersion
+// Simplified from the internal check — a cache hit requires:
+val cacheHit = !tree.isDirty
+    && cacheValid                            // no explicit clear since last rebuild
+    && width == cachedWidth
+    && height == cachedHeight
+    && (renderOptions to lightDirection) == cachedPrepareInputs
+    && engine.projectionVersion == cachedProjectionVersion
 ```
+
+`frameVersion` on `AdvancedSceneConfig` is often described alongside these, but it works differently: it is not a cache key. The draw phase reads it as a Compose state dependency, so bumping it triggers a redraw of the canvas — the cached scene is drawn again, without re-projection. To force actual re-projection of a clean tree, use `forceRebuild`: while `true` it clears the cache before every frame, disabling `PreparedScene` caching entirely. The benchmark harness pairs the two — `forceRebuild` to measure projection cost without cache hits, `frameVersion` bumps to keep a static scene redrawing.
 
 ## RenderCommand
 
-`RenderCommand` is the atomic unit of rendering. Each command represents one face to draw:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `commandId` | `String` | Unique identifier for this command (used in error reporting) |
-| `points` | `List<Point2D>` | Projected 2D screen coordinates of the face vertices |
-| `color` | `IsoColor` | Final color after lighting is applied |
-| `originalPath` | `Path` | The original 3D geometry before projection |
-| `originalShape` | `Shape?` | The parent shape, if this face came from a multi-face shape |
-| `ownerNodeId` | `String?` | The node that produced this command (used for hit testing) |
+`RenderCommand` is the atomic unit of rendering. Each command represents one face to draw: its projected 2D vertices, its final color after lighting (with any accumulated alpha already folded in), the original 3D geometry it came from, and the id of the node that produced it — which is what hit testing uses to map a tap back to a node. See the [Engine reference](../reference/engine.md#rendercommand) for the full field table.
 
 A `Prism` produces six faces (six `RenderCommand` objects). Culling runs in two passes: a pre-projection pass removes shared interior walls between adjacent shapes (e.g. the touching walls of two abutting tiles), then standard screen-space back-face culling drops faces that turn away from the camera — typically leaving three visible. After bounds checking, commands for off-screen faces are discarded.
 
@@ -106,13 +103,7 @@ These are independent and can be combined. See the [Performance guide](../guides
 
 ## PreparedScene
 
-`PreparedScene` is the output of `engine.projectScene()`. It is a self-contained snapshot of the projected scene:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `commands` | `List<RenderCommand>` | Sorted list of face-draw commands, ready for rendering |
-| `width` | `Int` | Viewport width at the time of projection |
-| `height` | `Int` | Viewport height at the time of projection |
+`PreparedScene` is the output of `engine.projectScene()`: a self-contained snapshot holding the depth-sorted `RenderCommand` list and the viewport dimensions it was projected for. See the [Engine reference](../reference/engine.md#preparedscene) for the field table.
 
 The `PreparedScene` is cached between frames and reused when the node tree is clean. It can also be intercepted via the `onPreparedSceneReady` hook for purposes beyond rendering:
 

@@ -104,4 +104,8 @@ capabilities the View API lacked: per-node `onLongClick`, `alpha`, `testTag`, an
 
 ### Backward Compatibility
 
-The `isometric-android-view` module still provides the View API for projects that aren't ready to migrate.
+The `isometric-android-view` module still provides the View API for projects that aren't
+ready to migrate to Compose. It is not a drop-in replacement for the original
+`io.fabianterhorst:isometric` artifact, however: the class lives at
+`io.github.jayteealao.isometric.view.IsometricView`, so XML layout tags and Kotlin/Java
+imports must be updated to the new package even if you keep the View API.

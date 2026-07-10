@@ -2,7 +2,7 @@
 title: Camera & Viewport
 description: Pan and zoom with CameraState
 sidebar:
-  order: 5
+  order: 8
 ---
 
 ## CameraState
@@ -96,6 +96,20 @@ IsometricScene(
     Shape(geometry = Prism(Point.ORIGIN))
 }
 ```
+
+A few `GestureConfig` knobs interact with camera behavior:
+
+- **`dragThreshold`** (default `8f` pixels) — how far the pointer must travel before a drag
+  (and therefore panning) begins. Raise it if taps near shape edges keep turning into
+  accidental pans.
+- **`longPressTimeoutMs`** (default `500L`) — the long-press timeout for per-node
+  `onLongClick`; a long-press that fires suppresses the trailing tap but does not affect
+  panning.
+- **`GestureConfig.Disabled`** — pass explicitly to switch off scene-level gesture handling
+  when a custom handler outside the scene takes over. Note that providing a `cameraState`
+  still enables the built-in drag-to-pan.
+
+See the [Scene Config reference](../reference/scene-config.md#gestureconfig) for the full table.
 
 ## Animated Camera
 

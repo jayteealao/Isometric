@@ -49,10 +49,11 @@ Stack(count = 5, axis = StackAxis.Y, gap = 2.0) { _ ->
 }
 ```
 
-## Gap Validation
+## Validation
 
 `gap` must be non-zero and finite. Zero or `NaN`/infinite values throw `IllegalArgumentException`
-at runtime. Use a negative value to reverse direction instead of zero.
+at runtime. Use a negative value to reverse direction instead of zero. `count` must be at
+least 1 — zero or negative counts also throw `IllegalArgumentException`.
 
 ## Positioning a Stack
 
@@ -112,9 +113,29 @@ TileGrid(width = 5, height = 5) { coord ->
 `Stack` only supports uniform gaps. For non-uniform spacing — items of varying size stacked
 flush — use `ForEach` with a running offset accumulator and explicit `Group` positioning.
 
+## Interacting with Stacked Shapes
+
+`Stack` positions its children; the children themselves stay fully interactive. Attach
+`onClick`, `onLongClick`, or `onDoubleClick` to the shapes you render inside the stack, and
+use the index to identify which layer was tapped. To fade a whole stack, wrap it in a
+`Group` with an `alpha` — the group's alpha multiplies into every stacked child (see
+[Per-Node Interactions — Alpha on groups](/guides/interactions/#alpha-on-groups)):
+
+```kotlin
+Group(alpha = if (highlighted) 1f else 0.4f) {
+    Stack(count = 5, axis = StackAxis.Z, gap = 1.0) { floor ->
+        Shape(
+            geometry = Prism(Point.ORIGIN),
+            onClick = { selectedFloor = floor }
+        )
+    }
+}
+```
+
 ## See Also
 
 - [Tile Grid guide](/guides/tile-grid/) — uniform interactive tile grids with tap routing
 - [Shapes guide](/guides/shapes/) — built-in shape types
+- [Per-Node Interactions](/guides/interactions/) — click handlers, alpha, and ids on stacked shapes
 - [Composables reference — Stack](/reference/composables/#stack)
 - [Composables reference — Group](/reference/composables/#group)

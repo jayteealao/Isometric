@@ -20,9 +20,9 @@ class IsometricEngine(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `angle` | `Double` | `PI / 6` (30 degrees) | Isometric projection angle in radians. Must be finite. |
+| `angle` | `Double` | `PI / 6` (30 degrees) | Isometric projection angle in radians. Must be finite and positive. |
 | `scale` | `Double` | `70.0` | Pixels per world unit. Must be positive and finite. |
-| `colorDifference` | `Double` | `0.20` | Strength of directional lighting on faces. Higher values produce more contrast between lit and shadowed faces. Must be non-negative. |
+| `colorDifference` | `Double` | `0.20` | Strength of directional lighting on faces. Higher values produce more contrast between lit and shadowed faces. Must be non-negative and finite. |
 | `lightColor` | `IsoColor` | `IsoColor.WHITE` | The color of the light source. Tint this to simulate warm or cool lighting. |
 
 Both `angle` and `scale` are mutable properties. Changing them at runtime rebuilds the internal projection matrix and increments `projectionVersion`. If the scene is rendered via `IsometricScene`, the cache detects this change on the next draw and rebuilds automatically.
@@ -96,6 +96,10 @@ fun projectScene(
     lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize()
 ): PreparedScene
 ```
+
+`DEFAULT_LIGHT_DIRECTION` is a public companion constant, `Vector(2.0, -1.0, 3.0)`,
+mirrored from `SceneProjector.DEFAULT_LIGHT_DIRECTION` — the classic top-right isometric
+light before normalization.
 
 ### findItemAt
 
@@ -213,6 +217,33 @@ This abstraction enables:
 
 - **Testing** -- supply a fake projector that returns canned `PreparedScene` data without running real 3D math.
 - **Custom projections** -- implement an alternative projection (e.g., oblique, dimetric) while reusing the Compose runtime.
+
+## RenderCommand
+
+The atomic unit of rendering — one face to draw. Produced by node traversal, consumed by
+`projectScene`, and returned from `findItemAt`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commandId` | `String` | Unique identifier for this command (used in error reporting) |
+| `points` | `List<Point2D>` | Projected 2D screen coordinates of the face vertices |
+| `color` | `IsoColor` | Final color after lighting is applied |
+| `originalPath` | `Path` | The original 3D geometry before projection |
+| `originalShape` | `Shape?` | The parent shape, if this face came from a multi-face shape |
+| `ownerNodeId` | `String?` | The node that produced this command (used for hit testing) |
+
+## PreparedScene
+
+The output of `projectScene()` — a self-contained snapshot of the projected scene.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commands` | `List<RenderCommand>` | Sorted list of face-draw commands, ready for rendering |
+| `width` | `Int` | Viewport width at the time of projection |
+| `height` | `Int` | Viewport height at the time of projection |
+
+See [Rendering Pipeline](../concepts/rendering-pipeline.md) for how these flow through
+projection, caching, and drawing.
 
 ## Direct Usage Outside Compose
 

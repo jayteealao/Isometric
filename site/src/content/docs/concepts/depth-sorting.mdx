@@ -38,13 +38,13 @@ Every face gets a depth value from the formula above — the mean of its vertice
 
 ### Stage 2: Broad Phase (Spatial Grid)
 
-Faces are bucketed into a 2D spatial grid based on their screen-space bounding boxes. Only faces that share a grid cell are candidates for overlap. This reduces the number of pairwise comparisons from O(n^2) to roughly O(n).
+Faces are bucketed into a 2D spatial grid based on their screen-space bounding boxes. Only faces that share a grid cell are candidates for overlap. For typical scenes — shapes spread out and roughly cell-sized — this reduces the pairwise comparisons from O(n^2) to approximately O(n); heavily clustered scenes, or single shapes spanning many cells, see less benefit because the per-cell candidate lists grow.
 
 The grid cell size is controlled by `broadPhaseCellSize` (default: `100.0` pixels).
 
 ### Stage 3: Narrow Phase (Strict Screen-Overlap Gate)
 
-For each pair of candidate faces within the same cell, `IntersectionUtils.hasInteriorIntersection()` performs a strict screen-overlap test: AABB rejection, then a SAT edge-crossing check, then a strict-inside fallback. Pairs that share only a boundary edge or vertex in screen space are correctly rejected — they cannot paint over each other regardless of depth, so adding a draw-order edge for them would produce spurious dependencies that can push unrelated faces to extreme positions in the final order. The lenient `hasIntersection()` variant (which treats any boundary contact as overlap) remains available for callers that want any-contact semantics.
+For each pair of candidate faces within the same cell, `IntersectionUtils.hasInteriorIntersection()` performs a strict screen-overlap test: AABB rejection, then a strict edge-crossing test (cross-product sign checks with a small epsilon, rejecting mere boundary grazes), then a strict-inside fallback. Pairs that share only a boundary edge or vertex in screen space are correctly rejected — they cannot paint over each other regardless of depth, so adding a draw-order edge for them would produce spurious dependencies that can push unrelated faces to extreme positions in the final order. The lenient `hasIntersection()` variant (which treats any boundary contact as overlap) remains available for callers that want any-contact semantics.
 
 ### Stage 4: Topological Sort
 
@@ -65,34 +65,7 @@ Interior-overlapping pairs
 Final draw order
 ```
 
-## Tuning broadPhaseCellSize
-
-The `broadPhaseCellSize` parameter controls the grid granularity of the broad-phase pass:
-
-| Value | Effect |
-|-------|--------|
-| Smaller (e.g., 50.0) | Fewer candidates per cell, but more cells to iterate. Better for dense scenes with many small shapes. |
-| Default (100.0) | Good general-purpose value for typical scenes. |
-| Larger (e.g., 200.0) | Fewer cells, but more candidates per cell. Reduces overhead for sparse scenes with large shapes. |
-
-```kotlin
-IsometricScene(
-    config = SceneConfig(
-        renderOptions = RenderOptions(
-            broadPhaseCellSize = 50.0  // finer grid for dense scenes
-        )
-    )
-) {
-    // Hundreds of small shapes
-    ForEach((0 until 20).toList()) { i ->
-        ForEach((0 until 20).toList()) { j ->
-            Shape(geometry = Prism(
-                Point(i * 0.5, j * 0.5, 0.0), 0.4, 0.4, 0.4
-            ))
-        }
-    }
-}
-```
+The cell size trades cell count against candidates per cell — a knob worth turning only when shape density is unusual in either direction. For the tuning table and configuration examples, see [Performance — Tuning broadPhaseCellSize](/guides/performance/#tuning-broadphasecellsize).
 
 ## Known Limitations
 
@@ -106,44 +79,10 @@ For intersecting geometry, the workaround is to split the shapes so they no long
 
 ## Disabling Depth Sort
 
-Two flags control the sorting pipeline. For full tuning guidance including when to change each flag, see the [Performance guide](/guides/performance/).
+Two flags control the pipeline, and they disable different halves of it. `enableDepthSorting = false` switches sorting off entirely, so faces paint in declaration order — the right choice when the scene *is* its own correct ordering (flat overlays, hand-ordered scenes) or when sorting cost matters more than correctness. `enableBroadPhaseSort = false` keeps the sort but removes the spatial-grid shortcut, falling back to pairwise testing — a debugging lever for isolating whether an artifact comes from the bucketing or from the sort logic itself.
 
-### enableDepthSorting = false
-
-Disables sorting entirely. Faces paint in the order you declare them in the composable tree — identical to insertion order in the scene graph. This is useful for:
-
-- Flat 2D overlays where you control the order manually
-- Scenes where you know the insertion order is already correct
-- Performance-critical paths where sorting cost is unacceptable
-
-```kotlin
-IsometricScene(
-    config = SceneConfig(
-        renderOptions = RenderOptions.NoDepthSorting
-    )
-) {
-    // These render in declaration order: blue behind, then green on top
-    Shape(geometry = Prism(Point(0.0, 0.0, 0.0)), color = IsoColor.BLUE)
-    Shape(geometry = Prism(Point(1.0, 0.0, 0.0)), color = IsoColor.GREEN)
-}
-```
-
-### enableBroadPhaseSort = false
-
-Keeps depth sorting enabled but disables the spatial grid optimization. Falls back to O(n^2) pairwise intersection testing. This is a debugging tool -- if you see sorting artifacts, disabling the broad phase can help determine whether the issue is in the broad-phase bucketing or in the sort logic itself.
-
-```kotlin
-IsometricScene(
-    config = SceneConfig(
-        renderOptions = RenderOptions(
-            enableDepthSorting = true,
-            enableBroadPhaseSort = false  // O(n^2) fallback
-        )
-    )
-) {
-    Shape(geometry = Prism(Point.ORIGIN))
-}
-```
+For configuration snippets and when-to-use guidance, see
+[Performance — Disabling depth sorting or the broad phase](/guides/performance/#disabling-depth-sorting-or-the-broad-phase).
 
 :::tip
 If you see depth sorting artifacts, first check whether the shapes intersect in 3D space. Intersecting faces are the most common cause of visual glitches and cannot be fixed by tuning parameters -- the geometry must be split.

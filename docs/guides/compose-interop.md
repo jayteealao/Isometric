@@ -2,7 +2,7 @@
 title: Compose Interop
 description: Embed IsometricScene in a Compose UI — layout, state, gestures, theming, and lifecycle
 sidebar:
-  order: 8
+  order: 12
 ---
 
 `IsometricScene` is a regular `@Composable` that renders to a `Canvas`. It participates in Compose layout like any other composable — you size it with `Modifier`, place it in `Column`/`Row`/`Box`, and share state across the boundary with normal Compose state.
@@ -118,6 +118,23 @@ fun Dashboard() {
 
 State changes in the slider recompose the scene content. Tap events in the scene update the info panel. No special bridging is needed — it is all standard Compose state.
 
+## Accessing the Engine
+
+**Inside** the `IsometricScene` content block, read `LocalIsometricEngine.current` for
+coordinate conversion:
+
+```kotlin
+@Composable
+fun IsometricScope.CoordinateAwareContent() {
+    val engine = LocalIsometricEngine.current
+    val screenPos = engine.worldToScreen(Point(1.0, 1.0, 1.0), 800, 600)
+    // position content or derive values from screenPos
+}
+```
+
+Reading `LocalIsometricEngine.current` outside an `IsometricScene` throws
+`IllegalStateException` — for sibling composables, use the callback below.
+
 ## Engine Access Outside the Scene
 
 `LocalIsometricEngine` is only available **inside** the `IsometricScene` content block. To use the engine from a sibling composable (e.g. a coordinate readout panel), use the `onEngineReady` callback. The callback hands you a `SceneProjector`; the projection helpers `worldToScreen` and `screenToWorld` are defined on the concrete `IsometricEngine`, so cast to it when you need them:
@@ -202,7 +219,13 @@ LazyColumn {
 }
 ```
 
-When no `onDrag` is set and no `CameraState` is provided, move events are not consumed, so the parent scrollable receives them.
+Move events are consumed only when the scene is actively handling them — when an `onDrag`
+handler is set, a `CameraState` is provided, or a node selected through
+`SceneConfig.nodeDragState` is actively being dragged. With none of those active, move
+events pass through and the parent scrollable receives them. Note the `nodeDragState`
+case when embedding in scrollables: the scene scrolls normally with the parent until the
+user taps a node to select it, after which dragging that node is consumed by the scene —
+see the [Drag & Camera guide](drag-and-camera.md).
 
 ## Overlaying Compose Content
 
@@ -379,7 +402,7 @@ NavHost(navController, startDestination = "map") {
 }
 ```
 
-## Quick Reference
+## Recap
 
 | Task | Pattern |
 |------|---------|

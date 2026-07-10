@@ -2,7 +2,7 @@
 title: Performance
 description: Optimization strategies, RenderOptions tuning, and benchmarking
 sidebar:
-  order: 7
+  order: 13
 ---
 
 Isometric ships with three built-in performance systems that work automatically. Most scenes need no tuning at all. This page explains what the systems do, how to configure them, and when to reach for advanced options.
@@ -45,6 +45,45 @@ Three presets cover common scenarios:
 
 See [Scene Config reference](/reference/scene-config/) for the full parameter table.
 
+### Tuning broadPhaseCellSize
+
+`broadPhaseCellSize` controls the grid granularity of the depth sort's broad phase
+(see [Depth Sorting](/concepts/depth-sorting/) for how the pipeline works):
+
+| Value | Effect |
+|-------|--------|
+| Smaller (e.g., 50.0) | Fewer candidates per cell, but more cells to iterate. Better for dense scenes with many small shapes. |
+| Default (100.0) | Good general-purpose value for typical scenes. |
+| Larger (e.g., 200.0) | Fewer cells, but more candidates per cell. Reduces overhead for sparse scenes with large shapes. |
+
+```kotlin
+IsometricScene(
+    config = SceneConfig(
+        renderOptions = RenderOptions(
+            broadPhaseCellSize = 50.0  // finer grid for dense scenes
+        )
+    )
+) {
+    // Hundreds of small shapes
+    ForEach((0 until 20).toList()) { i ->
+        ForEach((0 until 20).toList()) { j ->
+            Shape(geometry = Prism(
+                Point(i * 0.5, j * 0.5, 0.0), 0.4, 0.4, 0.4
+            ))
+        }
+    }
+}
+```
+
+### Disabling depth sorting or the broad phase
+
+- **`enableDepthSorting = false`** (or the `RenderOptions.NoDepthSorting` preset) paints
+  faces in declaration order. Useful for flat 2D overlays, scenes whose insertion order is
+  already correct, or performance-critical paths where sorting cost is unacceptable.
+- **`enableBroadPhaseSort = false`** keeps sorting but drops the spatial grid, falling back
+  to pairwise intersection testing. This is a debugging tool: if you see sorting artifacts,
+  disabling the broad phase helps isolate whether the bucketing or the sort logic is at fault.
+
 ## Native Canvas
 
 Setting `useNativeCanvas = true` bypasses Compose `DrawScope` and renders directly to `android.graphics.Canvas` with reused `Paint` objects. This eliminates per-frame allocations and produces roughly a 2x speedup on Android.
@@ -57,7 +96,7 @@ IsometricScene(
 }
 ```
 
-This flag is Android-only. On other platforms it is silently ignored, so you can set it unconditionally in shared code.
+This flag is Android-only, and the scene validates it at composition time: enabling it on a JVM without `android.graphics.Canvas` on the classpath (e.g., desktop) throws `IllegalStateException`. Gate it on platform in shared code rather than setting it unconditionally.
 
 ## Path Caching
 
@@ -99,15 +138,16 @@ IsometricScene(
 
 Two escape hatches let you override the caching system:
 
-- **`forceRebuild = true`** -- bypasses the PreparedScene cache and re-projects every frame. Useful for debugging to confirm a visual issue is not caused by stale cache.
-- **`frameVersion`** -- an external cache key. Increment it to force re-projection without setting `forceRebuild`. This is useful when you change something the dirty-tracking system cannot detect, such as a custom engine parameter.
+- **`forceRebuild = true`** -- clears the PreparedScene cache before every frame, so the scene re-projects each time it draws. Useful for debugging to confirm a visual issue is not caused by stale cache, and used by benchmarks to measure projection cost.
+- **`frameVersion`** -- a redraw trigger, not a cache key. The draw phase reads it as Compose state, so incrementing it redraws the canvas with the (possibly cached) scene. On its own it does **not** force re-projection — pair it with `forceRebuild` when you change something the cache cannot detect, such as a custom engine parameter.
 
 ```kotlin
 var version by remember { mutableLongStateOf(0L) }
 
 IsometricScene(
     config = AdvancedSceneConfig(
-        frameVersion = version
+        forceRebuild = true,   // re-project on every draw
+        frameVersion = version // bump to trigger the draw
     )
 ) {
     Shape(geometry = Prism(Point.ORIGIN))
@@ -116,6 +156,8 @@ IsometricScene(
 // Later, when you need to force a re-render:
 version++
 ```
+
+See [Rendering Pipeline — Cache Invalidation](/concepts/rendering-pipeline/#cache-invalidation) for exactly which conditions invalidate the cache.
 
 ## Anti-patterns
 

@@ -12,9 +12,12 @@ your app.
 ## Basic Usage
 
 Pass `width`, `height`, and an `onTileClick` callback. No `GestureConfig` on `IsometricScene`
-is needed — tap routing activates automatically when `onTileClick` is provided. The content
-lambda receives each tile's `TileCoordinate` and renders in that tile's local coordinate space,
-so a `Shape` at `Point.ORIGIN` appears at the tile's world position without any manual offset.
+is needed — tap routing activates automatically when `onTileClick` is provided. (`onTileClick`
+defaults to `null`, which means no tap handling — a purely visual grid needs only `width`,
+`height`, and content.) Both `width` and `height` must be at least 1, or the composable throws
+`IllegalArgumentException`. The content lambda receives each tile's `TileCoordinate` and
+renders in that tile's local coordinate space, so a `Shape` at `Point.ORIGIN` appears at the
+tile's world position without any manual offset.
 
 ```kotlin
 @Composable
@@ -130,7 +133,9 @@ fun VariableElevationTileScene(heights: Map<TileCoordinate, Double>) {
                         screenY = event.y,
                         viewportWidth = size.width,
                         viewportHeight = size.height,
-                        elevation = 0.0
+                        tileSize = 1.0,          // must match the grid's TileGridConfig.tileSize
+                        elevation = 0.0,
+                        originOffset = Point.ORIGIN // must match TileGridConfig.originOffset
                     )
                     if (coord.isWithin(10, 10)) { /* handle */ }
                 }
@@ -147,6 +152,13 @@ fun VariableElevationTileScene(heights: Map<TileCoordinate, Double>) {
     }
 }
 ```
+
+> **Caution**
+>
+`screenToTile` defaults `tileSize` to `1.0` and `originOffset` to `Point.ORIGIN`. If your
+grid uses a non-default `TileGridConfig`, pass the **same** `tileSize` and `originOffset`
+to `screenToTile` — the call compiles either way, but mismatched values silently resolve
+taps to the wrong tile.
 
 See [Engine — Tile Coordinate Helpers](../reference/engine.md#tile-coordinate-helpers) for full
 parameter details on `screenToTile`.
@@ -170,6 +182,8 @@ TileGrid(
 
 - [Stack guide](stack.md) — arrange shapes in a 1D line along any world axis
 - [Gestures — Tile Grid Tap Routing](gestures.md#tile-grid-tap-routing) — combining tile taps with drag gestures
+- [Per-Node Interactions](interactions.md) — `onClick`/`onLongClick`/`onDoubleClick`, alpha, and ids on the shapes you render inside tiles
+- [Drag & Camera](drag-and-camera.md) — pan/zoom the grid, or tap-select-then-drag a node with `NodeDragState`
 - [Composables reference — TileGrid](../reference/composables.md#tilegrid)
 - [Engine reference — screenToTile](../reference/engine.md#tile-coordinate-helpers)
 - [Coordinate System — Tile Coordinates](../getting-started/coordinate-system.md#tile-coordinates)

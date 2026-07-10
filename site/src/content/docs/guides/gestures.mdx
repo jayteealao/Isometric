@@ -2,7 +2,7 @@
 title: Gestures
 description: Handle tap and drag interactions with spatial hit testing
 sidebar:
-  order: 3
+  order: 6
 ---
 
 Gesture handling is configured through `GestureConfig`, passed inside a `SceneConfig`. By default, gestures are disabled (`GestureConfig.Disabled`).
@@ -72,12 +72,14 @@ pointer position; the `delta` field is the **per-event** movement, present only 
 The `dragThreshold` property (default `8f`) controls how many pixels of movement are required before a drag gesture is recognized. This prevents accidental drags during taps. The long-press timeout is configurable through `GestureConfig.longPressTimeoutMs` (default `500L`).
 
 :::note[Pointer event consumption]
-The scene consumes pointer events **only when actively handling the gesture** — that is, when at
-least one of `GestureConfig.onDrag`, a `CameraState`, or a `NodeDragState` is present and the
-pointer is dragging. An otherwise inert scene (no drag handler, no camera, no node-drag state)
-lets all pointer events pass through to parent scrollables and other composables unobstructed.
-This means you can safely embed an `IsometricScene` without drag handling inside a
-`LazyColumn` or `HorizontalPager` &mdash; the host scrollable will receive the gesture.
+The scene consumes move events **only when actively handling the gesture** — when a
+`GestureConfig.onDrag` handler is set, a `CameraState` is provided, or a node selected
+through a `NodeDragState` is actively being dragged. Note the last condition: merely
+passing a `NodeDragState` to `SceneConfig` does not consume events — a node must be
+selected and mid-drag. An otherwise inert scene lets all pointer events pass through to
+parent scrollables and other composables unobstructed, so you can safely embed an
+`IsometricScene` without drag handling inside a `LazyColumn` or `HorizontalPager`
+&mdash; the host scrollable will receive the gesture.
 :::
 
 ## Example: Tap to Change Color, Drag to Pan
@@ -113,19 +115,13 @@ fun InteractiveScene() {
 }
 ```
 
-## Why `onDrag` Is a Delta, Not a Position
-
-The camera autopan accumulates per-event deltas. Each `onDrag` reports how far the pointer moved
-*since the previous event* in `event.delta`, and panning sums those movements:
-`event.delta?.let { camera.pan(it.dx, it.dy) }`. If `onDrag` instead reported an absolute position,
-every call would jump the camera to that coordinate rather than nudge it — the viewport would snap to
-the finger instead of following it.
-
-That is why the field split exists: `x`/`y` are absolute (useful in `onDragStart` to record *where* a
-drag began, e.g. the origin of a selection rectangle), while `delta` is relative (what you sum to
-track travel). The single-node drag helper moves a selected node with the same delta — see the
-[Drag & Camera how-to](/guides/drag-and-camera/). Keeping both meanings in distinct fields means
-neither callback has to overload one pair of coordinates with two conflicting interpretations.
+:::note[Delta vs. position]
+`event.delta` is relative movement to *accumulate* (`camera.pan(it.dx, it.dy)` nudges rather than
+snaps), while `x`/`y` are the absolute pointer position — useful in `onDragStart` to record where a
+drag began. Summing an absolute position would jump the viewport to the finger instead of following
+it, which is why the two meanings live in distinct fields. The single-node drag helper moves a
+selected node with the same delta — see the [Drag & Camera how-to](/guides/drag-and-camera/).
+:::
 
 ## Hit Testing Performance
 
