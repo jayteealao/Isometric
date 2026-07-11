@@ -112,6 +112,44 @@ class IsometricEngine @JvmOverloads constructor(
             rebuildProjection()
         }
 
+    /**
+     * Horizontal position of the scene origin as a fraction of the viewport width.
+     *
+     * `0.0` places the origin at the left edge; `1.0` at the right edge; the
+     * default `0.5` centres the scene horizontally. Changing this at runtime
+     * bumps [projectionVersion] so downstream caches invalidate.
+     *
+     * Used by [projectScene], [worldToScreen], and [screenToWorld] as a single
+     * shared origin so hit-testing stays consistent with rendering.
+     *
+     * @see originYFraction
+     * @see fitContent
+     */
+    var originXFraction: Double = 0.5
+        set(value) {
+            require(value.isFinite()) { "originXFraction must be finite, got $value" }
+            field = value
+            projectionVersion++
+        }
+
+    /**
+     * Vertical position of the scene origin as a fraction of the viewport height.
+     *
+     * `0.0` places the origin at the top edge; `1.0` at the bottom edge; the
+     * default `0.9` anchors the floor of the scene 90% down the viewport, leaving
+     * ~10% headroom below the floor for sub-zero geometry while keeping most
+     * positive-Z content inside the canvas. Changing this bumps [projectionVersion].
+     *
+     * @see originXFraction
+     * @see fitContent
+     */
+    var originYFraction: Double = 0.9
+        set(value) {
+            require(value.isFinite()) { "originYFraction must be finite, got $value" }
+            field = value
+            projectionVersion++
+        }
+
     init {
         require(angle.isFinite() && angle > 0.0) { "angle must be finite and positive, got $angle" }
         require(scale.isFinite() && scale > 0.0) { "scale must be positive and finite, got $scale" }
@@ -152,8 +190,8 @@ class IsometricEngine @JvmOverloads constructor(
      * @return The 2D screen position
      */
     fun worldToScreen(point: Point, viewportWidth: Int, viewportHeight: Int): Point2D {
-        val originX = viewportWidth / 2.0
-        val originY = viewportHeight * 0.9
+        val originX = viewportWidth * originXFraction
+        val originY = viewportHeight * originYFraction
         return projection.translatePoint(point, originX, originY)
     }
 
@@ -176,9 +214,84 @@ class IsometricEngine @JvmOverloads constructor(
         viewportHeight: Int,
         z: Double = 0.0
     ): Point {
-        val originX = viewportWidth / 2.0
-        val originY = viewportHeight * 0.9
+        val originX = viewportWidth * originXFraction
+        val originY = viewportHeight * originYFraction
         return projection.screenToWorld(screenPoint, originX, originY, z)
+    }
+
+    /**
+     * Adjusts [scale], [originXFraction], and [originYFraction] so the scene's
+     * content fills the viewport with optional [padding] on all sides.
+     *
+     * Unlike [AwtRenderer]'s post-projection centering (which only shrinks
+     * overflowing content), this method also **enlarges** undersized content
+     * so small scenes fill their container. The fit is **proportional**: the
+     * larger of the two scale-to-fit ratios is used, so the content touches
+     * the padding boundary in one axis and is centred in the other.
+     *
+     * Call this **after** adding shapes to the scene graph and **before** calling
+     * [projectScene]. In Compose, use `SceneConfig.viewport`; in the Android View
+     * surface, use `IsometricView.setFitContent(padding)`. Both surfaces call this
+     * automatically when the viewport config is active.
+     *
+     * The method is a no-op when the scene graph is empty.
+     *
+     * @param width  Viewport width in pixels.
+     * @param height Viewport height in pixels.
+     * @param padding Uniform inset applied to all four sides (pixels, default 0.0).
+     */
+    fun fitContent(width: Int, height: Int, padding: Double = 0.0) {
+        val items = sceneGraph.items
+        if (items.isEmpty()) return
+        if (width <= 0 || height <= 0) return
+
+        // Project all vertices at scale=1, origin=(0,0) to find content bounds.
+        // The projection at unit scale is:
+        //   normX = (x - y) * cos(angle)      [since cos(PI-a) = -cos(a)]
+        //   normY = -(x + y) * sin(angle) - z  [since sin(PI-a) = sin(a)]
+        val cosA = kotlin.math.cos(this.angle)
+        val sinA = kotlin.math.sin(this.angle)
+        var minX = Double.POSITIVE_INFINITY
+        var maxX = Double.NEGATIVE_INFINITY
+        var minY = Double.POSITIVE_INFINITY
+        var maxY = Double.NEGATIVE_INFINITY
+        for (item in items) {
+            for (point in item.path.points) {
+                val nx = (point.x - point.y) * cosA
+                val ny = -(point.x + point.y) * sinA - point.z
+                if (nx < minX) minX = nx
+                if (nx > maxX) maxX = nx
+                if (ny < minY) minY = ny
+                if (ny > maxY) maxY = ny
+            }
+        }
+
+        val contentW = maxX - minX
+        val contentH = maxY - minY
+        if (contentW <= 0.0 || contentH <= 0.0) return
+
+        val availW = width - 2.0 * padding
+        val availH = height - 2.0 * padding
+        if (availW <= 0.0 || availH <= 0.0) return
+
+        // Scale so the larger axis fits the available space (proportional fit).
+        val newScale = minOf(availW / contentW, availH / contentH)
+
+        // Centre the scaled content within the padded viewport.
+        //   originX + minX * newScale = padding  →  originX = padding - minX * newScale
+        //   originY + minY * newScale = padding  →  originY = padding - minY * newScale
+        // But also centre in the perpendicular axis:
+        //   scaled extent in each axis:
+        val scaledW = contentW * newScale
+        val scaledH = contentH * newScale
+        val originX = (width - scaledW) / 2.0 - minX * newScale
+        val originY = (height - scaledH) / 2.0 - minY * newScale
+
+        // Store as fractions of the viewport so that worldToScreen / screenToWorld
+        // use the same origin as projectScene for this frame's dimensions.
+        this.scale = newScale
+        this.originXFraction = originX / width
+        this.originYFraction = originY / height
     }
 
     /**
@@ -230,11 +343,11 @@ class IsometricEngine @JvmOverloads constructor(
         lightDirection: Vector
     ): PreparedScene {
         val normalizedLight = lightDirection.normalize()
-        // World origin maps to horizontally-centred, anchored 90% down the viewport.
-        // This gives ~10% headroom below the floor for sub-zero geometry while keeping
-        // most positive-Z content (which projects upward on screen) inside the canvas.
-        val originX = width / 2.0
-        val originY = height * 0.9
+        // Origin position is configurable via [originXFraction] / [originYFraction];
+        // defaults (0.5 / 0.9) reproduce the historical hardcoded values exactly,
+        // preserving byte-identical output for callers that have not set either field.
+        val originX = width * originXFraction
+        val originY = height * originYFraction
 
         val sourceItems = if (renderOptions.enableBackfaceCulling) {
             cullSharedInteriorFaces(sceneGraph.items)

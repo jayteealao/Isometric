@@ -75,6 +75,15 @@ class IsometricRenderer(
      */
     var forceRebuild: Boolean = false
 
+    /**
+     * Viewport configuration applied before each scene projection.
+     * Set by [IsometricScene] when [SceneConfig.viewport] changes.
+     * When non-null and [ViewportConfig.fitContent] is true, [SceneCache.rebuild]
+     * calls [IsometricEngine.fitContent] after shapes are loaded but before
+     * [SceneProjector.projectScene].
+     */
+    var viewportConfig: ViewportConfig? = null
+
     // Closed flag — once true, the renderer must not be used
     private var closed = false
 
@@ -209,7 +218,7 @@ class IsometricRenderer(
         context: RenderContext,
         width: Int,
         height: Int
-    ): Boolean = cache.needsUpdate(rootNode, context, width, height)
+    ): Boolean = cache.needsUpdate(rootNode, context, width, height, viewportConfig)
 
     /**
      * Invalidate cache (call when render options change).
@@ -246,7 +255,7 @@ class IsometricRenderer(
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         if (width <= 0 || height <= 0) return null
         if (forceRebuild) clearCache()
-        if (cache.needsUpdate(rootNode, context, width, height)) {
+        if (cache.needsUpdate(rootNode, context, width, height, viewportConfig)) {
             benchmarkHooks?.onCacheMiss()
             benchmarkHooks?.onPrepareStart()
             rebuildAll(rootNode, context, width, height)
@@ -271,6 +280,7 @@ class IsometricRenderer(
     ) {
         check(!closed) { "Renderer has been closed and cannot be used for rendering" }
         rebuildAll(rootNode, context, width, height)
+        // Note: viewportConfig is used via the renderer's own field in rebuildAll
     }
 
     private fun rebuildAll(
@@ -279,7 +289,7 @@ class IsometricRenderer(
         width: Int,
         height: Int
     ) {
-        val scene = cache.rebuild(rootNode, context, width, height, onRenderError)
+        val scene = cache.rebuild(rootNode, context, width, height, onRenderError, viewportConfig)
         if (scene != null) {
             try {
                 hitTestResolver.rebuildIndices(rootNode, scene)

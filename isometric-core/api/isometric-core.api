@@ -79,13 +79,19 @@ public final class io/github/jayteealao/isometric/IsometricEngine : io/github/ja
 	public fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public fun clear ()V
 	public fun findItemAt (Lio/github/jayteealao/isometric/PreparedScene;DDLio/github/jayteealao/isometric/HitOrder;D)Lio/github/jayteealao/isometric/RenderCommand;
+	public final fun fitContent (IID)V
+	public static synthetic fun fitContent$default (Lio/github/jayteealao/isometric/IsometricEngine;IIDILjava/lang/Object;)V
 	public final fun getAngle ()D
+	public final fun getOriginXFraction ()D
+	public final fun getOriginYFraction ()D
 	public fun getProjectionVersion ()J
 	public final fun getScale ()D
 	public fun projectScene (IILio/github/jayteealao/isometric/RenderOptions;Lio/github/jayteealao/isometric/Vector;)Lio/github/jayteealao/isometric/PreparedScene;
 	public final fun screenToWorld (Lio/github/jayteealao/isometric/Point2D;IID)Lio/github/jayteealao/isometric/Point;
 	public static synthetic fun screenToWorld$default (Lio/github/jayteealao/isometric/IsometricEngine;Lio/github/jayteealao/isometric/Point2D;IIDILjava/lang/Object;)Lio/github/jayteealao/isometric/Point;
 	public final fun setAngle (D)V
+	public final fun setOriginXFraction (D)V
+	public final fun setOriginYFraction (D)V
 	public final fun setScale (D)V
 	public final fun worldToScreen (Lio/github/jayteealao/isometric/Point;II)Lio/github/jayteealao/isometric/Point2D;
 }

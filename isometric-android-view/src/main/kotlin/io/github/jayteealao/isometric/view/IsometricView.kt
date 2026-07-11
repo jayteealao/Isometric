@@ -57,6 +57,14 @@ class IsometricView @JvmOverloads constructor(
     private var sceneDirty = true
 
     /**
+     * When true, [IsometricEngine.fitContent] is applied before each scene projection,
+     * scaling and centering the scene within the view's bounds.
+     * Set via [setFitContent]; cleared via [clearFitContent].
+     */
+    private var fitContentEnabled: Boolean = false
+    private var fitContentPadding: Double = 0.0
+
+    /**
      * Enable/disable depth sorting.
      *
      * Marks the scene dirty and calls [invalidate]; the re-projection occurs on
@@ -136,6 +144,57 @@ class IsometricView @JvmOverloads constructor(
     }
 
     /**
+     * Scale and center the scene to fill this view's bounds, with optional uniform padding.
+     *
+     * Applies [IsometricEngine.fitContent] before the next scene projection. The effect
+     * persists across subsequent invalidations — call [clearFitContent] to revert.
+     *
+     * Marks the scene dirty and calls [invalidate]; the re-projection occurs on
+     * the next [onDraw].
+     *
+     * @param padding Uniform inset in pixels applied to all four sides before fitting.
+     */
+    fun setFitContent(padding: Double = 0.0) {
+        fitContentEnabled = true
+        fitContentPadding = padding
+        sceneDirty = true
+        invalidate()
+    }
+
+    /**
+     * Revert to the engine's default origin fractions and scale (undoes [setFitContent]).
+     *
+     * Marks the scene dirty and calls [invalidate]; the re-projection occurs on
+     * the next [onDraw].
+     */
+    fun clearFitContent() {
+        fitContentEnabled = false
+        sceneDirty = true
+        invalidate()
+    }
+
+    /**
+     * Override the viewport origin as fractions of the view's width and height.
+     *
+     * `x = 0.5, y = 0.5` centres the scene; the historic default is
+     * `x = 0.5, y = 0.9` (anchored near the bottom).
+     *
+     * Marks the scene dirty and calls [invalidate]; the re-projection occurs on
+     * the next [onDraw].
+     *
+     * @param x Fraction of viewport width for the scene origin (0.0 = left, 1.0 = right).
+     * @param y Fraction of viewport height for the scene origin (0.0 = top, 1.0 = bottom).
+     */
+    fun setOriginFraction(x: Double, y: Double) {
+        (engine as? IsometricEngine)?.let { iso ->
+            iso.originXFraction = x
+            iso.originYFraction = y
+        }
+        sceneDirty = true
+        invalidate()
+    }
+
+    /**
      * Clear all items from the scene.
      *
      * Marks the scene dirty and calls [invalidate]; the next draw will render an
@@ -189,6 +248,11 @@ class IsometricView @JvmOverloads constructor(
             val w = width
             val h = height
             if (w > 0 && h > 0) {
+                // Apply fitContent before projection so the engine's origin and scale
+                // are computed from the current scene content and viewport size.
+                if (fitContentEnabled) {
+                    (engine as? IsometricEngine)?.fitContent(w, h, fitContentPadding)
+                }
                 cachedScene = engine.projectScene(w, h, renderOptions)
                 sceneDirty = false
             }

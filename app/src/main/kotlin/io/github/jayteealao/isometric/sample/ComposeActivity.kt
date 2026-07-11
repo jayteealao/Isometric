@@ -14,6 +14,7 @@ import io.github.jayteealao.isometric.compose.runtime.IsometricScene
 import io.github.jayteealao.isometric.compose.runtime.SceneConfig
 import io.github.jayteealao.isometric.compose.runtime.Shape
 import io.github.jayteealao.isometric.compose.runtime.TapEvent
+import io.github.jayteealao.isometric.compose.runtime.ViewportConfig
 import io.github.jayteealao.isometric.shapes.*
 import kotlin.math.PI
 
@@ -101,7 +102,10 @@ fun MultipleShapesSample() {
 
 @Composable
 fun ComplexSceneSample() {
-    IsometricScene(modifier = Modifier.fillMaxSize()) {
+    IsometricScene(
+        modifier = Modifier.fillMaxSize(),
+        config = SceneConfig(viewport = ViewportConfig.FitContent)
+    ) {
         Shape(geometry = Prism(position = Point(1.0, -1.0, 0.0), width = 4.0, depth = 5.0, height = 2.0), color = IsoColor(33.0, 150.0, 243.0))
         Shape(geometry = Prism(position = Point(0.0, 0.0, 0.0), width = 1.0, depth = 4.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))
         Shape(geometry = Prism(position = Point(-1.0, 1.0, 0.0), width = 1.0, depth = 3.0, height = 1.0), color = IsoColor(33.0, 150.0, 243.0))

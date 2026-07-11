@@ -13,12 +13,16 @@ public final class io/github/jayteealao/isometric/view/IsometricView : android/v
 	public final fun add (Lio/github/jayteealao/isometric/Path;Lio/github/jayteealao/isometric/IsoColor;)V
 	public final fun add (Lio/github/jayteealao/isometric/Shape;Lio/github/jayteealao/isometric/IsoColor;)V
 	public final fun clear ()V
+	public final fun clearFitContent ()V
 	public fun onTouchEvent (Landroid/view/MotionEvent;)Z
 	public fun performClick ()Z
 	public final fun setBoundsCheck (Z)V
 	public final fun setClickListener (Lio/github/jayteealao/isometric/view/IsometricView$OnItemClickListener;)V
 	public final fun setCull (Z)V
+	public final fun setFitContent (D)V
+	public static synthetic fun setFitContent$default (Lio/github/jayteealao/isometric/view/IsometricView;DILjava/lang/Object;)V
 	public final fun setHitOrder (Lio/github/jayteealao/isometric/HitOrder;)V
+	public final fun setOriginFraction (DD)V
 	public final fun setSort (Z)V
 	public final fun setStrokeStyle (Lio/github/jayteealao/isometric/view/StrokeStyle;)V
 	public final fun setTouchRadius (D)V

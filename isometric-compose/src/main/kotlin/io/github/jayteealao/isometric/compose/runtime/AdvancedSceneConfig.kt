@@ -75,6 +75,7 @@ class AdvancedSceneConfig(
     useNativeCanvas: Boolean = false,
     cameraState: CameraState? = null,
     nodeDragState: NodeDragState? = null,
+    viewport: ViewportConfig? = null,
     val engine: SceneProjector = IsometricEngine(),
     val enablePathCaching: Boolean = false,
     val enableSpatialIndex: Boolean = true,
@@ -98,11 +99,12 @@ class AdvancedSceneConfig(
     gestures = gestures,
     useNativeCanvas = useNativeCanvas,
     cameraState = cameraState,
-    nodeDragState = nodeDragState
+    nodeDragState = nodeDragState,
+    viewport = viewport
 ) {
     /**
-     * Binary-compatible secondary constructor preserving the pre-nodeDragState descriptor.
-     * Delegates with `nodeDragState = null`.
+     * Binary-compatible secondary constructor preserving the pre-viewport, pre-nodeDragState
+     * descriptor. Delegates with `nodeDragState = null`, `viewport = null`.
      */
     constructor(
         renderOptions: RenderOptions = RenderOptions.Default,
@@ -129,7 +131,7 @@ class AdvancedSceneConfig(
         onPreparedSceneReady: ((PreparedScene) -> Unit)? = null
     ) : this(
         renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures,
-        useNativeCanvas, cameraState, null, engine, enablePathCaching, enableSpatialIndex,
+        useNativeCanvas, cameraState, null, null, engine, enablePathCaching, enableSpatialIndex,
         spatialIndexCellSize, forceRebuild, frameVersion, onHitTestReady, onFlagsReady,
         onRenderError, onEngineReady, onRendererReady, onBeforeDraw, onAfterDraw,
         onPreparedSceneReady

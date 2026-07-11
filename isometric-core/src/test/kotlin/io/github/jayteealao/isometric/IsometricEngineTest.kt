@@ -282,6 +282,136 @@ class IsometricEngineTest {
     }
 
     @Test
+    fun `originXFraction and originYFraction reject non-finite values`() {
+        val engine = IsometricEngine()
+        assertFailsWith<IllegalArgumentException> { engine.originXFraction = Double.NaN }
+        assertFailsWith<IllegalArgumentException> { engine.originXFraction = Double.POSITIVE_INFINITY }
+        assertFailsWith<IllegalArgumentException> { engine.originYFraction = Double.NaN }
+        assertFailsWith<IllegalArgumentException> { engine.originYFraction = Double.NEGATIVE_INFINITY }
+    }
+
+    @Test
+    fun `originXFraction and originYFraction bump projectionVersion`() {
+        val engine = IsometricEngine()
+        val v0 = engine.projectionVersion
+        engine.originXFraction = 0.3
+        val v1 = engine.projectionVersion
+        assertTrue(v1 != v0, "Setting originXFraction must bump projectionVersion")
+        engine.originYFraction = 0.7
+        val v2 = engine.projectionVersion
+        assertTrue(v2 != v1, "Setting originYFraction must bump projectionVersion")
+    }
+
+    @Test
+    fun `worldToScreen and screenToWorld round-trip under non-default origin fractions`() {
+        val engine = IsometricEngine()
+        engine.originXFraction = 0.3
+        engine.originYFraction = 0.7
+        val w = 800; val h = 600
+
+        val worldPoint = Point(2.0, 3.0, 1.0)
+        val screen: Point2D = engine.worldToScreen(worldPoint, w, h)
+        // screenToWorld inverts the projection onto the Z plane of the original point
+        val recovered: Point = engine.screenToWorld(screen, w, h, z = worldPoint.z)
+
+        // Round-trip tolerance: floating-point rounding in projection/inverse
+        val epsilon = 1e-6
+        assertTrue(
+            kotlin.math.abs(recovered.x - worldPoint.x) < epsilon &&
+            kotlin.math.abs(recovered.y - worldPoint.y) < epsilon,
+            "screenToWorld(worldToScreen(p)) should recover the original point: " +
+            "expected (${worldPoint.x}, ${worldPoint.y}) got (${recovered.x}, ${recovered.y})"
+        )
+    }
+
+    @Test
+    fun `worldToScreen output changes when origin fractions change`() {
+        val engine = IsometricEngine()
+        val w = 800; val h = 600
+        val p = Point(1.0, 1.0, 0.0)
+
+        val screenDefault = engine.worldToScreen(p, w, h)
+        engine.originXFraction = 0.3
+        engine.originYFraction = 0.7
+        val screenShifted = engine.worldToScreen(p, w, h)
+
+        assertTrue(
+            screenDefault.x != screenShifted.x || screenDefault.y != screenShifted.y,
+            "Changing origin fractions must shift screen coordinates"
+        )
+    }
+
+    @Test
+    fun `fitContent scales scene to fill viewport`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point.ORIGIN, 5.0, 5.0, 3.0), IsoColor.BLUE)
+        val w = 400; val h = 300
+        // 1-pixel tolerance for floating-point rounding in the projection/scale math.
+        val tolerance = 1.0
+
+        engine.fitContent(w, h, padding = 0.0)
+        val scene = engine.projectScene(w, h, RenderOptions.NoCulling)
+
+        // All projected points should lie within the viewport after fitContent
+        for (cmd in scene.commands) {
+            for (pt in cmd.points) {
+                assertTrue(pt.x >= -tolerance && pt.x <= w + tolerance,
+                    "Projected x=${pt.x} out of viewport width $w after fitContent")
+                assertTrue(pt.y >= -tolerance && pt.y <= h + tolerance,
+                    "Projected y=${pt.y} out of viewport height $h after fitContent")
+            }
+        }
+    }
+
+    @Test
+    fun `fitContent with padding leaves margin inside viewport`() {
+        val padding = 20.0
+        val engine = IsometricEngine()
+        engine.add(Prism(Point.ORIGIN, 5.0, 5.0, 3.0), IsoColor.BLUE)
+        val w = 400; val h = 300
+        // 1-pixel tolerance for floating-point rounding.
+        val tolerance = 1.0
+
+        engine.fitContent(w, h, padding = padding)
+        val scene = engine.projectScene(w, h, RenderOptions.NoCulling)
+
+        for (cmd in scene.commands) {
+            for (pt in cmd.points) {
+                assertTrue(pt.x >= padding - tolerance && pt.x <= w - padding + tolerance,
+                    "Projected x=${pt.x} violates padding=$padding at width $w")
+                assertTrue(pt.y >= padding - tolerance && pt.y <= h - padding + tolerance,
+                    "Projected y=${pt.y} violates padding=$padding at height $h")
+            }
+        }
+    }
+
+    @Test
+    fun `fitContent is a no-op on an empty scene`() {
+        val engine = IsometricEngine()
+        val scaleBefore = engine.scale
+        val xBefore = engine.originXFraction
+        val yBefore = engine.originYFraction
+
+        engine.fitContent(400, 300)
+
+        assertEquals(scaleBefore, engine.scale, "scale must not change on empty scene")
+        assertEquals(xBefore, engine.originXFraction, "originXFraction must not change on empty scene")
+        assertEquals(yBefore, engine.originYFraction, "originYFraction must not change on empty scene")
+    }
+
+    @Test
+    fun `fitContent is a no-op on zero-size viewport`() {
+        val engine = IsometricEngine()
+        engine.add(Prism(Point.ORIGIN, 2.0, 2.0, 2.0), IsoColor.BLUE)
+        val scaleBefore = engine.scale
+
+        engine.fitContent(0, 300)   // width zero
+        assertEquals(scaleBefore, engine.scale, "scale must not change on zero-width viewport")
+        engine.fitContent(400, 0)   // height zero
+        assertEquals(scaleBefore, engine.scale, "scale must not change on zero-height viewport")
+    }
+
+    @Test
     fun `shapes reject invalid dimensions`() {
         assertFailsWith<IllegalArgumentException> { Prism(Point.ORIGIN, width = 0.0) }
         assertFailsWith<IllegalArgumentException> { io.github.jayteealao.isometric.shapes.Pyramid(Point.ORIGIN, height = -1.0) }

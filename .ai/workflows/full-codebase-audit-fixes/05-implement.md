@@ -5,12 +5,12 @@ slug: full-codebase-audit-fixes
 status: complete
 stage-number: 5
 created-at: "2026-07-07T13:45:25Z"
-updated-at: "2026-07-07T22:07:54Z"
-slices-implemented: 8
-slices-total: 8
-metric-total-files-changed: 83
-metric-total-lines-added: 2067
-metric-total-lines-removed: 182
+updated-at: "2026-07-11T00:00:00Z"
+slices-implemented: 9
+slices-total: 9
+metric-total-files-changed: 97
+metric-total-lines-added: 2457
+metric-total-lines-removed: 191
 tags: []
 refs:
   index: 00-index.md
@@ -64,6 +64,14 @@ next-invocation: "/wf verify full-codebase-audit-fixes path-caching-test-fix"
   harness that retires the environment wall. `compileDebugKotlin + compileDebugAndroidTestKotlin`
   BUILD SUCCESSFUL; `apiCheck` BUILD SUCCESSFUL (internal accessor absent from public dump).
   Runtime AC-T1/T3 carry a device-run deferral cleared by first successful device run.
+
+- `probe-view-api-sample` slice (9/9) is complete. H1 (HashMap non-determinism in
+  `buildBroadPhaseCandidatePairs`) fixed via `pairs.sort()` before Kahn processing.
+  Viewport API added across all three layers: `IsometricEngine.originXFraction`,
+  `originYFraction`, `fitContent`; `ViewportConfig` + `SceneConfig.viewport` in Compose;
+  `IsometricView.setFitContent/clearFitContent/setOriginFraction` in the View layer.
+  5/5 ViewportOrderInvariance tests pass. 8/8 new engine tests pass. apiDump + apiCheck
+  BUILD SUCCESSFUL on all three modules. docs synced.
 
 ## Recommended Next Stage
 

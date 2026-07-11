@@ -4,11 +4,11 @@ type: index
 slug: full-codebase-audit-fixes
 title: "Fix the confirmed defects from the 2026-07-06 full-codebase multi-agent audit"
 status: active
-current-stage: review
-stage-number: 7
+current-stage: plan
+stage-number: 4
 created-at: "2026-07-06T23:57:04Z"
-updated-at: "2026-07-07T22:19:21Z"
-selected-slice: "path-caching-test-fix"
+updated-at: "2026-07-11T08:39:05Z"
+selected-slice: "probe-view-api-sample"
 branch-strategy: shared
 branch: "feat/ws10-interaction-props"
 base-branch: "master"
@@ -35,8 +35,8 @@ stack:
     - {name: gh-stack, hint: "Stacked-branch / dependent-PR management"}
   available-mcp: []
   user-confirmed: true
-next-command: wf-verify
-next-invocation: "/wf verify full-codebase-audit-fixes path-caching-test-fix"
+next-command: wf-handoff
+next-invocation: "/wf handoff full-codebase-audit-fixes"
 workflow-files:
   - 00-index.md
   - 01-intake.md
@@ -56,6 +56,7 @@ workflow-files:
   - 04-plan-path-caching-test-fix.md
   - 04-plan-path-caching-test-fix.yaml
   - 04-plan-path-caching-test-fix.html.fragment
+  - 03-slice-probe-slug-wide-2026-07-07.md
   - audit-findings.json
   - po-answers.md
   - 04-plan-core-math.yaml
@@ -106,6 +107,16 @@ workflow-files:
   - 07-review.md
   - 07-review.yaml
   - 07-review.html.fragment
+  - 03-slice-probe-view-api-sample.md
+  - 03-slice-probe-view-api-sample.01-divergence.html.fragment
+  - 04-plan-probe-view-api-sample.md
+  - 04-plan-probe-view-api-sample.yaml
+  - 04-plan-probe-view-api-sample.html.fragment
+  - 04-plan-probe-view-api-sample.01-consult.html.fragment
+  - 05-implement-probe-view-api-sample.md
+compressed-slices:
+  - {slug: probe-slug-wide-2026-07-07, slice-type: probe, created-at: "2026-07-07T22:45:00Z"}
+  - {slug: probe-view-api-sample, slice-type: probe, created-at: "2026-07-11T00:57:56Z"}
 runtime-evidence-deferrals:
   - slice: core-math
     reason: "AC-A1b KDoc CCW prose — prose accuracy is human-judged; dokka V2 build clean; CCW/right-handed text confirmed by source inspection on all three rotate functions. Rungs tried: (1) JVM-unit behavioral proof (rotateX/Y CCW assertEquals pass), (2) dokka V2 build clean, (3) source inspection. Residual is irreducibly human prose judgment. Constraint-resolution: po-accepted at plan time."
@@ -140,9 +151,9 @@ runtime-evidence-deferrals:
     cleared-by: null
     repeat-of: null
   - slice: snapshot-sweep-gate
-    reason: "AC-S3 instrumented re-run (gesture-touching code changed by c214af8) — IsometricScene.kt modified post-original-verify by c214af8 (onClick-only fast-fire path added). Rungs tried: (1) git show c214af8 diff inspection confirms onDoubleClick != null path unchanged — DoubleTapInstrumentedTest evidence (bbc5fda) valid for that specific path; (2) ./gradlew test BUILD SUCCESSFUL (JVM tests pass); (3) AVD boot not available in this session (same wall as gesture-coordination deferral). Residual: live connectedDebugAndroidTest re-run to confirm double-tap path and exercise new onClick-only path. Plan constraint-resolution for AC-S3 names prerequisite-slice: gesture-coordination verify — evidence stands for double-tap; new path is untested. Constraint-resolution: same proxy+deferral wall as gesture-coordination. Cleared by connectedDebugAndroidTest run in capable environment after c214af8."
+    reason: "AC-S3 instrumented re-run (gesture-touching code changed by c214af8) — IsometricScene.kt modified post-original-verify by c214af8 (onClick-only fast-fire path added). Rungs tried: (1) git show c214af8 diff inspection confirms onDoubleClick != null path unchanged — DoubleTapInstrumentedTest evidence (bbc5fda) valid for that specific path; (2) ./gradlew test BUILD SUCCESSFUL (JVM tests pass); (3) AVD boot not available in this session (same wall as gesture-coordination deferral). Residual: live connectedDebugAndroidTest re-run to confirm double-tap path and exercise new onClick-only path. Plan constraint-resolution for AC-S3 names prerequisite-slice: gesture-coordination verify — evidence stands for double-tap; new path is untested. Constraint-resolution: same proxy+deferral wall as gesture-coordination. Cleared by connectedDebugAndroidTest run in capable environment after c214af8. CLEARED by /wf probe (2026-07-07T23:32Z): connectedDebugAndroidTest green 36/0 on Pixel_9_Pro emulator AND 36/0 on physical SM-F956B (isolated rerun); the double-tap and new onClick-only paths both pass on both device classes after c214af8. First simultaneous-device run showed 4 DoubleTapInstrumentedTest flakes (5s scene-draw wait too tight under contention) that did not reproduce in isolation — a test-robustness residual, not a behavioral failure. Evidence: 03-slice-probe-slug-wide-2026-07-07.md."
     deferred-at: "2026-07-07T22:00:52Z"
-    cleared-by: null
+    cleared-by: "probe-slug-wide-2026-07-07"
     repeat-of: gesture-coordination
 progress:
   intake: complete

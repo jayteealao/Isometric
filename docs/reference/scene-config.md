@@ -23,6 +23,7 @@ as a change signal when you need to react to engine parameter changes.
 | useNativeCanvas | Boolean | false | Use Android native Canvas (faster on Android) |
 | cameraState | CameraState? | null | Camera pan/zoom state |
 | nodeDragState | NodeDragState? | null | State object for the single-node tap-to-select-then-drag affordance. Create with [`rememberNodeDragState`](composables.md#remembernodedragstate); see the [Drag & Camera how-to](../guides/drag-and-camera.md). |
+| viewport | ViewportConfig? | null | Controls scene placement and scaling within the viewport. Pass `ViewportConfig.FitContent` to auto-scale the scene to fill the available area. When `null`, the engine defaults apply (`originXFraction = 0.5`, `originYFraction = 0.9`). See [ViewportConfig](#viewportconfig). |
 
 ### RenderOptions
 
@@ -62,6 +63,35 @@ change and rebuilds. Failing to do so leaves the cache stale and changes are not
 | onBeforeDraw | (DrawScope.() -> Unit)? | null | Custom drawing before scene |
 | onAfterDraw | (DrawScope.() -> Unit)? | null | Custom drawing after scene |
 | onPreparedSceneReady | ((PreparedScene) -> Unit)? | null | Receive the latest cached projected scene (delivered after recomposition; may lag the draw by one frame) |
+
+### ViewportConfig
+
+Controls scene placement and scaling within the `IsometricScene` viewport. Three levels of control:
+
+- **Default (`null`)** — the engine positions the scene using its default origin fractions (`originXFraction = 0.5`, `originYFraction = 0.9`), reproducing the classic isometric.js look.
+- **`ViewportConfig.FitContent`** — the engine computes scale and origin each frame so all scene content fits the viewport (no clipping), preserving the scene's aspect ratio.
+- **Low-level** — set `IsometricEngine.originXFraction`, `originYFraction`, and `scale` directly on the engine exposed by `AdvancedSceneConfig.engine`.
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| fitContent | Boolean | false | When `true`, the engine enlarges or shrinks the scene so all content fills the available area, preserving aspect ratio. |
+| padding | Double | 0.0 | Uniform inset in pixels applied to all four sides before fitting. Only used when `fitContent` is `true`. |
+
+**Common usage:**
+
+```kotlin
+// Auto-fit the scene to its container
+IsometricScene(
+    modifier = Modifier.fillMaxSize(),
+    config = SceneConfig(viewport = ViewportConfig.FitContent)
+) { /* content */ }
+
+// Auto-fit with a 16 dp margin
+IsometricScene(
+    modifier = Modifier.fillMaxSize(),
+    config = SceneConfig(viewport = ViewportConfig(fitContent = true, padding = 16.0))
+) { /* content */ }
+```
 
 ### StrokeStyle
 
