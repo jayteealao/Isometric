@@ -2,6 +2,7 @@ package io.github.jayteealao.isometric.compose.runtime
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import io.github.jayteealao.isometric.IsometricEngine
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
 import io.github.jayteealao.isometric.RenderOptions
@@ -37,7 +38,8 @@ internal class SceneCache(
     /** Bundles inputs to engine.projectScene() for cache invalidation. */
     private data class PrepareInputs(
         val renderOptions: RenderOptions,
-        val lightDirection: Vector
+        val lightDirection: Vector,
+        val viewport: ViewportConfig?
     )
 
     // Cache state
@@ -58,9 +60,10 @@ internal class SceneCache(
         rootNode: GroupNode,
         context: RenderContext,
         width: Int,
-        height: Int
+        height: Int,
+        viewportConfig: ViewportConfig? = null
     ): Boolean {
-        val currentInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+        val currentInputs = PrepareInputs(context.renderOptions, context.lightDirection, viewportConfig)
         return rootNode.isDirty ||
                 !cacheValid ||
                 width != cachedWidth ||
@@ -84,7 +87,8 @@ internal class SceneCache(
         context: RenderContext,
         width: Int,
         height: Int,
-        onRenderError: ((String, Throwable) -> Unit)?
+        onRenderError: ((String, Throwable) -> Unit)?,
+        viewportConfig: ViewportConfig? = null
     ): PreparedScene? {
         return try {
             // Collect all render commands from the tree FIRST (may throw).
@@ -104,6 +108,12 @@ internal class SceneCache(
                 )
             }
 
+            // Apply viewport config after shapes are loaded but before projection
+            // so fitContent bounds are computed on the populated scene graph.
+            if (viewportConfig?.fitContent == true) {
+                (engine as? IsometricEngine)?.fitContent(width, height, viewportConfig.padding)
+            }
+
             val scene = engine.projectScene(
                 width = width,
                 height = height,
@@ -114,7 +124,7 @@ internal class SceneCache(
             currentPreparedScene = scene
             cachedWidth = width
             cachedHeight = height
-            cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection)
+            cachedPrepareInputs = PrepareInputs(context.renderOptions, context.lightDirection, viewportConfig)
             cachedProjectionVersion = engine.projectionVersion
 
             if (enablePathCaching) {

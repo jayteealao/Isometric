@@ -36,6 +36,10 @@ import io.github.jayteealao.isometric.Vector
  *   the scene then selects the tapped node and drags the selected node on its own, leaving
  *   empty-space drags to pan the camera. When `null`, no node selection or node drag occurs.
  *   Create one with [rememberNodeDragState]. Equality is checked by reference identity.
+ * @param viewport Optional [ViewportConfig] controlling scene placement and scaling within
+ *   the viewport. When `null`, the engine uses its default origin fractions
+ *   (`originXFraction = 0.5`, `originYFraction = 0.9`) and the caller's [IsometricEngine.scale].
+ *   Pass [ViewportConfig.FitContent] to have the scene fill its available area automatically.
  */
 @Stable
 open class SceneConfig(
@@ -47,11 +51,28 @@ open class SceneConfig(
     val gestures: GestureConfig = GestureConfig.Disabled,
     val useNativeCanvas: Boolean = false,
     val cameraState: CameraState? = null,
-    val nodeDragState: NodeDragState? = null
+    val nodeDragState: NodeDragState? = null,
+    val viewport: ViewportConfig? = null
 ) {
     /**
+     * Binary-compatible secondary constructor preserving the pre-viewport descriptor.
+     * Delegates with `viewport = null`.
+     */
+    constructor(
+        renderOptions: RenderOptions = RenderOptions.Default,
+        lightDirection: Vector = DEFAULT_LIGHT_DIRECTION.normalize(),
+        defaultColor: IsoColor = IsoColor(33.0, 150.0, 243.0),
+        colorPalette: ColorPalette = ColorPalette(),
+        strokeStyle: StrokeStyle = StrokeStyle.FillAndStroke(),
+        gestures: GestureConfig = GestureConfig.Disabled,
+        useNativeCanvas: Boolean = false,
+        cameraState: CameraState? = null,
+        nodeDragState: NodeDragState? = null
+    ) : this(renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures, useNativeCanvas, cameraState, nodeDragState, null)
+
+    /**
      * Binary-compatible secondary constructor preserving the pre-nodeDragState descriptor.
-     * Delegates with `nodeDragState = null`.
+     * Delegates with `nodeDragState = null`, `viewport = null`.
      */
     constructor(
         renderOptions: RenderOptions = RenderOptions.Default,
@@ -62,7 +83,8 @@ open class SceneConfig(
         gestures: GestureConfig = GestureConfig.Disabled,
         useNativeCanvas: Boolean = false,
         cameraState: CameraState? = null
-    ) : this(renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures, useNativeCanvas, cameraState, null)
+    ) : this(renderOptions, lightDirection, defaultColor, colorPalette, strokeStyle, gestures, useNativeCanvas, cameraState, null, null)
+
     override fun equals(other: Any?): Boolean =
         other != null &&
             other.javaClass == javaClass &&
@@ -75,7 +97,8 @@ open class SceneConfig(
             gestures == other.gestures &&
             useNativeCanvas == other.useNativeCanvas &&
             cameraState === other.cameraState &&
-            nodeDragState === other.nodeDragState
+            nodeDragState === other.nodeDragState &&
+            viewport == other.viewport
 
     override fun hashCode(): Int {
         var result = renderOptions.hashCode()
@@ -87,9 +110,10 @@ open class SceneConfig(
         result = 31 * result + useNativeCanvas.hashCode()
         result = 31 * result + (cameraState?.let { System.identityHashCode(it) } ?: 0)
         result = 31 * result + (nodeDragState?.let { System.identityHashCode(it) } ?: 0)
+        result = 31 * result + (viewport?.hashCode() ?: 0)
         return result
     }
 
     override fun toString(): String =
-        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas, cameraState=$cameraState, nodeDragState=$nodeDragState)"
+        "SceneConfig(renderOptions=$renderOptions, lightDirection=$lightDirection, defaultColor=$defaultColor, strokeStyle=$strokeStyle, gestures=$gestures, useNativeCanvas=$useNativeCanvas, cameraState=$cameraState, nodeDragState=$nodeDragState, viewport=$viewport)"
 }

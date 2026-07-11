@@ -48,5 +48,7 @@ class ViewSampleActivity : AppCompatActivity() {
         view.add(Pyramid(position = Point(2.0, 1.0, 3.0)).scale(Point(2.0, 1.0, 3.0), 0.5), IsoColor(40.0, 180.0, 40.0))
         view.add(Prism(position = Point(3.0, 2.0, 3.0), width = 1.0, depth = 1.0, height = 0.2), IsoColor(50.0, 50.0, 50.0))
         view.add(Octahedron(position = Point(3.0, 2.0, 3.2)), IsoColor(0.0, 180.0, 180.0))
+        // Fit the full monument scene into the view's bounds so nothing is clipped.
+        view.setFitContent(padding = 16.0)
     }
 }

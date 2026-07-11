@@ -302,6 +302,13 @@ internal object DepthSorter {
             }
         }
 
+        // Sort pairs into canonical order (ascending by packed value) so that the
+        // edge-accumulation order in drawBefore is viewport-independent. Without this,
+        // HashMap iteration of grid.values differs when the origin shifts (phone vs doc
+        // resolution), changing which edges are recorded first. Kahn's algorithm is
+        // sensitive to that order when multiple nodes compete for the same queue slot,
+        // causing non-deterministic face ordering across viewport sizes.
+        pairs.sort()
         return pairs.toLongArray()
     }
 

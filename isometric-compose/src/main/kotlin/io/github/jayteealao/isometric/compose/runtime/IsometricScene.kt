@@ -73,7 +73,8 @@ fun IsometricScene(
             gestures = config.gestures,
             useNativeCanvas = config.useNativeCanvas,
             cameraState = config.cameraState,
-            nodeDragState = config.nodeDragState
+            nodeDragState = config.nodeDragState,
+            viewport = config.viewport
         ),
         content = content
     )
@@ -179,6 +180,13 @@ fun IsometricScene(
         renderer.currentPreparedScene?.let { scene ->
             currentOnPreparedSceneReady?.invoke(scene)
         }
+    }
+
+    // Propagate viewport configuration to the renderer after every recomposition.
+    // SceneCache.rebuild() reads renderer.viewportConfig when projecting the scene,
+    // so the renderer must hold the latest value before the Canvas draw phase.
+    SideEffect {
+        renderer.viewportConfig = config.viewport
     }
 
     // Track canvas size
