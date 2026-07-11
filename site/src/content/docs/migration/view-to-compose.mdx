@@ -9,7 +9,7 @@ sidebar:
 The View API used the `io.fabianterhorst.isometric` package. The Compose API uses `io.github.jayteealao.isometric`. All imports change accordingly.
 :::
 
-### Module Dependencies
+## Module Dependencies
 
 Before:
 
@@ -23,7 +23,7 @@ After:
 implementation("io.github.jayteealao:isometric-compose:<version>")
 ```
 
-### Layout
+## Layout
 
 Before (XML):
 
@@ -42,7 +42,7 @@ IsometricScene(modifier = Modifier.fillMaxSize()) {
 }
 ```
 
-### Adding Shapes
+## Adding Shapes
 
 Before:
 
@@ -59,11 +59,11 @@ Shape(
 )
 ```
 
-### Color Class
+## Color Class
 
 `Color` was renamed to `IsoColor` to avoid collision with Compose's Color class.
 
-### Click Handling
+## Click Handling
 
 Before:
 
@@ -87,7 +87,7 @@ For background taps or raw screen coordinates, use a scene-level `GestureConfig.
 capabilities the View API lacked: per-node `onLongClick`, `alpha`, `testTag`, and a stable
 `nodeId`. See [Per-Node Interactions](/guides/interactions/).
 
-### Key Differences Summary
+## Key Differences Summary
 
 | Aspect | View API | Compose API |
 |---|---|---|
@@ -102,7 +102,7 @@ capabilities the View API lacked: per-node `onLongClick`, `alpha`, `testTag`, an
 | Color type | Color | IsoColor |
 | Animation | Manual invalidation | withFrameNanos + recomposition |
 
-### Backward Compatibility
+## Backward Compatibility
 
 The `isometric-android-view` module still provides the View API for projects that aren't
 ready to migrate to Compose. It is not a drop-in replacement for the original
