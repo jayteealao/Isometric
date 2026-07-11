@@ -215,6 +215,47 @@ object IntersectionUtils {
     }
 
     /**
+     * Pre-built overload of [hasInteriorIntersection] for [Point2D] vertices.
+     *
+     * Accepts edge equations precomputed at projection time (stored on
+     * [DepthSorter.TransformedItem]) so that [EdgeEquations2D.of] is never called
+     * inside the pairwise loop — each face's equations are built exactly once per
+     * frame.  Semantics are identical to the two-argument overload above.
+     *
+     * @param pointsA Vertices of the first polygon.
+     * @param edgesA  Pre-built edge equations for [pointsA].
+     * @param pointsB Vertices of the second polygon.
+     * @param edgesB  Pre-built edge equations for [pointsB].
+     * @return `true` only if the polygons share a non-trivial interior overlap.
+     */
+    @JvmName("hasInteriorIntersectionPoint2DPrebuilt")
+    internal fun hasInteriorIntersection(
+        pointsA: List<Point2D>, edgesA: EdgeEquations2D,
+        pointsB: List<Point2D>, edgesB: EdgeEquations2D,
+    ): Boolean {
+        if (pointsA.isEmpty() || pointsB.isEmpty()) return false
+        if (!aabbsOverlap2D(pointsA, pointsB)) return false
+        if (edgesCrossStrictly2D(pointsA, edgesA, pointsB, edgesB)) return true
+        for (i in pointsA.indices) {
+            val p = pointsA[i]
+            if (isPointInPoly2D(pointsB, p.x, p.y) &&
+                !isPointCloseToPoly2D(pointsB, p.x, p.y, EDGE_BAND)
+            ) {
+                return true
+            }
+        }
+        for (i in pointsB.indices) {
+            val p = pointsB[i]
+            if (isPointInPoly2D(pointsA, p.x, p.y) &&
+                !isPointCloseToPoly2D(pointsA, p.x, p.y, EDGE_BAND)
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
      * Quick axis-aligned bounding-box overlap test for [Point2D] vertices.
      */
     private fun aabbsOverlap2D(pointsA: List<Point2D>, pointsB: List<Point2D>): Boolean {
@@ -310,7 +351,7 @@ object IntersectionUtils {
     /**
      * Pre-computed edge equations for a closed [Point2D] polygon.
      */
-    private class EdgeEquations2D(
+    internal class EdgeEquations2D(
         val deltaX: DoubleArray,
         val deltaY: DoubleArray,
         val r: DoubleArray,

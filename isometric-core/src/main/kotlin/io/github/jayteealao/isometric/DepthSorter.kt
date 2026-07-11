@@ -14,7 +14,11 @@ internal object DepthSorter {
     internal data class TransformedItem(
         val item: SceneGraph.SceneItem,
         val transformedPoints: List<Point2D>,
-        val litColor: IsoColor
+        val litColor: IsoColor,
+        // Single-thread invariant: precomputed once at projection time per frame.
+        // Valid for this instance's transformedPoints. If sort ever moves off the
+        // Compose draw thread, this field needs revisiting.
+        val edgeEquations2D: IntersectionUtils.EdgeEquations2D,
     )
 
     /**
@@ -158,8 +162,8 @@ internal object DepthSorter {
         // for exact 3D shared edges that still need deterministic paint order
         // in stacked and tiled prism scenes.
         val intersects = IntersectionUtils.hasInteriorIntersection(
-            itemA.transformedPoints,
-            itemB.transformedPoints
+            itemA.transformedPoints, itemA.edgeEquations2D,
+            itemB.transformedPoints, itemB.edgeEquations2D,
         )
         val sharedEdgeOrder = if (options.enableBackfaceCulling) {
             sharedHorizontalVerticalEdgeOrder(itemA.item.path, itemB.item.path)
