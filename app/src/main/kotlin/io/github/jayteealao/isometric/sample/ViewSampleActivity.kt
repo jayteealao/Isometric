@@ -9,6 +9,7 @@ import io.github.jayteealao.isometric.shapes.Prism
 import io.github.jayteealao.isometric.shapes.Pyramid
 import io.github.jayteealao.isometric.shapes.Stairs
 import io.github.jayteealao.isometric.view.IsometricView
+import io.github.jayteealao.isometric.view.StrokeStyle
 
 class ViewSampleActivity : AppCompatActivity() {
 
@@ -19,6 +20,11 @@ class ViewSampleActivity : AppCompatActivity() {
         isometricView.setClickListener(object : IsometricView.OnItemClickListener {
             override fun onClick(item: io.github.jayteealao.isometric.RenderCommand) {}
         })
+        // Render faces fill-only so coplanar same-color blocks fuse into a seamless
+        // surface, matching the isomer.js reference render. The default
+        // FillAndStroke draws a translucent-black outline around every face, which
+        // shows as a delineation where blocks sit side by side.
+        isometricView.setStrokeStyle(StrokeStyle.FillOnly)
         buildScene(isometricView)
     }
 
