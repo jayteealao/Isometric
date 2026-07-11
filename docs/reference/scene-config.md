@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-### SceneConfig
+## SceneConfig
 
 `SceneConfig` is `@Stable` (not `@Immutable`): Compose tracks equality correctly, but mutable
 properties inside — like the engine's `angle` and `scale` — can change after construction. Compose
@@ -25,7 +25,7 @@ as a change signal when you need to react to engine parameter changes.
 | nodeDragState | NodeDragState? | null | State object for the single-node tap-to-select-then-drag affordance. Create with [`rememberNodeDragState`](composables.md#remembernodedragstate); see the [Drag & Camera how-to](../guides/drag-and-camera.md). |
 | viewport | ViewportConfig? | null | Controls scene placement and scaling within the viewport. Pass `ViewportConfig.FitContent` to auto-scale the scene to fill the available area. When `null`, the engine defaults apply (`originXFraction = 0.5`, `originYFraction = 0.9`). See [ViewportConfig](#viewportconfig). |
 
-### RenderOptions
+## RenderOptions
 
 | Param | Type | Default | Description |
 |---|---|---|---|
@@ -37,7 +37,7 @@ as a change signal when you need to react to engine parameter changes.
 
 Presets: `RenderOptions.Default`, `RenderOptions.NoDepthSorting`, `RenderOptions.NoCulling`
 
-### AdvancedSceneConfig
+## AdvancedSceneConfig
 
 Extends SceneConfig with additional fields:
 
@@ -64,7 +64,7 @@ change and rebuilds. Failing to do so leaves the cache stale and changes are not
 | onAfterDraw | (DrawScope.() -> Unit)? | null | Custom drawing after scene |
 | onPreparedSceneReady | ((PreparedScene) -> Unit)? | null | Receive the latest cached projected scene (delivered after recomposition; may lag the draw by one frame) |
 
-### ViewportConfig
+## ViewportConfig
 
 Controls scene placement and scaling within the `IsometricScene` viewport. Three levels of control:
 
@@ -93,7 +93,7 @@ IsometricScene(
 ) { /* content */ }
 ```
 
-### StrokeStyle
+## StrokeStyle
 
 Sealed class with three variants:
 
@@ -104,7 +104,7 @@ Sealed class with three variants:
 `width` must be positive. `DefaultStrokeColor` is near-transparent black,
 `IsoColor(0.0, 0.0, 0.0, 25.0)` (~10% opacity).
 
-### GestureConfig
+## GestureConfig
 
 Scene-level gesture handlers, passed via `SceneConfig.gestures`. Any callback left `null` is
 ignored; `enabled` is `true` when at least one is set. The default is `GestureConfig.Disabled`,
@@ -123,7 +123,7 @@ a shared no-op instance.
 timeout is configured here via `longPressTimeoutMs`. Double-tap is likewise a per-node prop
 (`onDoubleClick`). See [Per-Node Interactions](../guides/interactions.md).
 
-### CameraState
+## CameraState
 
 Mutable pan/zoom state, passed via `SceneConfig.cameraState`. All properties are Compose
 snapshot state, so mutations trigger recomposition.

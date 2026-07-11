@@ -25,6 +25,8 @@ jobs:
             !node_modules/**
             !**/build/**
             !site/dist/**
+            !.ai/**
+            !.claude/**
           config: .markdownlint.json
 
   # ── External link check ──────────────────────────────────────────────────────
