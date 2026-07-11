@@ -217,4 +217,109 @@ class IntersectionUtilsTest {
             "Strict containment counts as interior intersection"
         )
     }
+
+    // ------------------------------------------------------------------
+    // hasInteriorIntersection (pre-built EdgeEquations2D overload) —
+    // behavioral parity guard for the allocation-reduction refactoring.
+    // For each canonical polygon pair the pre-built overload must return
+    // the same Boolean as the two-argument overload. This test guards the
+    // refactoring at function level, independent of the golden sort tests.
+    // ------------------------------------------------------------------
+
+    private fun List<Point>.toPoint2D(): List<Point2D> = map { Point2D(it.x, it.y) }
+
+    @Test
+    fun `prebuilt overload parity - polygons sharing only an edge`() {
+        val a2d = listOf(
+            Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0)
+        ).toPoint2D()
+        val b2d = listOf(
+            Point(1.0, 0.0, 0.0), Point(2.0, 0.0, 0.0),
+            Point(2.0, 1.0, 0.0), Point(1.0, 1.0, 0.0)
+        ).toPoint2D()
+        val expected = IntersectionUtils.hasInteriorIntersection(a2d, b2d)
+        val actual = IntersectionUtils.hasInteriorIntersection(
+            a2d, IntersectionUtils.EdgeEquations2D.of(a2d),
+            b2d, IntersectionUtils.EdgeEquations2D.of(b2d),
+        )
+        kotlin.test.assertEquals(expected, actual,
+            "Pre-built overload must match two-arg overload for shared-edge pair")
+    }
+
+    @Test
+    fun `prebuilt overload parity - genuine interior overlap`() {
+        val a2d = listOf(
+            Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0)
+        ).toPoint2D()
+        val b2d = listOf(
+            Point(0.5, 0.5, 0.0), Point(1.5, 0.5, 0.0),
+            Point(1.5, 1.5, 0.0), Point(0.5, 1.5, 0.0)
+        ).toPoint2D()
+        val expected = IntersectionUtils.hasInteriorIntersection(a2d, b2d)
+        val actual = IntersectionUtils.hasInteriorIntersection(
+            a2d, IntersectionUtils.EdgeEquations2D.of(a2d),
+            b2d, IntersectionUtils.EdgeEquations2D.of(b2d),
+        )
+        kotlin.test.assertEquals(expected, actual,
+            "Pre-built overload must match two-arg overload for overlapping pair")
+    }
+
+    @Test
+    fun `prebuilt overload parity - fully disjoint polygons`() {
+        val a2d = listOf(
+            Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0)
+        ).toPoint2D()
+        val b2d = listOf(
+            Point(5.0, 0.0, 0.0), Point(6.0, 0.0, 0.0),
+            Point(6.0, 1.0, 0.0), Point(5.0, 1.0, 0.0)
+        ).toPoint2D()
+        val expected = IntersectionUtils.hasInteriorIntersection(a2d, b2d)
+        val actual = IntersectionUtils.hasInteriorIntersection(
+            a2d, IntersectionUtils.EdgeEquations2D.of(a2d),
+            b2d, IntersectionUtils.EdgeEquations2D.of(b2d),
+        )
+        kotlin.test.assertEquals(expected, actual,
+            "Pre-built overload must match two-arg overload for disjoint pair")
+    }
+
+    @Test
+    fun `prebuilt overload parity - strict containment`() {
+        val outer2d = listOf(
+            Point(0.0, 0.0, 0.0), Point(2.0, 0.0, 0.0),
+            Point(2.0, 2.0, 0.0), Point(0.0, 2.0, 0.0)
+        ).toPoint2D()
+        val inner2d = listOf(
+            Point(0.5, 0.5, 0.0), Point(1.5, 0.5, 0.0),
+            Point(1.5, 1.5, 0.0), Point(0.5, 1.5, 0.0)
+        ).toPoint2D()
+        val expected = IntersectionUtils.hasInteriorIntersection(outer2d, inner2d)
+        val actual = IntersectionUtils.hasInteriorIntersection(
+            outer2d, IntersectionUtils.EdgeEquations2D.of(outer2d),
+            inner2d, IntersectionUtils.EdgeEquations2D.of(inner2d),
+        )
+        kotlin.test.assertEquals(expected, actual,
+            "Pre-built overload must match two-arg overload for containment pair")
+    }
+
+    @Test
+    fun `prebuilt overload parity - polygons sharing only a vertex`() {
+        val a2d = listOf(
+            Point(0.0, 0.0, 0.0), Point(1.0, 0.0, 0.0),
+            Point(1.0, 1.0, 0.0), Point(0.0, 1.0, 0.0)
+        ).toPoint2D()
+        val b2d = listOf(
+            Point(1.0, 1.0, 0.0), Point(2.0, 1.0, 0.0),
+            Point(2.0, 2.0, 0.0), Point(1.0, 2.0, 0.0)
+        ).toPoint2D()
+        val expected = IntersectionUtils.hasInteriorIntersection(a2d, b2d)
+        val actual = IntersectionUtils.hasInteriorIntersection(
+            a2d, IntersectionUtils.EdgeEquations2D.of(a2d),
+            b2d, IntersectionUtils.EdgeEquations2D.of(b2d),
+        )
+        kotlin.test.assertEquals(expected, actual,
+            "Pre-built overload must match two-arg overload for shared-vertex pair")
+    }
 }

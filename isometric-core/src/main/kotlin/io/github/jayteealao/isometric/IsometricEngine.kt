@@ -436,7 +436,8 @@ class IsometricEngine @JvmOverloads constructor(
         }
 
         val litColor = projection.transformColor(item.path, item.baseColor, normalizedLight)
-        return DepthSorter.TransformedItem(item, screenPoints, litColor)
+        val edgeEq = IntersectionUtils.EdgeEquations2D.of(screenPoints)
+        return DepthSorter.TransformedItem(item, screenPoints, litColor, edgeEq)
     }
 
     /**
