@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric.compose.runtime
 
+import android.util.Log
 import io.github.jayteealao.isometric.HitOrder
 import io.github.jayteealao.isometric.PreparedScene
 import io.github.jayteealao.isometric.RenderCommand
@@ -23,6 +24,7 @@ internal class HitTestResolver(
 ) {
     companion object {
         internal const val HIT_TEST_RADIUS_PX: Double = 8.0
+        private const val TAG = "HitTestResolver"
     }
 
     // Spatial index for O(k) hit testing
@@ -156,10 +158,12 @@ internal class HitTestResolver(
             if (existing != null &&
                 (node.explicitNodeId != null || existing.explicitNodeId != null)
             ) {
-                error(
-                    "Duplicate nodeId '${node.nodeId}' detected. " +
+                Log.w(
+                    TAG,
+                    "Duplicate nodeId '${node.nodeId}' detected; keeping first occurrence and skipping duplicate. " +
                     "nodeId values must be unique within a scene."
                 )
+                return
             }
             for (child in node.childrenSnapshot) {
                 visit(child)
