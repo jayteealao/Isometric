@@ -8,37 +8,56 @@ import kotlin.test.assertTrue
 /**
  * Geometric unit tests for Octahedron (B1).
  *
- * The four equatorial vertices sit at (0,0,0.5), (1,0,0.5), (1,1,0.5), (0,1,0.5)
- * and the two apices at (0.5,0.5,0) and (0.5,0.5,1.0) — a regular octahedron
- * inscribed in the unit cube, as the KDoc documents. The now-removed
- * scale(center, sqrt(2)/2, sqrt(2)/2, 1.0) call compressed X and Y to ~70.7%,
- * producing a 0.707×0.707×1.0 bounding box that contradicts this.
+ * The `scale(center, sqrt(2)/2, sqrt(2)/2, 1.0)` post-scale pulls the equatorial square
+ * in from the cube corners (radius √2/2) to radius 0.5, so every one of the six vertices
+ * sits on a sphere of radius 0.5 about the center — a *regular* octahedron with twelve
+ * equal edges. Because it stands on a vertex, its footprint is ~0.707 across x/y and a
+ * full 1.0 on z; it deliberately does NOT fill the unit cube in x/y.
  *
- * The constructive proofs below have assertions that fail on the pre-fix geometry
- * and pass after removing the non-uniform post-scale.
+ * The regularity assertion below is the load-bearing guard: it fails on the un-scaled
+ * geometry (equator at radius 0.707 ≠ poles at 0.5) and passes only when the shape is
+ * genuinely regular. The span assertions pin the resulting 0.707 x/y footprint.
  */
 class OctahedronGeometryTest {
 
     private val epsilon = 1e-9
     private val oct = Octahedron()
     private val allPoints get() = oct.paths.flatMap { it.points }
+    private val center = Point(0.5, 0.5, 0.5)
 
-    // --- constructive proof assertions (fail pre-fix, pass post-fix) ---
+    // --- regularity: the load-bearing guard (fails on the un-scaled square bipyramid) ---
 
     @Test
-    fun `Octahedron X span covers full unit cube (min near 0, max near 1)`() {
+    fun `Octahedron is regular — all vertices lie on a radius-0_5 sphere about the center`() {
+        for (p in allPoints) {
+            val dx = p.x - center.x
+            val dy = p.y - center.y
+            val dz = p.z - center.z
+            val radius = Math.sqrt(dx * dx + dy * dy + dz * dz)
+            assertTrue(
+                Math.abs(radius - 0.5) < 1e-6,
+                "Vertex ($p) is at radius $radius, not 0.5 — geometry is not regular " +
+                    "(un-scaled equator sits at ~0.707)"
+            )
+        }
+    }
+
+    // --- span: pins the ~0.707 x/y footprint of the regular octahedron ---
+
+    @Test
+    fun `Octahedron X span is the regular ~0_707 footprint (min ~0_146, max ~0_854)`() {
         val minX = allPoints.minOf { it.x }
         val maxX = allPoints.maxOf { it.x }
-        assertTrue(minX <= epsilon, "Expected minX <= 0+ε but got $minX (pre-fix: ~0.146)")
-        assertTrue(maxX >= 1.0 - epsilon, "Expected maxX >= 1-ε but got $maxX (pre-fix: ~0.854)")
+        assertTrue(Math.abs(minX - 0.14644660940672627) < 1e-6, "Expected minX ~0.1464 but got $minX")
+        assertTrue(Math.abs(maxX - 0.8535533905932737) < 1e-6, "Expected maxX ~0.8536 but got $maxX")
     }
 
     @Test
-    fun `Octahedron Y span covers full unit cube (min near 0, max near 1)`() {
+    fun `Octahedron Y span is the regular ~0_707 footprint (min ~0_146, max ~0_854)`() {
         val minY = allPoints.minOf { it.y }
         val maxY = allPoints.maxOf { it.y }
-        assertTrue(minY <= epsilon, "Expected minY <= 0+ε but got $minY (pre-fix: ~0.146)")
-        assertTrue(maxY >= 1.0 - epsilon, "Expected maxY >= 1-ε but got $maxY (pre-fix: ~0.854)")
+        assertTrue(Math.abs(minY - 0.14644660940672627) < 1e-6, "Expected minY ~0.1464 but got $minY")
+        assertTrue(Math.abs(maxY - 0.8535533905932737) < 1e-6, "Expected maxY ~0.8536 but got $maxY")
     }
 
     // --- baseline assertions (pass both before and after fix) ---
