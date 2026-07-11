@@ -1,7 +1,7 @@
 package io.github.jayteealao.isometric
 
 import kotlin.math.PI
-import kotlin.math.roundToLong
+import kotlin.math.floor
 
 /**
  * Core isometric rendering engine.
@@ -476,10 +476,27 @@ class IsometricEngine @JvmOverloads constructor(
         // Bucket items by the canonicalized vertex set of their face. Two faces
         // are candidate partners only if they live in the same bucket — i.e.
         // share an identical (modulo winding) vertex list in 3D.
+        //
+        // Each face is indexed under TWO keys:
+        //   1. Its primary floor-bucket key (faceKey).
+        //   2. A "bumped" key (faceKeyBumped) where any coordinate whose fractional
+        //      position within its floor bucket exceeds 0.5 is advanced to the next
+        //      bucket. This ensures that two vertices whose coordinates straddle a
+        //      bucket boundary — i.e. one sits near the top of bucket k while the
+        //      other sits near the bottom of bucket k+1, with abs(a - b) < epsilon —
+        //      share at least one key and therefore appear in the same candidate group.
+        //
+        // A subsequent per-pair call to verticesCoincide() performs an explicit
+        // coordinate-level epsilon check, so only truly coincident faces (all vertices
+        // pairwise within SHARED_FACE_EPSILON) are ever culled.
         val groups = linkedMapOf<FaceKey, MutableList<Int>>()
         for (index in items.indices) {
-            val key = faceKey(items[index].path)
-            groups.getOrPut(key) { mutableListOf() }.add(index)
+            val primaryKey = faceKey(items[index].path)
+            groups.getOrPut(primaryKey) { mutableListOf() }.add(index)
+            val bumpedKey = faceKeyBumped(items[index].path)
+            if (bumpedKey != primaryKey) {
+                groups.getOrPut(bumpedKey) { mutableListOf() }.add(index)
+            }
         }
 
         val culled = BooleanArray(items.size)
@@ -489,9 +506,11 @@ class IsometricEngine @JvmOverloads constructor(
                 for (b in a + 1 until indices.size) {
                     val indexA = indices[a]
                     val indexB = indices[b]
+                    if (indexA == indexB) continue
                     if (isVerticalFace(items[indexA].path) &&
                         isVerticalFace(items[indexB].path) &&
-                        oppositeNormals(items[indexA].path, items[indexB].path)
+                        oppositeNormals(items[indexA].path, items[indexB].path) &&
+                        verticesCoincide(items[indexA].path, items[indexB].path)
                     ) {
                         culled[indexA] = true
                         culled[indexB] = true
@@ -504,13 +523,13 @@ class IsometricEngine @JvmOverloads constructor(
     }
 
     /**
-     * Builds a canonical identity key for a face's vertex set, independent of
-     * winding order or the choice of starting vertex.
+     * Builds a canonical identity key for a face's vertex set using floor-bucketing,
+     * independent of winding order or the choice of starting vertex.
      *
      * Two faces with vertices `[P, Q, R, S]` and `[R, S, P, Q]` (or any rotation
-     * or reversal) produce the same key, so they group together for
-     * coincidence detection. Coordinates are quantized to absorb
-     * floating-point drift (see [quantize]).
+     * or reversal) produce the same key. Coordinates are floor-quantized (see
+     * [quantize]). Use [faceKeyBumped] alongside this key to cover cross-boundary
+     * coincidences (see [cullSharedInteriorFaces]).
      */
     private fun faceKey(path: Path): FaceKey {
         return FaceKey(
@@ -522,6 +541,48 @@ class IsometricEngine @JvmOverloads constructor(
                 )
             }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
         )
+    }
+
+    /**
+     * Like [faceKey] but advances each coordinate's bucket by one whenever that
+     * coordinate sits in the upper half of its floor bucket (fractional part > 0.5).
+     *
+     * When indexed alongside [faceKey], the bumped key guarantees that two vertices
+     * whose coordinates straddle a floor-bucket boundary while being within
+     * [SHARED_FACE_EPSILON] of each other share at least one key — the lower
+     * vertex's bumped bucket equals the upper vertex's primary (floor) bucket.
+     */
+    private fun faceKeyBumped(path: Path): FaceKey {
+        return FaceKey(
+            path.points.map { point ->
+                QuantizedPoint(
+                    quantizeBumped(point.x),
+                    quantizeBumped(point.y),
+                    quantizeBumped(point.z)
+                )
+            }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
+        )
+    }
+
+    /**
+     * Returns `true` when the two paths have the same number of vertices and every
+     * corresponding pair of sorted vertices is within [SHARED_FACE_EPSILON] in each
+     * coordinate. Vertices are sorted by (x, y, z) so the check is winding-order
+     * and start-vertex independent.
+     *
+     * Used as an explicit guard after bucket-based grouping to rule out false
+     * positives that can arise from the bumped-key overlap (see [faceKeyBumped]).
+     */
+    private fun verticesCoincide(pathA: Path, pathB: Path): Boolean {
+        if (pathA.points.size != pathB.points.size) return false
+        val cmp = compareBy<Point> { it.x }.thenBy { it.y }.thenBy { it.z }
+        val sortedA = pathA.points.sortedWith(cmp)
+        val sortedB = pathB.points.sortedWith(cmp)
+        return sortedA.zip(sortedB).all { (a, b) ->
+            kotlin.math.abs(a.x - b.x) < SHARED_FACE_EPSILON &&
+            kotlin.math.abs(a.y - b.y) < SHARED_FACE_EPSILON &&
+            kotlin.math.abs(a.z - b.z) < SHARED_FACE_EPSILON
+        }
     }
 
     /**
@@ -579,12 +640,34 @@ class IsometricEngine @JvmOverloads constructor(
     }
 
     /**
-     * Maps a continuous world-coordinate to an integer bucket of width
-     * [SHARED_FACE_EPSILON]. Values that differ by less than the epsilon round
-     * to the same bucket and therefore hash equal in [FaceKey].
+     * Maps a continuous world-coordinate to the floor integer bucket of width
+     * [SHARED_FACE_EPSILON]. Any two values that fall within the same
+     * `[k * epsilon, (k+1) * epsilon)` interval produce the same bucket.
+     *
+     * Using floor (rather than round) moves the coarse bucket boundary from
+     * half-integer positions to integer positions, ensuring that two values
+     * such as `0.49e-6` and `0.51e-6` — which differ by less than epsilon but
+     * would round to different buckets — both land in bucket 0.
+     * Cross-boundary pairs (e.g. `0.99e-6` → bucket 0 and `1.01e-6` → bucket 1)
+     * are resolved by also indexing faces under [quantizeBumped] / [faceKeyBumped].
      */
     private fun quantize(value: Double): Long {
-        return (value / SHARED_FACE_EPSILON).roundToLong()
+        return floor(value / SHARED_FACE_EPSILON).toLong()
+    }
+
+    /**
+     * Like [quantize] but advances the bucket by one whenever the coordinate's
+     * fractional position within its floor bucket exceeds 0.5.
+     *
+     * Combined with [quantize] (see [faceKeyBumped]), this ensures that two
+     * coordinates which straddle a floor-bucket boundary while being within
+     * [SHARED_FACE_EPSILON] of each other share at least one canonical bucket
+     * and therefore appear in the same candidate group during face culling.
+     */
+    private fun quantizeBumped(value: Double): Long {
+        val scaled = value / SHARED_FACE_EPSILON
+        val floorBucket = floor(scaled).toLong()
+        return if (scaled - floorBucket > 0.5) floorBucket + 1L else floorBucket
     }
 
     /**

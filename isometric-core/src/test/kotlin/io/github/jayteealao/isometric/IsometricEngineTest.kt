@@ -428,4 +428,68 @@ class IsometricEngineTest {
         assertEquals(8, Octahedron().paths.size) // B1 guard: 4 rotations × 2 triangles = 8; corrected geometry must preserve this count
         assertTrue(Knot().paths.isNotEmpty())
     }
+
+    /**
+     * Regression test for the quantization bucket-boundary false negative.
+     *
+     * With the old round-based quantize:
+     *   0.49e-6 / SHARED_FACE_EPSILON = 0.49  →  roundToLong = 0
+     *   0.51e-6 / SHARED_FACE_EPSILON = 0.51  →  roundToLong = 1
+     * Different buckets → the two faces are NOT recognised as coincident interior walls
+     * → the front-facing wall survives shared-face culling and is erroneously rendered.
+     *
+     * With the floor-based quantize fix both values floor to 0, placing them in the
+     * same primary bucket, so the engine correctly identifies and culls the pair.
+     */
+    @Test
+    fun `shared interior face culling works across quantization bucket boundary`() {
+        val eps = 1e-6                      // mirrors SHARED_FACE_EPSILON
+        val xA = 0.49 * eps                 // just below the 0.5*eps round-bucket boundary
+        val xB = 0.51 * eps                 // just above it; |xB - xA| = 0.02*eps < eps
+
+        // Face A: vertical wall in the plane x=xA, outward normal in the +x direction.
+        // Winding (P0→P1→P2): u=(P1−P0)=(0,1,0), v=(P2−P0)=(0,1,1) → normal=(1,0,0).
+        val faceA = Path(
+            Point(xA, 0.0, 0.0),
+            Point(xA, 1.0, 0.0),
+            Point(xA, 1.0, 1.0),
+            Point(xA, 0.0, 1.0)
+        )
+
+        // Face B: vertical wall in the plane x=xB, outward normal in the −x direction.
+        // Reversed winding: u=(P1−P0)=(0,0,1), v=(P2−P0)=(0,1,1) → normal=(−1,0,0).
+        val faceB = Path(
+            Point(xB, 0.0, 0.0),
+            Point(xB, 0.0, 1.0),
+            Point(xB, 1.0, 1.0),
+            Point(xB, 1.0, 0.0)
+        )
+
+        val engine = IsometricEngine()
+        engine.add(faceA, IsoColor.BLUE)
+        engine.add(faceB, IsoColor.RED)
+
+        // Sanity: without culling both faces must be present.
+        val noCull = engine.projectScene(800, 600, RenderOptions.NoCulling)
+        assertEquals(2, noCull.commands.size, "Both faces must be visible when culling is disabled")
+
+        // With shared-face + back-face culling: the engine must recognise the pair as
+        // coincident interior walls and remove both. The old round-based quantize would
+        // produce 1 command (shared-face culling missed the boundary case; only
+        // standard back-face culling ran). The fix must produce 0 commands.
+        val withCull = engine.projectScene(
+            800, 600,
+            RenderOptions(
+                enableDepthSorting = false,
+                enableBackfaceCulling = true,
+                enableBoundsChecking = false
+            )
+        )
+        assertEquals(
+            0, withCull.commands.size,
+            "Both coincident interior walls must be culled when their x-coordinates " +
+            "straddle the quantization bucket boundary " +
+            "(xA=$xA, xB=$xB, diff=${xB - xA}, epsilon=$eps)"
+        )
+    }
 }
