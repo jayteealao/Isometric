@@ -1,5 +1,6 @@
 package io.github.jayteealao.isometric
 
+import java.util.IdentityHashMap
 import kotlin.math.PI
 import kotlin.math.floor
 
@@ -170,6 +171,10 @@ class IsometricEngine @JvmOverloads constructor(
         private set
 
     private val sceneGraph = SceneGraph()
+    // Single-thread invariant: these caches are accessed only on the Compose draw thread.
+    // If cullSharedInteriorFaces ever moves off-thread, synchronization is required.
+    private val faceKeyPrimaryCache = IdentityHashMap<Path, FaceKey>()
+    private val faceKeyBumpedCache  = IdentityHashMap<Path, FaceKey>()
     private var projection = IsometricProjection(angle, scale, colorDifference, lightColor)
 
     /**
@@ -322,7 +327,15 @@ class IsometricEngine @JvmOverloads constructor(
     /**
      * Removes all items from the scene graph.
      */
-    override fun clear() = sceneGraph.clear()
+    override fun clear() {
+        sceneGraph.clear()
+        faceKeyPrimaryCache.clear()
+        faceKeyBumpedCache.clear()
+    }
+
+    /** Returns the combined entry count of both faceKey memo maps. For test introspection only. */
+    internal fun faceKeyCacheSize(): Int =
+        faceKeyPrimaryCache.size + faceKeyBumpedCache.size
 
     /**
      * Projects the 3D scene to 2D screen space for the given viewport size.
@@ -532,17 +545,18 @@ class IsometricEngine @JvmOverloads constructor(
      * [quantize]). Use [faceKeyBumped] alongside this key to cover cross-boundary
      * coincidences (see [cullSharedInteriorFaces]).
      */
-    private fun faceKey(path: Path): FaceKey {
-        return FaceKey(
-            path.points.map { point ->
-                QuantizedPoint(
-                    quantize(point.x),
-                    quantize(point.y),
-                    quantize(point.z)
-                )
-            }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
-        )
-    }
+    private fun faceKey(path: Path): FaceKey =
+        faceKeyPrimaryCache.getOrPut(path) {
+            FaceKey(
+                path.points.map { point ->
+                    QuantizedPoint(
+                        quantize(point.x),
+                        quantize(point.y),
+                        quantize(point.z)
+                    )
+                }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
+            )
+        }
 
     /**
      * Like [faceKey] but advances each coordinate's bucket by one whenever that
@@ -553,17 +567,18 @@ class IsometricEngine @JvmOverloads constructor(
      * [SHARED_FACE_EPSILON] of each other share at least one key — the lower
      * vertex's bumped bucket equals the upper vertex's primary (floor) bucket.
      */
-    private fun faceKeyBumped(path: Path): FaceKey {
-        return FaceKey(
-            path.points.map { point ->
-                QuantizedPoint(
-                    quantizeBumped(point.x),
-                    quantizeBumped(point.y),
-                    quantizeBumped(point.z)
-                )
-            }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
-        )
-    }
+    private fun faceKeyBumped(path: Path): FaceKey =
+        faceKeyBumpedCache.getOrPut(path) {
+            FaceKey(
+                path.points.map { point ->
+                    QuantizedPoint(
+                        quantizeBumped(point.x),
+                        quantizeBumped(point.y),
+                        quantizeBumped(point.z)
+                    )
+                }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
+            )
+        }
 
     /**
      * Returns `true` when the two paths have the same number of vertices and every
