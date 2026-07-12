@@ -24,11 +24,36 @@ open class Path(
 ) {
     val points: List<Point> = points.toList()
 
+    /**
+     * Precomputed plane normal components (n = (p1−p0) × (p2−p0)) and plane constant d.
+     * Derived eagerly at construction from points[0..2]. Degenerate faces (collinear or
+     * duplicate first-three vertices) yield n = (0,0,0) and d = 0, matching the
+     * pre-optimisation inline behavior of [relativePlaneSide].
+     * Single-thread invariant: Path is immutable after construction; these fields are
+     * safely readable from any thread once init completes.
+     */
+    private val planeNx: Double
+    private val planeNy: Double
+    private val planeNz: Double
+    private val planeD:  Double
+
     init {
         require(this.points.size >= 3) { "Path requires at least 3 points, got ${this.points.size}" }
         require(this.points.all { it.x.isFinite() && it.y.isFinite() && it.z.isFinite() }) {
             "Path coordinates must be finite (no NaN or Infinity)"
         }
+        // Inline cross-product of (p1−p0) × (p2−p0), avoiding Vector allocations on the hot path.
+        // Formula matches Vector.crossProduct / Vector.fromTwoPoints exactly so degenerate faces
+        // (collinear or duplicate first-three vertices) produce n = (0,0,0) and d = 0.
+        val p0 = this.points[0]
+        val p1 = this.points[1]
+        val p2 = this.points[2]
+        val abx = p1.x - p0.x; val aby = p1.y - p0.y; val abz = p1.z - p0.z
+        val acx = p2.x - p0.x; val acy = p2.y - p0.y; val acz = p2.z - p0.z
+        planeNx = aby * acz - acy * abz
+        planeNy = -(abx * acz - acx * abz)
+        planeNz = abx * acy - acx * aby
+        planeD  = planeNx * p0.x + planeNy * p0.y + planeNz * p0.z
     }
 
     /**
@@ -215,16 +240,15 @@ open class Path(
      * coplanar vertices as neutral rather than counting them by sign.
      */
     private fun relativePlaneSide(pathA: Path, observer: Point): Int {
-        // pathA's plane: normal n = (a1 - a0) x (a2 - a0). Allocated once, outside
-        // the per-vertex loop; the per-vertex signed-distance test is inlined as
-        // n.x*p.x + n.y*p.y + n.z*p.z - d to avoid Vector.fromTwoPoints allocations.
-        val AB = Vector.fromTwoPoints(pathA.points[0], pathA.points[1])
-        val AC = Vector.fromTwoPoints(pathA.points[0], pathA.points[2])
-        val n = Vector.crossProduct(AB, AC)
-        val a0 = pathA.points[0]
-        val d = n.x * a0.x + n.y * a0.y + n.z * a0.z
+        // Reads precomputed plane normal and constant from pathA — zero Vector allocations.
+        // private fields of pathA are accessible here because relativePlaneSide is a method
+        // of Path, the same class (Kotlin private = class-level, not instance-level).
+        val nx = pathA.planeNx
+        val ny = pathA.planeNy
+        val nz = pathA.planeNz
+        val d  = pathA.planeD
 
-        val observerPosition = n.x * observer.x + n.y * observer.y + n.z * observer.z - d
+        val observerPosition = nx * observer.x + ny * observer.y + nz * observer.z - d
         val observerSign = when {
             observerPosition > EPSILON -> 1
             observerPosition < -EPSILON -> -1
@@ -234,7 +258,7 @@ open class Path(
         var anySameSide = false
         var anyOppositeSide = false
         for (p in points) {
-            val pPosition = n.x * p.x + n.y * p.y + n.z * p.z - d
+            val pPosition = nx * p.x + ny * p.y + nz * p.z - d
             val pSign = when {
                 pPosition > EPSILON -> 1
                 pPosition < -EPSILON -> -1
