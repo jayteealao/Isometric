@@ -18,7 +18,9 @@ internal object DepthSorter {
         // Single-thread invariant: precomputed once at projection time per frame.
         // Valid for this instance's transformedPoints. If sort ever moves off the
         // Compose draw thread, this field needs revisiting.
-        val edgeEquations2D: IntersectionUtils.EdgeEquations2D,
+        // Null when depth sorting is disabled: sort() is skipped so the edge
+        // equations are never read, and building them would allocate for nothing.
+        val edgeEquations2D: IntersectionUtils.EdgeEquations2D?,
     )
 
     /**
@@ -161,9 +163,11 @@ internal object DepthSorter {
         // Boundary-only pairs remain rejected except on the culled render path
         // for exact 3D shared edges that still need deterministic paint order
         // in stacked and tiled prism scenes.
+        // Non-null on the sort path: projectItem builds edge equations whenever depth
+        // sorting is enabled, and sort() (hence this method) only runs in that case.
         val intersects = IntersectionUtils.hasInteriorIntersection(
-            itemA.transformedPoints, itemA.edgeEquations2D,
-            itemB.transformedPoints, itemB.edgeEquations2D,
+            itemA.transformedPoints, itemA.edgeEquations2D!!,
+            itemB.transformedPoints, itemB.edgeEquations2D!!,
         )
         val sharedEdgeOrder = if (options.enableBackfaceCulling) {
             sharedHorizontalVerticalEdgeOrder(itemA.item.path, itemB.item.path)
