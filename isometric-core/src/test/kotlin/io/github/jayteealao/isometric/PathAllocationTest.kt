@@ -140,28 +140,43 @@ class PathAllocationTest {
         }
 
         // Allocation measurement.
+        // Fail closed: the allocation threshold must be enforced, never silently skipped.
+        // If the platform genuinely cannot measure per-thread allocation, that is a test
+        // failure rather than a pass — a silent no-op guard would let a regression slip by.
         val threadMxBean = ManagementFactory.getThreadMXBean()
         val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
+            ?: throw AssertionError(
+                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
+                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
+                    "The allocation threshold cannot be enforced — failing closed.",
+            )
+        assertTrue(
+            sunBean.isThreadAllocatedMemorySupported,
+            "Thread allocation measurement unsupported: " +
+                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
+                "The allocation threshold cannot be enforced — failing closed.",
+        )
+        if (!sunBean.isThreadAllocatedMemoryEnabled) {
+            sunBean.isThreadAllocatedMemoryEnabled = true
+        }
         val threadId = Thread.currentThread().id
 
         val measureIterations = 20
-        val beforeBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val beforeBytes = sunBean.getThreadAllocatedBytes(threadId)
         repeat(measureIterations) {
             for ((a, b) in pairs) {
                 a.closerThan(b, observer)
                 b.closerThan(a, observer)
             }
         }
-        val afterBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val afterBytes = sunBean.getThreadAllocatedBytes(threadId)
 
-        if (beforeBytes < 0 || afterBytes < 0) {
-            // com.sun.management.ThreadMXBean not available on this JVM vendor — degrade gracefully.
-            println(
-                "PathAllocationTest: com.sun.management.ThreadMXBean unavailable" +
-                    " — byte assertion skipped."
-            )
-            return
-        }
+        assertTrue(
+            beforeBytes >= 0 && afterBytes >= 0,
+            "Thread allocation measurement returned a negative reading even after enabling " +
+                "(before=$beforeBytes, after=$afterBytes). The allocation threshold cannot be " +
+                "enforced — failing closed.",
+        )
 
         val totalBytes = afterBytes - beforeBytes
         val perCallBytes = totalBytes.toDouble() / measureIterations
@@ -193,7 +208,7 @@ class PathAllocationTest {
             "PathAllocationTest: N=10 pairs, 20 closerThan calls/iteration, " +
                 "$measureIterations warm iterations — " +
                 "total=${totalBytes}B  per-iteration=${perCallBytes.toLong()}B  " +
-                "threshold=${thresholdPerCall.toLong()}B"
+                "threshold=${thresholdPerCall.toLong()}B",
         )
 
         assertTrue(
@@ -203,7 +218,7 @@ class PathAllocationTest {
                 "(baseline list-iterator overhead ~2,272 B; would be ~4,672 B if Vector objects " +
                 "were re-allocated per relativePlaneSide call). " +
                 "Check that relativePlaneSide reads pathA.planeNx/Ny/Nz/D directly instead of " +
-                "calling Vector.fromTwoPoints and Vector.crossProduct."
+                "calling Vector.fromTwoPoints and Vector.crossProduct.",
         )
     }
 }
