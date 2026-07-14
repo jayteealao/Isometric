@@ -927,9 +927,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -996,11 +996,15 @@ jobs:
       - name: Validate version matches tag
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          GRADLE_VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' isometric-core/build.gradle.kts | head -1)
-          if [ "$TAG" != "$GRADLE_VERSION" ]; then
-            echo "ERROR: Tag v$TAG does not match Gradle version $GRADLE_VERSION"
-            exit 1
-          fi
+          FAILED=0
+          for MODULE in isometric-core isometric-compose isometric-android-view; do
+            MODULE_VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' "$MODULE/build.gradle.kts" | head -1)
+            if [ "$TAG" != "$MODULE_VERSION" ]; then
+              echo "ERROR: Tag v$TAG does not match $MODULE version $MODULE_VERSION"
+              FAILED=1
+            fi
+          done
+          [ "$FAILED" -eq 0 ] || exit 1
 
       - name: Build and test
         run: ./gradlew build test apiCheck
@@ -1074,7 +1078,7 @@ jobs:
 This project should use **trunk-based development** — simple, low-overhead, and standard for small-team libraries.
 
 ```
-main ──●──●──●──●──●──●──●──●──●──●──
+master ──●──●──●──●──●──●──●──●──●──●──
             ↑           ↑           ↑
           v1.0.0      v1.1.0      v2.0.0
 ```
@@ -1083,10 +1087,10 @@ main ──●──●──●──●──●──●──●──●─
 
 | Rule | Detail |
 |---|---|
-| **`main` is always releasable** | Every commit to `main` should pass CI |
-| **Short-lived feature branches** | Branch from `main`, merge back via PR within hours/days |
+| **`master` is always releasable** | Every commit to `master` should pass CI |
+| **Short-lived feature branches** | Branch from `master`, merge back via PR within hours/days |
 | **No `develop` branch** | Unnecessary overhead for a small team |
-| **Releases are tags on `main`** | Create a GitHub Release → triggers publish workflow |
+| **Releases are tags on `master`** | Create a GitHub Release → triggers publish workflow |
 | **Hotfix branches only when needed** | Only if you need to patch an older major version |
 
 ### Release Process (Step by Step)
@@ -1094,9 +1098,9 @@ main ──●──●──●──●──●──●──●──●─
 #### 1. Prepare the release
 
 ```bash
-# Ensure you're on main and up to date
-git checkout main
-git pull origin main
+# Ensure you're on master and up to date
+git checkout master
+git pull origin master
 
 # Verify everything passes
 ./gradlew build test apiCheck
@@ -1138,7 +1142,7 @@ git cliff -o CHANGELOG.md --tag v1.1.0
 ```bash
 git add -A
 git commit -m "build: prepare release v1.1.0"
-git push origin main
+git push origin master
 ```
 
 #### 6. Create the GitHub Release
@@ -1153,7 +1157,7 @@ gh release create v1.1.0 \
 Or create the release via the GitHub web UI:
 1. Go to **Releases** → **Draft a new release**
 2. Tag: `v1.1.0` (create on publish)
-3. Target: `main`
+3. Target: `master`
 4. Title: `v1.1.0`
 5. Description: paste from `git cliff --latest`
 6. Click **Publish release**
@@ -1174,7 +1178,7 @@ version = "1.2.0-SNAPSHOT"  # or "1.1.1-SNAPSHOT"
 
 ```bash
 git commit -am "build: bump to next development version"
-git push origin main
+git push origin master
 ```
 
 ### Hotfix Pattern (When Needed)
