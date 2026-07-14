@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Run ktlint before committing when any Kotlin source is staged.
+# Bypass (not recommended): git commit --no-verify
+#
+# Note: ktlint-gradle has no clean changed-files-only mode, so this runs the
+# project-wide `ktlintCheck` (baseline-aware) whenever staged .kt/.kts files
+# are present. Existing violations are grandfathered by config/ktlint/baseline.xml,
+# so only newly introduced style issues block the commit.
+
+staged_kt=$(git diff --cached --name-only --diff-filter=ACM -- '*.kt' '*.kts')
+
+if [ -z "$staged_kt" ]; then
+  exit 0
+fi
+
+echo "ktlint: staged Kotlin files changed — running ./gradlew ktlintCheck ..."
+if ! ./gradlew --no-configuration-cache -q ktlintCheck; then
+  echo ""
+  echo "ERROR: ktlint found style violations in newly changed code."
+  echo "  Auto-fix:  ./gradlew ktlintFormat"
+  echo "  Bypass:    git commit --no-verify   (not recommended)"
+  exit 1
+fi
