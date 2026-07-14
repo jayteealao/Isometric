@@ -27,8 +27,9 @@ git cliff --bumped-version
 ```
 
 Present the suggested version and ask the user to confirm before continuing.
-The version must follow SemVer (`MAJOR.MINOR.PATCH`). Do **not** use a
-`-SNAPSHOT` suffix for releases.
+The version must be a valid SemVer string. A published **prerelease** qualifier
+is allowed (e.g. `1.2.0-alpha.03`, matching this project's alpha cadence), but a
+`-SNAPSHOT` suffix is **not** — SNAPSHOTs are development-only and never published.
 
 ### 1.2 Verify the working branch
 
@@ -37,7 +38,7 @@ git branch --show-current
 git status --short
 ```
 
-- Must be on a feature/release branch, **not** directly on `main`.
+- Must be on a feature/release branch, **not** directly on `master`.
 - Working tree must be **clean**. If there are uncommitted changes, stop and
   ask the user to commit or stash them first.
 
@@ -58,14 +59,16 @@ in step 1.1. If any differ, update them:
 version = "X.Y.Z"
 ```
 
-Also verify the release workflow's tag validation will pass:
+Also verify the release workflow's tag validation will pass. The workflow validates
+the tag against **all three** module versions (not just isometric-core):
 
 ```bash
-grep 'GRADLE_VERSION' .github/workflows/release.yml
+grep -A2 'for MODULE in' .github/workflows/release.yml
 ```
 
-The workflow reads the version from `isometric-core/build.gradle.kts` —
-confirm that pattern still matches.
+It loops over `isometric-core`, `isometric-compose`, and `isometric-android-view`,
+extracts each module's `version = "..."`, and fails the release if the tag `v<X>`
+does not match **every** one. Confirm all three modules were bumped above.
 
 ### 1.4 Run the full local CI suite
 
@@ -211,12 +214,12 @@ Use `--rebase` for a fast-forward merge — all release-prep commits land indivi
 `master` with their full history preserved. After merge:
 
 ```bash
-git checkout main
-git pull origin main
+git checkout master
+git pull origin master
 git log --oneline -5
 ```
 
-Confirm the release-prep commits are present on `main`.
+Confirm the release-prep commits are present on `master`.
 
 ---
 
@@ -236,10 +239,10 @@ Capture the output — it will be used as the GitHub Release description.
 gh release create vX.Y.Z \
   --title "vX.Y.Z" \
   --notes "$(git cliff --latest --strip header)" \
-  --target main
+  --target master
 ```
 
-This tag creation on `main` triggers the `release.yml` workflow immediately.
+This tag creation on `master` triggers the `release.yml` workflow immediately.
 
 ### 3.3 Confirm the release workflow started
 
@@ -262,7 +265,7 @@ at each:
 
 | Step | What it does | Common failure |
 |---|---|---|
-| `Validate version matches tag` | Ensures tag `vX.Y.Z` == `version` in `isometric-core/build.gradle.kts` | Version mismatch |
+| `Validate version matches tag` | Ensures tag `vX.Y.Z` == `version` in **all three** module `build.gradle.kts` files (core, compose, android-view) | Version mismatch in any module |
 | `Build and test` | Full `./gradlew build test apiCheck` | Flaky test or API drift |
 | `Publish to Maven Central` | `./gradlew publishAndReleaseToMavenCentral` | Bad signing credentials, wrong key format |
 
@@ -347,12 +350,13 @@ All three `✅` lines must appear.
 
 ### 6.1 Bump to next development version
 
-On `main`, update the version in all three library modules to the next
-SNAPSHOT:
+On `master`, update the version in all three library modules to the next
+development SNAPSHOT:
 
 ```kotlin
 // isometric-core/build.gradle.kts
-version = "X.Y+1.0-SNAPSHOT"   // or X+1.0.0-SNAPSHOT for a major bump
+version = "X.Y+1.0-SNAPSHOT"   // next minor; or the next prerelease, e.g.
+                               // 1.2.0-alpha.NN-SNAPSHOT, while the line is still in alpha
 ```
 
 Commit:
@@ -362,7 +366,7 @@ git add isometric-core/build.gradle.kts \
         isometric-compose/build.gradle.kts \
         isometric-android-view/build.gradle.kts
 git commit -m "build: bump to X.Y+1.0-SNAPSHOT development version"
-git push origin main
+git push origin master
 ```
 
 ### 6.2 Verify the GitHub Release page
@@ -387,7 +391,7 @@ Published:
 
 GitHub Release: https://github.com/jayteealao/Isometric/releases/tag/vX.Y.Z
 Maven Central:  https://central.sonatype.com/artifact/io.github.jayteealao/isometric-core
-Next version:   X.Y+1.0-SNAPSHOT (on main)
+Next version:   X.Y+1.0-SNAPSHOT (on master)
 ```
 
 ---
@@ -402,6 +406,6 @@ Next version:   X.Y+1.0-SNAPSHOT (on main)
 | GPG Fingerprint | `37823EE2BB39B1996E0B3E655B94324C764AB554` |
 | GPG Key Passphrase | stored in `~/.gradle/gradle.properties` as `signingInMemoryKeyPassword` — do not commit |
 | Central Portal | [central.sonatype.com](https://central.sonatype.com) |
-| Default branch | `main` |
-| Release trigger | GitHub Release creation on `main` |
+| Default branch | `master` |
+| Release trigger | GitHub Release creation on `master` |
 | Gradle publish task | `./gradlew publishAndReleaseToMavenCentral` |
