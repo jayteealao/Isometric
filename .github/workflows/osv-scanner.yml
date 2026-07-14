@@ -1,0 +1,17 @@
+name: Dependency audit
+
+# OSV-Scanner dependency vulnerability scan. The reusable PR workflow compares
+# the PR branch against the base and reports only newly introduced advisories
+# (recursive scan from the repo root, matching `osv-scanner -r .`).
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  actions: read
+  security-events: write
+  contents: read
+
+jobs:
+  scan-pr:
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@v2.3.8

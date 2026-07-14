@@ -4,6 +4,12 @@ on:
   release:
     types: [published]
 
+# Serialize releases; never cancel an in-flight publish (a half-published
+# deployment to Maven Central is worse than waiting).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
