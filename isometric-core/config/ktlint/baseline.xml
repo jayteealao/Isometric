@@ -126,43 +126,33 @@
         <error line="270" column="36" source="standard:trailing-comma-on-call-site" />
     </file>
     <file name="src/main/kotlin/io/github/jayteealao/isometric/IsometricEngine.kt">
-        <error line="75" column="28" source="standard:parameter-list-spacing" />
-        <error line="75" column="29" source="standard:no-multi-spaces" />
-        <error line="75" column="30" source="standard:discouraged-comment-location" />
-        <error line="78" column="54" source="standard:trailing-comma-on-declaration-site" />
-        <error line="174" column="5" source="standard:spacing-between-declarations-with-comments" />
-        <error line="177" column="36" source="standard:no-multi-spaces" />
-        <error line="217" column="9" source="standard:function-signature" />
-        <error line="218" column="9" source="standard:function-signature" />
-        <error line="219" column="9" source="standard:function-signature" />
-        <error line="220" column="9" source="standard:function-signature" />
-        <error line="220" column="24" source="standard:function-signature" />
-        <error line="220" column="24" source="standard:trailing-comma-on-declaration-site" />
-        <error line="320" column="9" source="standard:function-signature" />
-        <error line="321" column="9" source="standard:function-signature" />
-        <error line="322" column="9" source="standard:function-signature" />
-        <error line="323" column="9" source="standard:function-signature" />
-        <error line="324" column="9" source="standard:function-signature" />
-        <error line="324" column="29" source="standard:function-signature" />
-        <error line="324" column="29" source="standard:trailing-comma-on-declaration-site" />
-        <error line="325" column="9" source="standard:function-signature" />
-        <error line="337" column="43" source="standard:function-signature" />
-        <error line="356" column="31" source="standard:trailing-comma-on-declaration-site" />
-        <error line="393" column="63" source="standard:trailing-comma-on-call-site" />
-        <error line="415" column="28" source="standard:trailing-comma-on-declaration-site" />
-        <error line="437" column="20" source="standard:trailing-comma-on-declaration-site" />
-        <error line="556" column="47" source="standard:function-signature" />
-        <error line="563" column="42" source="standard:trailing-comma-on-call-site" />
-        <error line="565" column="97" source="standard:trailing-comma-on-call-site" />
-        <error line="578" column="53" source="standard:function-signature" />
-        <error line="585" column="48" source="standard:trailing-comma-on-call-site" />
-        <error line="587" column="97" source="standard:trailing-comma-on-call-site" />
-        <error line="607" column="1" source="standard:indent" />
-        <error line="608" column="1" source="standard:indent" />
-        <error line="662" column="34" source="standard:trailing-comma-on-call-site" />
-        <error line="712" column="20" source="standard:trailing-comma-on-declaration-site" />
-        <error line="722" column="22" source="standard:trailing-comma-on-declaration-site" />
-        <error line="724" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="73" column="28" source="standard:parameter-list-spacing" />
+        <error line="73" column="29" source="standard:no-multi-spaces" />
+        <error line="73" column="30" source="standard:discouraged-comment-location" />
+        <error line="76" column="54" source="standard:trailing-comma-on-declaration-site" />
+        <error line="211" column="9" source="standard:function-signature" />
+        <error line="212" column="9" source="standard:function-signature" />
+        <error line="213" column="9" source="standard:function-signature" />
+        <error line="214" column="9" source="standard:function-signature" />
+        <error line="214" column="24" source="standard:function-signature" />
+        <error line="214" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="314" column="9" source="standard:function-signature" />
+        <error line="315" column="9" source="standard:function-signature" />
+        <error line="316" column="9" source="standard:function-signature" />
+        <error line="317" column="9" source="standard:function-signature" />
+        <error line="318" column="9" source="standard:function-signature" />
+        <error line="318" column="29" source="standard:function-signature" />
+        <error line="318" column="29" source="standard:trailing-comma-on-declaration-site" />
+        <error line="319" column="9" source="standard:function-signature" />
+        <error line="344" column="31" source="standard:trailing-comma-on-declaration-site" />
+        <error line="381" column="63" source="standard:trailing-comma-on-call-site" />
+        <error line="403" column="28" source="standard:trailing-comma-on-declaration-site" />
+        <error line="425" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="552" column="1" source="standard:indent" />
+        <error line="553" column="1" source="standard:indent" />
+        <error line="607" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="618" column="22" source="standard:trailing-comma-on-declaration-site" />
+        <error line="620" column="1" source="standard:no-blank-line-before-rbrace" />
     </file>
     <file name="src/main/kotlin/io/github/jayteealao/isometric/IsometricProjection.kt">
         <error line="18" column="37" source="standard:trailing-comma-on-declaration-site" />
@@ -173,21 +163,21 @@
         <error line="61" column="45" source="standard:argument-list-wrapping" />
     </file>
     <file name="src/main/kotlin/io/github/jayteealao/isometric/Path.kt">
-        <error line="23" column="24" source="standard:trailing-comma-on-declaration-site" />
-        <error line="38" column="25" source="standard:no-multi-spaces" />
-        <error line="51" column="31" source="standard:statement-wrapping" />
-        <error line="51" column="54" source="standard:statement-wrapping" />
+        <error line="24" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="39" column="25" source="standard:no-multi-spaces" />
         <error line="52" column="31" source="standard:statement-wrapping" />
         <error line="52" column="54" source="standard:statement-wrapping" />
-        <error line="56" column="16" source="standard:no-multi-spaces" />
-        <error line="249" column="15" source="standard:no-multi-spaces" />
-        <error line="255" column="30" source="standard:no-multi-spaces" />
-        <error line="265" column="27" source="standard:no-multi-spaces" />
-        <error line="268" column="40" source="standard:multiline-if-else" />
-        <error line="269" column="18" source="standard:multiline-if-else" />
-        <error line="272" column="50" source="standard:no-multi-spaces" />
-        <error line="273" column="51" source="standard:no-multi-spaces" />
-        <error line="274" column="23" source="standard:no-multi-spaces" />
+        <error line="53" column="31" source="standard:statement-wrapping" />
+        <error line="53" column="54" source="standard:statement-wrapping" />
+        <error line="57" column="16" source="standard:no-multi-spaces" />
+        <error line="286" column="15" source="standard:no-multi-spaces" />
+        <error line="292" column="30" source="standard:no-multi-spaces" />
+        <error line="302" column="27" source="standard:no-multi-spaces" />
+        <error line="305" column="40" source="standard:multiline-if-else" />
+        <error line="306" column="18" source="standard:multiline-if-else" />
+        <error line="309" column="50" source="standard:no-multi-spaces" />
+        <error line="310" column="51" source="standard:no-multi-spaces" />
+        <error line="311" column="23" source="standard:no-multi-spaces" />
     </file>
     <file name="src/main/kotlin/io/github/jayteealao/isometric/Point.kt">
         <error line="23" column="24" source="standard:trailing-comma-on-declaration-site" />
@@ -509,14 +499,14 @@
         <error line="222" column="20" source="standard:trailing-comma-on-call-site" />
     </file>
     <file name="src/test/kotlin/io/github/jayteealao/isometric/FaceKeyMemoTest.kt">
-        <error line="41" column="34" source="standard:trailing-comma-on-call-site" />
-        <error line="53" column="83" source="standard:trailing-comma-on-call-site" />
-        <error line="79" column="88" source="standard:trailing-comma-on-call-site" />
-        <error line="102" column="56" source="standard:trailing-comma-on-call-site" />
-        <error line="119" column="34" source="standard:trailing-comma-on-call-site" />
-        <error line="142" column="49" source="standard:trailing-comma-on-call-site" />
-        <error line="175" column="58" source="standard:trailing-comma-on-call-site" />
-        <error line="184" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="35" column="33" source="standard:argument-list-wrapping" />
+        <error line="36" column="39" source="standard:argument-list-wrapping" />
+        <error line="89" column="49" source="standard:trailing-comma-on-call-site" />
+        <error line="108" column="99" source="standard:trailing-comma-on-call-site" />
+        <error line="115" column="80" source="standard:trailing-comma-on-call-site" />
+        <error line="121" column="73" source="standard:trailing-comma-on-call-site" />
+        <error line="148" column="89" source="standard:trailing-comma-on-call-site" />
+        <error line="155" column="50" source="standard:trailing-comma-on-call-site" />
     </file>
     <file name="src/test/kotlin/io/github/jayteealao/isometric/IntersectionUtilsTest.kt">
         <error line="33" column="39" source="standard:argument-list-wrapping" />

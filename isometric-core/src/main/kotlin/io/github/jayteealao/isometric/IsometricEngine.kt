@@ -1,8 +1,6 @@
 package io.github.jayteealao.isometric
 
-import java.util.IdentityHashMap
 import kotlin.math.PI
-import kotlin.math.floor
 
 /**
  * Core isometric rendering engine.
@@ -171,10 +169,6 @@ class IsometricEngine @JvmOverloads constructor(
         private set
 
     private val sceneGraph = SceneGraph()
-    // Single-thread invariant: these caches are accessed only on the Compose draw thread.
-    // If cullSharedInteriorFaces ever moves off-thread, synchronization is required.
-    private val faceKeyPrimaryCache = IdentityHashMap<Path, FaceKey>()
-    private val faceKeyBumpedCache  = IdentityHashMap<Path, FaceKey>()
     private var projection = IsometricProjection(angle, scale, colorDifference, lightColor)
 
     /**
@@ -329,13 +323,7 @@ class IsometricEngine @JvmOverloads constructor(
      */
     override fun clear() {
         sceneGraph.clear()
-        faceKeyPrimaryCache.clear()
-        faceKeyBumpedCache.clear()
     }
-
-    /** Returns the combined entry count of both faceKey memo maps. For test introspection only. */
-    internal fun faceKeyCacheSize(): Int =
-        faceKeyPrimaryCache.size + faceKeyBumpedCache.size
 
     /**
      * Projects the 3D scene to 2D screen space for the given viewport size.
@@ -513,9 +501,10 @@ class IsometricEngine @JvmOverloads constructor(
         // pairwise within SHARED_FACE_EPSILON) are ever culled.
         val groups = linkedMapOf<FaceKey, MutableList<Int>>()
         for (index in items.indices) {
-            val primaryKey = faceKey(items[index].path)
+            val path = items[index].path
+            val primaryKey = path.faceKey
             groups.getOrPut(primaryKey) { mutableListOf() }.add(index)
-            val bumpedKey = faceKeyBumped(items[index].path)
+            val bumpedKey = path.faceKeyBumped
             if (bumpedKey != primaryKey) {
                 groups.getOrPut(bumpedKey) { mutableListOf() }.add(index)
             }
@@ -543,50 +532,6 @@ class IsometricEngine @JvmOverloads constructor(
 
         return items.filterIndexed { index, _ -> !culled[index] }
     }
-
-    /**
-     * Builds a canonical identity key for a face's vertex set using floor-bucketing,
-     * independent of winding order or the choice of starting vertex.
-     *
-     * Two faces with vertices `[P, Q, R, S]` and `[R, S, P, Q]` (or any rotation
-     * or reversal) produce the same key. Coordinates are floor-quantized (see
-     * [quantize]). Use [faceKeyBumped] alongside this key to cover cross-boundary
-     * coincidences (see [cullSharedInteriorFaces]).
-     */
-    private fun faceKey(path: Path): FaceKey =
-        faceKeyPrimaryCache.getOrPut(path) {
-            FaceKey(
-                path.points.map { point ->
-                    QuantizedPoint(
-                        quantize(point.x),
-                        quantize(point.y),
-                        quantize(point.z)
-                    )
-                }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
-            )
-        }
-
-    /**
-     * Like [faceKey] but advances each coordinate's bucket by one whenever that
-     * coordinate sits in the upper half of its floor bucket (fractional part > 0.5).
-     *
-     * When indexed alongside [faceKey], the bumped key guarantees that two vertices
-     * whose coordinates straddle a floor-bucket boundary while being within
-     * [SHARED_FACE_EPSILON] of each other share at least one key — the lower
-     * vertex's bumped bucket equals the upper vertex's primary (floor) bucket.
-     */
-    private fun faceKeyBumped(path: Path): FaceKey =
-        faceKeyBumpedCache.getOrPut(path) {
-            FaceKey(
-                path.points.map { point ->
-                    QuantizedPoint(
-                        quantizeBumped(point.x),
-                        quantizeBumped(point.y),
-                        quantizeBumped(point.z)
-                    )
-                }.sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z })
-            )
-        }
 
     /**
      * Returns `true` when the two paths have the same number of vertices and every
@@ -662,55 +607,6 @@ class IsometricEngine @JvmOverloads constructor(
             z = ux * vy - uy * vx
         )
     }
-
-    /**
-     * Maps a continuous world-coordinate to the floor integer bucket of width
-     * [SHARED_FACE_EPSILON]. Any two values that fall within the same
-     * `[k * epsilon, (k+1) * epsilon)` interval produce the same bucket.
-     *
-     * Using floor (rather than round) moves the coarse bucket boundary from
-     * half-integer positions to integer positions, ensuring that two values
-     * such as `0.49e-6` and `0.51e-6` — which differ by less than epsilon but
-     * would round to different buckets — both land in bucket 0.
-     * Cross-boundary pairs (e.g. `0.99e-6` → bucket 0 and `1.01e-6` → bucket 1)
-     * are resolved by also indexing faces under [quantizeBumped] / [faceKeyBumped].
-     */
-    private fun quantize(value: Double): Long {
-        return floor(value / SHARED_FACE_EPSILON).toLong()
-    }
-
-    /**
-     * Like [quantize] but advances the bucket by one whenever the coordinate's
-     * fractional position within its floor bucket exceeds 0.5.
-     *
-     * Combined with [quantize] (see [faceKeyBumped]), this ensures that two
-     * coordinates which straddle a floor-bucket boundary while being within
-     * [SHARED_FACE_EPSILON] of each other share at least one canonical bucket
-     * and therefore appear in the same candidate group during face culling.
-     */
-    private fun quantizeBumped(value: Double): Long {
-        val scaled = value / SHARED_FACE_EPSILON
-        val floorBucket = floor(scaled).toLong()
-        return if (scaled - floorBucket > 0.5) floorBucket + 1L else floorBucket
-    }
-
-    /**
-     * Identity key for grouping faces that share an identical 3D vertex set,
-     * independent of winding order. The point list is sorted into a canonical
-     * order so any two faces with the same geometry produce equal keys.
-     */
-    private data class FaceKey(val points: List<QuantizedPoint>)
-
-    /**
-     * 3D point with each coordinate quantized into integer buckets of width
-     * [SHARED_FACE_EPSILON]. Used as a stable equality key for face vertices,
-     * absorbing the floating-point drift that a raw `Point` would expose.
-     */
-    private data class QuantizedPoint(
-        val x: Long,
-        val y: Long,
-        val z: Long
-    )
 
     /**
      * Unnormalized face normal vector. Magnitude is the parallelogram area of

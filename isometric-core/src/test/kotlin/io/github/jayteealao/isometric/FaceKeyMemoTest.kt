@@ -4,139 +4,86 @@ package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
 import java.lang.management.ManagementFactory
+import java.util.IdentityHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Correctness and regression tests for the [IsometricEngine] faceKey memo.
+ * Correctness and regression tests for the per-[Path] faceKey memo.
  *
- * The engine memoizes the `FaceKey` and `FaceKeyBumped` result for each [Path] instance
- * using an [java.util.IdentityHashMap], eliminating per-frame FaceKey allocations after
- * the first dirty frame.  These tests cover:
+ * Each [Path] computes its [Path.faceKey] and [Path.faceKeyBumped] lazily and exactly
+ * once per instance (via `by lazy`).  Because the key is a pure world-space function of
+ * the Path's points, the memo lives for the Path's own GC lifetime — there is no
+ * engine-side [IdentityHashMap] holding strong references to every Path until `clear()`.
  *
- * 1. Cache is populated after the first [IsometricEngine.projectScene] call.
- * 2. Coincident interior faces are still culled correctly when the memo is active
- *    (warm path produces the same face count as the cold path).
- * 3. Calling [IsometricEngine.clear] resets the memo to zero entries.
- * 4. Per-call FaceKey allocations are near zero on the warm path.
+ * These tests cover:
+ *
+ * 1. A single Path instance computes each key at most once — repeated access is flat
+ *    (near-zero allocation) versus the first-access build cost.
+ * 2. Coincident interior faces are still culled correctly (grouping/dedup unchanged).
+ * 3. The engine holds no external identity map of Paths (the retention leak is gone),
+ *    and churning many distinct Paths does not accumulate engine-side state.
  */
 class FaceKeyMemoTest {
 
-    // ---------------------------------------------------------------------------
-    // Test 1 — Cache populated on first projectScene call
-    // ---------------------------------------------------------------------------
-
-    @Test
-    fun `cache is populated after first projectScene call`() {
-        val engine = IsometricEngine()
-        // A 2×2 Prism grid — 4 Prisms × 6 faces each = 24 Path objects added to the
-        // scene graph.  projectScene calls cullSharedInteriorFaces, which invokes both
-        // faceKey() and faceKeyBumped() for every face path.  After the call both
-        // caches must be non-empty.
-        for (col in 0 until 2) {
-            for (row in 0 until 2) {
-                engine.add(
-                    Prism(Point(col.toDouble(), row.toDouble(), 0.0)),
-                    IsoColor.BLUE
-                )
-            }
-        }
-
-        assertTrue(engine.faceKeyCacheSize() == 0, "Cache must start empty")
-
-        engine.projectScene(800, 600, RenderOptions.Default)
-
-        assertTrue(
-            engine.faceKeyCacheSize() > 0,
-            "faceKeyPrimaryCache + faceKeyBumpedCache must contain entries after the " +
-                "first projectScene call (found 0 — memo is not being populated)."
+    private fun quad(i: Int): Path {
+        // Distinct geometry per i so no two Paths share a faceKey — each must build its own.
+        val d = i.toDouble()
+        return Path(
+            Point(d, 0.0, 0.0), Point(d + 1.0, 0.0, 0.0),
+            Point(d + 1.0, 1.0, 0.0), Point(d, 1.0, 0.0),
         )
     }
 
     // ---------------------------------------------------------------------------
-    // Test 2 — Culling correctness is unchanged when memo is active
+    // Test 1 — faceKey is computed at most once per Path instance
     // ---------------------------------------------------------------------------
 
     @Test
-    fun `coincident interior faces still culled correctly with memo active`() {
-        val engine = IsometricEngine()
-        // Two unit Prisms side by side along the x-axis: their shared vertical wall
-        // (the RIGHT face of Prism at x=0 coincides with the LEFT face of Prism at x=1)
-        // must be culled by the shared-interior-face pass.
-        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.BLUE)
-        engine.add(Prism(Point(1.0, 0.0, 0.0)), IsoColor.RED)
+    fun `faceKey computed at most once per Path instance`() {
+        val n = 24 // same face count as a 2x2 Prism grid
 
-        // Cold call — caches are populated here.
-        val coldScene = engine.projectScene(800, 600, RenderOptions.Default)
-        // Warm call — all FaceKey lookups come from the memo.
-        val warmScene = engine.projectScene(800, 600, RenderOptions.Default)
-
-        assertEquals(
-            coldScene.commands.size,
-            warmScene.commands.size,
-            "Warm-cache projectScene must produce the same number of rendered faces " +
-                "as the cold call — memo must not alter grouping or culling decisions."
-        )
-    }
-
-    // ---------------------------------------------------------------------------
-    // Test 3 — clear() empties both memo caches
-    // ---------------------------------------------------------------------------
-
-    @Test
-    fun `faceKeyCacheSize returns zero after clear`() {
-        val engine = IsometricEngine()
-        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.BLUE)
-        engine.add(Prism(Point(1.0, 0.0, 0.0)), IsoColor.RED)
-
-        engine.projectScene(800, 600, RenderOptions.Default)
-        assertTrue(engine.faceKeyCacheSize() > 0, "Cache must be non-empty after projectScene")
-
-        engine.clear()
-
-        assertEquals(
-            0,
-            engine.faceKeyCacheSize(),
-            "engine.clear() must reset both faceKey memo caches to size 0 — " +
-                "otherwise stale Path references leak."
-        )
-    }
-
-    // ---------------------------------------------------------------------------
-    // Test 4 — Per-frame faceKey allocations ≈ 0 on the warm path
-    // ---------------------------------------------------------------------------
-
-    @Test
-    fun `faceKey allocations near zero on warm path`() {
-        val engine = IsometricEngine()
-        // 2×2 Prism grid → 24 Face paths in the scene, including several coincident
-        // interior face pairs that drive faceKey() and faceKeyBumped() on every frame.
-        for (col in 0 until 2) {
-            for (row in 0 until 2) {
-                engine.add(
-                    Prism(Point(col.toDouble(), row.toDouble(), 0.0)),
-                    IsoColor.BLUE
-                )
-            }
-        }
-
-        val options = RenderOptions.Default
-
-        // Warm-up: let the JIT compile the hot path and populate the memo caches.
-        repeat(5) { engine.projectScene(800, 600, options) }
-
-        // Allocation measurement.
         val threadMxBean = ManagementFactory.getThreadMXBean()
         val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
         val threadId = Thread.currentThread().id
+        var sink = 0
 
-        val measureIterations = 20
-        val beforeBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
-        repeat(measureIterations) { engine.projectScene(800, 600, options) }
-        val afterBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        // Warm-up: let the JIT compile the lazy-build and access paths using throwaway
+        // Paths so the measured batch below is not polluted by first-compile allocation.
+        repeat(5) {
+            for (j in 0 until n) {
+                val p = quad(1000 + it * n + j)
+                sink += p.faceKey.hashCode()
+                sink += p.faceKeyBumped.hashCode()
+                sink += p.faceKey.hashCode() // second access — memoized
+            }
+        }
 
-        if (beforeBytes < 0 || afterBytes < 0) {
+        // Fresh Paths whose keys have NOT been accessed yet.
+        val paths = (0 until n).map { quad(it) }
+
+        // First access — each Path builds its two keys exactly once (unmemoized cost).
+        val beforeFirst = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        for (p in paths) {
+            sink += p.faceKey.hashCode()
+            sink += p.faceKeyBumped.hashCode()
+        }
+        val afterFirst = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+
+        // Second access — every key resolves from the per-Path memo (should be ~0 bytes).
+        val beforeSecond = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        for (p in paths) {
+            sink += p.faceKey.hashCode()
+            sink += p.faceKeyBumped.hashCode()
+        }
+        val afterSecond = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+
+        // Keep the JIT from dead-code-eliminating the key reads.
+        assertTrue(sink != Int.MIN_VALUE, "sink guard")
+
+        if (beforeFirst < 0 || afterFirst < 0 || beforeSecond < 0 || afterSecond < 0) {
             println(
                 "FaceKeyMemoTest: com.sun.management.ThreadMXBean unavailable" +
                     " — byte assertion skipped."
@@ -144,44 +91,101 @@ class FaceKeyMemoTest {
             return
         }
 
-        val totalBytes = afterBytes - beforeBytes
-        val perCallBytes = totalBytes.toDouble() / measureIterations
+        val firstBuildBytes = afterFirst - beforeFirst
+        val memoizedBytes = afterSecond - beforeSecond
 
-        // Threshold rationale:
-        //   Each warm faceKey()/faceKeyBumped() call resolves via IdentityHashMap.getOrPut
-        //   and allocates nothing.  Without the memo, N=24 faces × 2 key variants = 48
-        //   FaceKey constructions per frame.  Each construction allocates:
-        //     - map { QuantizedPoint(...) }   → ArrayList + 4 QuantizedPoints ≈  240 B
-        //     - .sortedWith(...)              → ArrayList copy                 ≈  128 B
-        //     - FaceKey() wrapper             → object header + ref            ≈   48 B
-        //   Subtotal ≈ 416 B/call × 48 calls ≈ 19,968 B/frame extra (unmemoized).
-        //
-        //   Measured projectScene base overhead for this 24-face scene on a warm JVM is
-        //   roughly 45 000–65 000 B (projection, lighting, sort, PreparedScene).
-        //
-        //   Threshold 90 000 B sits above the expected warm-path total (~65 000 B at most)
-        //   and below the unmemoized total (~85 000 B):
-        //     memoized   (~65 000 B) < 90 000 B ✓ PASS
-        //     unmemoized (~85 000 B) < 90 000 B — if this ever fails: check that the memo
-        //     is still active and re-calibrate this threshold with actual measurements.
-        //
-        //   If this test becomes flaky due to JVM or scene overhead changes, re-run with
-        //   verbose output to see the measured value and adjust accordingly.
-        val thresholdPerCall = 90_000.0
+        // Threshold rationale (Finding #4 — sit between memoized max and unmemoized min):
+        //   First access builds n×2 FaceKeys (ArrayList + 4 QuantizedPoint + sorted-copy +
+        //   wrapper per key); measured ≈ 33,000 B for the 24-Path batch on JDK 17 HotSpot.
+        //   Second access is pure memo lookups; measured ≈ 1,200 B (loop-iterator noise).
+        //   Threshold 4,000 B sits between the two — far below the ~33,000 B build cost and
+        //   comfortably above the memoized floor — so it fails loudly if the memo ever
+        //   stops caching without tripping on measurement noise.
+        val thresholdBytes = 4_000.0
 
         println(
-            "FaceKeyMemoTest: N=24 faces (2×2 Prism grid), $measureIterations warm calls — " +
-                "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
-                "threshold=${thresholdPerCall.toLong()}B"
+            "FaceKeyMemoTest: N=$n Paths — first-access build=${firstBuildBytes}B  " +
+                "second-access(memoized)=${memoizedBytes}B  threshold=${thresholdBytes.toLong()}B"
         )
 
         assertTrue(
-            perCallBytes < thresholdPerCall,
-            "projectScene allocated ${perCallBytes.toLong()} bytes/call on the warm path — " +
-                "expected < ${thresholdPerCall.toLong()} bytes/call. " +
-                "If per-call bytes are high, verify that faceKey()/faceKeyBumped() are " +
-                "resolving from the IdentityHashMap cache and not re-constructing FaceKey " +
-                "objects each frame."
+            firstBuildBytes > thresholdBytes,
+            "First access should build the keys and allocate more than " +
+                "${thresholdBytes.toLong()}B for $n Paths; measured ${firstBuildBytes}B. " +
+                "If this is ~0 the fixture is not exercising key construction."
         )
+        assertTrue(
+            memoizedBytes.toDouble() < thresholdBytes,
+            "Repeated faceKey/faceKeyBumped access on the same Path instances allocated " +
+                "${memoizedBytes}B — expected < ${thresholdBytes.toLong()}B. The `by lazy` " +
+                "memo must return the cached key without rebuilding it."
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 2 — Culling correctness / within-frame dedup is unchanged
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `coincident interior faces still culled correctly with per-Path memo`() {
+        val engine = IsometricEngine()
+        // Two unit Prisms side by side along the x-axis: their shared vertical wall
+        // (the RIGHT face of Prism at x=0 coincides with the LEFT face of Prism at x=1)
+        // must be culled by the shared-interior-face pass. The pass reads path.faceKey /
+        // path.faceKeyBumped, so this verifies grouping is unchanged by the memo move.
+        engine.add(Prism(Point(0.0, 0.0, 0.0)), IsoColor.BLUE)
+        engine.add(Prism(Point(1.0, 0.0, 0.0)), IsoColor.RED)
+
+        // Cold call — each Path builds its key on first access here.
+        val coldScene = engine.projectScene(800, 600, RenderOptions.Default)
+        // Warm call — every FaceKey lookup comes from the per-Path memo.
+        val warmScene = engine.projectScene(800, 600, RenderOptions.Default)
+
+        assertEquals(
+            coldScene.commands.size,
+            warmScene.commands.size,
+            "Warm projectScene must produce the same number of rendered faces as the cold " +
+                "call — the per-Path memo must not alter grouping or culling decisions."
+        )
+        // The shared interior wall pair is culled, so fewer than the 12 total faces
+        // (2 Prisms × 6) survive; assert culling actually happened.
+        assertTrue(
+            coldScene.commands.size < 12,
+            "Expected the shared interior wall to be culled (fewer than 12 faces), " +
+                "got ${coldScene.commands.size}."
+        )
+    }
+
+    // ---------------------------------------------------------------------------
+    // Test 3 — No engine-side identity map retains Paths (leak fixed)
+    // ---------------------------------------------------------------------------
+
+    @Test
+    fun `engine retains no identity map of Paths`() {
+        // Direct proof the retention vector is gone: the engine declares no
+        // IdentityHashMap (or any Map) field that could accumulate Path references.
+        val retainingMapField = IsometricEngine::class.java.declaredFields.firstOrNull { field ->
+            IdentityHashMap::class.java.isAssignableFrom(field.type) ||
+                Map::class.java.isAssignableFrom(field.type)
+        }
+        assertFalse(
+            retainingMapField != null,
+            "IsometricEngine must not hold a Map/IdentityHashMap field caching Path keys — " +
+                "found '${retainingMapField?.name}'. Face keys now live on the Path itself.",
+        )
+
+        // Churn scenario: many distinct Paths across repeated add/clear cycles. With the
+        // memo on the Path, nothing is retained engine-side once the scene is cleared.
+        val engine = IsometricEngine()
+        repeat(50) { frame ->
+            engine.clear()
+            for (i in 0 until 8) {
+                engine.add(Prism(Point(i.toDouble(), frame.toDouble(), 0.0)), IsoColor.BLUE)
+            }
+            engine.projectScene(800, 600, RenderOptions.Default)
+        }
+        // No assertion needed beyond completion + the reflection check above: if an
+        // engine-side map existed it would be growing here; there is none to grow.
+        engine.clear()
     }
 }

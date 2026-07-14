@@ -1,6 +1,7 @@
 package io.github.jayteealao.isometric
 
 import kotlin.math.PI
+import kotlin.math.floor
 import kotlin.math.sin
 
 /**
@@ -69,6 +70,42 @@ open class Path(
      */
     fun depth(angle: Double): Double {
         return points.sumOf { it.depth(angle) } / points.size
+    }
+
+    /**
+     * Canonical identity key for this face's vertex set, floor-bucketed and sorted so
+     * that any two faces with the same 3D geometry (independent of winding order or the
+     * choice of starting vertex) produce equal keys.
+     *
+     * The key is a pure world-space function of [points], so it is computed lazily and
+     * exactly once per Path instance and cached for this instance's own GC lifetime —
+     * no external map to grow unbounded. Pair with [faceKeyBumped] to also catch
+     * coincidences that straddle a floor-bucket boundary.
+     *
+     * Single-thread invariant: Path is immutable, and `by lazy` publishes safely, so the
+     * memoized key is readable from any thread once first computed.
+     */
+    internal val faceKey: FaceKey by lazy {
+        FaceKey(
+            points.map { p -> QuantizedPoint(quantize(p.x), quantize(p.y), quantize(p.z)) }
+                .sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z }),
+        )
+    }
+
+    /**
+     * Like [faceKey] but advances each coordinate's bucket by one whenever that
+     * coordinate sits in the upper half of its floor bucket (fractional part > 0.5).
+     *
+     * Indexed alongside [faceKey], the bumped key guarantees that two vertices whose
+     * coordinates straddle a floor-bucket boundary while within [FACE_KEY_EPSILON] of
+     * each other share at least one key — the lower vertex's bumped bucket equals the
+     * upper vertex's floor bucket. Also memoized lazily and once per Path instance.
+     */
+    internal val faceKeyBumped: FaceKey by lazy {
+        FaceKey(
+            points.map { p -> QuantizedPoint(quantizeBumped(p.x), quantizeBumped(p.y), quantizeBumped(p.z)) }
+                .sortedWith(compareBy<QuantizedPoint> { it.x }.thenBy { it.y }.thenBy { it.z }),
+        )
     }
 
     constructor(vararg points: Point) : this(points.toList())
@@ -283,5 +320,48 @@ open class Path(
          * [IntersectionUtils.hasInteriorIntersection]'s edge band).
          */
         private const val EPSILON: Double = 1e-6
+
+        /**
+         * Bucket width (world units) for face-key quantization. Must match the
+         * face-coincidence epsilon used by the culling stage so the two agree on what
+         * "same vertex" means.
+         */
+        private const val FACE_KEY_EPSILON: Double = 1e-6
+
+        /**
+         * Maps a continuous world coordinate to its floor integer bucket of width
+         * [FACE_KEY_EPSILON]. Using floor (rather than round) keeps bucket boundaries on
+         * integer positions; cross-boundary pairs are resolved via [quantizeBumped].
+         */
+        private fun quantize(value: Double): Long = floor(value / FACE_KEY_EPSILON).toLong()
+
+        /**
+         * Like [quantize] but advances the bucket by one whenever the coordinate's
+         * fractional position within its floor bucket exceeds 0.5.
+         */
+        private fun quantizeBumped(value: Double): Long {
+            val scaled = value / FACE_KEY_EPSILON
+            val floorBucket = floor(scaled).toLong()
+            return if (scaled - floorBucket > 0.5) floorBucket + 1L else floorBucket
+        }
     }
 }
+
+/**
+ * Identity key for grouping faces that share an identical 3D vertex set, independent of
+ * winding order. The point list is sorted into a canonical order so any two faces with
+ * the same geometry produce equal keys. Produced lazily by [Path.faceKey] /
+ * [Path.faceKeyBumped].
+ */
+internal data class FaceKey(val points: List<QuantizedPoint>)
+
+/**
+ * 3D point with each coordinate quantized into integer buckets of width
+ * `FACE_KEY_EPSILON`. Used as a stable equality key for face vertices, absorbing the
+ * floating-point drift that a raw [Point] would expose.
+ */
+internal data class QuantizedPoint(
+    val x: Long,
+    val y: Long,
+    val z: Long,
+)
