@@ -449,7 +449,15 @@ class IsometricEngine @JvmOverloads constructor(
         }
 
         val litColor = projection.transformColor(item.path, item.baseColor, normalizedLight)
-        val edgeEq = IntersectionUtils.EdgeEquations2D.of(screenPoints)
+        // Edge equations are consumed only by the depth-sort pass. When depth sorting is
+        // disabled, DepthSorter.sort is skipped and this field is never read, so skip the
+        // build entirely rather than allocate a wrapper + three DoubleArrays per visible
+        // face for nothing.
+        val edgeEq = if (renderOptions.enableDepthSorting) {
+            IntersectionUtils.EdgeEquations2D.of(screenPoints)
+        } else {
+            null
+        }
         return DepthSorter.TransformedItem(item, screenPoints, litColor, edgeEq)
     }
 
