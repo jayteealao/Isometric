@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <baseline version="1.0">
     <file name="build.gradle.kts">
-        <error line="24" column="37" source="standard:trailing-comma-on-call-site" />
+        <error line="25" column="37" source="standard:trailing-comma-on-call-site" />
     </file>
     <file name="src/main/kotlin/io/github/jayteealao/isometric/view/AndroidCanvasRenderer.kt">
         <error line="31" column="9" source="standard:function-signature" />
