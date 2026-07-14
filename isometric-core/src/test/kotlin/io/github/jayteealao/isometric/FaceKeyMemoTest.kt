@@ -45,8 +45,26 @@ class FaceKeyMemoTest {
     fun `faceKey computed at most once per Path instance`() {
         val n = 24 // same face count as a 2x2 Prism grid
 
+        // Allocation measurement.
+        // Fail closed: the allocation threshold must be enforced, never silently skipped.
+        // If the platform genuinely cannot measure per-thread allocation, that is a test
+        // failure rather than a pass — a silent no-op guard would let a regression slip by.
         val threadMxBean = ManagementFactory.getThreadMXBean()
         val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
+            ?: throw AssertionError(
+                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
+                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
+                    "The allocation threshold cannot be enforced — failing closed.",
+            )
+        assertTrue(
+            sunBean.isThreadAllocatedMemorySupported,
+            "Thread allocation measurement unsupported: " +
+                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
+                "The allocation threshold cannot be enforced — failing closed.",
+        )
+        if (!sunBean.isThreadAllocatedMemoryEnabled) {
+            sunBean.isThreadAllocatedMemoryEnabled = true
+        }
         val threadId = Thread.currentThread().id
         var sink = 0
 
@@ -65,31 +83,31 @@ class FaceKeyMemoTest {
         val paths = (0 until n).map { quad(it) }
 
         // First access — each Path builds its two keys exactly once (unmemoized cost).
-        val beforeFirst = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val beforeFirst = sunBean.getThreadAllocatedBytes(threadId)
         for (p in paths) {
             sink += p.faceKey.hashCode()
             sink += p.faceKeyBumped.hashCode()
         }
-        val afterFirst = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val afterFirst = sunBean.getThreadAllocatedBytes(threadId)
 
         // Second access — every key resolves from the per-Path memo (should be ~0 bytes).
-        val beforeSecond = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val beforeSecond = sunBean.getThreadAllocatedBytes(threadId)
         for (p in paths) {
             sink += p.faceKey.hashCode()
             sink += p.faceKeyBumped.hashCode()
         }
-        val afterSecond = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val afterSecond = sunBean.getThreadAllocatedBytes(threadId)
 
         // Keep the JIT from dead-code-eliminating the key reads.
         assertTrue(sink != Int.MIN_VALUE, "sink guard")
 
-        if (beforeFirst < 0 || afterFirst < 0 || beforeSecond < 0 || afterSecond < 0) {
-            println(
-                "FaceKeyMemoTest: com.sun.management.ThreadMXBean unavailable" +
-                    " — byte assertion skipped."
-            )
-            return
-        }
+        assertTrue(
+            beforeFirst >= 0 && afterFirst >= 0 && beforeSecond >= 0 && afterSecond >= 0,
+            "Thread allocation measurement returned a negative reading even after enabling " +
+                "(beforeFirst=$beforeFirst, afterFirst=$afterFirst, beforeSecond=$beforeSecond, " +
+                "afterSecond=$afterSecond). The allocation threshold cannot be enforced — " +
+                "failing closed.",
+        )
 
         val firstBuildBytes = afterFirst - beforeFirst
         val memoizedBytes = afterSecond - beforeSecond
@@ -105,20 +123,20 @@ class FaceKeyMemoTest {
 
         println(
             "FaceKeyMemoTest: N=$n Paths — first-access build=${firstBuildBytes}B  " +
-                "second-access(memoized)=${memoizedBytes}B  threshold=${thresholdBytes.toLong()}B"
+                "second-access(memoized)=${memoizedBytes}B  threshold=${thresholdBytes.toLong()}B",
         )
 
         assertTrue(
             firstBuildBytes > thresholdBytes,
             "First access should build the keys and allocate more than " +
                 "${thresholdBytes.toLong()}B for $n Paths; measured ${firstBuildBytes}B. " +
-                "If this is ~0 the fixture is not exercising key construction."
+                "If this is ~0 the fixture is not exercising key construction.",
         )
         assertTrue(
             memoizedBytes.toDouble() < thresholdBytes,
             "Repeated faceKey/faceKeyBumped access on the same Path instances allocated " +
                 "${memoizedBytes}B — expected < ${thresholdBytes.toLong()}B. The `by lazy` " +
-                "memo must return the cached key without rebuilding it."
+                "memo must return the cached key without rebuilding it.",
         )
     }
 
@@ -145,14 +163,14 @@ class FaceKeyMemoTest {
             coldScene.commands.size,
             warmScene.commands.size,
             "Warm projectScene must produce the same number of rendered faces as the cold " +
-                "call — the per-Path memo must not alter grouping or culling decisions."
+                "call — the per-Path memo must not alter grouping or culling decisions.",
         )
         // The shared interior wall pair is culled, so fewer than the 12 total faces
         // (2 Prisms × 6) survive; assert culling actually happened.
         assertTrue(
             coldScene.commands.size < 12,
             "Expected the shared interior wall to be culled (fewer than 12 faces), " +
-                "got ${coldScene.commands.size}."
+                "got ${coldScene.commands.size}.",
         )
     }
 

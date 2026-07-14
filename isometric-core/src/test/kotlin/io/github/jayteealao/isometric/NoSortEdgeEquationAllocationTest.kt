@@ -18,8 +18,8 @@ import kotlin.test.assertTrue
  * edge-equation build when depth sorting is disabled.
  *
  * Measurement uses [com.sun.management.ThreadMXBean.getThreadAllocatedBytes] (JDK 7+
- * HotSpot / OpenJDK).  When the API is absent the byte assertion is skipped and the
- * test degrades to a no-op pass so CI on exotic JVMs is not broken.
+ * HotSpot / OpenJDK).  When the API is unavailable or unsupported the test fails closed
+ * rather than silently passing — a no-op guard would let a regression slip by unnoticed.
  */
 class NoSortEdgeEquationAllocationTest {
 
@@ -50,22 +50,39 @@ class NoSortEdgeEquationAllocationTest {
         // Warm-up: let the JIT compile the hot path.
         repeat(5) { engine.projectScene(800, 600, options) }
 
+        // Allocation measurement.
+        // Fail closed: the allocation threshold must be enforced, never silently skipped.
+        // If the platform genuinely cannot measure per-thread allocation, that is a test
+        // failure rather than a pass — a silent no-op guard would let a regression slip by.
         val threadMxBean = ManagementFactory.getThreadMXBean()
         val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
+            ?: throw AssertionError(
+                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
+                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
+                    "The allocation threshold cannot be enforced — failing closed.",
+            )
+        assertTrue(
+            sunBean.isThreadAllocatedMemorySupported,
+            "Thread allocation measurement unsupported: " +
+                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
+                "The allocation threshold cannot be enforced — failing closed.",
+        )
+        if (!sunBean.isThreadAllocatedMemoryEnabled) {
+            sunBean.isThreadAllocatedMemoryEnabled = true
+        }
         val threadId = Thread.currentThread().id
 
         val measureIterations = 20
-        val beforeBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val beforeBytes = sunBean.getThreadAllocatedBytes(threadId)
         repeat(measureIterations) { engine.projectScene(800, 600, options) }
-        val afterBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
+        val afterBytes = sunBean.getThreadAllocatedBytes(threadId)
 
-        if (beforeBytes < 0 || afterBytes < 0) {
-            println(
-                "NoSortEdgeEquationAllocationTest: com.sun.management.ThreadMXBean unavailable" +
-                    " — byte assertion skipped."
-            )
-            return
-        }
+        assertTrue(
+            beforeBytes >= 0 && afterBytes >= 0,
+            "Thread allocation measurement returned a negative reading even after enabling " +
+                "(before=$beforeBytes, after=$afterBytes). The allocation threshold cannot be " +
+                "enforced — failing closed.",
+        )
 
         val totalBytes = afterBytes - beforeBytes
         val perCallBytes = totalBytes.toDouble() / measureIterations
@@ -87,7 +104,7 @@ class NoSortEdgeEquationAllocationTest {
             "NoSortEdgeEquationAllocationTest: N=24 faces (2×2 Prism grid), " +
                 "$measureIterations no-sort calls — " +
                 "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
-                "threshold=${thresholdPerCall.toLong()}B"
+                "threshold=${thresholdPerCall.toLong()}B",
         )
 
         assertTrue(
@@ -95,7 +112,7 @@ class NoSortEdgeEquationAllocationTest {
             "no-sort projectScene allocated ${perCallBytes.toLong()} bytes/call on the " +
                 "depth-sorting-disabled path — expected < ${thresholdPerCall.toLong()} bytes/call. " +
                 "If high, verify projectAndCull skips IntersectionUtils.EdgeEquations2D.of " +
-                "when renderOptions.enableDepthSorting is false."
+                "when renderOptions.enableDepthSorting is false.",
         )
     }
 }
