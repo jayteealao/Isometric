@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.paparazzi)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.kover)
     id("isometric.publishing")
 }
 
