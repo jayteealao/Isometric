@@ -122,3 +122,18 @@ jobs:
 
       - name: Lint Kotlin with ktlint
         run: ./gradlew ktlintCheck
+
+  # ── Secret scan (gitleaks) ───────────────────────────────────────────────────
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so gitleaks can scan all commits
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE needed: this is a personal-account repository.

@@ -1,0 +1,6 @@
+# Code owners for the Isometric repository.
+# A code-owner review is required by branch protection on `master`, so every
+# path needs at least one owner listed here.
+
+# Default owner for everything not matched by a more specific rule below.
+* @jayteealao
