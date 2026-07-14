@@ -198,7 +198,7 @@ object IntersectionUtils {
         for (i in pointsA.indices) {
             val p = pointsA[i]
             if (isPointInPoly2D(pointsB, p.x, p.y) &&
-                !isPointCloseToPoly2D(pointsB, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges2D(pointsB, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
@@ -206,7 +206,7 @@ object IntersectionUtils {
         for (i in pointsB.indices) {
             val p = pointsB[i]
             if (isPointInPoly2D(pointsA, p.x, p.y) &&
-                !isPointCloseToPoly2D(pointsA, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges2D(pointsA, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
@@ -239,7 +239,7 @@ object IntersectionUtils {
         for (i in pointsA.indices) {
             val p = pointsA[i]
             if (isPointInPoly2D(pointsB, p.x, p.y) &&
-                !isPointCloseToPoly2D(pointsB, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges2D(pointsB, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
@@ -247,7 +247,7 @@ object IntersectionUtils {
         for (i in pointsB.indices) {
             val p = pointsB[i]
             if (isPointInPoly2D(pointsA, p.x, p.y) &&
-                !isPointCloseToPoly2D(pointsA, p.x, p.y, EDGE_BAND)
+                !isPointCloseToEdges2D(pointsA, p.x, p.y, EDGE_BAND)
             ) {
                 return true
             }
@@ -294,7 +294,7 @@ object IntersectionUtils {
     }
 
     /** Edge-proximity test for [Point2D] vertices. */
-    private fun isPointCloseToPoly2D(poly: List<Point2D>, x: Double, y: Double, radius: Double): Boolean {
+    private fun isPointCloseToEdges2D(poly: List<Point2D>, x: Double, y: Double, radius: Double): Boolean {
         for (i in poly.indices) {
             val j = (i + 1) % poly.size
             val v = poly[i]
