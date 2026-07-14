@@ -1,2 +1,5 @@
 # Force LF line endings for shell scripts to prevent CRLF breakage on Windows
 *.sh text eol=lf
+# Git hooks are extensionless shell scripts; keep them LF so they run under
+# git-bash after `installGitHooks` copies them into .git/hooks/ on Windows.
+.githooks/** text eol=lf

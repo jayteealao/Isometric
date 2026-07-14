@@ -1,5 +1,6 @@
 plugins {
     id("isometric.android.library")
+    alias(libs.plugins.ktlint)
     id("isometric.publishing")
 }
 

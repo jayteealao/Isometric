@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{kt,kts}]
+# ktlint reads these keys to configure its rules.
+ktlint_code_style = intellij_idea
+max_line_length = 120
+# Wildcard imports are common in Compose/Android sources here; don't force expansion.
+ktlint_standard_no-wildcard-imports = disabled
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf

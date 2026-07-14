@@ -1,0 +1,799 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="build.gradle.kts">
+        <error line="44" column="37" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/DoubleTapInstrumentedTest.kt">
+        <error line="57" column="9" source="standard:function-signature" />
+        <error line="58" column="9" source="standard:function-signature" />
+        <error line="58" column="43" source="standard:function-signature" />
+        <error line="58" column="43" source="standard:trailing-comma-on-declaration-site" />
+        <error line="79" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="80" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="90" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="221" column="55" source="standard:trailing-comma-on-call-site" />
+        <error line="222" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="223" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="229" column="57" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricRendererNativeCanvasTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="18" column="1" source="standard:no-unused-imports" />
+        <error line="36" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="43" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="52" column="9" source="standard:function-signature" />
+        <error line="53" column="9" source="standard:function-signature" />
+        <error line="54" column="9" source="standard:function-signature" />
+        <error line="54" column="24" source="standard:function-signature" />
+        <error line="54" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="65" column="36" source="standard:trailing-comma-on-call-site" />
+        <error line="89" column="53" source="standard:trailing-comma-on-call-site" />
+        <error line="90" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="95" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="116" column="1" source="standard:max-line-length" />
+        <error line="116" column="30" source="standard:property-wrapping" />
+        <error line="116" column="49" source="standard:argument-list-wrapping" />
+        <error line="116" column="68" source="standard:argument-list-wrapping" />
+        <error line="116" column="95" source="standard:argument-list-wrapping" />
+        <error line="116" column="121" source="standard:argument-list-wrapping" />
+        <error line="124" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="139" column="31" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricRendererPathCachingTest.kt">
+        <error line="23" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="30" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="49" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="59" column="46" source="standard:trailing-comma-on-call-site" />
+        <error line="82" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="92" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="101" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="116" column="31" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/StackTest.kt">
+        <error line="10" column="1" source="standard:no-unused-imports" />
+    </file>
+    <file name="src/androidTest/kotlin/io/github/jayteealao/isometric/compose/runtime/TileGridTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="6" column="1" source="standard:no-unused-imports" />
+        <error line="14" column="1" source="standard:no-unused-imports" />
+        <error line="83" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="156" column="23" source="standard:trailing-comma-on-call-site" />
+        <error line="180" column="60" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/ColorExtensions.kt">
+        <error line="16" column="33" source="standard:trailing-comma-on-call-site" />
+        <error line="29" column="34" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/AdvancedSceneConfig.kt">
+        <error line="92" column="64" source="standard:trailing-comma-on-declaration-site" />
+        <error line="103" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="131" column="64" source="standard:trailing-comma-on-declaration-site" />
+        <error line="137" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="150" column="48" source="standard:function-signature" />
+        <error line="172" column="1" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/CameraState.kt">
+        <error line="22" column="23" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/CompositionLocals.kt">
+        <error line="89" column="54" source="standard:trailing-comma-on-declaration-site" />
+        <error line="97" column="37" source="standard:trailing-comma-on-declaration-site" />
+        <error line="100" column="48" source="standard:function-signature" />
+        <error line="120" column="1" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/GestureConfig.kt">
+        <error line="36" column="40" source="standard:trailing-comma-on-declaration-site" />
+        <error line="47" column="34" source="standard:trailing-comma-on-declaration-site" />
+        <error line="63" column="48" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/GestureEvents.kt">
+        <error line="14" column="36" source="standard:trailing-comma-on-declaration-site" />
+        <error line="30" column="19" source="standard:trailing-comma-on-declaration-site" />
+        <error line="51" column="33" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/HitTestResolver.kt">
+        <error line="23" column="45" source="standard:trailing-comma-on-declaration-site" />
+        <error line="48" column="9" source="standard:function-signature" />
+        <error line="49" column="9" source="standard:function-signature" />
+        <error line="50" column="9" source="standard:function-signature" />
+        <error line="50" column="37" source="standard:function-signature" />
+        <error line="50" column="37" source="standard:trailing-comma-on-declaration-site" />
+        <error line="61" column="45" source="standard:trailing-comma-on-call-site" />
+        <error line="104" column="42" source="standard:trailing-comma-on-call-site" />
+        <error line="112" column="45" source="standard:trailing-comma-on-call-site" />
+        <error line="143" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="164" column="1" source="standard:indent" />
+        <error line="164" column="67" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricApplier.kt">
+        <error line="12" column="20" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricComposables.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="4" column="1" source="standard:no-unused-imports" />
+        <error line="52" column="20" source="standard:function-naming" />
+        <error line="66" column="27" source="standard:trailing-comma-on-declaration-site" />
+        <error line="71" column="29" source="standard:statement-wrapping" />
+        <error line="71" column="45" source="standard:statement-wrapping" />
+        <error line="71" column="58" source="standard:statement-wrapping" />
+        <error line="72" column="26" source="standard:statement-wrapping" />
+        <error line="72" column="42" source="standard:statement-wrapping" />
+        <error line="72" column="55" source="standard:statement-wrapping" />
+        <error line="73" column="26" source="standard:statement-wrapping" />
+        <error line="73" column="42" source="standard:statement-wrapping" />
+        <error line="73" column="55" source="standard:statement-wrapping" />
+        <error line="74" column="29" source="standard:statement-wrapping" />
+        <error line="74" column="48" source="standard:statement-wrapping" />
+        <error line="74" column="61" source="standard:statement-wrapping" />
+        <error line="85" column="35" source="standard:statement-wrapping" />
+        <error line="85" column="60" source="standard:statement-wrapping" />
+        <error line="85" column="73" source="standard:statement-wrapping" />
+        <error line="86" column="32" source="standard:statement-wrapping" />
+        <error line="86" column="54" source="standard:statement-wrapping" />
+        <error line="86" column="67" source="standard:statement-wrapping" />
+        <error line="87" column="28" source="standard:statement-wrapping" />
+        <error line="87" column="48" source="standard:statement-wrapping" />
+        <error line="87" column="61" source="standard:statement-wrapping" />
+        <error line="92" column="27" source="standard:statement-wrapping" />
+        <error line="92" column="52" source="standard:statement-wrapping" />
+        <error line="92" column="65" source="standard:statement-wrapping" />
+        <error line="93" column="10" source="standard:trailing-comma-on-call-site" />
+        <error line="125" column="20" source="standard:function-naming" />
+        <error line="136" column="51" source="standard:trailing-comma-on-declaration-site" />
+        <error line="141" column="29" source="standard:statement-wrapping" />
+        <error line="141" column="48" source="standard:statement-wrapping" />
+        <error line="141" column="61" source="standard:statement-wrapping" />
+        <error line="152" column="35" source="standard:statement-wrapping" />
+        <error line="152" column="60" source="standard:statement-wrapping" />
+        <error line="152" column="73" source="standard:statement-wrapping" />
+        <error line="153" column="32" source="standard:statement-wrapping" />
+        <error line="153" column="54" source="standard:statement-wrapping" />
+        <error line="153" column="67" source="standard:statement-wrapping" />
+        <error line="154" column="28" source="standard:statement-wrapping" />
+        <error line="154" column="48" source="standard:statement-wrapping" />
+        <error line="154" column="61" source="standard:statement-wrapping" />
+        <error line="155" column="26" source="standard:statement-wrapping" />
+        <error line="155" column="42" source="standard:statement-wrapping" />
+        <error line="155" column="55" source="standard:statement-wrapping" />
+        <error line="156" column="34" source="standard:statement-wrapping" />
+        <error line="156" column="58" source="standard:statement-wrapping" />
+        <error line="156" column="71" source="standard:statement-wrapping" />
+        <error line="158" column="27" source="standard:statement-wrapping" />
+        <error line="158" column="52" source="standard:statement-wrapping" />
+        <error line="158" column="65" source="standard:statement-wrapping" />
+        <error line="162" column="10" source="standard:trailing-comma-on-call-site" />
+        <error line="189" column="20" source="standard:function-naming" />
+        <error line="203" column="27" source="standard:trailing-comma-on-declaration-site" />
+        <error line="208" column="25" source="standard:statement-wrapping" />
+        <error line="208" column="40" source="standard:statement-wrapping" />
+        <error line="208" column="53" source="standard:statement-wrapping" />
+        <error line="209" column="26" source="standard:statement-wrapping" />
+        <error line="209" column="42" source="standard:statement-wrapping" />
+        <error line="209" column="55" source="standard:statement-wrapping" />
+        <error line="210" column="26" source="standard:statement-wrapping" />
+        <error line="210" column="42" source="standard:statement-wrapping" />
+        <error line="210" column="55" source="standard:statement-wrapping" />
+        <error line="211" column="29" source="standard:statement-wrapping" />
+        <error line="211" column="48" source="standard:statement-wrapping" />
+        <error line="211" column="61" source="standard:statement-wrapping" />
+        <error line="222" column="35" source="standard:statement-wrapping" />
+        <error line="222" column="60" source="standard:statement-wrapping" />
+        <error line="222" column="73" source="standard:statement-wrapping" />
+        <error line="223" column="32" source="standard:statement-wrapping" />
+        <error line="223" column="54" source="standard:statement-wrapping" />
+        <error line="223" column="67" source="standard:statement-wrapping" />
+        <error line="224" column="28" source="standard:statement-wrapping" />
+        <error line="224" column="48" source="standard:statement-wrapping" />
+        <error line="224" column="61" source="standard:statement-wrapping" />
+        <error line="229" column="27" source="standard:statement-wrapping" />
+        <error line="229" column="52" source="standard:statement-wrapping" />
+        <error line="229" column="65" source="standard:statement-wrapping" />
+        <error line="230" column="10" source="standard:trailing-comma-on-call-site" />
+        <error line="257" column="20" source="standard:function-naming" />
+        <error line="271" column="27" source="standard:trailing-comma-on-declaration-site" />
+        <error line="276" column="27" source="standard:statement-wrapping" />
+        <error line="276" column="44" source="standard:statement-wrapping" />
+        <error line="276" column="57" source="standard:statement-wrapping" />
+        <error line="277" column="26" source="standard:statement-wrapping" />
+        <error line="277" column="42" source="standard:statement-wrapping" />
+        <error line="277" column="55" source="standard:statement-wrapping" />
+        <error line="278" column="26" source="standard:statement-wrapping" />
+        <error line="278" column="42" source="standard:statement-wrapping" />
+        <error line="278" column="55" source="standard:statement-wrapping" />
+        <error line="279" column="29" source="standard:statement-wrapping" />
+        <error line="279" column="48" source="standard:statement-wrapping" />
+        <error line="279" column="61" source="standard:statement-wrapping" />
+        <error line="290" column="35" source="standard:statement-wrapping" />
+        <error line="290" column="60" source="standard:statement-wrapping" />
+        <error line="290" column="73" source="standard:statement-wrapping" />
+        <error line="291" column="32" source="standard:statement-wrapping" />
+        <error line="291" column="54" source="standard:statement-wrapping" />
+        <error line="291" column="67" source="standard:statement-wrapping" />
+        <error line="292" column="28" source="standard:statement-wrapping" />
+        <error line="292" column="48" source="standard:statement-wrapping" />
+        <error line="292" column="61" source="standard:statement-wrapping" />
+        <error line="297" column="27" source="standard:statement-wrapping" />
+        <error line="297" column="52" source="standard:statement-wrapping" />
+        <error line="297" column="65" source="standard:statement-wrapping" />
+        <error line="298" column="10" source="standard:trailing-comma-on-call-site" />
+        <error line="315" column="20" source="standard:function-naming" />
+        <error line="316" column="5" source="standard:function-signature" />
+        <error line="317" column="5" source="standard:function-signature" />
+        <error line="317" column="51" source="standard:function-signature" />
+        <error line="317" column="51" source="standard:trailing-comma-on-declaration-site" />
+        <error line="340" column="24" source="standard:function-naming" />
+        <error line="343" column="52" source="standard:trailing-comma-on-declaration-site" />
+        <error line="406" column="20" source="standard:function-naming" />
+        <error line="420" column="76" source="standard:trailing-comma-on-declaration-site" />
+        <error line="425" column="27" source="standard:statement-wrapping" />
+        <error line="425" column="52" source="standard:statement-wrapping" />
+        <error line="425" column="65" source="standard:statement-wrapping" />
+        <error line="426" column="26" source="standard:statement-wrapping" />
+        <error line="426" column="42" source="standard:statement-wrapping" />
+        <error line="426" column="55" source="standard:statement-wrapping" />
+        <error line="427" column="29" source="standard:statement-wrapping" />
+        <error line="427" column="48" source="standard:statement-wrapping" />
+        <error line="427" column="61" source="standard:statement-wrapping" />
+        <error line="438" column="35" source="standard:statement-wrapping" />
+        <error line="438" column="60" source="standard:statement-wrapping" />
+        <error line="438" column="73" source="standard:statement-wrapping" />
+        <error line="439" column="32" source="standard:statement-wrapping" />
+        <error line="439" column="54" source="standard:statement-wrapping" />
+        <error line="439" column="67" source="standard:statement-wrapping" />
+        <error line="440" column="28" source="standard:statement-wrapping" />
+        <error line="440" column="48" source="standard:statement-wrapping" />
+        <error line="440" column="61" source="standard:statement-wrapping" />
+        <error line="441" column="34" source="standard:statement-wrapping" />
+        <error line="441" column="58" source="standard:statement-wrapping" />
+        <error line="441" column="71" source="standard:statement-wrapping" />
+        <error line="446" column="27" source="standard:statement-wrapping" />
+        <error line="446" column="52" source="standard:statement-wrapping" />
+        <error line="446" column="65" source="standard:statement-wrapping" />
+        <error line="447" column="10" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNode.kt">
+        <error line="197" column="58" source="standard:function-signature" />
+        <error line="205" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="236" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="244" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="252" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="268" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="279" column="1" source="standard:max-line-length" />
+        <error line="279" column="43" source="standard:discouraged-comment-location" />
+        <error line="283" column="41" source="standard:trailing-comma-on-call-site" />
+        <error line="284" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="288" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="296" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="312" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="321" column="39" source="standard:discouraged-comment-location" />
+        <error line="325" column="37" source="standard:trailing-comma-on-call-site" />
+        <error line="326" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="329" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="338" column="24" source="standard:trailing-comma-on-declaration-site" />
+        <error line="354" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="371" column="45" source="standard:trailing-comma-on-call-site" />
+        <error line="372" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="377" column="1" source="standard:no-blank-line-before-rbrace" />
+        <error line="389" column="88" source="standard:trailing-comma-on-declaration-site" />
+        <error line="407" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="421" column="54" source="standard:trailing-comma-on-call-site" />
+        <error line="422" column="22" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricRenderer.kt">
+        <error line="47" column="67" source="standard:trailing-comma-on-declaration-site" />
+        <error line="109" column="63" source="standard:trailing-comma-on-declaration-site" />
+        <error line="174" column="63" source="standard:trailing-comma-on-declaration-site" />
+        <error line="205" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="217" column="9" source="standard:function-signature" />
+        <error line="218" column="9" source="standard:function-signature" />
+        <error line="219" column="9" source="standard:function-signature" />
+        <error line="220" column="9" source="standard:function-signature" />
+        <error line="220" column="20" source="standard:function-signature" />
+        <error line="220" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="221" column="18" source="standard:function-signature" />
+        <error line="253" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="276" column="9" source="standard:function-signature" />
+        <error line="277" column="9" source="standard:function-signature" />
+        <error line="278" column="9" source="standard:function-signature" />
+        <error line="279" column="9" source="standard:function-signature" />
+        <error line="279" column="20" source="standard:function-signature" />
+        <error line="279" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="287" column="9" source="standard:function-signature" />
+        <error line="288" column="9" source="standard:function-signature" />
+        <error line="289" column="9" source="standard:function-signature" />
+        <error line="290" column="9" source="standard:function-signature" />
+        <error line="290" column="20" source="standard:function-signature" />
+        <error line="290" column="20" source="standard:trailing-comma-on-declaration-site" />
+        <error line="306" column="33" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScene.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="26" column="1" source="standard:no-unused-imports" />
+        <error line="39" column="26" source="standard:trailing-comma-on-declaration-site" />
+        <error line="53" column="5" source="standard:function-naming" />
+        <error line="56" column="51" source="standard:trailing-comma-on-declaration-site" />
+        <error line="77" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="79" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="94" column="5" source="standard:function-naming" />
+        <error line="97" column="51" source="standard:trailing-comma-on-declaration-site" />
+        <error line="101" column="20" source="standard:statement-wrapping" />
+        <error line="101" column="51" source="standard:statement-wrapping" />
+        <error line="101" column="57" source="standard:statement-wrapping" />
+        <error line="113" column="63" source="standard:trailing-comma-on-call-site" />
+        <error line="202" column="51" source="standard:trailing-comma-on-call-site" />
+        <error line="212" column="1" source="standard:max-line-length" />
+        <error line="212" column="22" source="standard:argument-list-wrapping" />
+        <error line="212" column="32" source="standard:argument-list-wrapping" />
+        <error line="212" column="42" source="standard:argument-list-wrapping" />
+        <error line="212" column="57" source="standard:argument-list-wrapping" />
+        <error line="212" column="70" source="standard:argument-list-wrapping" />
+        <error line="212" column="84" source="standard:argument-list-wrapping" />
+        <error line="212" column="105" source="standard:argument-list-wrapping" />
+        <error line="212" column="127" source="standard:argument-list-wrapping" />
+        <error line="219" column="24" source="standard:argument-list-wrapping" />
+        <error line="222" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="234" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="235" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="398" column="83" source="standard:trailing-comma-on-call-site" />
+        <error line="407" column="77" source="standard:trailing-comma-on-call-site" />
+        <error line="463" column="85" source="standard:trailing-comma-on-call-site" />
+        <error line="473" column="120" source="standard:trailing-comma-on-call-site" />
+        <error line="501" column="88" source="standard:trailing-comma-on-call-site" />
+        <error line="510" column="1" source="standard:max-line-length" />
+        <error line="510" column="75" source="standard:argument-list-wrapping" />
+        <error line="510" column="102" source="standard:argument-list-wrapping" />
+        <error line="510" column="127" source="standard:argument-list-wrapping" />
+        <error line="510" column="128" source="standard:trailing-comma-on-call-site" />
+        <error line="545" column="69" source="standard:no-multi-spaces" />
+        <error line="553" column="69" source="standard:no-multi-spaces" />
+        <error line="567" column="83" source="standard:trailing-comma-on-call-site" />
+        <error line="576" column="77" source="standard:trailing-comma-on-call-site" />
+        <error line="586" column="73" source="standard:no-multi-spaces" />
+        <error line="600" column="71" source="standard:trailing-comma-on-call-site" />
+        <error line="601" column="54" source="standard:trailing-comma-on-call-site" />
+        <error line="645" column="93" source="standard:trailing-comma-on-call-site" />
+        <error line="662" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="663" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="706" column="57" source="standard:trailing-comma-on-call-site" />
+        <error line="712" column="57" source="standard:trailing-comma-on-call-site" />
+        <error line="740" column="16" source="standard:trailing-comma-on-declaration-site" />
+        <error line="748" column="30" source="standard:trailing-comma-on-call-site" />
+        <error line="756" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="782" column="22" source="standard:trailing-comma-on-declaration-site" />
+        <error line="808" column="1" source="standard:indent" />
+        <error line="809" column="1" source="standard:indent" />
+        <error line="809" column="62" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricScope.kt">
+        <error line="3" column="1" source="standard:no-unused-imports" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/NativeSceneRenderer.kt">
+        <error line="42" column="79" source="standard:trailing-comma-on-declaration-site" />
+        <error line="111" column="35" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/NodeDragState.kt">
+        <error line="42" column="38" source="standard:trailing-comma-on-declaration-site" />
+        <error line="78" column="31" source="standard:trailing-comma-on-declaration-site" />
+        <error line="127" column="29" source="standard:trailing-comma-on-declaration-site" />
+        <error line="167" column="5" source="standard:function-signature" />
+        <error line="167" column="52" source="standard:function-signature" />
+        <error line="167" column="52" source="standard:trailing-comma-on-declaration-site" />
+        <error line="168" column="20" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/RenderContext.kt">
+        <error line="31" column="45" source="standard:trailing-comma-on-declaration-site" />
+        <error line="37" column="53" source="standard:trailing-comma-on-declaration-site" />
+        <error line="48" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="78" column="71" source="standard:trailing-comma-on-call-site" />
+        <error line="95" column="48" source="standard:trailing-comma-on-call-site" />
+        <error line="116" column="35" source="standard:trailing-comma-on-declaration-site" />
+        <error line="126" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="132" column="50" source="standard:trailing-comma-on-call-site" />
+        <error line="140" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="165" column="48" source="standard:trailing-comma-on-call-site" />
+        <error line="178" column="40" source="standard:wrapping" />
+        <error line="182" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="210" column="40" source="standard:wrapping" />
+        <error line="214" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="243" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="261" column="48" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/SceneCache.kt">
+        <error line="27" column="43" source="standard:trailing-comma-on-declaration-site" />
+        <error line="35" column="30" source="standard:trailing-comma-on-declaration-site" />
+        <error line="42" column="38" source="standard:trailing-comma-on-declaration-site" />
+        <error line="64" column="47" source="standard:trailing-comma-on-declaration-site" />
+        <error line="68" column="1" source="standard:indent" />
+        <error line="69" column="1" source="standard:indent" />
+        <error line="70" column="1" source="standard:indent" />
+        <error line="71" column="1" source="standard:indent" />
+        <error line="72" column="1" source="standard:indent" />
+        <error line="91" column="47" source="standard:trailing-comma-on-declaration-site" />
+        <error line="107" column="54" source="standard:trailing-comma-on-call-site" />
+        <error line="121" column="56" source="standard:trailing-comma-on-call-site" />
+        <error line="160" column="46" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/SceneConfig.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="55" column="41" source="standard:trailing-comma-on-declaration-site" />
+        <error line="70" column="45" source="standard:trailing-comma-on-declaration-site" />
+        <error line="71" column="1" source="standard:max-line-length" />
+        <error line="85" column="41" source="standard:trailing-comma-on-declaration-site" />
+        <error line="86" column="1" source="standard:max-line-length" />
+        <error line="88" column="48" source="standard:function-signature" />
+        <error line="118" column="1" source="standard:max-line-length" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/SpatialGrid.kt">
+        <error line="12" column="23" source="standard:parameter-list-wrapping" />
+        <error line="13" column="23" source="standard:parameter-list-wrapping" />
+        <error line="13" column="39" source="standard:trailing-comma-on-declaration-site" />
+        <error line="52" column="33" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/Stack.kt">
+        <error line="58" column="20" source="standard:function-naming" />
+        <error line="62" column="61" source="standard:trailing-comma-on-declaration-site" />
+        <error line="78" column="37" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/StrokeStyle.kt">
+        <error line="34" column="49" source="standard:trailing-comma-on-declaration-site" />
+        <error line="51" column="49" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/TileGestureHub.kt">
+        <error line="22" column="46" source="standard:trailing-comma-on-declaration-site" />
+        <error line="73" column="9" source="standard:function-signature" />
+        <error line="74" column="9" source="standard:function-signature" />
+        <error line="75" column="9" source="standard:function-signature" />
+        <error line="76" column="9" source="standard:function-signature" />
+        <error line="77" column="9" source="standard:function-signature" />
+        <error line="77" column="32" source="standard:function-signature" />
+        <error line="77" column="32" source="standard:trailing-comma-on-declaration-site" />
+        <error line="87" column="55" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/TileGrid.kt">
+        <error line="61" column="20" source="standard:function-naming" />
+        <error line="66" column="65" source="standard:trailing-comma-on-declaration-site" />
+        <error line="84" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="103" column="77" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/main/kotlin/io/github/jayteealao/isometric/compose/runtime/ViewportConfig.kt">
+        <error line="29" column="30" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricCanvasSnapshotTest.kt">
+        <error line="5" column="1" source="standard:import-ordering" />
+        <error line="51" column="17" source="standard:property-naming" />
+        <error line="52" column="17" source="standard:property-naming" />
+        <error line="53" column="17" source="standard:property-naming" />
+        <error line="54" column="17" source="standard:property-naming" />
+        <error line="55" column="17" source="standard:property-naming" />
+        <error line="56" column="17" source="standard:property-naming" />
+        <error line="57" column="17" source="standard:property-naming" />
+        <error line="58" column="17" source="standard:property-naming" />
+        <error line="59" column="17" source="standard:property-naming" />
+        <error line="68" column="9" source="standard:function-signature" />
+        <error line="69" column="9" source="standard:function-signature" />
+        <error line="70" column="9" source="standard:function-signature" />
+        <error line="70" column="55" source="standard:function-signature" />
+        <error line="70" column="55" source="standard:trailing-comma-on-declaration-site" />
+        <error line="105" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="111" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="120" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="135" column="58" source="standard:trailing-comma-on-call-site" />
+        <error line="136" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="138" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="148" column="58" source="standard:trailing-comma-on-call-site" />
+        <error line="149" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="151" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="160" column="37" source="standard:trailing-comma-on-call-site" />
+        <error line="161" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="163" column="28" source="standard:trailing-comma-on-call-site" />
+        <error line="178" column="45" source="standard:trailing-comma-on-call-site" />
+        <error line="179" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="181" column="30" source="standard:trailing-comma-on-call-site" />
+        <error line="203" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="218" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="233" column="49" source="standard:trailing-comma-on-call-site" />
+        <error line="234" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="236" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="238" column="28" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/IsometricSnapshotHarness.kt">
+        <error line="90" column="5" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/AutopanDeltaContractTest.kt">
+        <error line="42" column="58" source="standard:no-multi-spaces" />
+        <error line="43" column="58" source="standard:no-multi-spaces" />
+        <error line="61" column="57" source="standard:no-multi-spaces" />
+        <error line="62" column="57" source="standard:no-multi-spaces" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/CameraStateInteractionTest.kt">
+        <error line="25" column="36" source="standard:no-multi-spaces" />
+        <error line="33" column="28" source="standard:no-multi-spaces" />
+        <error line="34" column="28" source="standard:no-multi-spaces" />
+        <error line="78" column="9" source="standard:spacing-between-declarations-with-comments" />
+        <error line="88" column="25" source="standard:no-multi-spaces" />
+        <error line="93" column="26" source="standard:no-multi-spaces" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/ConsumptionGatingTest.kt">
+        <error line="44" column="32" source="standard:trailing-comma-on-declaration-site" />
+        <error line="65" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="80" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="95" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="110" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="125" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="149" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="149" column="35" source="standard:no-multi-spaces" />
+        <error line="149" column="37" source="standard:discouraged-comment-location" />
+        <error line="163" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="180" column="35" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DoubleTapDisambiguationTest.kt">
+        <error line="103" column="28" source="standard:no-multi-spaces" />
+        <error line="142" column="38" source="standard:no-multi-spaces" />
+        <error line="143" column="32" source="standard:no-multi-spaces" />
+        <error line="185" column="38" source="standard:no-multi-spaces" />
+        <error line="195" column="32" source="standard:no-multi-spaces" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DragANodeTest.kt">
+        <error line="26" column="77" source="standard:function-signature" />
+        <error line="40" column="51" source="standard:no-multi-spaces" />
+        <error line="41" column="37" source="standard:no-multi-spaces" />
+        <error line="49" column="28" source="standard:no-multi-spaces" />
+        <error line="58" column="62" source="standard:no-multi-spaces" />
+        <error line="77" column="34" source="standard:statement-wrapping" />
+        <error line="80" column="29" source="standard:no-multi-spaces" />
+        <error line="90" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="102" column="49" source="standard:no-multi-spaces" />
+        <error line="112" column="34" source="standard:statement-wrapping" />
+        <error line="125" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="143" column="34" source="standard:statement-wrapping" />
+        <error line="157" column="28" source="standard:trailing-comma-on-call-site" />
+        <error line="177" column="34" source="standard:statement-wrapping" />
+        <error line="191" column="28" source="standard:trailing-comma-on-call-site" />
+        <error line="209" column="38" source="standard:no-multi-spaces" />
+        <error line="219" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="241" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="257" column="34" source="standard:argument-list-wrapping" />
+        <error line="261" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="273" column="35" source="standard:argument-list-wrapping" />
+        <error line="277" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="303" column="30" source="standard:trailing-comma-on-call-site" />
+        <error line="330" column="28" source="standard:trailing-comma-on-call-site" />
+        <error line="350" column="26" source="standard:trailing-comma-on-call-site" />
+        <error line="384" column="62" source="standard:no-multi-spaces" />
+        <error line="395" column="28" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/DragEventClarityTest.kt">
+        <error line="68" column="53" source="standard:statement-wrapping" />
+        <error line="68" column="68" source="standard:statement-wrapping" />
+        <error line="68" column="84" source="standard:statement-wrapping" />
+        <error line="70" column="71" source="standard:no-multi-spaces" />
+        <error line="71" column="71" source="standard:no-multi-spaces" />
+        <error line="98" column="36" source="standard:statement-wrapping" />
+        <error line="98" column="51" source="standard:statement-wrapping" />
+        <error line="98" column="67" source="standard:statement-wrapping" />
+        <error line="100" column="45" source="standard:trailing-comma-on-call-site" />
+        <error line="118" column="52" source="standard:no-multi-spaces" />
+        <error line="119" column="52" source="standard:no-multi-spaces" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/GestureStateResetTest.kt">
+        <error line="45" column="47" source="standard:trailing-comma-on-declaration-site" />
+        <error line="60" column="9" source="standard:function-signature" />
+        <error line="61" column="9" source="standard:function-signature" />
+        <error line="61" column="38" source="standard:function-signature" />
+        <error line="61" column="38" source="standard:trailing-comma-on-declaration-site" />
+        <error line="220" column="38" source="standard:no-multi-spaces" />
+        <error line="230" column="38" source="standard:no-multi-spaces" />
+        <error line="231" column="40" source="standard:no-multi-spaces" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/InteractionHarnessReadme.kt">
+        <error line="1" column="1" source="standard:no-empty-file" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricNodeRenderTest.kt">
+        <error line="20" column="46" source="standard:trailing-comma-on-call-site" />
+        <error line="34" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="41" column="54" source="standard:trailing-comma-on-call-site" />
+        <error line="50" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="62" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="71" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="99" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="114" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="123" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="137" column="47" source="standard:trailing-comma-on-call-site" />
+        <error line="174" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="194" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="229" column="56" source="standard:trailing-comma-on-call-site" />
+        <error line="240" column="20" source="standard:trailing-comma-on-call-site" />
+        <error line="255" column="56" source="standard:trailing-comma-on-call-site" />
+        <error line="269" column="20" source="standard:trailing-comma-on-call-site" />
+        <error line="284" column="56" source="standard:trailing-comma-on-call-site" />
+        <error line="301" column="20" source="standard:trailing-comma-on-call-site" />
+        <error line="313" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="322" column="31" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/IsometricRendererTest.kt">
+        <error line="49" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="85" column="26" source="standard:argument-list-wrapping" />
+        <error line="87" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="95" column="26" source="standard:argument-list-wrapping" />
+        <error line="97" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="106" column="25" source="standard:trailing-comma-on-call-site" />
+        <error line="117" column="26" source="standard:argument-list-wrapping" />
+        <error line="119" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="128" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="135" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="142" column="59" source="standard:trailing-comma-on-call-site" />
+        <error line="153" column="26" source="standard:argument-list-wrapping" />
+        <error line="155" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="164" column="58" source="standard:trailing-comma-on-call-site" />
+        <error line="171" column="22" source="standard:argument-list-wrapping" />
+        <error line="173" column="30" source="standard:trailing-comma-on-call-site" />
+        <error line="185" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="189" column="33" source="standard:trailing-comma-on-call-site" />
+        <error line="202" column="23" source="standard:trailing-comma-on-declaration-site" />
+        <error line="295" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="309" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="317" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="344" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="360" column="56" source="standard:trailing-comma-on-call-site" />
+        <error line="367" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="388" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="395" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="412" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="435" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="442" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="460" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="467" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="486" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="493" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="600" column="26" source="standard:argument-list-wrapping" />
+        <error line="602" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="657" column="22" source="standard:wrapping" />
+        <error line="657" column="22" source="standard:argument-list-wrapping" />
+        <error line="658" column="23" source="standard:argument-list-wrapping" />
+        <error line="658" column="59" source="standard:wrapping" />
+        <error line="658" column="60" source="standard:argument-list-wrapping" />
+        <error line="658" column="60" source="standard:trailing-comma-on-call-site" />
+        <error line="659" column="22" source="standard:wrapping" />
+        <error line="659" column="22" source="standard:argument-list-wrapping" />
+        <error line="660" column="24" source="standard:argument-list-wrapping" />
+        <error line="660" column="61" source="standard:wrapping" />
+        <error line="660" column="62" source="standard:argument-list-wrapping" />
+        <error line="660" column="62" source="standard:trailing-comma-on-call-site" />
+        <error line="677" column="50" source="standard:trailing-comma-on-call-site" />
+        <error line="681" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="690" column="53" source="standard:trailing-comma-on-call-site" />
+        <error line="702" column="43" source="standard:trailing-comma-on-call-site" />
+        <error line="715" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="734" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="758" column="43" source="standard:trailing-comma-on-call-site" />
+        <error line="780" column="1" source="standard:max-line-length" />
+        <error line="780" column="35" source="standard:parameter-list-wrapping" />
+        <error line="780" column="35" source="standard:function-signature" />
+        <error line="780" column="102" source="standard:parameter-list-wrapping" />
+        <error line="780" column="102" source="standard:function-signature" />
+        <error line="780" column="124" source="standard:parameter-list-wrapping" />
+        <error line="780" column="124" source="standard:function-signature" />
+        <error line="800" column="44" source="standard:comment-wrapping" />
+        <error line="812" column="1" source="standard:max-line-length" />
+        <error line="812" column="35" source="standard:parameter-list-wrapping" />
+        <error line="812" column="35" source="standard:function-signature" />
+        <error line="812" column="102" source="standard:parameter-list-wrapping" />
+        <error line="812" column="102" source="standard:function-signature" />
+        <error line="812" column="124" source="standard:parameter-list-wrapping" />
+        <error line="812" column="124" source="standard:function-signature" />
+        <error line="873" column="38" source="standard:trailing-comma-on-call-site" />
+        <error line="890" column="42" source="standard:trailing-comma-on-call-site" />
+        <error line="902" column="76" source="standard:trailing-comma-on-call-site" />
+        <error line="904" column="41" source="standard:trailing-comma-on-call-site" />
+        <error line="918" column="21" source="standard:trailing-comma-on-call-site" />
+        <error line="937" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="941" column="33" source="standard:trailing-comma-on-call-site" />
+        <error line="945" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="951" column="85" source="standard:trailing-comma-on-call-site" />
+        <error line="974" column="49" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/NodeCallbacksInteractionTest.kt">
+        <error line="108" column="38" source="standard:no-multi-spaces" />
+        <error line="120" column="31" source="standard:trailing-comma-on-call-site" />
+        <error line="123" column="68" source="standard:trailing-comma-on-call-site" />
+        <error line="139" column="89" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/RenderContextTest.kt">
+        <error line="15" column="46" source="standard:trailing-comma-on-call-site" />
+        <error line="99" column="25" source="standard:wrapping" />
+        <error line="102" column="33" source="standard:trailing-comma-on-call-site" />
+        <error line="103" column="9" source="standard:wrapping" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/TileGestureHubTest.kt">
+        <error line="37" column="22" source="standard:wrapping" />
+        <error line="41" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="42" column="9" source="standard:wrapping" />
+        <error line="54" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="72" column="22" source="standard:wrapping" />
+        <error line="76" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="77" column="9" source="standard:wrapping" />
+        <error line="88" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="105" column="22" source="standard:wrapping" />
+        <error line="109" column="44" source="standard:trailing-comma-on-call-site" />
+        <error line="110" column="9" source="standard:wrapping" />
+        <error line="121" column="35" source="standard:trailing-comma-on-call-site" />
+        <error line="137" column="39" source="standard:wrapping" />
+        <error line="141" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="142" column="9" source="standard:wrapping" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/runtime/WS6EscapeHatchesTest.kt">
+        <error line="18" column="46" source="standard:trailing-comma-on-call-site" />
+        <error line="52" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="70" column="34" source="standard:trailing-comma-on-call-site" />
+        <error line="86" column="50" source="standard:trailing-comma-on-call-site" />
+        <error line="90" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="108" column="33" source="standard:trailing-comma-on-call-site" />
+        <error line="119" column="41" source="standard:trailing-comma-on-call-site" />
+        <error line="120" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="141" column="39" source="standard:trailing-comma-on-call-site" />
+        <error line="142" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="198" column="89" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/AlphaSampleScene.kt">
+        <error line="37" column="20" source="standard:function-naming" />
+        <error line="42" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="49" column="91" source="standard:trailing-comma-on-call-site" />
+        <error line="51" column="30" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/CameraControlScene.kt">
+        <error line="25" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/DoubleTapScene.kt">
+        <error line="23" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/DragLifecycleScene.kt">
+        <error line="23" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/DragNodeScene.kt">
+        <error line="19" column="20" source="standard:function-naming" />
+        <error line="28" column="24" source="standard:trailing-comma-on-call-site" />
+        <error line="39" column="37" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/ElevatedTileScene.kt">
+        <error line="45" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/HoverRecipeScene.kt">
+        <error line="23" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/LongPressConfigScene.kt">
+        <error line="24" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/LongPressGridScene.kt">
+        <error line="30" column="20" source="standard:function-naming" />
+        <error line="37" column="72" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/NodeIdRowScene.kt">
+        <error line="25" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/OccludedPickScene.kt">
+        <error line="50" column="20" source="standard:function-naming" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/OnClickRowScene.kt">
+        <error line="27" column="20" source="standard:function-naming" />
+        <error line="35" column="30" source="standard:argument-list-wrapping" />
+        <error line="36" column="54" source="standard:trailing-comma-on-call-site" />
+        <error line="38" column="63" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/PerNodeCallbackScene.kt">
+        <error line="5" column="1" source="standard:import-ordering" />
+        <error line="30" column="20" source="standard:function-naming" />
+        <error line="41" column="37" source="standard:trailing-comma-on-call-site" />
+        <error line="42" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="44" column="31" source="standard:trailing-comma-on-call-site" />
+        <error line="51" column="91" source="standard:trailing-comma-on-call-site" />
+        <error line="53" column="32" source="standard:trailing-comma-on-call-site" />
+        <error line="64" column="41" source="standard:trailing-comma-on-call-site" />
+        <error line="65" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="74" column="41" source="standard:trailing-comma-on-call-site" />
+        <error line="75" column="18" source="standard:trailing-comma-on-call-site" />
+        <error line="77" column="10" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/io/github/jayteealao/isometric/compose/scenes/PinchZoomRecipeScene.kt">
+        <error line="24" column="20" source="standard:function-naming" />
+    </file>
+</baseline>
