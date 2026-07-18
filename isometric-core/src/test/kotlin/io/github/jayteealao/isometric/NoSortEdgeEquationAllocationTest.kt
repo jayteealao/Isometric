@@ -3,7 +3,6 @@
 package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
-import java.lang.management.ManagementFactory
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -32,7 +31,7 @@ class NoSortEdgeEquationAllocationTest {
             for (row in 0 until 2) {
                 engine.add(
                     Prism(Point(col.toDouble(), row.toDouble(), 0.0)),
-                    IsoColor.BLUE
+                    IsoColor.BLUE,
                 )
             }
         }
@@ -47,45 +46,13 @@ class NoSortEdgeEquationAllocationTest {
             enableBackfaceCulling = false,
         )
 
-        // Warm-up: let the JIT compile the hot path.
-        repeat(5) { engine.projectScene(800, 600, options) }
-
-        // Allocation measurement.
-        // Fail closed: the allocation threshold must be enforced, never silently skipped.
-        // If the platform genuinely cannot measure per-thread allocation, that is a test
-        // failure rather than a pass — a silent no-op guard would let a regression slip by.
-        val threadMxBean = ManagementFactory.getThreadMXBean()
-        val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
-            ?: throw AssertionError(
-                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
-                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
-                    "The allocation threshold cannot be enforced — failing closed.",
-            )
-        assertTrue(
-            sunBean.isThreadAllocatedMemorySupported,
-            "Thread allocation measurement unsupported: " +
-                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
-                "The allocation threshold cannot be enforced — failing closed.",
-        )
-        if (!sunBean.isThreadAllocatedMemoryEnabled) {
-            sunBean.isThreadAllocatedMemoryEnabled = true
-        }
-        val threadId = Thread.currentThread().id
-
+        // Allocation measurement — fail closed via the shared probe: the threshold must
+        // be enforced, never silently skipped, even on a JVM that cannot measure.
+        // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val beforeBytes = sunBean.getThreadAllocatedBytes(threadId)
-        repeat(measureIterations) { engine.projectScene(800, 600, options) }
-        val afterBytes = sunBean.getThreadAllocatedBytes(threadId)
-
-        assertTrue(
-            beforeBytes >= 0 && afterBytes >= 0,
-            "Thread allocation measurement returned a negative reading even after enabling " +
-                "(before=$beforeBytes, after=$afterBytes). The allocation threshold cannot be " +
-                "enforced — failing closed.",
-        )
-
-        val totalBytes = afterBytes - beforeBytes
-        val perCallBytes = totalBytes.toDouble() / measureIterations
+        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
+            engine.projectScene(800, 600, options)
+        }
 
         // Threshold rationale (measured on JDK 17 HotSpot):
         //   All 24 faces are projected (back-face culling disabled).  On the unfixed path
@@ -103,7 +70,7 @@ class NoSortEdgeEquationAllocationTest {
         println(
             "NoSortEdgeEquationAllocationTest: N=24 faces (2×2 Prism grid), " +
                 "$measureIterations no-sort calls — " +
-                "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
+                "total=${(perCallBytes * measureIterations).toLong()}B  per-call=${perCallBytes.toLong()}B  " +
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
