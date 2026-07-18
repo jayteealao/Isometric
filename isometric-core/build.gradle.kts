@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.jayteealao"
-version = "1.2.0-alpha.03-SNAPSHOT"
+version = "1.2.0-alpha.03"
 
 kotlin {
     jvmToolchain(17)
