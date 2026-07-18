@@ -48,8 +48,8 @@ class FaceKeyMemoTest {
 
         // Allocation measurement — fail closed via the shared probe: the threshold must
         // be enforced, never silently skipped, even on a JVM that cannot measure. The
-        // two-phase (first-build vs memoized) capture uses the probe's raw bean surface.
-        val sunBean = AllocationProbe.requireAllocatingBean()
+        // two-phase (first-build vs memoized) capture uses two AllocationProbe.measureBytes
+        // calls, one per phase.
         var sink = 0
 
         // Warm-up: let the JIT compile the lazy-build and access paths using throwaway
@@ -67,26 +67,23 @@ class FaceKeyMemoTest {
         val paths = (0 until n).map { quad(it) }
 
         // First access — each Path builds its two keys exactly once (unmemoized cost).
-        val beforeFirst = sunBean.allocatedBytes()
-        for (p in paths) {
-            sink += p.faceKey.hashCode()
-            sink += p.faceKeyBumped.hashCode()
+        val firstBuildBytes = AllocationProbe.measureBytes {
+            for (p in paths) {
+                sink += p.faceKey.hashCode()
+                sink += p.faceKeyBumped.hashCode()
+            }
         }
-        val afterFirst = sunBean.allocatedBytes()
 
         // Second access — every key resolves from the per-Path memo (should be ~0 bytes).
-        val beforeSecond = sunBean.allocatedBytes()
-        for (p in paths) {
-            sink += p.faceKey.hashCode()
-            sink += p.faceKeyBumped.hashCode()
+        val memoizedBytes = AllocationProbe.measureBytes {
+            for (p in paths) {
+                sink += p.faceKey.hashCode()
+                sink += p.faceKeyBumped.hashCode()
+            }
         }
-        val afterSecond = sunBean.allocatedBytes()
 
         // Keep the JIT from dead-code-eliminating the key reads.
         assertTrue(sink != Int.MIN_VALUE, "sink guard")
-
-        val firstBuildBytes = afterFirst - beforeFirst
-        val memoizedBytes = afterSecond - beforeSecond
 
         // Threshold rationale (Finding #4 — sit between memoized max and unmemoized min):
         //   First access builds n×2 FaceKeys (ArrayList + 4 QuantizedPoint + sorted-copy +

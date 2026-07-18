@@ -50,9 +50,11 @@ class NoSortEdgeEquationAllocationTest {
         // be enforced, never silently skipped, even on a JVM that cannot measure.
         // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
-            engine.projectScene(800, 600, options)
+        repeat(5) { engine.projectScene(800, 600, options) }
+        val totalBytes = AllocationProbe.measureBytes {
+            repeat(measureIterations) { engine.projectScene(800, 600, options) }
         }
+        val perCallBytes = totalBytes.toDouble() / measureIterations
 
         // Threshold rationale (measured on JDK 17 HotSpot):
         //   All 24 faces are projected (back-face culling disabled).  On the unfixed path
@@ -70,7 +72,7 @@ class NoSortEdgeEquationAllocationTest {
         println(
             "NoSortEdgeEquationAllocationTest: N=24 faces (2×2 Prism grid), " +
                 "$measureIterations no-sort calls — " +
-                "total=${(perCallBytes * measureIterations).toLong()}B  per-call=${perCallBytes.toLong()}B  " +
+                "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 

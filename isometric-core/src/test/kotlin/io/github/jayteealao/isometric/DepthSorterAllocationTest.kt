@@ -72,9 +72,11 @@ class DepthSorterAllocationTest {
         // be enforced, never silently skipped, even on a JVM that cannot measure.
         // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
-            DepthSorter.sort(items, options, defaultAngle)
+        repeat(5) { DepthSorter.sort(items, options, defaultAngle) }
+        val totalBytes = AllocationProbe.measureBytes {
+            repeat(measureIterations) { DepthSorter.sort(items, options, defaultAngle) }
         }
+        val perCallBytes = totalBytes.toDouble() / measureIterations
 
         // Threshold rationale:
         //   Each EdgeEquations2D for a 4-vertex polygon ≈ 192 bytes
@@ -91,7 +93,7 @@ class DepthSorterAllocationTest {
         println(
             "DepthSorterAllocationTest: N=10 overlapping faces, 45 pairs, " +
                 "$measureIterations warm calls — " +
-                "total=${(perCallBytes * measureIterations).toLong()}B  per-call=${perCallBytes.toLong()}B  " +
+                "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
