@@ -1,6 +1,5 @@
 package io.github.jayteealao.isometric
 
-import java.lang.management.ManagementFactory
 import kotlin.math.PI
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -15,10 +14,10 @@ import kotlin.test.assertTrue
  * guard for AC1: if the sort path ever rebuilds EdgeEquations2D per pair the
  * per-call allocation will spike well above the assertion threshold.
  *
- * Measurement uses [com.sun.management.ThreadMXBean.getThreadAllocatedBytes] (JDK
- * 7+ HotSpot / OpenJDK).  When the API is absent (non-HotSpot JVM), the byte
- * assertion is skipped and the test degrades to a no-op pass so CI on exotic JVMs
- * is not broken.
+ * Measurement goes through [AllocationProbe] ([com.sun.management.ThreadMXBean],
+ * JDK 7+ HotSpot / OpenJDK).  When the API is unavailable or unsupported the test
+ * fails closed rather than silently passing — a no-op guard would let a regression
+ * slip by unnoticed.
  */
 class DepthSorterAllocationTest {
 
@@ -35,8 +34,10 @@ class DepthSorterAllocationTest {
      */
     private fun buildOverlappingItems(n: Int): List<DepthSorter.TransformedItem> {
         val screenPoints = listOf(
-            Point2D(0.0, 0.0), Point2D(1.0, 0.0),
-            Point2D(1.0, 1.0), Point2D(0.0, 1.0),
+            Point2D(0.0, 0.0),
+            Point2D(1.0, 0.0),
+            Point2D(1.0, 1.0),
+            Point2D(0.0, 1.0),
         )
         // Pre-build once — this is exactly what the optimization does.
         val edges = IntersectionUtils.EdgeEquations2D.of(screenPoints)
@@ -45,8 +46,10 @@ class DepthSorterAllocationTest {
             // Distinct z levels so DepthSorter.sort's depth pre-sort is stable.
             val z = i.toDouble() * 0.1
             val path = Path(
-                Point(0.0, 0.0, z), Point(1.0, 0.0, z),
-                Point(1.0, 1.0, z), Point(0.0, 1.0, z),
+                Point(0.0, 0.0, z),
+                Point(1.0, 0.0, z),
+                Point(1.0, 1.0, z),
+                Point(0.0, 1.0, z),
             )
             val sceneItem = SceneGraph.SceneItem(
                 path = path,
@@ -65,30 +68,13 @@ class DepthSorterAllocationTest {
         // ensures the full edge-crossing path fires on every pair.
         val options = RenderOptions.Default.copy(enableBroadPhaseSort = false)
 
-        // Warm-up: allow the JIT to compile the hot path before measuring.
-        repeat(5) { DepthSorter.sort(items, options, defaultAngle) }
-
-        // Allocation measurement.
-        val threadMxBean = ManagementFactory.getThreadMXBean()
-        val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
-        val threadId = Thread.currentThread().id
-
+        // Allocation measurement — fail closed via the shared probe: the threshold must
+        // be enforced, never silently skipped, even on a JVM that cannot measure.
+        // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val beforeBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
-        repeat(measureIterations) { DepthSorter.sort(items, options, defaultAngle) }
-        val afterBytes = sunBean?.getThreadAllocatedBytes(threadId) ?: -1L
-
-        if (beforeBytes < 0 || afterBytes < 0) {
-            // com.sun.management not available on this JVM vendor — degrade gracefully.
-            println(
-                "DepthSorterAllocationTest: com.sun.management.ThreadMXBean unavailable" +
-                    " — byte assertion skipped."
-            )
-            return
+        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
+            DepthSorter.sort(items, options, defaultAngle)
         }
-
-        val totalBytes = afterBytes - beforeBytes
-        val perCallBytes = totalBytes.toDouble() / measureIterations
 
         // Threshold rationale:
         //   Each EdgeEquations2D for a 4-vertex polygon ≈ 192 bytes
@@ -105,8 +91,8 @@ class DepthSorterAllocationTest {
         println(
             "DepthSorterAllocationTest: N=10 overlapping faces, 45 pairs, " +
                 "$measureIterations warm calls — " +
-                "total=${totalBytes}B  per-call=${perCallBytes.toLong()}B  " +
-                "threshold=${thresholdPerCall.toLong()}B"
+                "total=${(perCallBytes * measureIterations).toLong()}B  per-call=${perCallBytes.toLong()}B  " +
+                "threshold=${thresholdPerCall.toLong()}B",
         )
 
         assertTrue(
@@ -115,7 +101,7 @@ class DepthSorterAllocationTest {
                 "expected < ${thresholdPerCall.toLong()} bytes/call (sort overhead ~13,000; " +
                 "would be ~30,000 if EdgeEquations2D were re-allocated per pair). " +
                 "Check that checkDepthDependency uses the pre-built overload from " +
-                "TransformedItem.edgeEquations2D."
+                "TransformedItem.edgeEquations2D.",
         )
     }
 }

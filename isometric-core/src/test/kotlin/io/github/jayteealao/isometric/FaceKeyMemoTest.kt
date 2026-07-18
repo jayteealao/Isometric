@@ -3,7 +3,6 @@
 package io.github.jayteealao.isometric
 
 import io.github.jayteealao.isometric.shapes.Prism
-import java.lang.management.ManagementFactory
 import java.util.IdentityHashMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,8 +31,10 @@ class FaceKeyMemoTest {
         // Distinct geometry per i so no two Paths share a faceKey — each must build its own.
         val d = i.toDouble()
         return Path(
-            Point(d, 0.0, 0.0), Point(d + 1.0, 0.0, 0.0),
-            Point(d + 1.0, 1.0, 0.0), Point(d, 1.0, 0.0),
+            Point(d, 0.0, 0.0),
+            Point(d + 1.0, 0.0, 0.0),
+            Point(d + 1.0, 1.0, 0.0),
+            Point(d, 1.0, 0.0),
         )
     }
 
@@ -45,27 +46,10 @@ class FaceKeyMemoTest {
     fun `faceKey computed at most once per Path instance`() {
         val n = 24 // same face count as a 2x2 Prism grid
 
-        // Allocation measurement.
-        // Fail closed: the allocation threshold must be enforced, never silently skipped.
-        // If the platform genuinely cannot measure per-thread allocation, that is a test
-        // failure rather than a pass — a silent no-op guard would let a regression slip by.
-        val threadMxBean = ManagementFactory.getThreadMXBean()
-        val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
-            ?: throw AssertionError(
-                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
-                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
-                    "The allocation threshold cannot be enforced — failing closed.",
-            )
-        assertTrue(
-            sunBean.isThreadAllocatedMemorySupported,
-            "Thread allocation measurement unsupported: " +
-                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
-                "The allocation threshold cannot be enforced — failing closed.",
-        )
-        if (!sunBean.isThreadAllocatedMemoryEnabled) {
-            sunBean.isThreadAllocatedMemoryEnabled = true
-        }
-        val threadId = Thread.currentThread().id
+        // Allocation measurement — fail closed via the shared probe: the threshold must
+        // be enforced, never silently skipped, even on a JVM that cannot measure. The
+        // two-phase (first-build vs memoized) capture uses the probe's raw bean surface.
+        val sunBean = AllocationProbe.requireAllocatingBean()
         var sink = 0
 
         // Warm-up: let the JIT compile the lazy-build and access paths using throwaway
@@ -83,31 +67,23 @@ class FaceKeyMemoTest {
         val paths = (0 until n).map { quad(it) }
 
         // First access — each Path builds its two keys exactly once (unmemoized cost).
-        val beforeFirst = sunBean.getThreadAllocatedBytes(threadId)
+        val beforeFirst = sunBean.allocatedBytes()
         for (p in paths) {
             sink += p.faceKey.hashCode()
             sink += p.faceKeyBumped.hashCode()
         }
-        val afterFirst = sunBean.getThreadAllocatedBytes(threadId)
+        val afterFirst = sunBean.allocatedBytes()
 
         // Second access — every key resolves from the per-Path memo (should be ~0 bytes).
-        val beforeSecond = sunBean.getThreadAllocatedBytes(threadId)
+        val beforeSecond = sunBean.allocatedBytes()
         for (p in paths) {
             sink += p.faceKey.hashCode()
             sink += p.faceKeyBumped.hashCode()
         }
-        val afterSecond = sunBean.getThreadAllocatedBytes(threadId)
+        val afterSecond = sunBean.allocatedBytes()
 
         // Keep the JIT from dead-code-eliminating the key reads.
         assertTrue(sink != Int.MIN_VALUE, "sink guard")
-
-        assertTrue(
-            beforeFirst >= 0 && afterFirst >= 0 && beforeSecond >= 0 && afterSecond >= 0,
-            "Thread allocation measurement returned a negative reading even after enabling " +
-                "(beforeFirst=$beforeFirst, afterFirst=$afterFirst, beforeSecond=$beforeSecond, " +
-                "afterSecond=$afterSecond). The allocation threshold cannot be enforced — " +
-                "failing closed.",
-        )
 
         val firstBuildBytes = afterFirst - beforeFirst
         val memoizedBytes = afterSecond - beforeSecond

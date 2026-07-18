@@ -1,6 +1,5 @@
 package io.github.jayteealao.isometric
 
-import java.lang.management.ManagementFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -35,7 +34,8 @@ class PathAllocationTest {
         val degeneratePath = Path(
             Point(0.0, 0.0, 0.0),
             Point(1.0, 0.0, 0.0),
-            Point(2.0, 0.0, 0.0)   // collinear with the first two
+            // collinear with the first two
+            Point(2.0, 0.0, 0.0),
         )
 
         // Access private fields via reflection — the test verifies the precomputed state
@@ -51,10 +51,22 @@ class PathAllocationTest {
         // (e.g. -(0.0) = -0.0).  In IEEE 754, 0.0 == -0.0 is true, but JUnit's
         // assertEquals(Double, Double) uses Double.compare which treats them as unequal.
         // We only care that the value is zero-magnitude, not its sign bit.
-        assertTrue(getPlaneField("planeNx") == 0.0, "planeNx must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNx")}")
-        assertTrue(getPlaneField("planeNy") == 0.0, "planeNy must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNy")}")
-        assertTrue(getPlaneField("planeNz") == 0.0, "planeNz must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNz")}")
-        assertTrue(getPlaneField("planeD")  == 0.0, "planeD must be 0.0 for a degenerate (zero-normal) face; got ${getPlaneField("planeD")}")
+        assertTrue(
+            getPlaneField("planeNx") == 0.0,
+            "planeNx must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNx")}",
+        )
+        assertTrue(
+            getPlaneField("planeNy") == 0.0,
+            "planeNy must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNy")}",
+        )
+        assertTrue(
+            getPlaneField("planeNz") == 0.0,
+            "planeNz must be 0.0 for a degenerate (collinear) face; got ${getPlaneField("planeNz")}",
+        )
+        assertTrue(
+            getPlaneField("planeD") == 0.0,
+            "planeD must be 0.0 for a degenerate (zero-normal) face; got ${getPlaneField("planeD")}",
+        )
 
         // With a zero normal, observerPosition = 0 − 0 = 0 ≤ EPSILON:
         // relativePlaneSide hits the early-return branch and returns 0 (observer-on-plane /
@@ -65,13 +77,14 @@ class PathAllocationTest {
         val degeneratePath2 = Path(
             Point(0.0, 0.0, 0.0),
             Point(0.0, 1.0, 0.0),
-            Point(0.0, 2.0, 0.0)   // collinear along Y
+            // collinear along Y
+            Point(0.0, 2.0, 0.0),
         )
         assertEquals(
             0,
             degeneratePath.closerThan(degeneratePath2, observer),
             "closerThan between two degenerate faces must return 0 (both plane-side steps " +
-                "hit the observer-on-plane early-return due to zero-magnitude normals)"
+                "hit the observer-on-plane early-return due to zero-magnitude normals)",
         )
     }
 
@@ -85,12 +98,16 @@ class PathAllocationTest {
         // factoryTop.closerThan(hqRight, observer) > 0 means factoryTop is farther than hqRight.
         // Antisymmetry requires hqRight.closerThan(factoryTop, observer) < 0 (opposite sign).
         val hqRight = Path(
-            Point(1.5, 1.0, 0.1), Point(1.5, 2.5, 0.1),
-            Point(1.5, 2.5, 3.1), Point(1.5, 1.0, 3.1)
+            Point(1.5, 1.0, 0.1),
+            Point(1.5, 2.5, 0.1),
+            Point(1.5, 2.5, 3.1),
+            Point(1.5, 1.0, 3.1),
         )
         val factoryTop = Path(
-            Point(2.0, 1.0, 2.1), Point(3.5, 1.0, 2.1),
-            Point(3.5, 2.5, 2.1), Point(2.0, 2.5, 2.1)
+            Point(2.0, 1.0, 2.1),
+            Point(3.5, 1.0, 2.1),
+            Point(3.5, 2.5, 2.1),
+            Point(2.0, 2.5, 2.1),
         )
 
         val fwdResult = factoryTop.closerThan(hqRight, observer)
@@ -98,11 +115,12 @@ class PathAllocationTest {
 
         assertTrue(
             fwdResult > 0,
-            "factoryTop.closerThan(hqRight, observer) must be > 0 (factoryTop is farther); got $fwdResult"
+            "factoryTop.closerThan(hqRight, observer) must be > 0 (factoryTop is farther); got $fwdResult",
         )
         assertTrue(
             revResult < 0,
-            "hqRight.closerThan(factoryTop, observer) must be < 0 (antisymmetry — sign opposite to forward); got $revResult"
+            "hqRight.closerThan(factoryTop, observer) must be < 0 " +
+                "(antisymmetry — sign opposite to forward); got $revResult",
         )
     }
 
@@ -119,67 +137,32 @@ class PathAllocationTest {
         // Each pair is a variant of the hq-right / factory-top canonical pair, shifted
         // along the x-axis so all 10 pairs have the same overlap geometry.
         val pairs: List<Pair<Path, Path>> = (0 until 10).map { i ->
-            val dx = i.toDouble() * 0.01   // tiny offset — keeps iso-depth extents overlapping
+            val dx = i.toDouble() * 0.01 // tiny offset — keeps iso-depth extents overlapping
             val a = Path(
-                Point(1.5 + dx, 1.0, 0.1), Point(1.5 + dx, 2.5, 0.1),
-                Point(1.5 + dx, 2.5, 3.1), Point(1.5 + dx, 1.0, 3.1)
+                Point(1.5 + dx, 1.0, 0.1),
+                Point(1.5 + dx, 2.5, 0.1),
+                Point(1.5 + dx, 2.5, 3.1),
+                Point(1.5 + dx, 1.0, 3.1),
             )
             val b = Path(
-                Point(2.0 + dx, 1.0, 2.1), Point(3.5 + dx, 1.0, 2.1),
-                Point(3.5 + dx, 2.5, 2.1), Point(2.0 + dx, 2.5, 2.1)
+                Point(2.0 + dx, 1.0, 2.1),
+                Point(3.5 + dx, 1.0, 2.1),
+                Point(3.5 + dx, 2.5, 2.1),
+                Point(2.0 + dx, 2.5, 2.1),
             )
             a to b
         }
 
-        // Warm-up: let the JIT compile the hot path before measuring.
-        repeat(5) {
-            for ((a, b) in pairs) {
-                a.closerThan(b, observer)
-                b.closerThan(a, observer)
-            }
-        }
-
-        // Allocation measurement.
-        // Fail closed: the allocation threshold must be enforced, never silently skipped.
-        // If the platform genuinely cannot measure per-thread allocation, that is a test
-        // failure rather than a pass — a silent no-op guard would let a regression slip by.
-        val threadMxBean = ManagementFactory.getThreadMXBean()
-        val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
-            ?: throw AssertionError(
-                "Thread allocation measurement unavailable: ThreadMXBean is not a " +
-                    "com.sun.management.ThreadMXBean on this JVM (${threadMxBean.javaClass.name}). " +
-                    "The allocation threshold cannot be enforced — failing closed.",
-            )
-        assertTrue(
-            sunBean.isThreadAllocatedMemorySupported,
-            "Thread allocation measurement unsupported: " +
-                "com.sun.management.ThreadMXBean.isThreadAllocatedMemorySupported is false. " +
-                "The allocation threshold cannot be enforced — failing closed.",
-        )
-        if (!sunBean.isThreadAllocatedMemoryEnabled) {
-            sunBean.isThreadAllocatedMemoryEnabled = true
-        }
-        val threadId = Thread.currentThread().id
-
+        // Allocation measurement — fail closed via the shared probe: the threshold must
+        // be enforced, never silently skipped, even on a JVM that cannot measure.
+        // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val beforeBytes = sunBean.getThreadAllocatedBytes(threadId)
-        repeat(measureIterations) {
+        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
             for ((a, b) in pairs) {
                 a.closerThan(b, observer)
                 b.closerThan(a, observer)
             }
         }
-        val afterBytes = sunBean.getThreadAllocatedBytes(threadId)
-
-        assertTrue(
-            beforeBytes >= 0 && afterBytes >= 0,
-            "Thread allocation measurement returned a negative reading even after enabling " +
-                "(before=$beforeBytes, after=$afterBytes). The allocation threshold cannot be " +
-                "enforced — failing closed.",
-        )
-
-        val totalBytes = afterBytes - beforeBytes
-        val perCallBytes = totalBytes.toDouble() / measureIterations
 
         // Threshold rationale:
         //   Each measurement iteration calls closerThan for all 10 pairs × 2 directions
@@ -207,7 +190,7 @@ class PathAllocationTest {
         println(
             "PathAllocationTest: N=10 pairs, 20 closerThan calls/iteration, " +
                 "$measureIterations warm iterations — " +
-                "total=${totalBytes}B  per-iteration=${perCallBytes.toLong()}B  " +
+                "total=${(perCallBytes * measureIterations).toLong()}B  per-iteration=${perCallBytes.toLong()}B  " +
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
