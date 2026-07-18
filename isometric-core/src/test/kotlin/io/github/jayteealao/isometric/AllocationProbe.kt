@@ -15,10 +15,10 @@ import kotlin.test.assertTrue
  * unnoticed. This object is the single source of truth for that guard; tests must not
  * hand-roll their own bean acquisition.
  *
- * Two surfaces are exposed:
- * - [measurePerCallBytes] — per-call convenience for the common warm-up/measure loop.
- * - [requireAllocatingBean] + [allocatedBytes] — raw before/after capture for tests with
- *   bespoke measurement phases (e.g. FaceKeyMemoTest's first-build vs memoized split).
+ * The public surface is a single primitive: [measureBytes] returns the fail-closed total
+ * bytes allocated by a block, and [measurePerCallBytes] is a per-call convenience built on
+ * top of it. The raw bean plumbing is private — there is no way to measure allocation on
+ * the current thread without going through one of these two functions.
  */
 object AllocationProbe {
 
@@ -26,7 +26,7 @@ object AllocationProbe {
      * Acquires the platform [com.sun.management.ThreadMXBean] with allocation measurement
      * supported and enabled, or throws [AssertionError] (failing closed).
      */
-    fun requireAllocatingBean(): com.sun.management.ThreadMXBean {
+    private fun requireAllocatingBean(): com.sun.management.ThreadMXBean {
         val threadMxBean = ManagementFactory.getThreadMXBean()
         val sunBean = threadMxBean as? com.sun.management.ThreadMXBean
             ?: throw AssertionError(
@@ -47,32 +47,40 @@ object AllocationProbe {
     }
 
     /**
+     * Allocated-byte reading for the current thread with the fail-closed non-negative
+     * guard: a negative reading means the JVM could not measure, so the test must fail
+     * rather than silently pass.
+     */
+    private fun com.sun.management.ThreadMXBean.allocatedBytes(): Long {
+        val bytes = getThreadAllocatedBytes(Thread.currentThread().id)
+        if (bytes < 0) {
+            throw AssertionError(
+                "Thread allocation measurement returned a negative reading even after " +
+                    "enabling ($bytes). The allocation threshold cannot be enforced — " +
+                    "failing closed.",
+            )
+        }
+        return bytes
+    }
+
+    /**
+     * Fail-closed total bytes allocated by [block] on the current thread.
+     */
+    fun measureBytes(block: () -> Unit): Long {
+        val sunBean = requireAllocatingBean()
+        val beforeBytes = sunBean.allocatedBytes()
+        block()
+        val afterBytes = sunBean.allocatedBytes()
+        return afterBytes - beforeBytes
+    }
+
+    /**
      * Runs [block] [warmup] times (JIT warm-up), then [iterations] times between two
      * fail-closed allocation captures on the current thread, and returns the mean
      * allocated bytes per call.
      */
-    inline fun measurePerCallBytes(warmup: Int, iterations: Int, block: () -> Unit): Double {
+    fun measurePerCallBytes(warmup: Int, iterations: Int, block: () -> Unit): Double {
         repeat(warmup) { block() }
-        val sunBean = requireAllocatingBean()
-        val beforeBytes = sunBean.allocatedBytes()
-        repeat(iterations) { block() }
-        val afterBytes = sunBean.allocatedBytes()
-        return (afterBytes - beforeBytes).toDouble() / iterations
+        return measureBytes { repeat(iterations) { block() } }.toDouble() / iterations
     }
-}
-
-/**
- * Allocated-byte reading for the current thread with the fail-closed non-negative guard:
- * a negative reading means the JVM could not measure, so the test must fail rather than
- * silently pass.
- */
-fun com.sun.management.ThreadMXBean.allocatedBytes(): Long {
-    val bytes = getThreadAllocatedBytes(Thread.currentThread().id)
-    if (bytes < 0) {
-        throw AssertionError(
-            "Thread allocation measurement returned a negative reading even after enabling " +
-                "($bytes). The allocation threshold cannot be enforced — failing closed.",
-        )
-    }
-    return bytes
 }

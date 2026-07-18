@@ -157,12 +157,15 @@ class PathAllocationTest {
         // be enforced, never silently skipped, even on a JVM that cannot measure.
         // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
         val measureIterations = 20
-        val perCallBytes = AllocationProbe.measurePerCallBytes(warmup = 5, iterations = measureIterations) {
+        val runPairs = {
             for ((a, b) in pairs) {
                 a.closerThan(b, observer)
                 b.closerThan(a, observer)
             }
         }
+        repeat(5) { runPairs() }
+        val totalBytes = AllocationProbe.measureBytes { repeat(measureIterations) { runPairs() } }
+        val perCallBytes = totalBytes.toDouble() / measureIterations
 
         // Threshold rationale:
         //   Each measurement iteration calls closerThan for all 10 pairs × 2 directions
@@ -190,7 +193,7 @@ class PathAllocationTest {
         println(
             "PathAllocationTest: N=10 pairs, 20 closerThan calls/iteration, " +
                 "$measureIterations warm iterations — " +
-                "total=${(perCallBytes * measureIterations).toLong()}B  per-iteration=${perCallBytes.toLong()}B  " +
+                "total=${totalBytes}B  per-iteration=${perCallBytes.toLong()}B  " +
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
