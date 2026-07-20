@@ -16,9 +16,8 @@ import kotlin.test.assertTrue
  * hand-roll their own bean acquisition.
  *
  * The public surface is a single primitive: [measureBytes] returns the fail-closed total
- * bytes allocated by a block, and [measurePerCallBytes] is a per-call convenience built on
- * top of it. The raw bean plumbing is private — there is no way to measure allocation on
- * the current thread without going through one of these two functions.
+ * bytes allocated by a block. The raw bean plumbing is private — there is no way to
+ * measure allocation on the current thread without going through [measureBytes].
  */
 object AllocationProbe {
 
@@ -72,15 +71,5 @@ object AllocationProbe {
         block()
         val afterBytes = sunBean.allocatedBytes()
         return afterBytes - beforeBytes
-    }
-
-    /**
-     * Runs [block] [warmup] times (JIT warm-up), then [iterations] times between two
-     * fail-closed allocation captures on the current thread, and returns the mean
-     * allocated bytes per call.
-     */
-    fun measurePerCallBytes(warmup: Int, iterations: Int, block: () -> Unit): Double {
-        repeat(warmup) { block() }
-        return measureBytes { repeat(iterations) { block() } }.toDouble() / iterations
     }
 }

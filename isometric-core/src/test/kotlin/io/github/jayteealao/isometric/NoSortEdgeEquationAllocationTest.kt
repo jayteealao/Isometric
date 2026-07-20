@@ -48,7 +48,8 @@ class NoSortEdgeEquationAllocationTest {
 
         // Allocation measurement — fail closed via the shared probe: the threshold must
         // be enforced, never silently skipped, even on a JVM that cannot measure.
-        // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
+        // Warm-up (runs before the measured probe call) lets the JIT compile the hot path
+        // before measuring.
         val measureIterations = 20
         repeat(5) { engine.projectScene(800, 600, options) }
         val totalBytes = AllocationProbe.measureBytes {

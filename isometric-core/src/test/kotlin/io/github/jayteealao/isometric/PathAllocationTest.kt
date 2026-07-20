@@ -155,7 +155,8 @@ class PathAllocationTest {
 
         // Allocation measurement — fail closed via the shared probe: the threshold must
         // be enforced, never silently skipped, even on a JVM that cannot measure.
-        // Warm-up (inside the probe) lets the JIT compile the hot path before measuring.
+        // Warm-up (runs before the measured probe call) lets the JIT compile the hot path
+        // before measuring.
         val measureIterations = 20
         val runPairs = {
             for ((a, b) in pairs) {
