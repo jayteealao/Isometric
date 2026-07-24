@@ -77,6 +77,19 @@ class NoSortEdgeEquationAllocationTest {
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
+        // Lower-bound canary: projectScene projects all 24 faces per call and provably allocates
+        // (~21,500 B/call optimized baseline). A reading at/near zero means measurement is not
+        // happening — a JVM that reports support but returns a stuck constant, so delta == 0 — or
+        // the fixture stopped projecting; either way the `< threshold` assertion below would pass
+        // vacuously. Floor 3,000 sits far under the ~21,500 B baseline and far above zero.
+        assertTrue(
+            perCallBytes > 3_000.0,
+            "no-sort projectScene allocated only ${perCallBytes.toLong()} bytes/call — expected > 3000. " +
+                "A near-zero reading means thread-allocation measurement is not working " +
+                "(stuck/constant reading) or the fixture no longer projects the scene; the upper-bound " +
+                "assertion below would then pass without measuring anything.",
+        )
+
         assertTrue(
             perCallBytes < thresholdPerCall,
             "no-sort projectScene allocated ${perCallBytes.toLong()} bytes/call on the " +
