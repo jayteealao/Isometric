@@ -198,6 +198,19 @@ class PathAllocationTest {
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
+        // Lower-bound canary: each iteration runs 20 closerThan calls and provably allocates
+        // (list-iterator objects, ~2,272 B/iteration baseline). A reading at/near zero means
+        // measurement is not happening — a stuck/constant reading, so delta == 0 — or the JIT
+        // elided the loop; either way the `< threshold` assertion below would pass vacuously.
+        // Floor 500 sits well under the ~2,272 B baseline and well above zero.
+        assertTrue(
+            perCallBytes > 500.0,
+            "relativePlaneSide allocated only ${perCallBytes.toLong()} bytes/iteration — expected > 500. " +
+                "A near-zero reading means thread-allocation measurement is not working " +
+                "(stuck/constant reading) or the fixture no longer exercises closerThan; the " +
+                "upper-bound assertion below would then pass without measuring anything.",
+        )
+
         assertTrue(
             perCallBytes < thresholdPerCall,
             "relativePlaneSide allocated ${perCallBytes.toLong()} bytes/iteration on the warm path — " +
