@@ -18,6 +18,18 @@ import kotlin.test.assertTrue
  * The public surface is a single primitive: [measureBytes] returns the fail-closed total
  * bytes allocated by a block. The raw bean plumbing is private — there is no way to
  * measure allocation on the current thread without going through [measureBytes].
+ *
+ * A fourth failure mode exists that this probe deliberately does **not** guard: a JVM that
+ * reports allocation measurement as supported yet returns a stuck/constant non-negative
+ * reading, so `after - before` is `0`. The negative-reading guard above does not catch this —
+ * a stuck-at-zero delta is non-negative and passes it vacuously. The check cannot live here
+ * either, because "how large a delta counts as real" depends on what each caller's block
+ * allocates, not on the probe. Every caller must therefore assert its own lower bound
+ * (`measured > floor`, sized well below the block's documented baseline and well above
+ * zero/noise) alongside any upper-bound threshold — an upper-bound-only assertion
+ * (`measured < threshold`) passes vacuously when `measured` is `0`. See
+ * `DepthSorterAllocationTest`, `PathAllocationTest`, `NoSortEdgeEquationAllocationTest`, and
+ * `FaceKeyMemoTest` for the pattern.
  */
 object AllocationProbe {
 
@@ -64,6 +76,11 @@ object AllocationProbe {
 
     /**
      * Fail-closed total bytes allocated by [block] on the current thread.
+     *
+     * This only guards the negative-reading failure mode; it performs no check for a
+     * stuck/constant reading (`after - before == 0`) — see the object KDoc above. Callers must
+     * assert their own lower bound (`measured > floor`) below the block's documented baseline
+     * to catch that case; an upper-bound-only assertion passes vacuously when `measured` is `0`.
      */
     fun measureBytes(block: () -> Unit): Long {
         val sunBean = requireAllocatingBean()
