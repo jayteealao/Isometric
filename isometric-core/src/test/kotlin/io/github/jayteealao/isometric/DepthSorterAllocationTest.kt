@@ -89,6 +89,11 @@ class DepthSorterAllocationTest {
         //   Threshold 22,000 bytes sits between the two:
         //     optimized (~13,000) < 22,000 ✓ PASS
         //     broken    (~30,000) > 22,000 ✓ FAIL
+        //   Band: floorPerCall < optimized baseline < thresholdPerCall, i.e.
+        //     2,000 < ~13,000 < 22,000.
+        //   Floor sized to ~15% of the optimized baseline — far below it to avoid flakiness,
+        //   far above zero/noise to catch a stuck/constant measurement (delta == 0).
+        val floorPerCall = 2_000.0
         val thresholdPerCall = 22_000.0
 
         println(
@@ -98,18 +103,14 @@ class DepthSorterAllocationTest {
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
-        // Lower-bound canary: this block sorts 10 overlapping faces 20× and provably allocates
-        // (IntArrays, ArrayList growth, Timsort). A reading at/near zero means measurement is not
-        // actually happening — a JVM that reports support but returns a stuck constant, so
-        // delta == 0 — or the fixture stopped exercising sort; either way the `< threshold`
-        // assertion below would pass vacuously. Floor 2,000 sits far under the ~13,000 B/call
-        // optimized baseline and far above zero/noise.
-        assertTrue(
-            perCallBytes > 2_000.0,
-            "Sort allocated only ${perCallBytes.toLong()} bytes/call — expected > 2000. A near-zero " +
-                "reading means thread-allocation measurement is not working (stuck/constant reading) " +
-                "or the fixture no longer exercises DepthSorter.sort; the upper-bound assertion below " +
-                "would then pass without measuring anything.",
+        // Lower-bound canary — see assertAllocationCanary's KDoc. This block sorts 10 overlapping
+        // faces 20× and provably allocates (IntArrays, ArrayList growth, Timsort).
+        assertAllocationCanary(
+            measured = perCallBytes,
+            floor = floorPerCall,
+            unit = "bytes/call",
+            subject = "Sort",
+            fixtureHint = "the fixture no longer exercises DepthSorter.sort",
         )
 
         assertTrue(

@@ -68,6 +68,10 @@ class NoSortEdgeEquationAllocationTest {
         //     broken (~25,700) > 23,500 ✓ FAIL
         //   If this becomes flaky due to JVM/scene overhead changes, re-run with verbose
         //   output to read the measured value and re-calibrate.
+        //   Band: floorPerCall < fixed baseline < thresholdPerCall, i.e. 3,000 < ~21,500 < 23,500.
+        //   Floor sized to ~14% of the fixed baseline — far below it to avoid flakiness, far
+        //   above zero/noise to catch a stuck/constant measurement (delta == 0).
+        val floorPerCall = 3_000.0
         val thresholdPerCall = 23_500.0
 
         println(
@@ -77,17 +81,14 @@ class NoSortEdgeEquationAllocationTest {
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
-        // Lower-bound canary: projectScene projects all 24 faces per call and provably allocates
-        // (~21,500 B/call optimized baseline). A reading at/near zero means measurement is not
-        // happening — a JVM that reports support but returns a stuck constant, so delta == 0 — or
-        // the fixture stopped projecting; either way the `< threshold` assertion below would pass
-        // vacuously. Floor 3,000 sits far under the ~21,500 B baseline and far above zero.
-        assertTrue(
-            perCallBytes > 3_000.0,
-            "no-sort projectScene allocated only ${perCallBytes.toLong()} bytes/call — expected > 3000. " +
-                "A near-zero reading means thread-allocation measurement is not working " +
-                "(stuck/constant reading) or the fixture no longer projects the scene; the upper-bound " +
-                "assertion below would then pass without measuring anything.",
+        // Lower-bound canary — see assertAllocationCanary's KDoc. projectScene projects all 24
+        // faces per call and provably allocates (~21,500 B/call optimized baseline).
+        assertAllocationCanary(
+            measured = perCallBytes,
+            floor = floorPerCall,
+            unit = "bytes/call",
+            subject = "no-sort projectScene",
+            fixtureHint = "the fixture no longer projects the scene",
         )
 
         assertTrue(

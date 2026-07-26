@@ -26,6 +26,13 @@ Thank you for your interest in contributing!
 ./gradlew :isometric-compose:testDebugUnitTest
 ```
 
+> `isometric-core`'s allocation regression tests (`*AllocationTest`, `FaceKeyMemoTest`) require
+> a JVM that supports `com.sun.management.ThreadMXBean` per-thread allocation measurement
+> (HotSpot/OpenJDK, e.g. Temurin — the toolchain default). They fail closed by design: if a
+> failure message mentions "allocation measurement unavailable" or "unsupported", that means
+> your JVM can't measure allocations, not that you've introduced a regression. Run with a
+> HotSpot-based JDK (Temurin, etc.) to avoid this.
+
 ### Paparazzi snapshot tests
 
 ```bash

@@ -189,6 +189,12 @@ class PathAllocationTest {
         //
         //   If this test becomes flaky, re-run with verbose output to measure the baseline
         //   and adjust the threshold accordingly.
+        //
+        //   Band: floorPerCall < optimized baseline < thresholdPerCall, i.e. 500 < ~2,272 < 3,500.
+        //   Floor sized to ~22% of the optimized baseline (the smallest baseline of the three
+        //   allocation tests, so the most conservative fraction) — far below it to avoid
+        //   flakiness, far above zero/noise to catch a stuck/constant measurement (delta == 0).
+        val floorPerCall = 500.0
         val thresholdPerCall = 3_500.0
 
         println(
@@ -198,17 +204,16 @@ class PathAllocationTest {
                 "threshold=${thresholdPerCall.toLong()}B",
         )
 
-        // Lower-bound canary: each iteration runs 20 closerThan calls and provably allocates
-        // (list-iterator objects, ~2,272 B/iteration baseline). A reading at/near zero means
-        // measurement is not happening — a stuck/constant reading, so delta == 0 — or the JIT
-        // elided the loop; either way the `< threshold` assertion below would pass vacuously.
-        // Floor 500 sits well under the ~2,272 B baseline and well above zero.
-        assertTrue(
-            perCallBytes > 500.0,
-            "relativePlaneSide allocated only ${perCallBytes.toLong()} bytes/iteration — expected > 500. " +
-                "A near-zero reading means thread-allocation measurement is not working " +
-                "(stuck/constant reading) or the fixture no longer exercises closerThan; the " +
-                "upper-bound assertion below would then pass without measuring anything.",
+        // Lower-bound canary — see assertAllocationCanary's KDoc. Each iteration runs 20
+        // closerThan calls and provably allocates (list-iterator objects, ~2,272 B/iteration
+        // baseline); a stuck/constant reading or an elided loop would defeat the upper-bound
+        // assertion below.
+        assertAllocationCanary(
+            measured = perCallBytes,
+            floor = floorPerCall,
+            unit = "bytes/iteration",
+            subject = "relativePlaneSide",
+            fixtureHint = "the fixture no longer exercises closerThan",
         )
 
         assertTrue(
