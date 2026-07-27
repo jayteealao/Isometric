@@ -51,6 +51,7 @@ build-logic/build_*/
 .kotlin/errors/*
 plugins/**/*
 .ai/**/*
+.scratch/
 docs/internal/research/WEBGPU_PERFORMANCE_OPTIMIZATIONS.md
 zlog*
 app/src/main/assets/textures/ground_color.jpg
